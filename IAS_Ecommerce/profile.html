@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - IAS</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="top-header full-width">
+        <div class="logo">IAS</div>
+        <div class="search-wrap"><input type="text" placeholder="Search here..."><span class="search-icon">⌕</span></div>
+        <div class="header-icons">
+            <button class="icon-badge-btn" onclick="location.href='index.html'"><span class="icon-main">🏠</span></button>
+            <button class="icon-badge-btn"><span class="icon-main">🔔</span><span class="badge">2</span></button>
+            <button class="icon-badge-btn profile-outline-btn"><span class="icon-main">👤</span></button>
+        </div>
+    </header>
+
+    <main class="profile-main">
+        <section class="profile-top">
+            <div class="avatar"></div>
+            <div>
+                <h2 style="margin:0 0 8px;">User0001</h2>
+                <div style="color:#66727a;">Loyal IAS customer</div>
+            </div>
+            <div class="action-row">
+                <button class="action-chip alt" onclick="location.href='index.html'">🏠 Home</button>
+                <button class="action-chip">🔥 Daily Sign In</button>
+                <button class="action-chip alt">🎟️ Collect Vouchers</button>
+                <button class="action-chip" id="logoutBtn">🚪 Logout</button>
+            </div>
+        </section>
+
+        <section class="profile-sections">
+            <article class="profile-card">
+                <h3 style="margin-top:0;">🧡 Favorites</h3>
+                <div id="favoritesGrid" class="recent-grid"></div>
+            </article>
+            <article class="profile-card">
+                <h3 style="margin-top:0;">📦 Recent Viewed Products</h3>
+                <div id="recentViewedGrid" class="recent-grid"></div>
+            </article>
+        </section>
+
+        <section class="order-status">
+            <button class="order-btn" data-status="to_pay">🧾 To Pay</button>
+            <button class="order-btn" data-status="to_ship">🚚 To Ship</button>
+            <button class="order-btn" data-status="to_receive">📥 To Receive</button>
+            <button class="order-btn" data-status="to_review">⭐ To Review</button>
+            <button class="order-btn" onclick="location.href='orders.html'">📄 Order Details</button>
+        </section>
+    </main>
+
+    <footer class="full-width">© 2026 IAS. All Rights Reserved.</footer>
+    <script src="script.js"></script>
+</body>
+</html>
