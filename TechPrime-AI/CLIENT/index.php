@@ -73,15 +73,6 @@ if (empty($recommendations)) {
             </form>
         </div>
         <div class="header-icons">
-            <button class="icon-badge-btn" title="Store Locator">
-                <i class="fas fa-map-marker-alt"></i>
-            </button>
-            <button class="icon-badge-btn" title="Track Order" onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : '../login.php'; ?>'">
-                <i class="fas fa-truck"></i>
-            </button>
-            <button class="icon-badge-btn" title="Chat with us" onclick="location.href='messages.php'">
-                <i class="fas fa-comment-dots"></i>
-            </button>
             <button class="icon-badge-btn" title="Wishlist" onclick="this.classList.toggle('active')">
                 <i class="far fa-heart"></i>
             </button>
