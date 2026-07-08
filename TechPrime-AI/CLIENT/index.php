@@ -126,7 +126,6 @@ $displayProducts = ias_client_filter_products_for_display(
         &copy; 2026 IAS E-Commerce Client Center. All Rights Reserved.
     </footer>
 
-<<<<<<< Updated upstream
     <script src="../includes/ui_alerts.js"></script>
     <script>
         // Check for "added to cart" message from products.php
@@ -191,8 +190,6 @@ $displayProducts = ias_client_filter_products_for_display(
             document.getElementById('pill-all').classList.add('active-pill');
         }
     </script>
-=======
 <?php ias_alert_footer(); ?>
->>>>>>> Stashed changes
 </body>
 </html>

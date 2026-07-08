@@ -10,21 +10,55 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'seller') {
 $db = getDbConnection();
 $sellerId = (int)$_SESSION['user_id'];
 $message = "";
+$messageType = "success";
 
 // --- HANDLE UPDATES ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['update_profile'])) {
-        $newName = $db->real_escape_string($_POST['shop_name']);
-        $newBio = $db->real_escape_string($_POST['shop_bio']);
+        $newName = trim($_POST['shop_name'] ?? '');
+        $newBio = trim($_POST['shop_bio'] ?? '');
         
         $stmt = $db->prepare("UPDATE users SET name = ?, shop_description = ? WHERE id = ?");
         $stmt->bind_param("ssi", $newName, $newBio, $sellerId);
-        if($stmt->execute()) $message = "Profile updated successfully!";
+        if ($stmt->execute()) {
+            $message = "Profile updated successfully!";
+        } else {
+            $message = "Could not update profile.";
+            $messageType = "error";
+        }
+        $stmt->close();
+    }
+
+    if (isset($_POST['update_password'])) {
+        $newPassword = (string)($_POST['new_password'] ?? '');
+
+        if ($newPassword === '') {
+            $message = "Please enter a new password.";
+            $messageType = "error";
+        } elseif (!isPasswordComplex($newPassword, $db)) {
+            $message = "Password does not meet the site's complexity requirements.";
+            $messageType = "error";
+        } else {
+            $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+            $stmt = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
+            $stmt->bind_param("si", $passwordHash, $sellerId);
+            if ($stmt->execute()) {
+                $message = "Password updated successfully!";
+            } else {
+                $message = "Could not update password.";
+                $messageType = "error";
+            }
+            $stmt->close();
+        }
     }
 }
 
 // --- FETCH CURRENT DATA ---
-$user = $db->query("SELECT name, email, shop_description FROM users WHERE id = $sellerId")->fetch_assoc();
+$stmt = $db->prepare("SELECT name, email, shop_description FROM users WHERE id = ?");
+$stmt->bind_param("i", $sellerId);
+$stmt->execute();
+$user = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -108,6 +142,7 @@ $user = $db->query("SELECT name, email, shop_description FROM users WHERE id = $
         .btn-save:hover { opacity: 0.9; transform: translateY(-1px); }
         
         .alert { padding: 15px; background: #e3faf3; color: #0ca678; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 600; border: 1px solid #0ca678; }
+        .alert.error { background: #fff0f0; color: #c92a2a; border-color: #ff8787; }
 
         /* FOOTER */
         .ias-footer {
@@ -138,7 +173,7 @@ $user = $db->query("SELECT name, email, shop_description FROM users WHERE id = $
     <main class="seller-main">
         <div class="settings-container">
             <?php if($message): ?>
-                <div class="alert">✅ <?php echo $message; ?></div>
+                <div class="alert <?php echo $messageType === 'error' ? 'error' : ''; ?>"><?php echo h($message); ?></div>
             <?php endif; ?>
 
             <form method="POST">

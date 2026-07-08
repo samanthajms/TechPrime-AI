@@ -10,6 +10,7 @@ $user_id = (int)$_SESSION['user_id'];
 // FIX: $name already escaped with htmlspecialchars — keep as is
 $name = htmlspecialchars($_SESSION['name']);
 
+$search_query = trim($_GET['q'] ?? '');
 $current_filter = ias_normalize_order_status_filter($_GET['status'] ?? 'All');
 $allowed_filters = ['All', 'to_pay', 'to_ship', 'to_receive', 'to_review', 'Order Details'];
 if (!in_array($current_filter, $allowed_filters, true)) {
@@ -89,16 +90,11 @@ $recentProducts = ias_client_filter_products_for_display(
         <div class="dash-grid">
             <div class="panel">
                 <div class="panel-header">
-<<<<<<< HEAD
                     <h3>📦 <?php
                         $titles = ['All'=>'Transaction History','to_pay'=>'To Pay','to_ship'=>'To Ship','to_receive'=>'To Receive','to_review'=>'To Review'];
                         echo ($current_filter === 'Order Details' || $current_filter === 'All')
                             ? 'Transaction History' : ($titles[$current_filter] ?? 'Orders');
                     ?></h3>
-=======
-                    <!-- FIX: $current_filter is whitelisted via in_array — safe, but wrap anyway -->
-                    <h3>📦 <?php echo h(($current_filter === 'Order Details' || $current_filter === 'All') ? 'Transaction History' : $current_filter); ?></h3>
->>>>>>> cbf0f392eb2a935bfe3b7575419f23e51f680e68
                 </div>
 
                 <div class="table-responsive">
@@ -109,18 +105,10 @@ $recentProducts = ias_client_filter_products_for_display(
                         <tbody>
                         <?php while($o = $orders->fetch_assoc()): ?>
                         <tr>
-<<<<<<< HEAD
                             <td><strong>#ORD-<?php echo $o['id']; ?></strong></td>
                             <td><span style="color:#888;"><?php echo date('M d, Y', strtotime($o['created_at'])); ?></span></td>
                             <td><b style="color: #1a1a1a;">₱<?php echo number_format($o['total'], 2); ?></b></td>
                             <td><span class="status-tag"><?php echo h(ias_order_display_status($o['status'] ?? '', $o['shipment_status'] ?? null)); ?></span></td>
-=======
-                            <!-- FIX: Cast ID to int, wrap status with h() -->
-                            <td><strong>#ORD-<?php echo (int)$o['id']; ?></strong></td>
-                            <td><span class="meta-text"><?php echo date('M d, Y', strtotime($o['created_at'])); ?></span></td>
-                            <td><b>₱<?php echo number_format($o['total'], 2); ?></b></td>
-                            <td><span class="status-tag"><?php echo h($o['status']); ?></span></td>
->>>>>>> cbf0f392eb2a935bfe3b7575419f23e51f680e68
                         </tr>
                         <?php endwhile; ?>
 
@@ -137,11 +125,7 @@ $recentProducts = ias_client_filter_products_for_display(
                 <div class="recent-grid">
                     <?php foreach ($recentProducts as $rp): ?>
                     <div class="mini-card">
-<<<<<<< HEAD
                         <img src="<?php echo h(ias_client_product_image_url($rp)); ?>" alt="">
-=======
-                        <img src="<?php echo htmlspecialchars($rp['image']); ?>" alt="<?php echo htmlspecialchars($rp['name']); ?>">
->>>>>>> cbf0f392eb2a935bfe3b7575419f23e51f680e68
                         <div class="mini-card-body">
                             <span class="mini-card-title"><?php echo htmlspecialchars($rp['name']); ?></span>
                             <span class="p-price">₱<?php echo number_format($rp['price'], 2); ?></span>
@@ -153,20 +137,11 @@ $recentProducts = ias_client_filter_products_for_display(
         </div>
 
         <div class="status-bar">
-<<<<<<< HEAD
             <a href="user_dashboard.php?status=All" class="tab-item <?php echo $current_filter === 'All' ? 'active' : ''; ?>">📋 All History</a>
             <a href="user_dashboard.php?status=to_pay" class="tab-item <?php echo $current_filter === 'to_pay' ? 'active' : ''; ?>">💳 To Pay</a>
             <a href="user_dashboard.php?status=to_ship" class="tab-item <?php echo $current_filter === 'to_ship' ? 'active' : ''; ?>">🚚 To Ship</a>
             <a href="user_dashboard.php?status=to_receive" class="tab-item <?php echo $current_filter === 'to_receive' ? 'active' : ''; ?>">📬 To Receive</a>
             <a href="user_dashboard.php?status=to_review" class="tab-item <?php echo $current_filter === 'to_review' ? 'active' : ''; ?>">⭐ To Review</a>
-=======
-            <!-- FIX: $current_filter is whitelisted, comparison result is a string literal — safe -->
-            <a href="user_dashboard.php?status=All" class="tab-item <?php echo $current_filter == 'All' ? 'active' : ''; ?>">📋 All History</a>
-            <a href="user_dashboard.php?status=To Pay" class="tab-item <?php echo $current_filter == 'To Pay' ? 'active' : ''; ?>">💳 To Pay</a>
-            <a href="user_dashboard.php?status=To Ship" class="tab-item <?php echo $current_filter == 'To Ship' ? 'active' : ''; ?>">🚚 To Ship</a>
-            <a href="user_dashboard.php?status=To Receive" class="tab-item <?php echo $current_filter == 'To Receive' ? 'active' : ''; ?>">📬 To Receive</a>
-            <a href="user_dashboard.php?status=To Review" class="tab-item <?php echo $current_filter == 'To Review' ? 'active' : ''; ?>">⭐ To Review</a>
->>>>>>> cbf0f392eb2a935bfe3b7575419f23e51f680e68
         </div>
     </div>
 
