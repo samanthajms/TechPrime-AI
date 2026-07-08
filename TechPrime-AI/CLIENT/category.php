@@ -90,6 +90,6 @@ $isLoggedIn = isset($_SESSION['user_id']);
         </section>
     </main>
 
-    <footer class="full-width">© 2026 IAS. All Rights Reserved.</footer>
+    <footer class="full-width">© 2026 EASYPC. All Rights Reserved.</footer>
 </body>
 </html>

@@ -51,14 +51,14 @@ $recentProducts = ias_client_filter_products_for_display(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Dashboard - IAS</title>
+    <title>User Dashboard - Easy PC</title>
     <link rel="stylesheet" href="../styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
     <header class="top-header full-width">
-        <a href="index.php" class="logo">IAS</a>
+        <a href="index.php" class="logo">EASYPC</a>
         <div class="search-wrap">
             <form action="user_dashboard.php" method="GET" class="search-form">
                 <?php if ($current_filter !== 'All'): ?>
@@ -145,7 +145,7 @@ $recentProducts = ias_client_filter_products_for_display(
         </div>
     </div>
 
-    <footer class="site-footer">© 2026 IAS Marketplace Client Portal</footer>
+    <footer class="site-footer">© 2026 EASYPC E-Commerce</footer>
 
 <?php ias_alert_footer(); ?>
 </body>
