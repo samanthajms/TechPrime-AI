@@ -73,6 +73,10 @@ $count_admin   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='admin'"
 $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
 $csrf = generateCsrfToken();
 $active_tab = $_GET['tab'] ?? 'all';
+$valid_tabs = ['all', 'client', 'seller', 'courier', 'admin'];
+if (!in_array($active_tab, $valid_tabs, true)) {
+    $active_tab = 'all';
+}
  
 // Helper: fetch all users to PHP arrays for JS injection
 function fetchToArray($result) {
@@ -80,15 +84,14 @@ function fetchToArray($result) {
     while ($row = $result->fetch_assoc()) $arr[] = $row;
     return $arr;
 }
-$users = $all_users;
-$js_all     = json_encode(fetchToArray($all_users));
-if ($all_users instanceof mysqli_result) {
-    mysqli_data_seek($all_users, 0);
-}
-$js_clients = json_encode(fetchToArray($clients));
-$js_sellers = json_encode(fetchToArray($sellers));
-$js_couriers= json_encode(fetchToArray($couriers));
-$js_admins  = json_encode(fetchToArray($admins));
+$user_rows = [
+    'all'     => fetchToArray($all_users),
+    'client'  => fetchToArray($clients),
+    'seller'  => fetchToArray($sellers),
+    'courier' => fetchToArray($couriers),
+    'admin'   => fetchToArray($admins),
+];
+$users = $user_rows[$active_tab];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -117,6 +120,7 @@ $js_admins  = json_encode(fetchToArray($admins));
             font-weight: 600;
             cursor: pointer;
             color: var(--text-muted);
+            text-decoration: none;
             transition: all .15s;
             font-family: var(--font-base);
         }
@@ -393,6 +397,13 @@ $js_admins  = json_encode(fetchToArray($admins));
         .btn-store:hover { background: #166534; color: #fff; border-color: #166534; }
         .btn-contact { background: var(--teal-pale); color: var(--teal-deeper); border: 1.5px solid var(--teal-light); }
         .btn-contact:hover { background: var(--teal); color: var(--yellow); border-color: var(--teal); }
+        .users-summary { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+        .users-summary .stat-card { padding: 16px 18px; }
+        .users-summary .stat-num { font-size: 24px; }
+        .user-name { display: flex; flex-direction: column; gap: 2px; }
+        .actions-cell form { margin: 0; }
+        .status-text { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+        .tabs-card { padding: 18px 22px 0; }
     </style>
 </head>
 <body>
@@ -432,9 +443,48 @@ $js_admins  = json_encode(fetchToArray($admins));
         </div>
     </div>
 
-    <div class="card" style="padding:0; overflow:hidden;">
-        <div style="overflow-x: auto;">
-            <table class="table">
+    <div class="page-content">
+        <div class="stats-grid users-summary">
+            <div class="stat-card">
+                <div class="stat-label">All Users</div>
+                <div class="stat-num"><?php echo (int)$count_all; ?></div>
+                <div class="stat-icon">A</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Clients</div>
+                <div class="stat-num"><?php echo (int)$count_client; ?></div>
+                <div class="stat-icon">C</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Sellers</div>
+                <div class="stat-num"><?php echo (int)$count_seller; ?></div>
+                <div class="stat-icon">S</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Couriers</div>
+                <div class="stat-num"><?php echo (int)$count_courier; ?></div>
+                <div class="stat-icon">D</div>
+            </div>
+        </div>
+
+        <div class="card tabs-card">
+            <div class="tab-nav">
+                <a class="tab-btn <?php echo $active_tab === 'all' ? 'active' : ''; ?>" href="manage_users.php?tab=all">All <span class="tab-count"><?php echo (int)$count_all; ?></span></a>
+                <a class="tab-btn <?php echo $active_tab === 'client' ? 'active' : ''; ?>" href="manage_users.php?tab=client">Clients <span class="tab-count"><?php echo (int)$count_client; ?></span></a>
+                <a class="tab-btn <?php echo $active_tab === 'seller' ? 'active' : ''; ?>" href="manage_users.php?tab=seller">Sellers <span class="tab-count"><?php echo (int)$count_seller; ?></span></a>
+                <a class="tab-btn <?php echo $active_tab === 'courier' ? 'active' : ''; ?>" href="manage_users.php?tab=courier">Couriers <span class="tab-count"><?php echo (int)$count_courier; ?></span></a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h3><span class="card-icon">U</span> User Accounts</h3>
+                    <div class="card-subtitle">Showing <?php echo count($users); ?> account<?php echo count($users) === 1 ? '' : 's'; ?> for the selected role</div>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="ias-table">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -446,11 +496,16 @@ $js_admins  = json_encode(fetchToArray($admins));
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while($u = $users->fetch_assoc()): ?>
+                    <?php foreach($users as $u): ?>
                     <tr>
-                        <td><strong><?php echo h($u['name'] . ' ' . $u['surname']); ?></strong></td>
-                        <td><?php echo h($u['email']); ?></td>
-                        <td><span class="badge badge-<?php echo $u['role']; ?>"><?php echo $u['role']; ?></span></td>
+                        <td>
+                            <div class="user-name">
+                                <strong><?php echo h(trim($u['name'] . ' ' . $u['surname'])); ?></strong>
+                                <span class="text-muted text-small">ID #<?php echo (int)$u['id']; ?></span>
+                            </div>
+                        </td>
+                        <td class="text-muted"><?php echo h($u['email']); ?></td>
+                        <td><span class="badge badge-<?php echo h($u['role']); ?>"><?php echo h($u['role']); ?></span></td>
                         <td>
                             <?php if($u['is_verified']): ?>
                                 <span style="color: #27ae60;">✔ Verified</span>
@@ -466,36 +521,45 @@ $js_admins  = json_encode(fetchToArray($admins));
                             <?php endif; ?>
                         </td>
                         <td>
-                            <div style="display: flex; align-items: center;">
+                            <div class="actions-cell">
                                 <?php if((int)$u['id'] === $admin_id): ?>
-                                    <a href="admin_profile.php" class="btn" style="background: #3498db;">Edit Profile</a>
+                                    <a href="admin_profile.php" class="btn btn-primary btn-xs">Edit Profile</a>
                                 <?php else: ?>
                                     <?php if($u['is_locked']): ?>
                                         <form method="post">
                                             <input type="hidden" name="action" value="unblock">
-                                            <input type="hidden" name="id" value="<?php echo $u['id']; ?>">
-                                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                            <button type="submit" class="btn btn-unblock">Unlock</button>
+                                            <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
+                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+                                            <button type="submit" class="btn btn-success btn-xs">Unlock</button>
                                         </form>
                                     <?php else: ?>
                                         <form method="post">
                                             <input type="hidden" name="action" value="block">
-                                            <input type="hidden" name="id" value="<?php echo $u['id']; ?>">
-                                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                            <button type="submit" class="btn btn-block">Block</button>
+                                            <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
+                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+                                            <button type="submit" class="btn btn-warn btn-xs">Block</button>
                                         </form>
                                     <?php endif; ?>
                                     <form method="post" onsubmit="return confirm('Permanently delete this user?')">
                                         <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="id" value="<?php echo $u['id']; ?>">
-                                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                        <button type="submit" class="btn btn-delete">Delete</button>
+                                        <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
+                                        <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+                                        <button type="submit" class="btn btn-danger btn-xs">Delete</button>
                                     </form>
                                 <?php endif; ?>
                             </div>
                         </td>
                     </tr>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
+                    <?php if(empty($users)): ?>
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <p>No users found for this role.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -503,6 +567,8 @@ $js_admins  = json_encode(fetchToArray($admins));
 </div>
 
 <!-- ══ SCRIPTS ══════════════════════════════════════════════════════════════ -->
+</div>
+
 <script src="../includes/ui_alerts.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
