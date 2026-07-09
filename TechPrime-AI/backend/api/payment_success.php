@@ -31,7 +31,7 @@ $total   = $order['total'];
 $address = $db->real_escape_string($order['address']);
 $phone   = $db->real_escape_string($order['phone']);
 
-$stmt = $db->prepare("INSERT INTO orders (user_id, total, status, shipping_address, customer_phone) VALUES (?, ?, 'To Ship', ?, ?)");
+$stmt = $db->prepare("INSERT INTO orders (user_id, total, status, shipping_address, customer_phone) VALUES (?, ?, 'to_ship', ?, ?)");
 $stmt->bind_param("idss", $userId, $total, $address, $phone);
 
 if ($stmt->execute()) {
