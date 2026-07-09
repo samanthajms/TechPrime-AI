@@ -39,7 +39,7 @@ if (isset($_POST['place_order'])) {
     }
 
     // FIX: Use prepared statement instead of real_escape_string
-    $stmt = $db->prepare("INSERT INTO orders (user_id, total, status, shipping_address, customer_phone) VALUES (?, ?, 'To Ship', ?, ?)");
+    $stmt = $db->prepare("INSERT INTO orders (user_id, total, status, shipping_address, customer_phone) VALUES (?, ?, 'to_ship', ?, ?)");
     $address = $_POST['address'];
     $phone   = $_POST['phone'];
     $stmt->bind_param("idss", $user_id, $total, $address, $phone);
