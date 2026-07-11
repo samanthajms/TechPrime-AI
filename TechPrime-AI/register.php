@@ -15,18 +15,6 @@ $registeredEmail = '';
 $connection = getDbConnection();
 $pwRules = getPasswordRules($connection);
 
-if (isset($_GET['refresh_captcha'])) {
-    $_SESSION['register_captcha_number'] = random_int(1000, 9999);
-    header('Content-Type: application/json');
-    echo json_encode(['captcha' => $_SESSION['register_captcha_number']]);
-    exit;
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_SESSION['register_captcha_number'])) {
-    $_SESSION['register_captcha_number'] = random_int(1000, 9999);
-}
-$captchaNumber = $_SESSION['register_captcha_number'] ?? random_int(1000, 9999);
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role            = $_POST['role'] ?? 'client';
     $name            = trim($_POST['name'] ?? '');
@@ -36,15 +24,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email           = strtolower(trim($_POST['email'] ?? ''));
     $password        = $_POST['password'] ?? '';
     $confirm         = $_POST['confirm_password'] ?? '';
-    $captchaAnswer   = trim($_POST['captcha_answer'] ?? '');
-
-    $expectedCaptcha = $_SESSION['register_captcha_number'] ?? null;
-    if ($expectedCaptcha === null || !ctype_digit($captchaAnswer) || intval($captchaAnswer) !== $expectedCaptcha) {
-        unset($_SESSION['register_captcha_number']);
-        header("Location: register.php?error=" . urlencode("Please enter the number shown in the box."));
-        exit;
-    }
-    unset($_SESSION['register_captcha_number']);
 
     if (empty($password) || $password !== $confirm) {
         header("Location: register.php?error=Passwords do not match!");
@@ -128,10 +107,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .btn-reg:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(9, 152, 168, 0.3); }
         .footer-link { margin-top: 20px; font-size: 13px; color: #666; text-align: center; }
         .footer-link a { color: var(--ias-teal); text-decoration: none; font-weight: 700; }
-        .captcha-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-        .captcha-box { min-width: 140px; padding: 18px 0; text-align: center; font-size: 22px; letter-spacing: 4px; font-weight: 900; background: #eef7ff; border: 2px dashed #9ac6ff; border-radius: 14px; color: #0f4a85; }
-        .captcha-refresh { background: transparent; border: 1px solid #9ac6ff; color: #0f4a85; padding: 10px 16px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: background 0.2s ease; }
-        .captcha-refresh:hover { background: #d8ecff; }
     </style>
 </head>
 <body>
@@ -205,13 +180,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <label>Confirm Password</label>
             <input type="password" name="confirm_password" required>
 
-            <label for="captcha_answer" style="margin-top: 15px; display: block;">Enter the number shown in the box</label>
-            <div class="captcha-row">
-                <div class="captcha-box"><?php echo htmlspecialchars($captchaNumber); ?></div>
-                <button type="button" class="captcha-refresh" onclick="refreshCaptcha()">↻ Refresh</button>
-            </div>
-            <input type="text" name="captcha_answer" id="captcha_answer" required style="margin-top: 10px;">
-
             <button type="submit" class="btn-reg">Register Account</button>
         </form>
 
@@ -245,20 +213,6 @@ function checkPasswordComplexity(password) {
     if (PW_RULES.reqLower)   setCheck('pw-lower',   /[a-z]/.test(password));
     if (PW_RULES.reqNumber)  setCheck('pw-num',     /[0-9]/.test(password));
     if (PW_RULES.reqSpecial) setCheck('pw-special', /[^A-Za-z0-9]/.test(password));
-}
-
-function refreshCaptcha() {
-    fetch('register.php?refresh_captcha=1', { cache: 'no-store' })
-        .then(response => response.json())
-        .then(data => {
-            const box = document.querySelector('.captcha-box');
-            if (box) box.textContent = data.captcha;
-            const answer = document.getElementById('captcha_answer');
-            if (answer) answer.value = '';
-        })
-        .catch(() => {
-            alert('Unable to refresh captcha. Please reload the page.');
-        });
 }
 </script>
 <?php ias_alert_footer(); ?>

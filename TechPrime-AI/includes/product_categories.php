@@ -1,7 +1,5 @@
 <?php
-/**
- * Product categories from inventory spreadsheet (single source of truth).
- */
+
 function ias_product_categories(): array
 {
     return [
