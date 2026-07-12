@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Create Account | IAS</title>
+    <title>Create Account | Easy PC</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root { --ias-teal: #0998a8; --bg: #f4f7f6; }
@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="reg-card">
     <h1>Create Account</h1>
-    <p class="sub">Join the IAS Marketplace</p>
+    <p class="sub">Join the Easy PC Marketplace</p>
 
     <?php if ($registered): ?>
         <!-- ✅ Registration Success — Email Activation Notice -->
@@ -140,8 +140,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <label>Account Type</label>
             <select name="role" style="margin-bottom: 15px;">
                 <option value="client">Client</option>
-                <option value="seller">Seller</option>
-                <option value="courier">Courier</option>
+                <option value="retail_officer">Retail Officer</option>
+                <option value="technician">Technician</option>
+                <option value="inventory_custodian">Inventory Custodian</option>
                 <option value="admin">Admin</option>
             </select>
 

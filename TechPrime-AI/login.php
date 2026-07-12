@@ -79,6 +79,13 @@ function redirectByRole($role) {
         case 'courier':
             header("Location: courier/courier_dashboard.php");
             break;
+        case 'retail_officer':
+            header("Location: RETAIL/retail_dashboard.php");
+            break;
+        case 'technician':
+        case 'inventory_custodian':
+            header("Location: ASSOCIATE/associate_dashboard.php");
+            break;
         default:
             header("Location: CLIENT/index.php");
             break;
@@ -90,7 +97,7 @@ function redirectByRole($role) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>IAS Portal | Login</title>
+    <title>Easy PC Portal | Login</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root { --ias-teal: #0998a8; --bg: #f4f7f6; }
@@ -112,7 +119,7 @@ function redirectByRole($role) {
 </head>
 <body>
 <div class="login-card">
-    <h1>IAS</h1>
+    <h1>Easy PC</h1>
     <p class="subtitle">SECURE ACCESS PORTAL</p>
 
     <?php if ($error): ?>

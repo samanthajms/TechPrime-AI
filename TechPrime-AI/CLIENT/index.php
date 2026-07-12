@@ -157,8 +157,8 @@ if (empty($recommendations)) {
                                         <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
                                         <input type="hidden" name="add_to_cart" value="1">
                                         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                        <span class="ep-cart-icon"><i class="fas fa-shopping-cart"></i></span>
-                                        <button type="submit" class="ep-buy-btn">BUY NOW</button>
+                                        <button  type="submit" class="ep-cart-icon"><i class="fas fa-shopping-cart"></i></button>
+                                        <button class="ep-buy-btn">BUY NOW</button>
                                     </form>
                                 </div>
                             </div>
@@ -202,7 +202,6 @@ if (empty($recommendations)) {
                     </div>
                     <div class="ep-match-right">
                         <h4>Device/Peripherals</h4>
-                        <i class="fas fa-chevron-up"></i>
                         <div class="ep-display-box">
                                
                             <ul id="epMatchList" class="ep-display-list">

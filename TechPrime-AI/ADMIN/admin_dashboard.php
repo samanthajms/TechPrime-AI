@@ -14,9 +14,10 @@ $admin_id = (int)$_SESSION['user_id'];
 
 // Stats
 $cnt = [];
-$cnt['sellers'] = $db->query("SELECT COUNT(*) FROM users WHERE role='seller'")->fetch_row()[0];
 $cnt['clients'] = $db->query("SELECT COUNT(*) FROM users WHERE role='client'")->fetch_row()[0];
-$cnt['couriers'] = $db->query("SELECT COUNT(*) FROM users WHERE role='courier'")->fetch_row()[0];
+$cnt['retail_officer'] = $db->query("SELECT COUNT(*) FROM users WHERE role='retail_officer'")->fetch_row()[0];
+$cnt['technician'] = $db->query("SELECT COUNT(*) FROM users WHERE role='technician'")->fetch_row()[0];
+$cnt['inventory_custodian'] = $db->query("SELECT COUNT(*) FROM users WHERE role='inventory_custodian'")->fetch_row()[0];
 $cnt['orders'] = $db->query("SELECT COUNT(*) FROM orders")->fetch_row()[0];
 
 // Recent Logs
@@ -71,9 +72,19 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
     <div class="page-content">
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-label">Sellers</div>
-                <div class="stat-num"><?php echo $cnt['sellers']; ?></div>
+                <div class="stat-label">Retail Officers</div>
+                <div class="stat-num"><?php echo $cnt['retail_officer']; ?></div>
                 <div class="stat-icon">S</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Technician</div>
+                <div class="stat-num"><?php echo $cnt['technician']; ?></div>
+                <div class="stat-icon">T</div>
+            </div>
+                        <div class="stat-card">
+                <div class="stat-label">Inventory Custodian</div>
+                <div class="stat-num"><?php echo $cnt['inventory_custodian']; ?></div>
+                <div class="stat-icon">IC</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Clients</div>
@@ -81,45 +92,9 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
                 <div class="stat-icon">C</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Couriers</div>
-                <div class="stat-num"><?php echo $cnt['couriers']; ?></div>
-                <div class="stat-icon">D</div>
-            </div>
-            <div class="stat-card">
                 <div class="stat-label">Orders</div>
                 <div class="stat-num"><?php echo $cnt['orders']; ?></div>
                 <div class="stat-icon">O</div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <div>
-                    <h3><span class="card-icon">A</span> Recent System Activity</h3>
-                    <div class="card-subtitle">Latest audit events across the platform</div>
-                </div>
-            </div>
-            <div class="table-wrap">
-                <table class="ias-table">
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>User</th>
-                            <th>Action</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php while($l = $logs->fetch_assoc()): ?>
-                        <tr>
-                            <td class="mono text-small text-muted" style="white-space:nowrap"><?php echo $l['created_at']; ?></td>
-                            <td><strong><?php echo h($l['name'] ?? 'System'); ?></strong></td>
-                            <td><span class="badge badge-action"><?php echo h($l['action']); ?></span></td>
-                            <td class="text-muted text-small" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><?php echo h($l['details']); ?></td>
-                        </tr>
-                        <?php endwhile; ?>
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>

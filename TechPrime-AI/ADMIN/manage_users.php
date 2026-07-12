@@ -59,21 +59,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── Fetch Users by Role ───────────────────────────────────────────────────────
 $all_users     = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id ORDER BY u.role, u.name ASC");
 $clients       = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='client' ORDER BY u.name ASC");
-$sellers       = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='seller' ORDER BY u.name ASC");
-$couriers      = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='courier' ORDER BY u.name ASC");
 $admins        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='admin' ORDER BY u.name ASC");
+$retail_officers        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='retail_officer' ORDER BY u.name ASC");
+$technicians        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='technician' ORDER BY u.name ASC");
+$inventory_custodians        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='inventory_custodian' ORDER BY u.name ASC");
+
  
 // Counts
 $count_all     = $db->query("SELECT COUNT(*) as c FROM users")->fetch_assoc()['c'];
 $count_client  = $db->query("SELECT COUNT(*) as c FROM users WHERE role='client'")->fetch_assoc()['c'];
-$count_seller  = $db->query("SELECT COUNT(*) as c FROM users WHERE role='seller'")->fetch_assoc()['c'];
-$count_courier = $db->query("SELECT COUNT(*) as c FROM users WHERE role='courier'")->fetch_assoc()['c'];
 $count_admin   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='admin'")->fetch_assoc()['c'];
+$count_officer   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='retail_officer'")->fetch_assoc()['c'];
+$count_technician   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='technician'")->fetch_assoc()['c'];
+$count_custodian   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='inventory_custodian'")->fetch_assoc()['c'];
+
  
 $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
 $csrf = generateCsrfToken();
 $active_tab = $_GET['tab'] ?? 'all';
-$valid_tabs = ['all', 'client', 'seller', 'courier', 'admin'];
+$valid_tabs = ['all', 'client', 'admin', 'retail_officer', 'technician', 'inventory_custodian'];
 if (!in_array($active_tab, $valid_tabs, true)) {
     $active_tab = 'all';
 }
@@ -87,9 +91,11 @@ function fetchToArray($result) {
 $user_rows = [
     'all'     => fetchToArray($all_users),
     'client'  => fetchToArray($clients),
-    'seller'  => fetchToArray($sellers),
-    'courier' => fetchToArray($couriers),
     'admin'   => fetchToArray($admins),
+    'retail_officer' => fetchToArray($retail_officers),
+    'technician' => fetchToArray($technicians),
+    'inventory_custodian' => fetchToArray($inventory_custodians),
+    
 ];
 $users = $user_rows[$active_tab];
 ?>
@@ -216,10 +222,6 @@ $users = $user_rows[$active_tab];
             font-size: 16px; font-weight: 800;
             flex-shrink: 0;
         }
-        .avatar-admin    { background: #f3e8ff; color: #7c3aed; }
-        .avatar-seller   { background: var(--teal-pale); color: var(--teal-deeper); }
-        .avatar-client   { background: #eff6ff; color: #2563eb; }
-        .avatar-courier  { background: #fff7ed; color: #c2410c; }
         .user-card-name { font-size: 14px; font-weight: 700; line-height: 1.2; }
         .user-card-email { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; word-break: break-all; }
         .user-card-meta {
@@ -456,13 +458,18 @@ $users = $user_rows[$active_tab];
                 <div class="stat-icon">C</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Sellers</div>
-                <div class="stat-num"><?php echo (int)$count_seller; ?></div>
-                <div class="stat-icon">S</div>
+                <div class="stat-label">Retail Officers</div>
+                <div class="stat-num"><?php echo (int)$count_officer; ?></div>
+                <div class="stat-icon">D</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Couriers</div>
-                <div class="stat-num"><?php echo (int)$count_courier; ?></div>
+                <div class="stat-label">Technician</div>
+                <div class="stat-num"><?php echo (int)$count_technician; ?></div>
+                <div class="stat-icon">D</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Inventory Custodian</div>
+                <div class="stat-num"><?php echo (int)$count_custodian; ?></div>
                 <div class="stat-icon">D</div>
             </div>
         </div>
@@ -471,8 +478,9 @@ $users = $user_rows[$active_tab];
             <div class="tab-nav">
                 <a class="tab-btn <?php echo $active_tab === 'all' ? 'active' : ''; ?>" href="manage_users.php?tab=all">All <span class="tab-count"><?php echo (int)$count_all; ?></span></a>
                 <a class="tab-btn <?php echo $active_tab === 'client' ? 'active' : ''; ?>" href="manage_users.php?tab=client">Clients <span class="tab-count"><?php echo (int)$count_client; ?></span></a>
-                <a class="tab-btn <?php echo $active_tab === 'seller' ? 'active' : ''; ?>" href="manage_users.php?tab=seller">Sellers <span class="tab-count"><?php echo (int)$count_seller; ?></span></a>
-                <a class="tab-btn <?php echo $active_tab === 'courier' ? 'active' : ''; ?>" href="manage_users.php?tab=courier">Couriers <span class="tab-count"><?php echo (int)$count_courier; ?></span></a>
+                <a class="tab-btn <?php echo $active_tab === 'retail_officer' ? 'active' : ''; ?>" href="manage_users.php?tab=retail_officer">Retail Officers <span class="tab-count"><?php echo (int)$count_officer; ?></span></a>
+                <a class="tab-btn <?php echo $active_tab === 'technician' ? 'active' : ''; ?>" href="manage_users.php?tab=technician">Technician <span class="tab-count"><?php echo (int)$count_technician; ?></span></a>
+                <a class="tab-btn <?php echo $active_tab === 'inventory_custodian' ? 'active' : ''; ?>" href="manage_users.php?tab=inventory_custodian">Inventory Custodian <span class="tab-count"><?php echo (int)$count_custodian; ?></span></a>
             </div>
         </div>
 

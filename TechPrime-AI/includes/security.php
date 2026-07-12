@@ -4,7 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /**
- * Security Helper for IAS E-commerce
+ * Security Helper for Easy PC E-commerce
  */
 
 // CSRF Protection
@@ -290,7 +290,9 @@ function ias_alert_footer(): void
     $msg = ias_alert_message_from_request();
     $root = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/SELLER/') !== false
         || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/courier/') !== false
-        || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/CLIENT/') !== false)
+        || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/CLIENT/') !== false
+        || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/RETAIL/') !== false
+        || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/ASSOCIATE/') !== false)
         ? '../includes/ui_alerts.js' : 'includes/ui_alerts.js';
     echo '<script src="' . h($root) . '"></script>';
     if ($msg) {

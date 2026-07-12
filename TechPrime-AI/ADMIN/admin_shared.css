@@ -340,10 +340,6 @@ table.ias-table tbody tr:hover { background: var(--teal-pale); }
   font-weight: 600;
   white-space: nowrap;
 }
-.badge-admin    { background: #f3e8ff; color: #6b21a8; }
-.badge-seller   { background: var(--teal-pale); color: var(--teal-deeper); border: 1px solid var(--teal-light); }
-.badge-client   { background: #eff6ff; color: #1d4ed8; }
-.badge-courier  { background: #fff7ed; color: #c2410c; }
 .badge-locked   { background: #fef2f2; color: #dc2626; }
 .badge-active   { background: #f0fdf4; color: #16a34a; }
 .badge-unverified { background: #fffbeb; color: #b45309; }
