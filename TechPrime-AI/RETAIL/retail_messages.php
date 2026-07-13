@@ -3,13 +3,13 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'seller') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'retail_officer') {
     header("Location: ../login.html");
     exit();
 }
 
 $db = getDbConnection();
-$sellerId = (int)$_SESSION['user_id'];
+$retailId = (int)$_SESSION['user_id'];
 
 // --- 1. FETCH CUSTOMERS ---
 $convQuery = "SELECT DISTINCT u.id, u.name 
@@ -20,7 +20,7 @@ $convQuery = "SELECT DISTINCT u.id, u.name
               ORDER BY m.created_at DESC";
 
 $stmt = $db->prepare($convQuery);
-$stmt->bind_param("iii", $sellerId, $sellerId, $sellerId);
+$stmt->bind_param("iii", $retailId, $retailId, $retailId);
 $stmt->execute();
 $contacts = $stmt->get_result();
 
@@ -39,7 +39,7 @@ if ($activeClientId) {
                  OR (sender_id = ? AND receiver_id = ?) 
                  ORDER BY created_at ASC";
     $mStmt = $db->prepare($msgQuery);
-    $mStmt->bind_param("iiii", $sellerId, $activeClientId, $activeClientId, $sellerId);
+    $mStmt->bind_param("iiii", $retailId, $activeClientId, $activeClientId, $retailId);
     $mStmt->execute();
     $messages = $mStmt->get_result();
 }
@@ -48,8 +48,8 @@ if ($activeClientId) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Customer Messages | IAS Seller</title>
-    <link rel="stylesheet" href="../seller.css">
+    <title>Customer Messages | Easy PC Retail</title>
+    <link rel="stylesheet" href="../retail.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -69,7 +69,7 @@ if ($activeClientId) {
         }
         
         /* HEADER */
-        .seller-header { 
+        .retail-header { 
             background: var(--ias-teal); 
             padding: 15px 30px; 
             border-bottom: 3px solid var(--ias-gold); 
@@ -77,10 +77,10 @@ if ($activeClientId) {
         }
         .logo-text { color: var(--ias-gold); font-size: 24px; font-weight: 900; letter-spacing: 1px; }
 
-        .seller-layout { display: flex; flex: 1; overflow: hidden; }
+        .retail-layout { display: flex; flex: 1; overflow: hidden; }
 
         /* SIDEBAR */
-        .seller-sidebar { 
+        .retail-sidebar { 
             background: var(--sidebar-gray); 
             width: 260px; 
             padding-top: 10px; 
@@ -161,17 +161,18 @@ if ($activeClientId) {
 </head>
 <body>
 
-<header class="seller-header">
-    <div class="logo-text">IAS SELLER</div>
+<header class="retail-header">
+    <div class="logo-text">EASY PC RETAIL</div>
 </header>
 
-<div class="seller-layout">
-    <aside class="seller-sidebar">
-        <button class="sidebar-item" onclick="location.href='seller_dashboard.php'">📊 Dashboard</button>
-        <button class="sidebar-item" onclick="location.href='seller_products.php'">📦 My Products</button>
-        <button class="sidebar-item" onclick="location.href='seller_orders.php'">📜 Orders</button>
+<div class="retail-layout">
+    <aside class="retail-sidebar">
+        <button class="sidebar-item" onclick="location.href='retail_dashboard.php'">📊 Dashboard</button>
+        <button class="sidebar-item" onclick="location.href='retail_products.php'">📦 My Products</button>
+        <button class="sidebar-item" onclick="location.href='retail_orders.php'">📜 Orders</button>
         <button class="sidebar-item active">💬 Messages</button>
-        <button class="sidebar-item" onclick="location.href='seller_settings.php'">⚙️ Settings</button>
+        <button class="sidebar-item" onclick="location.href='retail_reviews.php'">⭐ Reviews</button>
+        <button class="sidebar-item" onclick="location.href='retail_settings.php'">⚙️ Settings</button>
         <button class="sidebar-item logout-btn" onclick="location.href='../logout.php'">🚪 Logout</button>
     </aside>
 
@@ -181,7 +182,7 @@ if ($activeClientId) {
                 <div class="column-head">CUSTOMER INQUIRIES</div>
                 <div style="overflow-y: auto; flex: 1;">
                     <?php while($c = $contacts->fetch_assoc()): ?>
-                        <a href="seller_messages.php?client_id=<?php echo $c['id']; ?>" 
+                        <a href="retail_messages.php?client_id=<?php echo $c['id']; ?>" 
                            class="contact-link <?php echo ($activeClientId == $c['id']) ? 'active' : ''; ?>">
                             <?php echo h($c['name']); ?>
                         </a>
@@ -203,7 +204,7 @@ if ($activeClientId) {
                 <div class="chat-messages" id="chatWindow">
                     <?php if($activeClientId): ?>
                         <?php while($m = $messages->fetch_assoc()): ?>
-                            <div class="bubble <?php echo ($m['sender_id'] == $sellerId) ? 'sent' : 'received'; ?>">
+                            <div class="bubble <?php echo ($m['sender_id'] == $retailId) ? 'sent' : 'received'; ?>">
                                 <?php echo h($m['message']); ?>
                                 <div style="font-size: 9px; margin-top: 5px; opacity: 0.7; text-align: right;">
                                     <?php echo date('h:i A', strtotime($m['created_at'])); ?>
@@ -233,7 +234,7 @@ if ($activeClientId) {
 </div>
 
 <footer class="ias-footer">
-    © 2026 IAS E-Commerce Seller Center. All Rights Reserved.
+    © 2026 Easy PC Retail Center. All Rights Reserved.
 </footer>
 
 <script>

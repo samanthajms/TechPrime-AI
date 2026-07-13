@@ -32,8 +32,10 @@ if ($action === 'register') {
     $address  = trim($_POST['address'] ?? '');
     $email    = strtolower(trim($_POST['email'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
-    $role     = strtolower(trim($_POST['role'] ?? 'client'));
-    $allowedRoles = ['client', 'seller', 'courier', 'admin'];
+    // Registration is public, so it may only create client accounts. Staff
+    // accounts are created by an authenticated admin in Manage Users.
+    $role     = 'client';
+    $allowedRoles = ['client'];
 
     if ($name === '' || $surname === '' || $age < 13 || $address === '' || $email === '' || $password === '') {
         json_exit(422, ['success' => false, 'message' => 'Please complete all required fields.']);

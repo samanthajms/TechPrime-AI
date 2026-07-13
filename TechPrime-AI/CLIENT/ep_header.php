@@ -10,6 +10,8 @@
  */
 $peripheralCategories = $peripheralCategories ?? ['Mobile', 'Cameras', 'Accessories'];
 $searchQuery          = $searchQuery ?? '';
+$isHomePage           = ($activePage ?? '') === 'home';
+$bodyClass            = $bodyClass ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -28,7 +30,7 @@ $searchQuery          = $searchQuery ?? '';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if (!empty($extraHead)) echo $extraHead; ?>
 </head>
-<body class="ep-body">
+<body class="ep-body <?php echo htmlspecialchars($bodyClass, ENT_QUOTES, 'UTF-8'); ?>">
 
 <header class="top-header ep-header full-width">
     <div class="logo ep-logo" onclick="location.href='index.php'" style="cursor:pointer;">
@@ -72,9 +74,11 @@ $searchQuery          = $searchQuery ?? '';
     </div>
 </header>
 
-<section class="ep-hero full-width">
+<section class="<?php echo $isHomePage ? 'ep-hero' : 'ep-nav-bar'; ?> full-width">
+    <?php if ($isHomePage): ?>
     <p class="ep-hero-kicker">SHOP NOW AT</p>
     <h1 class="ep-hero-title">EASYPC ONE OASIS.</h1>
+    <?php endif; ?>
 
     <nav class="ep-nav">
         <a href="index.php"

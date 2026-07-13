@@ -1,6 +1,5 @@
 <?php
 session_start();
-// REVISION: Added ../ so this file can find the folders outside the ADMIN folder
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 
@@ -72,6 +71,16 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
     <div class="page-content">
         <div class="stats-grid">
             <div class="stat-card">
+                <div class="stat-label">Orders</div>
+                <div class="stat-num"><?php echo $cnt['orders']; ?></div>
+                <div class="stat-icon">O</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Clients</div>
+                <div class="stat-num"><?php echo $cnt['clients']; ?></div>
+                <div class="stat-icon">C</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-label">Retail Officers</div>
                 <div class="stat-num"><?php echo $cnt['retail_officer']; ?></div>
                 <div class="stat-icon">S</div>
@@ -85,16 +94,6 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
                 <div class="stat-label">Inventory Custodian</div>
                 <div class="stat-num"><?php echo $cnt['inventory_custodian']; ?></div>
                 <div class="stat-icon">IC</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Clients</div>
-                <div class="stat-num"><?php echo $cnt['clients']; ?></div>
-                <div class="stat-icon">C</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Orders</div>
-                <div class="stat-num"><?php echo $cnt['orders']; ?></div>
-                <div class="stat-icon">O</div>
             </div>
         </div>
     </div>

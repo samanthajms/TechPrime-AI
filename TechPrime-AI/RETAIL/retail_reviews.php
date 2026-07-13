@@ -3,14 +3,14 @@ session_start();
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/security.php';
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'seller') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'retail_officer') {
     header("Location: ../login.html"); exit;
 }
 
 $db = getDbConnection();
-$sellerId = (int)$_SESSION['user_id'];
+$retailId = (int)$_SESSION['user_id'];
 
-// --- HANDLE SELLER REPLY ---
+// --- HANDLE RETAIL REPLY ---
 if (isset($_POST['submit_reply'])) {
     $reviewId = (int)$_POST['review_id'];
     $replyText = $db->real_escape_string($_POST['reply_text']);
@@ -19,12 +19,12 @@ if (isset($_POST['submit_reply'])) {
                             JOIN products p ON r.product_id = p.id 
                             SET r.seller_reply = ?, r.replied_at = NOW() 
                             WHERE r.id = ? AND p.seller_id = ?");
-    $update->bind_param("sii", $replyText, $reviewId, $sellerId);
+    $update->bind_param("sii", $replyText, $reviewId, $retailId);
     $update->execute();
-    header("Location: seller_reviews.php?success=1"); exit;
+    header("Location: retail_reviews.php?success=1"); exit;
 }
 
-// --- FETCH REVIEWS FOR THIS SELLER'S PRODUCTS ---
+// --- FETCH REVIEWS FOR THIS RETAILER'S PRODUCTS ---
 $query = "SELECT r.*, u.name as customer_name, p.name as product_name 
           FROM reviews r
           JOIN products p ON r.product_id = p.id
@@ -32,7 +32,7 @@ $query = "SELECT r.*, u.name as customer_name, p.name as product_name
           WHERE p.seller_id = ?
           ORDER BY r.created_at DESC";
 $stmt = $db->prepare($query);
-$stmt->bind_param("i", $sellerId);
+$stmt->bind_param("i", $retailId);
 $stmt->execute();
 $reviews = $stmt->get_result();
 ?>
@@ -40,8 +40,8 @@ $reviews = $stmt->get_result();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Customer Reviews | IAS Seller</title>
-    <link rel="stylesheet" href="../seller.css">
+    <title>Customer Reviews | Easy PC Retail</title>
+    <link rel="stylesheet" href="../retail.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -60,17 +60,17 @@ $reviews = $stmt->get_result();
         }
         
         /* HEADER */
-        .seller-header { 
+        .retail-header { 
             background: var(--ias-teal); 
             padding: 15px 30px; 
             border-bottom: 3px solid var(--ias-gold); 
         }
         .logo-text { color: var(--ias-gold); font-size: 24px; font-weight: 900; letter-spacing: 1px; }
 
-        .seller-layout { display: flex; flex: 1; overflow: hidden; }
+        .retail-layout { display: flex; flex: 1; overflow: hidden; }
 
         /* SIDEBAR */
-        .seller-sidebar { 
+        .retail-sidebar { 
             background: var(--sidebar-gray); 
             width: 260px; 
             padding-top: 10px; 
@@ -96,7 +96,7 @@ $reviews = $stmt->get_result();
         .logout-btn { background: #b22222 !important; margin-top: auto; border-bottom: none; }
 
         /* MAIN CONTENT */
-        .seller-main { padding: 30px; flex: 1; overflow-y: auto; }
+        .retail-main { padding: 30px; flex: 1; overflow-y: auto; }
         
         .review-card { 
             background: white; 
@@ -118,7 +118,7 @@ $reviews = $stmt->get_result();
         
         .comment-text { font-size: 14px; color: #444; line-height: 1.6; font-style: italic; background: #fafafa; padding: 10px; border-radius: 8px; }
         
-        /* SELLER REPLY BOX */
+        /* RETAIL REPLY BOX */
         .reply-section { 
             background: #f8f9fa; 
             padding: 15px; 
@@ -143,22 +143,22 @@ $reviews = $stmt->get_result();
 </head>
 <body>
 
-<header class="seller-header">
-    <div class="logo-text">IAS SELLER</div>
+<header class="retail-header">
+    <div class="logo-text">EASY PC RETAIL</div>
 </header>
 
-<div class="seller-layout">
-    <aside class="seller-sidebar">
-        <button class="sidebar-item" onclick="location.href='seller_dashboard.php'">📊 Dashboard</button>
-        <button class="sidebar-item" onclick="location.href='seller_products.php'">📦 My Products</button>
-        <button class="sidebar-item" onclick="location.href='seller_orders.php'">📜 Orders</button>
-        <button class="sidebar-item" onclick="location.href='seller_messages.php'">💬 Messages</button>
+<div class="retail-layout">
+    <aside class="retail-sidebar">
+        <button class="sidebar-item" onclick="location.href='retail_dashboard.php'">📊 Dashboard</button>
+        <button class="sidebar-item" onclick="location.href='retail_products.php'">📦 My Products</button>
+        <button class="sidebar-item" onclick="location.href='retail_orders.php'">📜 Orders</button>
+        <button class="sidebar-item" onclick="location.href='retail_messages.php'">💬 Messages</button>
         <button class="sidebar-item active">⭐ Reviews</button>
-        <button class="sidebar-item" onclick="location.href='seller_settings.php'">⚙️ Settings</button>
+        <button class="sidebar-item" onclick="location.href='retail_settings.php'">⚙️ Settings</button>
         <button class="sidebar-item logout-btn" onclick="location.href='../logout.php'">🚪 Logout</button>
     </aside>
 
-    <main class="seller-main">
+    <main class="retail-main">
         <h2 style="margin-bottom: 25px; color: #333;">Customer Feedback</h2>
 
         <?php if($reviews->num_rows > 0): ?>
@@ -210,7 +210,7 @@ $reviews = $stmt->get_result();
 </div>
 
 <footer class="ias-footer">
-    © 2026 IAS E-Commerce Seller Center. All Rights Reserved.
+    © 2026 Easy PC Retail Center. All Rights Reserved.
 </footer>
 
 </body>

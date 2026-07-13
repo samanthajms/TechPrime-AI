@@ -16,7 +16,9 @@ $connection = getDbConnection();
 $pwRules = getPasswordRules($connection);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $role            = $_POST['role'] ?? 'client';
+    // Public registration is limited to customer accounts. Never trust a
+    // role submitted by the browser, as it could be modified outside the form.
+    $role            = 'client';
     $name            = trim($_POST['name'] ?? '');
     $surname         = trim($_POST['surname'] ?? '');
     $age             = intval($_POST['age'] ?? 0);
@@ -137,14 +139,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form action="register.php" method="POST" id="regForm">
-            <label>Account Type</label>
-            <select name="role" style="margin-bottom: 15px;">
-                <option value="client">Client</option>
-                <option value="retail_officer">Retail Officer</option>
-                <option value="technician">Technician</option>
-                <option value="inventory_custodian">Inventory Custodian</option>
-                <option value="admin">Admin</option>
-            </select>
 
             <div class="form-grid">
                 <div><label>First Name</label><input type="text" name="name" required></div>

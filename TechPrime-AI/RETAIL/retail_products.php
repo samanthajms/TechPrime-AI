@@ -5,12 +5,12 @@ require_once __DIR__ . '/../backend/config/database.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
-checkRole('seller');
+checkRole('retail_officer');
 
-$seller_id = (int)$_SESSION['user_id'];
+$retail_id = (int)$_SESSION['user_id'];
 $allowed_categories = ['Laptops', 'Desktop', 'Mobile', 'Cameras', 'Accessories'];
 
-function seller_product_category(array $allowed): string
+function retail_product_category(array $allowed): string
 {
     $category = $_POST['category'] ?? 'Accessories';
     return in_array($category, $allowed, true) ? $category : 'Accessories';
@@ -21,8 +21,8 @@ if (isset($_POST['add_product'])) {
     $price = (float)($_POST['price'] ?? 0);
     $stock = (int)($_POST['stock'] ?? 0);
     $desc = trim($_POST['description'] ?? '');
-    $category = seller_product_category($allowed_categories);
-    $imageFile = ias_handle_product_upload($seller_id);
+    $category = retail_product_category($allowed_categories);
+    $imageFile = ias_handle_product_upload($retail_id);
 
     if ($name !== '' && $price > 0 && $stock >= 0 && $imageFile !== null) {
         $emptyUrl = '';
@@ -30,16 +30,16 @@ if (isset($_POST['add_product'])) {
             'INSERT INTO products (seller_id, name, price, stock, description, image, image_url, category)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->bind_param('isdissss', $seller_id, $name, $price, $stock, $desc, $imageFile, $emptyUrl, $category);
+        $stmt->bind_param('isdissss', $retail_id, $name, $price, $stock, $desc, $imageFile, $emptyUrl, $category);
         $stmt->execute();
         $stmt->close();
 
-        logActivity($db, $seller_id, 'add_product', "Added product: $name");
-        header('Location: seller_products.php?alert=added');
+        logActivity($db, $retail_id, 'add_product', "Added product: $name");
+        header('Location: retail_products.php?alert=added');
         exit;
     }
 
-    header('Location: seller_products.php?alert=error');
+    header('Location: retail_products.php?alert=error');
     exit;
 }
 
@@ -49,20 +49,20 @@ if (isset($_POST['edit_product'])) {
     $price = (float)($_POST['price'] ?? 0);
     $stock = (int)($_POST['stock'] ?? 0);
     $desc = trim($_POST['description'] ?? '');
-    $category = seller_product_category($allowed_categories);
+    $category = retail_product_category($allowed_categories);
 
     if ($id > 0 && $name !== '' && $price > 0 && $stock >= 0) {
-        $newImage = ias_handle_product_upload($seller_id);
+        $newImage = ias_handle_product_upload($retail_id);
         $triedImageUpload = !empty($_FILES['product_image']['name']);
 
         if ($triedImageUpload && $newImage === null) {
-            header('Location: seller_products.php?alert=error');
+            header('Location: retail_products.php?alert=error');
             exit;
         }
 
         if ($newImage !== null) {
             $oldSt = $db->prepare('SELECT image FROM products WHERE id = ? AND seller_id = ?');
-            $oldSt->bind_param('ii', $id, $seller_id);
+            $oldSt->bind_param('ii', $id, $retail_id);
             $oldSt->execute();
             $oldRow = $oldSt->get_result()->fetch_assoc();
             $oldSt->close();
@@ -73,7 +73,7 @@ if (isset($_POST['edit_product'])) {
                  SET name = ?, price = ?, stock = ?, description = ?, category = ?, image = ?, image_url = ?
                  WHERE id = ? AND seller_id = ?'
             );
-            $stmt->bind_param('sdissssii', $name, $price, $stock, $desc, $category, $newImage, $emptyUrl, $id, $seller_id);
+            $stmt->bind_param('sdissssii', $name, $price, $stock, $desc, $category, $newImage, $emptyUrl, $id, $retail_id);
             $stmt->execute();
             $stmt->close();
 
@@ -89,17 +89,17 @@ if (isset($_POST['edit_product'])) {
                  SET name = ?, price = ?, stock = ?, description = ?, category = ?
                  WHERE id = ? AND seller_id = ?'
             );
-            $stmt->bind_param('sdissii', $name, $price, $stock, $desc, $category, $id, $seller_id);
+            $stmt->bind_param('sdissii', $name, $price, $stock, $desc, $category, $id, $retail_id);
             $stmt->execute();
             $stmt->close();
         }
 
-        logActivity($db, $seller_id, 'edit_product', "Updated product #$id");
-        header('Location: seller_products.php?alert=updated');
+        logActivity($db, $retail_id, 'edit_product', "Updated product #$id");
+        header('Location: retail_products.php?alert=updated');
         exit;
     }
 
-    header('Location: seller_products.php?alert=error');
+    header('Location: retail_products.php?alert=error');
     exit;
 }
 
@@ -107,13 +107,13 @@ if (isset($_POST['action']) && $_POST['action'] === 'delete') {
     $pid = (int)($_POST['id'] ?? 0);
     if ($pid > 0) {
         $imgSt = $db->prepare('SELECT image FROM products WHERE id = ? AND seller_id = ?');
-        $imgSt->bind_param('ii', $pid, $seller_id);
+        $imgSt->bind_param('ii', $pid, $retail_id);
         $imgSt->execute();
         $row = $imgSt->get_result()->fetch_assoc();
         $imgSt->close();
 
         $del = $db->prepare('DELETE FROM products WHERE id = ? AND seller_id = ?');
-        $del->bind_param('ii', $pid, $seller_id);
+        $del->bind_param('ii', $pid, $retail_id);
         $del->execute();
         $del->close();
 
@@ -129,14 +129,14 @@ if (isset($_POST['action']) && $_POST['action'] === 'delete') {
             }
         }
 
-        logActivity($db, $seller_id, 'delete_product', "Deleted product #$pid");
-        header('Location: seller_products.php?alert=deleted');
+        logActivity($db, $retail_id, 'delete_product', "Deleted product #$pid");
+        header('Location: retail_products.php?alert=deleted');
         exit;
     }
 }
 
 $stmt = $db->prepare('SELECT * FROM products WHERE seller_id = ? ORDER BY id DESC');
-$stmt->bind_param('i', $seller_id);
+$stmt->bind_param('i', $retail_id);
 $stmt->execute();
 $products = $stmt->get_result();
 ?>
@@ -144,20 +144,20 @@ $products = $stmt->get_result();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>My Inventory | IAS Seller</title>
+    <title>My Inventory | Easy PC Retail</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root { --ias-teal: #0998a8; --ias-gold: #f5f500; --sidebar-gray: #6a969a; --bg: #f4f7f6; }
         html, body { height: 100%; margin: 0; }
         body { display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); }
-        .seller-header { background: var(--ias-teal); padding: 15px 30px; border-bottom: 3px solid var(--ias-gold); }
+        .retail-header { background: var(--ias-teal); padding: 15px 30px; border-bottom: 3px solid var(--ias-gold); }
         .logo-text { color: var(--ias-gold); font-size: 24px; font-weight: 900; letter-spacing: 1px; }
-        .seller-layout { display: flex; flex: 1; overflow: hidden; }
-        .seller-sidebar { background: var(--sidebar-gray); width: 260px; padding-top: 10px; display: flex; flex-direction: column; }
+        .retail-layout { display: flex; flex: 1; overflow: hidden; }
+        .retail-sidebar { background: var(--sidebar-gray); width: 260px; padding-top: 10px; display: flex; flex-direction: column; }
         .sidebar-item { background: transparent; color: white; border: none; padding: 15px 25px; width: 100%; text-align: left; font-size: 15px; font-weight: 600; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar-item:hover, .sidebar-item.active { background: rgba(0,0,0,0.1); color: var(--ias-gold); }
         .logout-btn { background: #b22222 !important; margin-top: auto; border-bottom: none; }
-        .seller-main { padding: 30px; flex: 1; overflow-y: auto; }
+        .retail-main { padding: 30px; flex: 1; overflow-y: auto; }
         .content-grid { display: grid; grid-template-columns: 1fr 380px; gap: 25px; max-width: 1400px; }
         .card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px dashed var(--ias-teal); }
         .card h2 { margin-top: 0; font-size: 18px; font-weight: 800; color: #333; margin-bottom: 20px; }
@@ -181,19 +181,20 @@ $products = $stmt->get_result();
 </head>
 <body>
 
-<header class="seller-header"><div class="logo-text">IAS SELLER</div></header>
+<header class="retail-header"><div class="logo-text">EASY PC RETAIL</div></header>
 
-<div class="seller-layout">
-    <aside class="seller-sidebar">
-        <button type="button" class="sidebar-item" onclick="location.href='seller_dashboard.php'">Dashboard</button>
+<div class="retail-layout">
+    <aside class="retail-sidebar">
+        <button type="button" class="sidebar-item" onclick="location.href='retail_dashboard.php'">Dashboard</button>
         <button type="button" class="sidebar-item active">My Products</button>
-        <button type="button" class="sidebar-item" onclick="location.href='seller_orders.php'">Orders</button>
-        <button type="button" class="sidebar-item" onclick="location.href='seller_messages.php'">Messages</button>
-        <button type="button" class="sidebar-item" onclick="location.href='seller_settings.php'">Settings</button>
+        <button type="button" class="sidebar-item" onclick="location.href='retail_orders.php'">Orders</button>
+        <button type="button" class="sidebar-item" onclick="location.href='retail_messages.php'">Messages</button>
+        <button type="button" class="sidebar-item" onclick="location.href='retail_reviews.php'">Reviews</button>
+        <button type="button" class="sidebar-item" onclick="location.href='retail_settings.php'">Settings</button>
         <button type="button" class="sidebar-item logout-btn" onclick="location.href='../logout.php'">Logout</button>
     </aside>
 
-    <main class="seller-main">
+    <main class="retail-main">
         <div class="content-grid">
             <section class="card">
                 <h2>Current Inventory</h2>
@@ -304,7 +305,7 @@ $products = $stmt->get_result();
     </div>
 </div>
 
-<footer class="ias-footer">&copy; 2026 IAS E-Commerce Seller Center.</footer>
+<footer class="ias-footer">&copy; 2026 Easy PC Retail Center.</footer>
 
 <script>
 function openEditModal(product) {

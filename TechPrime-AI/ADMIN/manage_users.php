@@ -7,6 +7,11 @@ checkSessionTimeout();
 checkRole('admin');
  
 $admin_id = (int)$_SESSION['user_id'];
+$staffRoles = [
+    'retail_officer' => 'Retail Officer',
+    'technician' => 'Technician',
+    'inventory_custodian' => 'Inventory Custodian',
+];
  
 // ── Handle POST Actions ──────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -14,8 +19,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Invalid CSRF token.");
     }
 
-    $id     = (int)$_POST['id'];
-    $action = $_POST['action'];
+    $id     = (int)($_POST['id'] ?? 0);
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'create_staff') {
+        $role = $_POST['role'] ?? '';
+        $name = trim($_POST['name'] ?? '');
+        $surname = trim($_POST['surname'] ?? '');
+        $age = (int)($_POST['age'] ?? 0);
+        $address = trim($_POST['address'] ?? '');
+        $email = strtolower(trim($_POST['email'] ?? ''));
+        $password = $_POST['password'] ?? '';
+
+        if (!isset($staffRoles[$role]) || $name === '' || $surname === '' || $age < 13 || $address === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            header('Location: manage_users.php?error=' . urlencode('Please complete all staff-account fields with valid information.'));
+            exit;
+        }
+        if (!isPasswordComplex($password, $db)) {
+            header('Location: manage_users.php?error=' . urlencode('The temporary password does not meet the configured password rules.'));
+            exit;
+        }
+
+        $check = $db->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+        $check->bind_param('s', $email);
+        $check->execute();
+        if ($check->get_result()->num_rows > 0) {
+            header('Location: manage_users.php?error=' . urlencode('That email address is already in use.'));
+            exit;
+        }
+
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+        // Staff accounts are created by an administrator and are ready to use
+        // immediately; email activation remains exclusive to client sign-up.
+        $insert = $db->prepare('INSERT INTO users (name, surname, age, address, email, password, role, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, 1)');
+        $insert->bind_param('ssissss', $name, $surname, $age, $address, $email, $hash, $role);
+        if (!$insert->execute()) {
+            header('Location: manage_users.php?error=' . urlencode('Unable to create the staff account. Please try again.'));
+            exit;
+        }
+
+        logActivity($db, $admin_id, 'create_staff_account', 'Admin created a ' . $staffRoles[$role] . ' account for ' . $email);
+
+        header('Location: manage_users.php?success=staff_created');
+        exit;
+    }
 
     if ($action === 'block') {
         // FIX: Use prepared statements
@@ -140,6 +187,14 @@ $users = $user_rows[$active_tab];
             font-weight: 700;
         }
         .tab-btn:not(.active) .tab-count { background: var(--slate-100); color: var(--slate-600); }
+
+        .staff-create-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .staff-create-grid .full-width { grid-column: 1 / -1; }
+        .staff-create-grid label { display: block; margin-bottom: 5px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+        .staff-create-grid input, .staff-create-grid select { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1.5px solid var(--border); border-radius: 8px; font: inherit; }
+        .staff-create-grid input:focus, .staff-create-grid select:focus { outline: none; border-color: var(--teal); }
+        .staff-create-actions { display: flex; align-items: end; }
+        @media (max-width: 650px) { .staff-create-grid { grid-template-columns: 1fr; } .staff-create-grid .full-width { grid-column: auto; } }
 
         /* ── Toolbar ── */
         .toolbar {
@@ -474,6 +529,54 @@ $users = $user_rows[$active_tab];
             </div>
         </div>
 
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header">
+                <div>
+                    <h3><span class="card-icon">+</span> Create Staff Account</h3>
+                    <div class="card-subtitle">Create accounts for retail officers, technicians, and inventory custodians. New staff accounts are verified and ready to sign in.</div>
+                </div>
+            </div>
+            <form method="post" class="staff-create-grid">
+                <input type="hidden" name="action" value="create_staff">
+                <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>">
+                <div>
+                    <label for="staff-name">First Name</label>
+                    <input id="staff-name" type="text" name="name" required>
+                </div>
+                <div>
+                    <label for="staff-surname">Surname</label>
+                    <input id="staff-surname" type="text" name="surname" required>
+                </div>
+                <div>
+                    <label for="staff-role">Role</label>
+                    <select id="staff-role" name="role" required>
+                        <?php foreach ($staffRoles as $roleValue => $roleLabel): ?>
+                            <option value="<?php echo h($roleValue); ?>"><?php echo h($roleLabel); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label for="staff-age">Age</label>
+                    <input id="staff-age" type="number" name="age" min="13" required>
+                </div>
+                <div>
+                    <label for="staff-email">Email Address</label>
+                    <input id="staff-email" type="email" name="email" required>
+                </div>
+                <div>
+                    <label for="staff-password">Temporary Password</label>
+                    <input id="staff-password" type="password" name="password" required>
+                </div>
+                <div class="full-width">
+                    <label for="staff-address">Location</label>
+                    <input id="staff-address" type="text" name="address" placeholder="City, Country" required>
+                </div>
+                <div class="full-width staff-create-actions">
+                    <button type="submit" class="btn btn-primary">Create Staff Account</button>
+                </div>
+            </form>
+        </div>
+
         <div class="card tabs-card">
             <div class="tab-nav">
                 <a class="tab-btn <?php echo $active_tab === 'all' ? 'active' : ''; ?>" href="manage_users.php?tab=all">All <span class="tab-count"><?php echo (int)$count_all; ?></span></a>
@@ -581,8 +684,15 @@ $users = $user_rows[$active_tab];
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('success')) {
+        if (urlParams.get('success') === 'staff_created') {
+            IAS_UI.alert('Staff account created and verified successfully.', 'success');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (urlParams.has('success')) {
             IAS_UI.alert('User action completed successfully!', 'success');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        if (urlParams.has('error')) {
+            IAS_UI.alert(urlParams.get('error'), 'error');
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     });

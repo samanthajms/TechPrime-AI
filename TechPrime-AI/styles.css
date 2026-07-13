@@ -1473,6 +1473,12 @@ body {
 }
 
 .ep-body { background: #ffffff; font-family: 'Poppins', 'Inter', Arial, sans-serif; }
+.ep-body.ep-category-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+.ep-category-layout .ep-main { flex: 1; }
 
 /* ---- Header (overrides shared .top-header for a green brand look) ---- */
 .ep-header {
@@ -1520,6 +1526,10 @@ body {
     text-align: center;
     padding: 28px 20px 0;
 }
+.ep-nav-bar {
+    background: #ffffff;
+    padding: 14px 20px 0;
+}
 .ep-hero-kicker {
     margin: 0;
     font-size: 24px;
@@ -1541,7 +1551,7 @@ body {
     align-items: center;
     gap: 28px;
     flex-wrap: wrap;
-    padding-bottom: 14px;
+    padding: 14px;
     border-bottom: 1px solid var(--ep-border);
 }
 .ep-nav-link {

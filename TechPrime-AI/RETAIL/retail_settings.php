@@ -3,12 +3,12 @@ session_start();
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/security.php';
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'seller') {
-    header("Location: ../login.html"); exit;
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'retail_officer') {
+    header("Location: ../login.php"); exit;
 }
 
 $db = getDbConnection();
-$sellerId = (int)$_SESSION['user_id'];
+$retailId = (int)$_SESSION['user_id'];
 $message = "";
 $messageType = "success";
 
@@ -16,17 +16,22 @@ $messageType = "success";
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['update_profile'])) {
         $newName = trim($_POST['shop_name'] ?? '');
-        $newBio = trim($_POST['shop_bio'] ?? '');
-        
-        $stmt = $db->prepare("UPDATE users SET name = ?, shop_description = ? WHERE id = ?");
-        $stmt->bind_param("ssi", $newName, $newBio, $sellerId);
-        if ($stmt->execute()) {
-            $message = "Profile updated successfully!";
+
+        if ($newName === '') {
+            $message = "Display name is required.";
+            $messageType = "error";
         } else {
+            $stmt = $db->prepare("UPDATE users SET name = ? WHERE id = ?");
+            $stmt->bind_param("si", $newName, $retailId);
+            if ($stmt->execute()) {
+            $_SESSION['name'] = $newName;
+            $message = "Profile updated successfully!";
+            } else {
             $message = "Could not update profile.";
             $messageType = "error";
+            }
+            $stmt->close();
         }
-        $stmt->close();
     }
 
     if (isset($_POST['update_password'])) {
@@ -41,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
             $stmt = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
-            $stmt->bind_param("si", $passwordHash, $sellerId);
+            $stmt->bind_param("si", $passwordHash, $retailId);
             if ($stmt->execute()) {
                 $message = "Password updated successfully!";
             } else {
@@ -54,8 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // --- FETCH CURRENT DATA ---
-$stmt = $db->prepare("SELECT name, email, shop_description FROM users WHERE id = ?");
-$stmt->bind_param("i", $sellerId);
+$stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
+$stmt->bind_param("i", $retailId);
 $stmt->execute();
 $user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
@@ -64,8 +69,8 @@ $stmt->close();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Shop Settings | IAS Seller</title>
-    <link rel="stylesheet" href="../seller.css">
+    <title>Shop Settings | Easy PC Retail</title>
+    <link rel="stylesheet" href="../retail.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -84,17 +89,17 @@ $stmt->close();
         }
         
         /* HEADER */
-        .seller-header { 
+        .retail-header { 
             background: var(--ias-teal); 
             padding: 15px 30px; 
             border-bottom: 3px solid var(--ias-gold); 
         }
         .logo-text { color: var(--ias-gold); font-size: 24px; font-weight: 900; letter-spacing: 1px; }
 
-        .seller-layout { display: flex; flex: 1; overflow: hidden; }
+        .retail-layout { display: flex; flex: 1; overflow: hidden; }
 
         /* SIDEBAR */
-        .seller-sidebar { 
+        .retail-sidebar { 
             background: var(--sidebar-gray); 
             width: 260px; 
             padding-top: 10px; 
@@ -120,7 +125,7 @@ $stmt->close();
         .logout-btn { background: #b22222 !important; margin-top: auto; border-bottom: none; }
 
         /* MAIN CONTENT */
-        .seller-main { padding: 30px; flex: 1; overflow-y: auto; }
+        .retail-main { padding: 30px; flex: 1; overflow-y: auto; }
         .settings-container { max-width: 800px; }
         
         .card { 
@@ -156,21 +161,22 @@ $stmt->close();
 </head>
 <body>
 
-<header class="seller-header">
-    <div class="logo-text">IAS SELLER</div>
+<header class="retail-header">
+    <div class="logo-text">EASY PC RETAIL</div>
 </header>
 
-<div class="seller-layout">
-    <aside class="seller-sidebar">
-        <button class="sidebar-item" onclick="location.href='seller_dashboard.php'">📊 Dashboard</button>
-        <button class="sidebar-item" onclick="location.href='seller_products.php'">📦 My Products</button>
-        <button class="sidebar-item" onclick="location.href='seller_orders.php'">📜 Orders</button>
-        <button class="sidebar-item" onclick="location.href='seller_messages.php'">💬 Messages</button>
+<div class="retail-layout">
+    <aside class="retail-sidebar">
+        <button class="sidebar-item" onclick="location.href='retail_dashboard.php'">📊 Dashboard</button>
+        <button class="sidebar-item" onclick="location.href='retail_products.php'">📦 My Products</button>
+        <button class="sidebar-item" onclick="location.href='retail_orders.php'">📜 Orders</button>
+        <button class="sidebar-item" onclick="location.href='retail_messages.php'">💬 Messages</button>
+        <button class="sidebar-item" onclick="location.href='retail_reviews.php'">⭐ Reviews</button>
         <button class="sidebar-item active">⚙️ Settings</button>
         <button class="sidebar-item logout-btn" onclick="location.href='../logout.php'">🚪 Logout</button>
     </aside>
 
-    <main class="seller-main">
+    <main class="retail-main">
         <div class="settings-container">
             <?php if($message): ?>
                 <div class="alert <?php echo $messageType === 'error' ? 'error' : ''; ?>"><?php echo h($message); ?></div>
@@ -186,10 +192,6 @@ $stmt->close();
                     <div class="form-group">
                         <label>Shop Display Name</label>
                         <input type="text" name="shop_name" value="<?php echo h($user['name']); ?>" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Shop Description / Bio</label>
-                        <textarea name="shop_bio" rows="4" placeholder="Tell customers about your shop..."><?php echo h($user['shop_description']); ?></textarea>
                     </div>
                     <button type="submit" name="update_profile" class="btn-save">Save Changes</button>
                 </section>
@@ -208,7 +210,7 @@ $stmt->close();
 </div>
 
 <footer class="ias-footer">
-    © 2026 IAS E-Commerce Seller Center. All Rights Reserved.
+    © 2026 Easy PC Retail Center. All Rights Reserved.
 </footer>
 
 </body>

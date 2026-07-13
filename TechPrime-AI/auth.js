@@ -160,7 +160,7 @@ function initLoginPage() {
 
 function redirectByRole(role) {
     if (role === 'admin')   window.location.href = "ADMIN/admin_dashboard.php";
-    else if (role === 'seller')  window.location.href = "SELLER/seller_dashboard.php";
+    else if (role === 'seller' || role === 'retail_officer') window.location.href = "RETAIL/retail_dashboard.php";
     else if (role === 'courier') window.location.href = "courier/courier_dashboard.php";
     else                         window.location.href = "CLIENT/index.php";
 }

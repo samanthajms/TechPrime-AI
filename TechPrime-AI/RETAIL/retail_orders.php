@@ -3,13 +3,13 @@ session_start();
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/security.php';
 
-if (empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'seller') {
+if (empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'retail_officer') {
     header('Location: ../login.php');
     exit;
 }
 
 $db = getDbConnection();
-$sellerId = (int)$_SESSION['user_id'];
+$retailId = (int)$_SESSION['user_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pass_to_courier'])) {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pass_to_courier'])) {
                 WHERE oi.order_id = o.id AND p.seller_id = ?
             ) LIMIT 1'
         );
-        $verify->bind_param('ii', $orderId, $sellerId);
+        $verify->bind_param('ii', $orderId, $retailId);
         $verify->execute();
         if ($verify->get_result()->fetch_assoc()) {
             $up = $db->prepare("UPDATE orders SET status = 'to_receive' WHERE id = ?");
@@ -40,8 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pass_to_courier'])) {
                 $ins->close();
             }
             $chk->close();
-            logActivity($db, $sellerId, 'pass_to_courier', "Order #$orderId passed to courier");
-            header('Location: seller_orders.php?alert=passed');
+            logActivity($db, $retailId, 'pass_to_courier', "Order #$orderId passed to courier");
+            header('Location: retail_orders.php?alert=passed');
             exit;
         }
         $verify->close();
@@ -63,7 +63,7 @@ $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.cust
         )
         ORDER BY o.id DESC";
 $st = $db->prepare($sql);
-$st->bind_param('ii', $sellerId, $sellerId);
+$st->bind_param('ii', $retailId, $retailId);
 $st->execute();
 $rows = $st->get_result()->fetch_all(MYSQLI_ASSOC);
 $st->close();
@@ -73,20 +73,20 @@ $st->close();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Store Orders | IAS Seller</title>
+    <title>Store Orders | Easy PC Retail</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root { --ias-teal: #0998a8; --ias-gold: #f5f500; --sidebar-gray: #6a969a; --bg: #f4f7f6; }
         html, body { height: 100%; margin: 0; }
         body { display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); }
-        .seller-header { background: var(--ias-teal); padding: 15px 30px; border-bottom: 3px solid var(--ias-gold); }
+        .retail-header { background: var(--ias-teal); padding: 15px 30px; border-bottom: 3px solid var(--ias-gold); }
         .logo-text { color: var(--ias-gold); font-size: 24px; font-weight: 900; }
-        .seller-layout { display: flex; flex: 1; overflow: hidden; }
-        .seller-sidebar { background: var(--sidebar-gray); width: 260px; padding-top: 10px; display: flex; flex-direction: column; }
+        .retail-layout { display: flex; flex: 1; overflow: hidden; }
+        .retail-sidebar { background: var(--sidebar-gray); width: 260px; padding-top: 10px; display: flex; flex-direction: column; }
         .sidebar-item { background: transparent; color: white; border: none; padding: 15px 25px; width: 100%; text-align: left; font-size: 15px; font-weight: 600; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar-item:hover, .sidebar-item.active { background: rgba(0,0,0,0.1); color: var(--ias-gold); }
         .logout-btn { background: #b22222 !important; margin-top: auto; }
-        .seller-main { padding: 30px; flex: 1; overflow-y: auto; }
+        .retail-main { padding: 30px; flex: 1; overflow-y: auto; }
         .card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px dashed var(--ias-teal); }
         .order-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
         .order-table th { text-align: left; padding: 15px; background: #f8f9fa; color: #888; font-size: 11px; text-transform: uppercase; }
@@ -102,19 +102,20 @@ $st->close();
 </head>
 <body>
 
-<header class="seller-header"><div class="logo-text">IAS SELLER</div></header>
+<header class="retail-header"><div class="logo-text">EASY PC RETAIL</div></header>
 
-<div class="seller-layout">
-    <aside class="seller-sidebar">
-        <button type="button" class="sidebar-item" onclick="location.href='seller_dashboard.php'">📊 Dashboard</button>
-        <button type="button" class="sidebar-item" onclick="location.href='seller_products.php'">📦 My Products</button>
+<div class="retail-layout">
+    <aside class="retail-sidebar">
+        <button type="button" class="sidebar-item" onclick="location.href='retail_dashboard.php'">📊 Dashboard</button>
+        <button type="button" class="sidebar-item" onclick="location.href='retail_products.php'">📦 My Products</button>
         <button type="button" class="sidebar-item active">📜 Orders</button>
-        <button type="button" class="sidebar-item" onclick="location.href='seller_messages.php'">💬 Messages</button>
-        <button type="button" class="sidebar-item" onclick="location.href='seller_settings.php'">⚙️ Settings</button>
+        <button type="button" class="sidebar-item" onclick="location.href='retail_messages.php'">💬 Messages</button>
+        <button type="button" class="sidebar-item" onclick="location.href='retail_reviews.php'">⭐ Reviews</button>
+        <button type="button" class="sidebar-item" onclick="location.href='retail_settings.php'">⚙️ Settings</button>
         <button type="button" class="sidebar-item logout-btn" onclick="location.href='../logout.php'">🚪 Logout</button>
     </aside>
 
-    <main class="seller-main">
+    <main class="retail-main">
         <section class="card">
             <h2 style="margin:0;">Fulfillment Center</h2>
             <p style="color:#666;font-size:14px;">Client orders appear here. Pass ready orders to the courier.</p>
@@ -170,7 +171,7 @@ $st->close();
     </main>
 </div>
 
-<footer class="ias-footer">© 2026 IAS E-Commerce Seller Center.</footer>
+<footer class="ias-footer">© 2026 Easy PC Retail Center.</footer>
 <?php ias_alert_footer(); ?>
 </body>
 </html>

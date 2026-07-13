@@ -38,7 +38,7 @@
             </div>
             <div class="ep-footer-col">
                 <h5>Resources</h5>
-                <a href="../privacy_policy.php">Privacy Policy</a>
+                <a href="privacy_policy.php">Privacy Policy</a>
                 <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Account</a>
                 <a href="messages.php">Help Center</a>
             </div>

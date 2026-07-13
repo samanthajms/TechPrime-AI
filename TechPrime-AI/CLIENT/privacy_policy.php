@@ -1,12 +1,12 @@
 <?php
-require_once __DIR__ . '/includes/security.php';
+require_once __DIR__ . '/../includes/security.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy - IAS E-commerce</title>
+    <title>Privacy Policy - EASYPC</title>
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 40px 20px; background: #f4f6f9; }
         .container { background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
@@ -21,7 +21,7 @@ require_once __DIR__ . '/includes/security.php';
         <h1>Privacy Policy</h1>
         <p>Last Updated: May 05, 2026</p>
         
-        <p>Welcome to IAS E-commerce. Your privacy is critically important to us. This policy explains how we collect, use, and protect your personal data.</p>
+        <p>Welcome to Easy PC. Your privacy is critically important to us. This policy explains how we collect, use, and protect your personal data.</p>
 
         <h2>1. Data Collection</h2>
         <p>We collect information you provide directly to us, such as your name, email address, physical address, and phone number when you register an account or place an order.</p>

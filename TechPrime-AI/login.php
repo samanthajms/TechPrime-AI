@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: login.php?error=" . urlencode("Account locked after 3 failed attempts. Contact support."));
         } else {
             $remaining = 3 - $failed;
-            header("Location: login.php?error=" . urlencode("Invalid email or password. $remaining attempt(s) remaining."));
+            header("Location: login.php?error=" . urlencode("Invalid email or password."));
         }
         exit;
     }

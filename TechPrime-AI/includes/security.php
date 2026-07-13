@@ -38,7 +38,7 @@ function logActivity($db, $user_id, $action, $details) {
 // Role Based Access Control
 function checkRole($roles) {
     if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], (array)$roles)) {
-        header("Location: /login.html");
+        header("Location: /login.php");
         exit;
     }
 }
@@ -49,7 +49,7 @@ function checkSessionTimeout() {
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > $timeout)) {
         session_unset();
         session_destroy();
-        header("Location: /login.html?timeout=1");
+        header("Location: /login.php?timeout=1");
         exit;
     }
     $_SESSION['last_activity'] = time();

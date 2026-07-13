@@ -10,6 +10,7 @@ $isLoggedIn = isset($_SESSION['user_id']);
 $activePage = strtolower($type) === 'desktop' ? 'desktop' : (strtolower($type) === 'laptops' ? 'laptop' : '');
 $pageTitle  = h($type);
 $searchQuery = '';
+$bodyClass = 'ep-category-layout';
 
 $peripheralCategories = ['Mobile', 'Cameras', 'Accessories'];
 
