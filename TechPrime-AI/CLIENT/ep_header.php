@@ -76,7 +76,7 @@ $peripheralNavCategories = [
             <?php endif; ?>
         </button>
         <button id="profileBtn" class="icon-badge-btn profile-outline-btn ep-account-btn"
-                onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : './login.php'; ?>'">
+                onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : '../login.php'; ?>'">
             <i class="far fa-user"></i>
             <span class="ep-account-label">
                 <?php if ($isLoggedIn): ?>My Account<?php else: ?>Login /<br>Sign In<?php endif; ?>

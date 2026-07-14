@@ -121,7 +121,6 @@ function redirectByRole($role) {
 </head>
 <body>
 <div class="login-card">
-    <img src="assets/easypc-logo-transparent.png" alt="EasyPC" class="login-logo">
     <h1>EasyPC</h1>
     <p class="subtitle">SECURE ACCESS PORTAL</p>
 
