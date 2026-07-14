@@ -144,132 +144,193 @@ $products = $stmt->get_result();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>My Inventory | Easy PC Retail</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Inventory | TechPrime AI</title>
+    <link rel="stylesheet" href="../retail.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { --ias-teal: #0998a8; --ias-gold: #f5f500; --sidebar-gray: #6a969a; --bg: #f4f7f6; }
-        html, body { height: 100%; margin: 0; }
-        body { display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); }
-        .retail-header { background: var(--ias-teal); padding: 15px 30px; border-bottom: 3px solid var(--ias-gold); }
-        .logo-text { color: var(--ias-gold); font-size: 24px; font-weight: 900; letter-spacing: 1px; }
-        .retail-layout { display: flex; flex: 1; overflow: hidden; }
-        .retail-sidebar { background: var(--sidebar-gray); width: 260px; padding-top: 10px; display: flex; flex-direction: column; }
-        .sidebar-item { background: transparent; color: white; border: none; padding: 15px 25px; width: 100%; text-align: left; font-size: 15px; font-weight: 600; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .sidebar-item:hover, .sidebar-item.active { background: rgba(0,0,0,0.1); color: var(--ias-gold); }
-        .logout-btn { background: #b22222 !important; margin-top: auto; border-bottom: none; }
-        .retail-main { padding: 30px; flex: 1; overflow-y: auto; }
-        .content-grid { display: grid; grid-template-columns: 1fr 380px; gap: 25px; max-width: 1400px; }
-        .card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px dashed var(--ias-teal); }
-        .card h2 { margin-top: 0; font-size: 18px; font-weight: 800; color: #333; margin-bottom: 20px; }
         .product-table { width: 100%; border-collapse: collapse; }
-        .product-table th { text-align: left; padding: 12px; background: #fafafa; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-        .product-table td { padding: 15px 12px; border-bottom: 1px solid #eee; font-size: 14px; vertical-align: middle; }
-        .thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; background: #eef3f3; }
-        .category-pill { background: #e7f5f7; color: var(--ias-teal); padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-        .btn-edit { background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-        .btn-delete { background: #ff4757; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-        .btn-primary { background: var(--ias-teal); color: white; border: none; padding: 14px; width: 100%; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.3s; }
-        .btn-primary:hover { opacity: 0.9; }
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
+        .product-table th,
+        .product-table td { padding: 16px 18px; border-bottom: 1px solid #edf2f5; }
+        .product-table th { background: #f7fafb; color: var(--ias-slate); text-transform: uppercase; font-size: 12px; }
+        .thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 12px; background: #eef3f3; }
+        .category-pill { background: rgba(9, 152, 168, 0.12); color: var(--ias-teal); padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .btn-edit { border: none; background: #3498db; color: white; padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 700; }
+        .btn-delete { border: none; background: #ff4757; color: white; padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 700; }
+        .modal { position: fixed; inset: 0; background: rgba(12, 27, 33, 0.35); display: none; align-items: center; justify-content: center; z-index: 100; }
         .modal.open { display: flex; }
-        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 450px; max-width: 92%; max-height: 90vh; overflow-y: auto; position: relative; border: 2px solid var(--ias-teal); }
-        .modal .close { position: absolute; right: 20px; top: 15px; font-size: 24px; cursor: pointer; border: none; background: none; }
-        input, textarea, select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-family: inherit; background: white; }
-        label { font-size: 12px; font-weight: 800; color: #666; text-transform: uppercase; display: block; margin-top: 8px; }
-        .ias-footer { background: var(--ias-teal); color: white; padding: 15px 30px; font-size: 14px; font-weight: 500; }
+        .modal-card { width: min(560px, 100%); background: white; border-radius: 24px; padding: 28px; box-shadow: 0 24px 70px rgba(5, 22, 31, 0.16); }
+        .modal-card h3 { margin-top: 0; }
+        .modal-card .form-group { margin-bottom: 18px; }
+        .modal-card .form-control { width: 100%; }
+        .modal-close { position: absolute; right: 22px; top: 22px; border: none; background: transparent; font-size: 24px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<header class="retail-header"><div class="logo-text">EASY PC RETAIL</div></header>
-
-<div class="retail-layout">
-    <aside class="retail-sidebar">
-        <button type="button" class="sidebar-item" onclick="location.href='retail_dashboard.php'">Dashboard</button>
-        <button type="button" class="sidebar-item active">My Products</button>
-        <button type="button" class="sidebar-item" onclick="location.href='retail_orders.php'">Orders</button>
-        <button type="button" class="sidebar-item" onclick="location.href='retail_messages.php'">Messages</button>
-        <button type="button" class="sidebar-item" onclick="location.href='retail_reviews.php'">Reviews</button>
-        <button type="button" class="sidebar-item" onclick="location.href='retail_settings.php'">Settings</button>
-        <button type="button" class="sidebar-item logout-btn" onclick="location.href='../logout.php'">Logout</button>
-    </aside>
-
+<?php $active = 'inventory'; include __DIR__ . '/../includes/retail_shell.php'; ?>
     <main class="retail-main">
-        <div class="content-grid">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">My Inventory</h1>
+                <p class="page-subtitle">Manage products, stock, and pricing in one centralized retail control panel.</p>
+            </div>
+        </div>
+
+        <div class="grid-2">
             <section class="card">
-                <h2>Current Inventory</h2>
-                <table class="product-table">
-                    <thead>
-                        <tr><th>Image</th><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Action</th></tr>
-                    </thead>
-                    <tbody>
-                        <?php if ($products->num_rows > 0): ?>
-                            <?php while ($p = $products->fetch_assoc()):
-                                $imgSrc = ias_product_image_url($p);
-                                $editProduct = [
-                                    'id' => (int)$p['id'],
-                                    'name' => $p['name'] ?? '',
-                                    'price' => (float)$p['price'],
-                                    'stock' => (int)$p['stock'],
-                                    'category' => $p['category'] ?? 'Accessories',
-                                    'description' => $p['description'] ?? '',
-                                ];
-                            ?>
+                <div class="section-title">Current Inventory</div>
+                <div class="section-body" style="overflow-x:auto;">
+                    <table class="product-table">
+                        <thead>
                             <tr>
-                                <td><?php if ($imgSrc !== ''): ?><img src="<?php echo h($imgSrc); ?>" alt="" class="thumb"><?php endif; ?></td>
-                                <td><strong><?php echo h($p['name']); ?></strong></td>
-                                <td><span class="category-pill"><?php echo h($p['category'] ?? 'Accessories'); ?></span></td>
-                                <td style="color: var(--ias-teal); font-weight: 700;">PHP <?php echo number_format((float)$p['price'], 2); ?></td>
-                                <td><?php echo (int)$p['stock']; ?></td>
-                                <td style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <button type="button" class="btn-edit" onclick='openEditModal(<?php echo json_encode($editProduct, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>)'>Edit</button>
-                                    <form method="post" onsubmit="return confirm('Delete this product?');">
-                                        <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
-                                        <button type="submit" class="btn-delete">Delete</button>
-                                    </form>
-                                </td>
+                                <th>Image</th>
+                                <th>Product</th>
+                                <th>Category</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>Action</th>
                             </tr>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <tr><td colspan="6" style="text-align:center;color:#888;">No products yet.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            <?php if ($products->num_rows > 0): ?>
+                                <?php while ($p = $products->fetch_assoc()):
+                                    $imgSrc = ias_product_image_url($p);
+                                    $editProduct = [
+                                        'id' => (int)$p['id'],
+                                        'name' => $p['name'] ?? '',
+                                        'price' => (float)$p['price'],
+                                        'stock' => (int)$p['stock'],
+                                        'category' => $p['category'] ?? 'Accessories',
+                                        'description' => $p['description'] ?? '',
+                                    ];
+                                ?>
+                                <tr>
+                                    <td><?php if ($imgSrc !== ''): ?><img src="<?php echo h($imgSrc); ?>" alt="" class="thumb"><?php endif; ?></td>
+                                    <td><strong><?php echo h($p['name']); ?></strong></td>
+                                    <td><span class="category-pill"><?php echo h($p['category'] ?? 'Accessories'); ?></span></td>
+                                    <td style="color: var(--ias-teal); font-weight: 700;">PHP <?php echo number_format((float)$p['price'], 2); ?></td>
+                                    <td><?php echo (int)$p['stock']; ?></td>
+                                    <td style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                        <button type="button" class="btn-edit" onclick='openEditModal(<?php echo json_encode($editProduct, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>)'>Edit</button>
+                                        <form method="post" onsubmit="return confirm('Delete this product?');">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
+                                            <button type="submit" class="btn-delete">Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr><td colspan="6" style="text-align:center; color: var(--ias-slate);">No products yet.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
             <section class="card">
-                <h2>Add New Product</h2>
-                <form method="post" enctype="multipart/form-data">
-                    <label>Product Name</label>
-                    <input type="text" name="name" placeholder="e.g. Wireless Keyboard" required>
-
-                    <label>Category</label>
-                    <select name="category" required>
-                        <option value="" disabled selected>Select a category...</option>
-                        <?php foreach ($allowed_categories as $category): ?>
-                            <option value="<?php echo h($category); ?>"><?php echo h($category); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-
-                    <label>Price</label>
-                    <input type="number" step="0.01" min="0.01" name="price" required>
-
-                    <label>Stock</label>
-                    <input type="number" min="0" name="stock" required>
-
-                    <label>Description</label>
-                    <textarea name="description" rows="3" placeholder="Describe your product..."></textarea>
-
-                    <label>Product Image (JPG, JPEG, PNG)</label>
-                    <input type="file" name="product_image" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
-
-                    <button type="submit" name="add_product" class="btn-primary" style="margin-top:12px;">Add to Shop</button>
-                </form>
+                <div class="section-title">Add New Product</div>
+                <div class="section-body">
+                    <form method="post" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label class="form-label">Product Name</label>
+                            <input type="text" name="name" class="form-control" placeholder="e.g. Wireless Keyboard" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Category</label>
+                            <select name="category" class="form-control" required>
+                                <option value="" disabled selected>Select a category...</option>
+                                <?php foreach ($allowed_categories as $category): ?>
+                                    <option value="<?php echo h($category); ?>"><?php echo h($category); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Price</label>
+                            <input type="number" step="0.01" min="0.01" name="price" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Stock</label>
+                            <input type="number" min="0" name="stock" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" rows="4" class="form-control" placeholder="Describe your product..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Product Image</label>
+                            <input type="file" name="product_image" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+                        </div>
+                        <button type="submit" name="add_product" class="btn btn-primary" style="width:100%;">Add to Shop</button>
+                    </form>
+                </div>
             </section>
         </div>
     </main>
 </div>
+
+<div class="modal" id="editModal">
+    <div class="modal-card">
+        <button type="button" class="modal-close" onclick="closeEditModal()">×</button>
+        <h3>Edit Product</h3>
+        <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="edit_product" value="1">
+            <input type="hidden" name="product_id" id="editProductId">
+            <div class="form-group">
+                <label class="form-label">Product Name</label>
+                <input type="text" name="name" id="editName" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select name="category" id="editCategory" class="form-control" required>
+                    <?php foreach ($allowed_categories as $category): ?>
+                        <option value="<?php echo h($category); ?>"><?php echo h($category); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Price</label>
+                <input type="number" step="0.01" min="0.01" name="price" id="editPrice" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Stock</label>
+                <input type="number" min="0" name="stock" id="editStock" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea name="description" id="editDescription" rows="4" class="form-control"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Image (optional)</label>
+                <input type="file" name="product_image" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;">Save Changes</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditModal(product) {
+    document.getElementById('editProductId').value = product.id;
+    document.getElementById('editName').value = product.name;
+    document.getElementById('editPrice').value = product.price;
+    document.getElementById('editStock').value = product.stock;
+    document.getElementById('editCategory').value = product.category;
+    document.getElementById('editDescription').value = product.description;
+    document.getElementById('editModal').classList.add('open');
+}
+function closeEditModal() {
+    document.getElementById('editModal').classList.remove('open');
+}
+</script>
+
+<footer class="ias-footer">© 2026 TechPrime AI Retail Center.</footer>
+
+<?php ias_alert_footer(); ?>
+</body>
+</html>
+
 
 <div id="editModal" class="modal">
     <div class="modal-content">

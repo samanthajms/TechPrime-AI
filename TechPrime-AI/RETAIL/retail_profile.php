@@ -83,54 +83,25 @@ $userInitials = strtoupper(substr($user['name'] ?? 'R', 0, 1));
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile — Easy PC Retail</title>
-    <link rel="stylesheet" href="../ADMIN/admin_shared.css">
+    <title>My Profile — TechPrime AI</title>
+    <link rel="stylesheet" href="../retail.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-        @media(max-width:768px){ .profile-grid { grid-template-columns: 1fr; } }
-        .profile-avatar {
-            width: 72px; height: 72px;
-            background: var(--teal);
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 28px; font-weight: 800; color: #fff;
-            margin-bottom: 16px;
-        }
+        @media (max-width: 768px) { .profile-grid { grid-template-columns: 1fr; } }
+        .profile-avatar { width: 88px; height: 88px; background: var(--ias-teal); border-radius: 50%; display: grid; place-items: center; color: white; font-size: 32px; font-weight: 900; margin-bottom: 22px; }
     </style>
 </head>
 <body>
 
-<div class="sidebar">
-    <div class="sidebar-brand">
-        <div>
-            <div class="brand-text">Easy PC Retail</div>
-            <div class="brand-sub">Retail Officer</div>
-        </div>
-    </div>
-    <nav>
-        <a href="retail_dashboard.php">Dashboard</a>
-        <a href="retail_profile.php" class="active">Profile &amp; Settings</a>
-    </nav>
-    <div class="sidebar-footer">
-        <a href="../logout.php">🚪 Logout</a>
-    </div>
-</div>
-
-<div class="main">
-    <div class="topbar">
-        <div class="topbar-left">
-            <h2>My Profile</h2>
-            <div class="breadcrumb">Manage your account details</div>
-        </div>
-        <div class="topbar-right">
-            <div class="admin-badge">
-                <div class="avatar"><?php echo $userInitials; ?></div>
-                <?php echo h($user['name']); ?>
+<?php $active = 'settings'; include __DIR__ . '/../includes/retail_shell.php'; ?>
+    <main class="retail-main">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">My Profile</h1>
+                <p class="page-subtitle">Manage your personal details and account security from one place.</p>
             </div>
         </div>
-    </div>
-
-    <div class="page-content">
 
         <?php if ($success): ?>
             <div class="alert alert-success">✔ <?php echo h($success); ?></div>
@@ -140,16 +111,9 @@ $userInitials = strtoupper(substr($user['name'] ?? 'R', 0, 1));
         <?php endif; ?>
 
         <div class="profile-grid">
-
-            <!-- Profile Info -->
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <h3><span class="card-icon">👤</span> Profile Information</h3>
-                        <div class="card-subtitle">Update your name and contact info</div>
-                    </div>
-                </div>
-                <div class="card-body">
+            <section class="card">
+                <div class="section-title">Profile Information</div>
+                <div class="section-body">
                     <div class="profile-avatar"><?php echo $userInitials; ?></div>
                     <form method="post">
                         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
@@ -173,23 +137,17 @@ $userInitials = strtoupper(substr($user['name'] ?? 'R', 0, 1));
                         </div>
                         <div class="form-group">
                             <label class="form-label">Email</label>
-                            <input type="email" class="form-control" value="<?php echo h($user['email']); ?>" disabled style="background:var(--slate-50);color:var(--text-muted);">
+                            <input type="email" class="form-control" value="<?php echo h($user['email']); ?>" disabled>
                             <div class="form-hint">Email cannot be changed here.</div>
                         </div>
                         <button type="submit" class="btn btn-primary">Save Profile</button>
                     </form>
                 </div>
-            </div>
+            </section>
 
-            <!-- Change Password -->
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <h3><span class="card-icon">🔑</span> Change Password</h3>
-                        <div class="card-subtitle">Must meet current complexity requirements</div>
-                    </div>
-                </div>
-                <div class="card-body">
+            <section class="card">
+                <div class="section-title">Change Password</div>
+                <div class="section-body">
                     <form method="post">
                         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                         <input type="hidden" name="form" value="password">
@@ -209,12 +167,12 @@ $userInitials = strtoupper(substr($user['name'] ?? 'R', 0, 1));
                         <button type="submit" class="btn btn-primary">Update Password</button>
                     </form>
                 </div>
-            </div>
-
+            </section>
         </div>
-    </div>
+    </main>
 </div>
 
+<footer class="ias-footer">© 2026 TechPrime AI Retail Center.</footer>
 <?php ias_alert_footer(); ?>
 </body>
 </html>

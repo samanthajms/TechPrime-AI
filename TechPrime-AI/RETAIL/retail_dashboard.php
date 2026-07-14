@@ -39,132 +39,38 @@ $activities = $stmtAct->get_result();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Retail Officer Dashboard | IAS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retail Officer Dashboard | TechPrime AI</title>
     <link rel="stylesheet" href="../retail.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --ias-teal: #0998a8;
-            --ias-gold: #f5f500;
-            --sidebar-gray: #6a969a;
-            --bg-gray: #f4f7f6;
-        }
-
-        html, body { height: 100%; margin: 0; }
-        body { 
-            display: flex; 
-            flex-direction: column; 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            background: var(--bg-gray); 
-        }
-
-        /* THEME HEADER */
-        .retail-header {
-            background: var(--ias-teal);
-            padding: 15px 30px;
-            border-bottom: 3px solid var(--ias-gold);
-        }
-        .logo-text { color: var(--ias-gold); font-size: 24px; font-weight: 900; letter-spacing: 1px; }
-
-        .retail-layout { display: flex; flex: 1; overflow: hidden; }
-
-        /* FIXED SIDEBAR */
-        .retail-sidebar {
-            background: var(--sidebar-gray);
-            width: 260px;
-            padding-top: 10px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .sidebar-item {
-            background: transparent;
-            color: white;
-            border: none;
-            padding: 15px 25px;
-            width: 100%;
-            text-align: left;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            transition: 0.2s;
-        }
-
-        .sidebar-item:hover, .sidebar-item.active {
-            background: rgba(0,0,0,0.1);
-            color: var(--ias-gold);
-        }
-
-        .logout-btn { background: #b22222 !important; margin-top: auto; border-bottom: none; }
-
-        /* MAIN CONTENT AREA */
-        .retail-main { padding: 30px; flex: 1; overflow-y: auto; }
-        
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 1.8fr 1fr;
-            gap: 25px;
-            max-width: 1400px;
-        }
-
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            border: 1px dashed var(--ias-teal);
-        }
-
-        .card h2 { font-size: 20px; margin-top: 0; margin-bottom: 20px; color: #111; font-weight: 800; }
-
-        /* ACTIVITY LIST */
-        .act-row { padding: 15px 0; border-bottom: 1px solid #eee; }
-        .act-row:last-child { border-bottom: none; }
-        .act-title { font-weight: 700; color: var(--ias-teal); font-size: 14px; }
-        .act-sub { font-size: 13px; color: #555; margin: 4px 0; line-height: 1.4; }
-        .act-time { font-size: 11px; color: #999; text-transform: uppercase; }
-
-        /* FOOTER */
-        .ias-footer {
-            background: var(--ias-teal);
-            color: white;
-            padding: 15px 30px;
-            font-size: 14px;
-            font-weight: 500;
-        }
+        .dashboard-grid { max-width: 1400px; }
+        .dashboard-grid canvas { width: 100% !important; height: 100% !important; }
     </style>
 </head>
 <body>
 
-<header class="retail-header">
-    <div class="logo-text">IAS RETAIL CENTER</div>
-</header>
-
-<div class="retail-layout">
-    <aside class="retail-sidebar">
-        <button class="sidebar-item active">📊 Dashboard</button>
-        <button class="sidebar-item" onclick="location.href='retail_products.php'">📦 My Products</button>
-        <button class="sidebar-item" onclick="location.href='retail_orders.php'">📜 Orders</button>
-        <button class="sidebar-item" onclick="location.href='retail_messages.php'">💬 Messages</button>
-        <button class="sidebar-item" onclick="location.href='retail_reviews.php'">⭐ Reviews</button>
-        <button class="sidebar-item" onclick="location.href='retail_settings.php'">⚙️ Settings</button>
-        <button class="sidebar-item logout-btn" onclick="location.href='../logout.php'">🚪 Logout</button>
-    </aside>
-
+<?php $active = 'dashboard'; include __DIR__ . '/../includes/retail_shell.php'; ?>
     <main class="retail-main">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Retail Officer Dashboard</h1>
+                <p class="page-subtitle">Monitor sales performance, customer alerts, and AI-driven insights in one unified view.</p>
+            </div>
+        </div>
+
         <div class="dashboard-grid">
             <section class="card">
-                <h2>Monthly Sales Report</h2>
-                <div style="height: 380px;">
+                <div class="section-title">Monthly Sales Report</div>
+                <div class="section-body" style="min-height: 420px; padding: 0;">
                     <canvas id="salesChart"></canvas>
                 </div>
             </section>
 
             <section class="card">
-                <h2>Recent Notifications</h2>
-                <div class="rows-list">
+                <div class="section-title">Recent Notifications</div>
+                <div class="section-body">
                     <?php while($row = $activities->fetch_assoc()): ?>
                         <div class="act-row">
                             <div class="act-title">📩 New from <?php echo h($row['title']); ?></div>
@@ -172,11 +78,11 @@ $activities = $stmtAct->get_result();
                             <div class="act-time"><?php echo date('M d, Y • g:i a', strtotime($row['created_at'])); ?></div>
                         </div>
                     <?php endwhile; ?>
-                    
+
                     <?php if($activities->num_rows == 0): ?>
-                        <div style="text-align:center; padding: 40px 0;">
-                            <span style="font-size: 40px;">🔔</span>
-                            <p style="color:#999; margin-top:10px;">No new notifications yet.</p>
+                        <div style="text-align:center; padding: 40px 0; color: var(--ias-slate);">
+                            <span style="font-size: 42px;">🔔</span>
+                            <p style="margin-top: 14px;">No new notifications yet.</p>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -185,9 +91,7 @@ $activities = $stmtAct->get_result();
     </main>
 </div>
 
-<footer class="ias-footer">
-    © 2026 Easy PC Retail Center. All Rights Reserved.
-</footer>
+<footer class="ias-footer">© 2026 TechPrime AI Retail Center.</footer>
 
 <script>
 const ctx = document.getElementById('salesChart').getContext('2d');
@@ -213,7 +117,7 @@ new Chart(ctx, {
     options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { 
+        plugins: {
             legend: { display: false },
             tooltip: {
                 backgroundColor: '#0998a8',
@@ -227,11 +131,11 @@ new Chart(ctx, {
                 }
             }
         },
-        scales: { 
-            y: { 
-                beginAtZero: true, 
+        scales: {
+            y: {
+                beginAtZero: true,
                 grid: { color: '#f0f0f0' },
-                ticks: { 
+                ticks: {
                     callback: value => '₱' + value.toLocaleString()
                 }
             },

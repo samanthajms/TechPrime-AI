@@ -24,11 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $db->prepare("UPDATE users SET name = ? WHERE id = ?");
             $stmt->bind_param("si", $newName, $retailId);
             if ($stmt->execute()) {
-            $_SESSION['name'] = $newName;
-            $message = "Profile updated successfully!";
+                $_SESSION['name'] = $newName;
+                $message = "Profile updated successfully!";
             } else {
-            $message = "Could not update profile.";
-            $messageType = "error";
+                $message = "Could not update profile.";
+                $messageType = "error";
             }
             $stmt->close();
         }
@@ -87,95 +87,17 @@ $stmt->close();
             font-family: 'Plus Jakarta Sans', sans-serif; 
             background: var(--bg); 
         }
-        
-        /* HEADER */
-        .retail-header { 
-            background: var(--ias-teal); 
-            padding: 15px 30px; 
-            border-bottom: 3px solid var(--ias-gold); 
-        }
-        .logo-text { color: var(--ias-gold); font-size: 24px; font-weight: 900; letter-spacing: 1px; }
-
-        .retail-layout { display: flex; flex: 1; overflow: hidden; }
-
-        /* SIDEBAR */
-        .retail-sidebar { 
-            background: var(--sidebar-gray); 
-            width: 260px; 
-            padding-top: 10px; 
-            display: flex;
-            flex-direction: column;
-        }
-        .sidebar-item { 
-            background: transparent; 
-            color: white; 
-            border: none; 
-            padding: 15px 25px; 
-            width: 100%; 
-            text-align: left; 
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer; 
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .sidebar-item:hover, .sidebar-item.active { 
-            background: rgba(0,0,0,0.1); 
-            color: var(--ias-gold); 
-        }
-        .logout-btn { background: #b22222 !important; margin-top: auto; border-bottom: none; }
-
-        /* MAIN CONTENT */
         .retail-main { padding: 30px; flex: 1; overflow-y: auto; }
         .settings-container { max-width: 800px; }
-        
-        .card { 
-            background: white; 
-            border-radius: 12px; 
-            padding: 30px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
-            margin-bottom: 25px; 
-            border: 1px dashed var(--ias-teal);
-        }
-        .card h2 { font-size: 18px; margin-bottom: 20px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; font-weight: 800; }
-
-        .form-group { margin-bottom: 20px; }
-        label { display: block; font-size: 13px; font-weight: 700; color: #666; margin-bottom: 8px; }
-        input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; box-sizing: border-box; }
-        input[readonly] { background: #f9f9f9; color: #aaa; cursor: not-allowed; }
-        
-        .btn-save { background: var(--ias-teal); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.3s; }
-        .btn-save:hover { opacity: 0.9; transform: translateY(-1px); }
-        
+        .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 25px; border: 1px dashed var(--ias-teal); }
+        .btn-save { background: var(--ias-teal); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-weight: 700; cursor: pointer; }
         .alert { padding: 15px; background: #e3faf3; color: #0ca678; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 600; border: 1px solid #0ca678; }
         .alert.error { background: #fff0f0; color: #c92a2a; border-color: #ff8787; }
-
-        /* FOOTER */
-        .ias-footer {
-            background: var(--ias-teal);
-            color: white;
-            padding: 15px 30px;
-            font-size: 14px;
-            font-weight: 500;
-        }
     </style>
 </head>
 <body>
 
-<header class="retail-header">
-    <div class="logo-text">EASY PC RETAIL</div>
-</header>
-
-<div class="retail-layout">
-    <aside class="retail-sidebar">
-        <button class="sidebar-item" onclick="location.href='retail_dashboard.php'">📊 Dashboard</button>
-        <button class="sidebar-item" onclick="location.href='retail_products.php'">📦 My Products</button>
-        <button class="sidebar-item" onclick="location.href='retail_orders.php'">📜 Orders</button>
-        <button class="sidebar-item" onclick="location.href='retail_messages.php'">💬 Messages</button>
-        <button class="sidebar-item" onclick="location.href='retail_reviews.php'">⭐ Reviews</button>
-        <button class="sidebar-item active">⚙️ Settings</button>
-        <button class="sidebar-item logout-btn" onclick="location.href='../logout.php'">🚪 Logout</button>
-    </aside>
-
+<?php $active = 'settings'; include __DIR__ . '/../includes/retail_shell.php'; ?>
     <main class="retail-main">
         <div class="settings-container">
             <?php if($message): ?>
@@ -209,9 +131,7 @@ $stmt->close();
     </main>
 </div>
 
-<footer class="ias-footer">
-    © 2026 Easy PC Retail Center. All Rights Reserved.
-</footer>
+<footer class="ias-footer">© 2026 Easy PC Retail Center. All Rights Reserved.</footer>
 
 </body>
 </html>
