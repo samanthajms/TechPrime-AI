@@ -93,8 +93,9 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings — IAS Admin</title>
+    <title>Settings — EasyPC Admin</title>
     <link rel="stylesheet" href="admin_shared.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
         .rule-row {
             display: flex; align-items: flex-start;
@@ -120,7 +121,7 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
             color: var(--text-main);
             transition: all .15s;
         }
-        .stepper-btn:hover { background: var(--teal-pale); border-color: var(--teal); color: var(--teal-deeper); }
+        .stepper-btn:hover { background: var(--ep-green-light); border-color: var(--ep-green); color: var(--teal-deeper); }
         .stepper-input {
             width: 68px; padding: 7px 10px;
             border: 1.5px solid var(--border);
@@ -130,7 +131,7 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
             font-family: var(--font-mono);
             color: var(--text-main);
         }
-        .stepper-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(9,152,167,.1); }
+        .stepper-input:focus { border-color: var(--ep-green); box-shadow: 0 0 0 3px rgba(97,179,55,.15); }
         .stepper-range { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
         .preview-box {
@@ -142,18 +143,18 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
         .preview-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
         .preview-list li { font-size: 13px; display: flex; align-items: center; gap: 9px; transition: opacity .2s; }
         .pdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transition: background .2s; }
-        .pdot-on  { background: var(--teal); }
+        .pdot-on  { background: var(--ep-green); }
         .pdot-off { background: var(--slate-300); }
 
         .attempts-banner {
-            background: var(--teal-pale);
+            background: var(--ep-green-light);
             border: 1.5px solid var(--teal-light);
             border-radius: 10px;
             padding: 16px 20px;
             display: flex; gap: 14px; align-items: flex-start;
             margin-bottom: 0;
         }
-        .attempts-icon { font-size: 28px; flex-shrink: 0; }
+        .attempts-icon { font-size: 22px; flex-shrink: 0; color: var(--ep-green-dark); }
         .attempts-desc strong { display: block; font-size: 14px; color: var(--teal-deeper); margin-bottom: 4px; }
         .attempts-desc span { font-size: 12.5px; color: var(--slate-500); }
     </style>
@@ -162,20 +163,21 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
 
 <div class="sidebar">
     <div class="sidebar-brand">
+        <img src="../assets/easypc-logo-transparent.png" alt="EasyPC" class="ep-logo-img brand-logo">
         <div>
-            <div class="brand-text">IAS Admin</div>
-            <div class="brand-sub">Control Panel</div>
+            <div class="brand-text">EasyPC</div>
+            <div class="brand-sub">Admin</div>
         </div>
     </div>
     <nav>
-        <a href="admin_dashboard.php">Dashboard</a>
-        <a href="manage_users.php">Manage Users</a>
-        <a href="view_logs.php">Activity Logs</a>
-        <a href="admin_profile.php">My Profile</a>
-        <a href="admin_settings.php" class="active">Settings</a>
+        <a href="admin_dashboard.php"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
+        <a href="manage_users.php"><i class="fas fa-users"></i><span>Manage Users</span></a>
+        <a href="view_logs.php"><i class="fas fa-clipboard-list"></i><span>Activity Logs</span></a>
+        <a href="admin_profile.php"><i class="fas fa-user"></i><span>My Profile</span></a>
+        <a href="admin_settings.php" class="active"><i class="fas fa-cog"></i><span>Settings</span></a>
     </nav>
     <div class="sidebar-footer">
-        <a href="../logout.php">🚪 Logout</a>
+        <a href="../logout.php"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
     </div>
 </div>
 
@@ -213,13 +215,13 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
             <div class="card">
                 <div class="card-header">
                     <div>
-                        <h3><span class="card-icon">🔒</span> Login Security</h3>
+                        <h3><span class="card-icon"><i class="fas fa-shield-alt"></i></span> Login Security</h3>
                         <div class="card-subtitle">Controls how many failed attempts are allowed before an account is locked</div>
                     </div>
                 </div>
                 <div class="card-body">
                     <div class="attempts-banner">
-                        <div class="attempts-icon">🚫</div>
+                        <div class="attempts-icon"><i class="fas fa-ban"></i></div>
                         <div class="attempts-desc">
                             <strong>Maximum Failed Login Attempts</strong>
                             <span>After this many consecutive wrong passwords, the user's account will be automatically locked. An admin must unlock it. Default is 3.</span>
@@ -248,7 +250,7 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
             <div class="card">
                 <div class="card-header">
                     <div>
-                        <h3><span class="card-icon">🔑</span> Password Complexity</h3>
+                        <h3><span class="card-icon"><i class="fas fa-key"></i></span> Password Complexity</h3>
                         <div class="card-subtitle">Rules new users must meet when registering or changing passwords</div>
                     </div>
                 </div>
@@ -335,7 +337,7 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
             <!-- ── Live Preview ── -->
             <div class="card">
                 <div class="card-header">
-                    <h3><span class="card-icon">👁️</span> Live Preview</h3>
+                    <h3><span class="card-icon"><i class="fas fa-eye"></i></span> Live Preview</h3>
                 </div>
                 <div class="card-body">
                     <div class="preview-box">
@@ -367,7 +369,7 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
             </div>
 
             <div style="display:flex; gap:12px; align-items:center;">
-                <button type="submit" class="btn btn-primary">💾 Save Settings</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Settings</button>
                 <span class="text-muted text-small">Changes to login attempts take effect immediately.</span>
             </div>
         </form>

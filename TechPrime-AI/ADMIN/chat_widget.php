@@ -20,16 +20,16 @@ $_cw_openSeller = isset($_GET['chat_seller']) ? (int)$_GET['chat_seller'] : 0;
 <style>
 /* ── Tokens ─────────────────────────────────────────────────────────────── */
 :root {
-    --cw-teal:       #0998a8;
-    --cw-teal-dk:    #077a87;
-    --cw-yellow:     #f5f500;
-    --cw-yellow2:    #eaf41f;
-    --cw-bg:         #f0f2f5;
+    --cw-teal:       #61b337;
+    --cw-teal-dk:    #4b8b2a;
+    --cw-yellow:     #f3c400;
+    --cw-yellow2:    #f3c400;
+    --cw-bg:         #f3f4f5;
     --cw-surface:    #ffffff;
-    --cw-border:     #e4e6eb;
+    --cw-border:     #e4e8ea;
     --cw-text:       #1c1e21;
     --cw-muted:      #65676b;
-    --cw-sent-bg:    #0998a8;
+    --cw-sent-bg:    #61b337;
     --cw-recv-bg:    #e9ecef;
     --cw-radius:     16px;
     --cw-w:          340px;
@@ -54,11 +54,11 @@ $_cw_openSeller = isset($_GET['chat_seller']) ? (int)$_GET['chat_seller'] : 0;
     font-family: inherit;
     font-size: 14px;
     font-weight: 700;
-    box-shadow: 0 4px 18px rgba(9,152,168,.38);
+    box-shadow: 0 4px 18px rgba(97,179,55,.38);
     transition: transform .2s, box-shadow .2s;
     user-select: none;
 }
-#cwFab:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(9,152,168,.45); }
+#cwFab:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(97,179,55,.45); }
 #cwFab .cw-fab-icon { font-size: 18px; color: var(--cw-yellow); line-height: 1; }
 #cwFab .cw-fab-label { letter-spacing: .2px; }
 

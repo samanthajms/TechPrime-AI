@@ -83,14 +83,15 @@ $adminInitials = strtoupper(substr($admin['name'] ?? 'A', 0, 1));
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile — IAS Admin</title>
+    <title>My Profile — EasyPC Admin</title>
     <link rel="stylesheet" href="admin_shared.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
         .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media(max-width:768px){ .profile-grid { grid-template-columns: 1fr; } }
         .profile-avatar {
             width: 72px; height: 72px;
-            background: var(--teal);
+            background: var(--ep-green);
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-size: 28px; font-weight: 800; color: #fff;
@@ -102,20 +103,21 @@ $adminInitials = strtoupper(substr($admin['name'] ?? 'A', 0, 1));
 
 <div class="sidebar">
     <div class="sidebar-brand">
+        <img src="../assets/easypc-logo-transparent.png" alt="EasyPC" class="ep-logo-img brand-logo">
         <div>
-            <div class="brand-text">IAS Admin</div>
-            <div class="brand-sub">Control Panel</div>
+            <div class="brand-text">EasyPC</div>
+            <div class="brand-sub">Admin</div>
         </div>
     </div>
     <nav>
-        <a href="admin_dashboard.php">Dashboard</a>
-        <a href="manage_users.php">Manage Users</a>
-        <a href="view_logs.php">Activity Logs</a>
-        <a href="admin_profile.php" class="active">My Profile</a>
-        <a href="admin_settings.php">Settings</a>
+        <a href="admin_dashboard.php"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
+        <a href="manage_users.php"><i class="fas fa-users"></i><span>Manage Users</span></a>
+        <a href="view_logs.php"><i class="fas fa-clipboard-list"></i><span>Activity Logs</span></a>
+        <a href="admin_profile.php" class="active"><i class="fas fa-user"></i><span>My Profile</span></a>
+        <a href="admin_settings.php"><i class="fas fa-cog"></i><span>Settings</span></a>
     </nav>
     <div class="sidebar-footer">
-        <a href="../logout.php">🚪 Logout</a>
+        <a href="../logout.php"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
     </div>
 </div>
 
@@ -148,7 +150,7 @@ $adminInitials = strtoupper(substr($admin['name'] ?? 'A', 0, 1));
             <div class="card">
                 <div class="card-header">
                     <div>
-                        <h3><span class="card-icon">👤</span> Profile Information</h3>
+                        <h3><span class="card-icon"><i class="fas fa-user"></i></span> Profile Information</h3>
                         <div class="card-subtitle">Update your name and contact info</div>
                     </div>
                 </div>
@@ -188,7 +190,7 @@ $adminInitials = strtoupper(substr($admin['name'] ?? 'A', 0, 1));
             <div class="card">
                 <div class="card-header">
                     <div>
-                        <h3><span class="card-icon">🔑</span> Change Password</h3>
+                        <h3><span class="card-icon"><i class="fas fa-key"></i></span> Change Password</h3>
                         <div class="card-subtitle">Must meet current complexity requirements</div>
                     </div>
                 </div>
