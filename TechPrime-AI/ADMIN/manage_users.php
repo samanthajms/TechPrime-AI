@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/staff_layout.php';
  
 $db = getDbConnection();
 checkSessionTimeout();
@@ -151,8 +152,9 @@ $users = $user_rows[$active_tab];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Users — IAS Admin</title>
+    <title>Manage Users — EasyPC Admin</title>
     <link rel="stylesheet" href="admin_shared.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
         /* ── Tab Navigation ── */
         .tab-nav {
@@ -178,7 +180,7 @@ $users = $user_rows[$active_tab];
             font-family: var(--font-base);
         }
         .tab-btn:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-pale); }
-        .tab-btn.active { background: var(--teal); color: var(--yellow); border-color: var(--teal); }
+        .tab-btn.active { background: var(--ep-green); color: #fff; border-color: var(--ep-green); }
         .tab-btn .tab-count {
             background: rgba(255,255,255,.22);
             padding: 1px 7px;
@@ -223,7 +225,7 @@ $users = $user_rows[$active_tab];
             color: var(--text-main);
             transition: border-color .15s;
         }
-        .search-wrap input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(9,152,167,.1); }
+        .search-wrap input:focus { border-color: var(--ep-green); box-shadow: 0 0 0 3px rgba(97,179,55,.15); }
         .search-icon {
             position: absolute;
             left: 11px;
@@ -263,7 +265,7 @@ $users = $user_rows[$active_tab];
             transition: box-shadow .15s, border-color .15s;
             position: relative;
         }
-        .user-card:hover { box-shadow: 0 4px 16px rgba(9,152,167,.1); border-color: var(--teal-light); }
+        .user-card:hover { box-shadow: 0 4px 16px rgba(97,179,55,.12); border-color: var(--teal-light); }
         .user-card-top {
             display: flex;
             align-items: center;
@@ -391,8 +393,8 @@ $users = $user_rows[$active_tab];
             transition: border-color .15s;
         }
         .modal-select:focus, .modal-input:focus, .modal-textarea:focus {
-            border-color: var(--teal);
-            box-shadow: 0 0 0 3px rgba(9,152,167,.1);
+            border-color: var(--ep-green);
+            box-shadow: 0 0 0 3px rgba(97,179,55,.15);
         }
         .modal-textarea { resize: vertical; min-height: 70px; }
         .duration-grid {
@@ -414,7 +416,7 @@ $users = $user_rows[$active_tab];
             transition: all .15s;
         }
         .duration-chip:hover { border-color: var(--teal); color: var(--teal); }
-        .duration-chip.selected { background: var(--teal); color: var(--yellow); border-color: var(--teal); }
+        .duration-chip.selected { background: var(--ep-green); color: #fff; border-color: var(--ep-green); }
         .user-info-box {
             background: var(--teal-pale);
             border: 1px solid var(--teal-light);
@@ -430,8 +432,8 @@ $users = $user_rows[$active_tab];
             border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
             font-size: 14px; font-weight: 800;
-            background: var(--teal);
-            color: var(--yellow);
+            background: var(--ep-green);
+            color: #fff;
             flex-shrink: 0;
         }
         .user-info-box .uib-name { font-size: 13.5px; font-weight: 700; }
@@ -453,7 +455,7 @@ $users = $user_rows[$active_tab];
         .btn-store { background: #f0fdf4; color: #166534; border: 1.5px solid #bbf7d0; }
         .btn-store:hover { background: #166534; color: #fff; border-color: #166534; }
         .btn-contact { background: var(--teal-pale); color: var(--teal-deeper); border: 1.5px solid var(--teal-light); }
-        .btn-contact:hover { background: var(--teal); color: var(--yellow); border-color: var(--teal); }
+        .btn-contact:hover { background: var(--ep-green); color: #fff; border-color: var(--ep-green); }
         .users-summary { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
         .users-summary .stat-card { padding: 16px 18px; }
         .users-summary .stat-num { font-size: 24px; }
@@ -465,23 +467,23 @@ $users = $user_rows[$active_tab];
 </head>
 <body>
 
-<!-- ══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
 <div class="sidebar">
     <div class="sidebar-brand">
+        <img src="../assets/easypc-logo-transparent.png" alt="EasyPC" class="ep-logo-img brand-logo">
         <div>
-            <div class="brand-text">IAS Admin</div>
-            <div class="brand-sub">Control Panel</div>
+            <div class="brand-text">EasyPC</div>
+            <div class="brand-sub">Admin</div>
         </div>
     </div>
     <nav>
-        <a href="admin_dashboard.php">Dashboard</a>
-        <a href="manage_users.php" class="active">Manage Users</a>
-        <a href="view_logs.php">Activity Logs</a>
-        <a href="admin_profile.php">My Profile</a>
-        <a href="admin_settings.php">Settings</a>
+        <a href="admin_dashboard.php"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
+        <a href="manage_users.php" class="active"><i class="fas fa-users"></i><span>Manage Users</span></a>
+        <a href="view_logs.php"><i class="fas fa-clipboard-list"></i><span>Activity Logs</span></a>
+        <a href="admin_profile.php"><i class="fas fa-user"></i><span>My Profile</span></a>
+        <a href="admin_settings.php"><i class="fas fa-cog"></i><span>Settings</span></a>
     </nav>
     <div class="sidebar-footer">
-        <a href="../logout.php">🚪Logout</a>
+        <a href="../logout.php"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
     </div>
 </div>
 

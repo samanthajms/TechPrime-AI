@@ -81,41 +81,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Create Account | Easy PC</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>Create Account | EasyPC</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { --ias-teal: #0998a8; --bg: #f4f7f6; }
-        body { margin:0; font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px 0; }
-        .reg-card { background: white; padding: 35px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); width: 100%; max-width: 450px; border-top: 6px solid var(--ias-teal); }
-        h1 { color: var(--ias-teal); font-weight: 900; margin: 0 0 5px; text-align: center; }
-        p.sub { color: #888; font-size: 14px; margin-bottom: 25px; text-align: center; font-weight: 600; }
-        .error-box { background: #fff5f5; color: #ff4757; padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 700; margin-bottom: 20px; border: 1px solid #ffccd5; }
+        :root { --ep-green: #61b337; --ep-green-dark: #4b8b2a; --bg: #f3f4f5; }
+        body { margin:0; font-family: 'Poppins', sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px 0; }
+        .reg-card { background: white; padding: 35px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); width: 100%; max-width: 450px; border-top: 5px solid var(--ep-green); }
+        .reg-logo { height: 32px; width: auto; display: block; margin: 0 auto 10px; }
+        h1 { color: var(--ep-green); font-weight: 800; margin: 0 0 5px; text-align: center; }
+        p.sub { color: #888; font-size: 13px; margin-bottom: 25px; text-align: center; font-weight: 600; }
+        .error-box { background: #fff5f5; color: #ff4757; padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 600; margin-bottom: 20px; border: 1px solid #ffccd5; }
         .success-card { text-align: center; padding: 20px 0; }
-        .success-icon { font-size: 60px; margin-bottom: 15px; }
-        .success-title { color: var(--ias-teal); font-size: 22px; font-weight: 900; margin-bottom: 10px; }
+        .success-icon { font-size: 48px; margin-bottom: 15px; color: var(--ep-green); }
+        .success-title { color: var(--ep-green); font-size: 22px; font-weight: 800; margin-bottom: 10px; }
         .success-msg { color: #444; font-size: 14px; line-height: 1.7; margin-bottom: 20px; }
-        .email-highlight { background: #e7f5f7; color: var(--ias-teal); padding: 8px 14px; border-radius: 8px; font-weight: 800; display: inline-block; margin: 8px 0; word-break: break-all; }
-        .gmail-btn { display: inline-block; background: #EA4335; color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 14px; margin-top: 10px; transition: 0.3s; }
-        .gmail-btn:hover { background: #c5221f; transform: translateY(-2px); }
+        .email-highlight { background: #eef8e6; color: var(--ep-green-dark); padding: 8px 14px; border-radius: 8px; font-weight: 700; display: inline-block; margin: 8px 0; word-break: break-all; }
+        .gmail-btn { display: inline-block; background: #EA4335; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 14px; margin-top: 10px; transition: 0.2s; }
+        .gmail-btn:hover { background: #c5221f; transform: translateY(-1px); }
         .note { color: #999; font-size: 12px; margin-top: 15px; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-        label { display: block; font-size: 11px; font-weight: 800; color: #666; text-transform: uppercase; margin-bottom: 5px; }
-        input, select { width: 100%; padding: 12px; border: 2px solid #eee; border-radius: 10px; box-sizing: border-box; font-family: inherit; font-size: 14px; }
-        input:focus { outline: none; border-color: var(--ias-teal); background: #f0fbfc; }
+        label { display: block; font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 12px; border: 1.5px solid #e4e8ea; border-radius: 10px; box-sizing: border-box; font-family: inherit; font-size: 14px; }
+        input:focus { outline: none; border-color: var(--ep-green); box-shadow: 0 0 0 3px rgba(97,179,55,0.15); }
         #passwordComplexity { font-size: 11px; margin: 10px 0; padding: 12px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; }
         .invalid { color: #e74c3c; font-weight: 600; }
         .valid { color: #27ae60; font-weight: 600; }
-        .btn-reg { background: var(--ias-teal); color: white; border: none; width: 100%; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; margin-top: 15px; }
-        .btn-reg:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(9, 152, 168, 0.3); }
+        .btn-reg { background: var(--ep-green); color: white; border: none; width: 100%; padding: 15px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; transition: 0.2s; margin-top: 15px; font-family: inherit; }
+        .btn-reg:hover { background: var(--ep-green-dark); transform: translateY(-1px); box-shadow: 0 5px 15px rgba(97, 179, 55, 0.3); }
         .footer-link { margin-top: 20px; font-size: 13px; color: #666; text-align: center; }
-        .footer-link a { color: var(--ias-teal); text-decoration: none; font-weight: 700; }
+        .footer-link a { color: var(--ep-green-dark); text-decoration: none; font-weight: 700; }
     </style>
 </head>
 <body>
 
 <div class="reg-card">
+    <img src="assets/easypc-logo-transparent.png" alt="EasyPC" class="reg-logo">
     <h1>Create Account</h1>
-    <p class="sub">Join the Easy PC Marketplace</p>
+    <p class="sub">Join the EasyPC Marketplace</p>
 
     <?php if ($registered): ?>
         <!-- ✅ Registration Success — Email Activation Notice -->

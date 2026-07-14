@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/staff_layout.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -42,84 +43,108 @@ $ship = $shipStmt->get_result()->fetch_assoc();
 $shipStmt->close();
 
 $addr = $order['shipping_address'] ?: $order['user_address'];
+
+staff_page_start([
+    'role' => $_SESSION['role'],
+    'title' => 'Order #' . $oid,
+    'active' => 'orders',
+    'heading' => 'Order #' . $oid,
+    'subtitle' => 'Order details',
+    'extra_head' => '<style>.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;margin-bottom:20px;}</style>',
+]);
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Order Details - Associate</title>
-    <style>
-        body { margin: 0; font-family: Arial, sans-serif; background: #f4f6f9; }
-        .sidebar { width: 300px; height: 100vh; position: fixed; left: 0; top: 0; background: #0998a8; color: #fff; display: flex; flex-direction: column; padding: 20px 0 0; }
-        .sidebar .brand { padding: 8px 24px 24px; text-align: center; color: #f5f500; font-weight: 800; font-size: 26px; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; padding: 14px 24px; color: #fff; text-decoration: none; font-weight: 600; border-left: 4px solid transparent; }
-        .sidebar a.active { background: rgba(255,255,255,0.2); border-left-color: #f5f500; }
-        .sidebar .logout-link { margin-top: auto; border-top: 1px solid rgba(255,255,255,0.25); }
-        .main { margin-left: 300px; padding: 20px; }
-        .card { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        .card h3 { margin-top: 0; color: #0998a8; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-        .btn { padding: 10px 18px; background: #0998a8; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; }
-        .table { width: 100%; border-collapse: collapse; }
-        .table th, .table td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
-    </style>
-</head>
-<body>
 
-<aside class="sidebar">
-    <div class="brand">IAS</div>
-    <a href="associate_dashboard.php">📊 <span>Dashboard</span></a>
-    <a href="associate_orders.php" class="active">🛒 <span>Orders</span></a>
-    <a href="associate_assign.php">🚚 <span>Delivery Assignment</span></a>
-    <a href="associate_history.php">📜 <span>History</span></a>
-    <a href="../logout.php" class="logout-link">🚪 <span>Logout</span></a>
-</aside>
+        <p style="margin:0 0 16px;">
+            <a href="associate_orders.php" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Orders</a>
+        </p>
 
-<div class="main">
-    <p><a href="associate_orders.php" class="btn">← Back to Orders</a></p>
-    <div class="grid">
-        <div class="card">
-            <h3>Customer</h3>
-            <p><strong>Name:</strong> <?php echo h($order['name'] . ' ' . $order['surname']); ?></p>
-            <p><strong>Email:</strong> <?php echo h($order['email']); ?></p>
-            <p><strong>Phone:</strong> <?php echo h($order['customer_phone'] ?? ''); ?></p>
+        <div class="detail-grid">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h3><span class="card-icon"><i class="fas fa-user"></i></span> Customer</h3>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p><strong>Name:</strong> <?php echo h($order['name'] . ' ' . $order['surname']); ?></p>
+                    <p><strong>Email:</strong> <?php echo h($order['email']); ?></p>
+                    <p><strong>Phone:</strong> <?php echo h($order['customer_phone'] ?? ''); ?></p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h3><span class="card-icon"><i class="fas fa-map-marker-alt"></i></span> Shipping</h3>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p><?php echo nl2br(h($addr)); ?></p>
+                </div>
+            </div>
+            <?php if ($ship): ?>
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h3><span class="card-icon"><i class="fas fa-shipping-fast"></i></span> Shipment</h3>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p><strong>Carrier:</strong> <?php echo h($ship['carrier']); ?></p>
+                    <p><strong>Shipment:</strong> <?php echo h(ias_order_display_status(null, $ship['shipment_status'] ?? '')); ?></p>
+                    <p><strong>Order:</strong> <?php echo h(ias_order_display_status($order['status'] ?? '')); ?></p>
+                </div>
+            </div>
+            <?php endif; ?>
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h3><span class="card-icon"><i class="fas fa-receipt"></i></span> Order</h3>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p><strong>Total:</strong> PHP <?php echo number_format((float)$order['total'], 2); ?></p>
+                    <p><strong>Status:</strong> <?php echo h(ias_order_display_status($order['status'] ?? '')); ?></p>
+                    <p><strong>Date:</strong> <?php echo h($order['created_at']); ?></p>
+                </div>
+            </div>
         </div>
-        <div class="card">
-            <h3>Shipping</h3>
-            <p><?php echo nl2br(h($addr)); ?></p>
-        </div>
-        <?php if ($ship): ?>
-        <div class="card">
-            <h3>Shipment</h3>
-            <p><strong>Carrier:</strong> <?php echo h($ship['carrier']); ?></p>
-            <p><strong>Shipment:</strong> <?php echo h(ias_order_display_status(null, $ship['shipment_status'] ?? '')); ?></p>
-            <p><strong>Order:</strong> <?php echo h(ias_order_display_status($order['status'] ?? '')); ?></p>
-        </div>
-        <?php endif; ?>
-        <div class="card">
-            <h3>Order</h3>
-            <p><strong>Total:</strong> PHP <?php echo number_format((float)$order['total'], 2); ?></p>
-            <p><strong>Status:</strong> <?php echo h(ias_order_display_status($order['status'] ?? '')); ?></p>
-            <p><strong>Date:</strong> <?php echo h($order['created_at']); ?></p>
-        </div>
-    </div>
-    <div class="card">
-        <h3>Line Items</h3>
-        <table class="table">
-            <thead><tr><th>Product</th><th>Qty</th><th>Price</th></tr></thead>
-            <tbody>
-                <?php foreach ($itemRows as $it): ?>
-                <tr>
-                    <td><?php echo h($it['name']); ?></td>
-                    <td><?php echo (int)$it['quantity']; ?></td>
-                    <td>PHP <?php echo number_format((float)$it['price'], 2); ?></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
 
-<?php ias_alert_footer(); ?>
-</body>
-</html>
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h3><span class="card-icon"><i class="fas fa-box"></i></span> Line Items</h3>
+                </div>
+            </div>
+            <div class="card-body" style="padding-top:0;">
+                <div class="table-wrap">
+                    <table class="ias-table">
+                        <thead>
+                            <tr><th>Product</th><th>Qty</th><th>Price</th></tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($itemRows as $it): ?>
+                            <tr>
+                                <td><?php echo h($it['name']); ?></td>
+                                <td><?php echo (int)$it['quantity']; ?></td>
+                                <td>PHP <?php echo number_format((float)$it['price'], 2); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($itemRows)): ?>
+                            <tr><td colspan="3" class="empty-state">No line items.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+<?php
+$flash = '';
+if ($__m = ias_alert_message_from_request()) {
+    $__t = ((!empty($_GET['alert']) && $_GET['alert'] === 'error') || !empty($_GET['error'])) ? 'error' : 'success';
+    $flash = '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof IAS_UI!=="undefined")IAS_UI.alert('
+        . json_encode($__m, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ','
+        . json_encode($__t) . ',0);});</script>';
+}
+staff_page_end($flash);
+?>
