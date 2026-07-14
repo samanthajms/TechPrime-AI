@@ -6,7 +6,7 @@ require_once __DIR__ . '/../includes/staff_layout.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
-checkRole(['technician', 'inventory_custodian']);
+checkRole('inventory_custodian');
 
 $user_id = (int)$_SESSION['user_id'];
 $roleLabel = h(ias_staff_role_label($_SESSION['role']));
@@ -79,11 +79,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$userInitials = strtoupper(substr($user['name'] ?? 'S', 0, 1));
+$userInitials = strtoupper(substr($user['name'] ?? 'I', 0, 1));
 
 staff_page_start([
-    'role' => $_SESSION['role'],
-    'title' => 'My Profile',
+    'role' => 'inventory_custodian',
+    'title' => 'Profile',
     'active' => 'profile',
     'heading' => 'My Profile',
     'subtitle' => 'Manage your account details',

@@ -38,7 +38,6 @@ function ias_product_categories(): array
 function ias_staff_roles(): array
 {
     return [
-        'technician'          => 'Technician',
         'inventory_custodian' => 'Inventory Custodian',
         'retail_officer'      => 'Retail Officer',
     ];

@@ -82,9 +82,11 @@ function redirectByRole($role) {
         case 'retail_officer':
             header("Location: RETAIL/retail_dashboard.php");
             break;
-        case 'technician':
         case 'inventory_custodian':
-            header("Location: ASSOCIATE/associate_dashboard.php");
+            header("Location: INVENTORY/inventory_dashboard.php");
+            break;
+        case 'technician':
+            header("Location: login.php?error=" . urlencode("The Technician role has been removed. Contact an administrator."));
             break;
         default:
             header("Location: CLIENT/index.php");

@@ -5,11 +5,11 @@ require_once __DIR__ . '/../includes/staff_layout.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
-checkRole(['technician', 'inventory_custodian']);
+checkRole('inventory_custodian');
 
 $oid = (int)($_GET['id'] ?? 0);
 if ($oid <= 0) {
-    header('Location: associate_orders.php');
+    header('Location: inventory_orders.php');
     exit;
 }
 
@@ -24,7 +24,7 @@ $order = $st->get_result()->fetch_assoc();
 $st->close();
 
 if (!$order) {
-    header('Location: associate_orders.php');
+    header('Location: inventory_orders.php');
     exit;
 }
 
@@ -45,7 +45,7 @@ $shipStmt->close();
 $addr = $order['shipping_address'] ?: $order['user_address'];
 
 staff_page_start([
-    'role' => $_SESSION['role'],
+    'role' => 'inventory_custodian',
     'title' => 'Order #' . $oid,
     'active' => 'orders',
     'heading' => 'Order #' . $oid,
@@ -55,7 +55,7 @@ staff_page_start([
 ?>
 
         <p style="margin:0 0 16px;">
-            <a href="associate_orders.php" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Orders</a>
+            <a href="inventory_orders.php" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Orders</a>
         </p>
 
         <div class="detail-grid">
@@ -89,7 +89,6 @@ staff_page_start([
                     </div>
                 </div>
                 <div class="card-body">
-                    <p><strong>Carrier:</strong> <?php echo h($ship['carrier']); ?></p>
                     <p><strong>Shipment:</strong> <?php echo h(ias_order_display_status(null, $ship['shipment_status'] ?? '')); ?></p>
                     <p><strong>Order:</strong> <?php echo h(ias_order_display_status($order['status'] ?? '')); ?></p>
                 </div>
@@ -138,13 +137,4 @@ staff_page_start([
             </div>
         </div>
 
-<?php
-$flash = '';
-if ($__m = ias_alert_message_from_request()) {
-    $__t = ((!empty($_GET['alert']) && $_GET['alert'] === 'error') || !empty($_GET['error'])) ? 'error' : 'success';
-    $flash = '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof IAS_UI!=="undefined")IAS_UI.alert('
-        . json_encode($__m, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ','
-        . json_encode($__t) . ',0);});</script>';
-}
-staff_page_end($flash);
-?>
+<?php staff_page_end(); ?>

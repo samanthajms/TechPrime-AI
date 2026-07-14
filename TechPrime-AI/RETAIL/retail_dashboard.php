@@ -28,64 +28,91 @@ for ($i = 11; $i >= 0; $i--) {
     $salesData[] = $res['monthly_total'] ?? 0;
 }
 
-$activityQuery = "SELECT 'Message' as type, u.name as title, m.message as subtitle, m.created_at
-                  FROM messages m JOIN users u ON m.sender_id = u.id
-                  WHERE m.receiver_id = ? ORDER BY m.created_at DESC LIMIT 5";
-$stmtAct = $db->prepare($activityQuery);
-$stmtAct->bind_param('i', $retailId);
-$stmtAct->execute();
-$activities = $stmtAct->get_result();
+// Delivery cards (same metrics as former associate dashboard, scoped to this seller's orders)
+$totalQ = $db->prepare(
+    "SELECT COUNT(DISTINCT s.id) FROM shipments s
+     INNER JOIN orders o ON s.order_id = o.id
+     WHERE EXISTS (
+        SELECT 1 FROM order_items oi INNER JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = o.id AND p.seller_id = ?
+     )"
+);
+$totalQ->bind_param('i', $retailId);
+$totalQ->execute();
+$total = (int)($totalQ->get_result()->fetch_row()[0] ?? 0);
+$totalQ->close();
+
+$pendingQ = $db->prepare(
+    "SELECT COUNT(DISTINCT s.id) FROM shipments s
+     INNER JOIN orders o ON s.order_id = o.id
+     WHERE s.shipment_status != 'delivered'
+     AND EXISTS (
+        SELECT 1 FROM order_items oi INNER JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = o.id AND p.seller_id = ?
+     )"
+);
+$pendingQ->bind_param('i', $retailId);
+$pendingQ->execute();
+$pending = (int)($pendingQ->get_result()->fetch_row()[0] ?? 0);
+$pendingQ->close();
+
+$doneQ = $db->prepare(
+    "SELECT COUNT(DISTINCT s.id) FROM shipments s
+     INNER JOIN orders o ON s.order_id = o.id
+     WHERE s.shipment_status = 'delivered'
+     AND EXISTS (
+        SELECT 1 FROM order_items oi INNER JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = o.id AND p.seller_id = ?
+     )"
+);
+$doneQ->bind_param('i', $retailId);
+$doneQ->execute();
+$done = (int)($doneQ->get_result()->fetch_row()[0] ?? 0);
+$doneQ->close();
 
 staff_page_start([
     'role' => 'retail_officer',
     'title' => 'Retail Dashboard',
     'active' => 'dashboard',
     'heading' => 'Retail Dashboard',
-    'subtitle' => 'Sales performance and recent activity',
+    'subtitle' => 'Sales performance and delivery overview',
     'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>',
 ]);
 ?>
 
-        <div class="dash-grid">
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <h3><span class="card-icon"><i class="fas fa-chart-line"></i></span> Monthly Sales Report</h3>
-                        <div class="card-subtitle">Revenue for the last 12 months</div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="chart-wrap">
-                        <canvas id="salesChart"></canvas>
-                    </div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Deliveries</div>
+                <div class="stat-num"><?php echo $total; ?></div>
+                <div class="stat-icon"><i class="fas fa-truck"></i></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Pending Shipments</div>
+                <div class="stat-num"><?php echo $pending; ?></div>
+                <div class="stat-icon"><i class="fas fa-clock"></i></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Completed Deliveries</div>
+                <div class="stat-num"><?php echo $done; ?></div>
+                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Product Demand Forecast</div>
+                <div class="stat-num" style="font-size:18px;padding-top:8px;">Coming Soon</div>
+                <div class="stat-icon"><i class="fas fa-chart-pie"></i></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h3><span class="card-icon"><i class="fas fa-chart-line"></i></span> Monthly Sales Report</h3>
+                    <div class="card-subtitle">Revenue for the last 12 months</div>
                 </div>
             </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <h3><span class="card-icon"><i class="fas fa-bell"></i></span> Recent Notifications</h3>
-                        <div class="card-subtitle">Latest customer messages</div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <?php
-                    $hasRows = false;
-                    while ($row = $activities->fetch_assoc()):
-                        $hasRows = true;
-                    ?>
-                        <div class="act-row">
-                            <div class="act-title">New from <?php echo h($row['title']); ?></div>
-                            <div class="act-sub">"<?php echo h(substr($row['subtitle'], 0, 80)); ?>…"</div>
-                            <div class="act-time"><?php echo date('M d, Y • g:i a', strtotime($row['created_at'])); ?></div>
-                        </div>
-                    <?php endwhile; ?>
-                    <?php if (!$hasRows): ?>
-                        <div class="empty-state">
-                            <i class="fas fa-bell" style="font-size:28px;opacity:.35;margin-bottom:8px;"></i>
-                            <p>No new notifications yet.</p>
-                        </div>
-                    <?php endif; ?>
+            <div class="card-body">
+                <div class="chart-wrap">
+                    <canvas id="salesChart"></canvas>
                 </div>
             </div>
         </div>
