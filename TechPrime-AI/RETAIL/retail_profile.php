@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/staff_layout.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -77,75 +78,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $userInitials = strtoupper(substr($user['name'] ?? 'R', 0, 1));
+
+staff_page_start([
+    'role' => 'retail_officer',
+    'title' => 'My Profile',
+    'active' => 'profile',
+    'heading' => 'My Profile',
+    'subtitle' => 'Manage your account details',
+    'extra_head' => <<<'EXTRA'
+<style>
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 768px) { .profile-grid { grid-template-columns: 1fr; } }
+.profile-avatar {
+    width: 72px; height: 72px;
+    background: var(--ep-green);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 800; color: #fff;
+    margin-bottom: 16px;
+}
+</style>
+EXTRA
+]);
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile — Easy PC Retail</title>
-    <link rel="stylesheet" href="../ADMIN/admin_shared.css">
-    <style>
-        .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-        @media(max-width:768px){ .profile-grid { grid-template-columns: 1fr; } }
-        .profile-avatar {
-            width: 72px; height: 72px;
-            background: var(--teal);
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 28px; font-weight: 800; color: #fff;
-            margin-bottom: 16px;
-        }
-    </style>
-</head>
-<body>
-
-<div class="sidebar">
-    <div class="sidebar-brand">
-        <div>
-            <div class="brand-text">Easy PC Retail</div>
-            <div class="brand-sub">Retail Officer</div>
-        </div>
-    </div>
-    <nav>
-        <a href="retail_dashboard.php">Dashboard</a>
-        <a href="retail_profile.php" class="active">Profile &amp; Settings</a>
-    </nav>
-    <div class="sidebar-footer">
-        <a href="../logout.php">🚪 Logout</a>
-    </div>
-</div>
-
-<div class="main">
-    <div class="topbar">
-        <div class="topbar-left">
-            <h2>My Profile</h2>
-            <div class="breadcrumb">Manage your account details</div>
-        </div>
-        <div class="topbar-right">
-            <div class="admin-badge">
-                <div class="avatar"><?php echo $userInitials; ?></div>
-                <?php echo h($user['name']); ?>
-            </div>
-        </div>
-    </div>
-
-    <div class="page-content">
 
         <?php if ($success): ?>
-            <div class="alert alert-success">✔ <?php echo h($success); ?></div>
+            <div class="alert alert-success"><i class="fas fa-check-circle"></i> <?php echo h($success); ?></div>
         <?php endif; ?>
         <?php if ($error): ?>
-            <div class="alert alert-error">✘ <?php echo h($error); ?></div>
+            <div class="alert alert-error"><i class="fas fa-times-circle"></i> <?php echo h($error); ?></div>
         <?php endif; ?>
 
         <div class="profile-grid">
 
-            <!-- Profile Info -->
             <div class="card">
                 <div class="card-header">
                     <div>
-                        <h3><span class="card-icon">👤</span> Profile Information</h3>
+                        <h3><span class="card-icon"><i class="fas fa-user"></i></span> Profile Information</h3>
                         <div class="card-subtitle">Update your name and contact info</div>
                     </div>
                 </div>
@@ -181,11 +150,10 @@ $userInitials = strtoupper(substr($user['name'] ?? 'R', 0, 1));
                 </div>
             </div>
 
-            <!-- Change Password -->
             <div class="card">
                 <div class="card-header">
                     <div>
-                        <h3><span class="card-icon">🔑</span> Change Password</h3>
+                        <h3><span class="card-icon"><i class="fas fa-key"></i></span> Change Password</h3>
                         <div class="card-subtitle">Must meet current complexity requirements</div>
                     </div>
                 </div>
@@ -212,9 +180,5 @@ $userInitials = strtoupper(substr($user['name'] ?? 'R', 0, 1));
             </div>
 
         </div>
-    </div>
-</div>
 
-<?php ias_alert_footer(); ?>
-</body>
-</html>
+<?php staff_page_end(); ?>
