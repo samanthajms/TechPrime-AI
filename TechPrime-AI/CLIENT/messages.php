@@ -57,10 +57,8 @@ if ($activeContactId) {
     <div class="ep-page-inner">
 
         <div class="ep-page-header-row">
-            <button class="ep-back-btn" onclick="location.href='index.php'">
-                <i class="fas fa-arrow-left"></i> Back to Home
-            </button>
-            <h2 class="ep-page-title">EasyFix Support</h2>
+            <a href="index.php" class="ep-back-link">← Back to Home</a>
+            <h2 class="ep-page-title">Support</h2>
         </div>
 
         <div class="ep-messaging-layout">

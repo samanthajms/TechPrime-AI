@@ -77,9 +77,7 @@ $peripheralCategories = ['Mobile', 'Cameras', 'Accessories'];
     <div class="ep-page-inner">
 
         <div class="ep-page-header-row">
-            <button class="ep-back-btn" onclick="location.href='index.php'">
-                <i class="fas fa-arrow-left"></i> Back to Home
-            </button>
+            <a href="index.php" class="ep-back-link">← Back to Home</a>
             <h2 class="ep-page-title">All Products</h2>
         </div>
 

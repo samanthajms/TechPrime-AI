@@ -3,7 +3,7 @@
  * ep_header.php — Shared EasyPC header & nav for all CLIENT pages.
  * Variables expected from the including file:
  *   $isLoggedIn  (bool)
- *   $activePage  (string) — 'home'|'desktop'|'laptop'|'easyfix'|'peripherals'|'brands'|'products'
+ *   $activePage  (string) — 'home'|'desktop'|'laptop'|'peripherals'|'brands'|'products'
  *
  * Optional:
  *   $searchQuery (string) — pre-fills the search box
@@ -12,6 +12,24 @@ $peripheralCategories = $peripheralCategories ?? ['Mobile', 'Cameras', 'Accessor
 $searchQuery          = $searchQuery ?? '';
 $isHomePage           = ($activePage ?? '') === 'home';
 $bodyClass            = $bodyClass ?? '';
+
+// Categories shown in the PERIPHERALS nav dropdown (label => actual category value).
+// Left column fills first (7 items), then the right column (6 items).
+$peripheralNavCategories = [
+    'CCTV'                 => 'CCTV',
+    'Headset'              => 'Headset',
+    'Keyboard'             => 'Keyboard',
+    'Keyboard And Mouse'   => 'Keyboard And Mouse',
+    'Display'              => 'Display',
+    'Mouse'                => 'Mouse',
+    'Network Device'       => 'Network Device',
+    'Printer & Scanner'    => 'Printer and Scanner',
+    'Projector'            => 'Projector',
+    'Recorder'             => 'Recorder',
+    'Speaker'              => 'Speaker',
+    'UPS & AVR'            => 'UPS & AVR',
+    'Web & Digital Camera' => 'Web & Digital Camera',
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -58,7 +76,7 @@ $bodyClass            = $bodyClass ?? '';
             <?php endif; ?>
         </button>
         <button id="profileBtn" class="icon-badge-btn profile-outline-btn ep-account-btn"
-                onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : '../login.php'; ?>'">
+                onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : './login.php'; ?>'">
             <i class="far fa-user"></i>
             <span class="ep-account-label">
                 <?php if ($isLoggedIn): ?>My Account<?php else: ?>Login /<br>Sign In<?php endif; ?>
@@ -73,11 +91,26 @@ $bodyClass            = $bodyClass ?? '';
         </ul>
     </div>
 </header>
+<script>
+    // Keep page content clear of the fixed header at all viewport sizes.
+    (function () {
+        function epSetHeaderOffset() {
+            var header = document.querySelector('.ep-header');
+            if (header) document.body.style.paddingTop = header.offsetHeight + 'px';
+        }
+        epSetHeaderOffset();
+        window.addEventListener('resize', epSetHeaderOffset);
+    })();
+</script>
 
 <section class="<?php echo $isHomePage ? 'ep-hero' : 'ep-nav-bar'; ?> full-width">
     <?php if ($isHomePage): ?>
     <p class="ep-hero-kicker">SHOP NOW AT</p>
     <h1 class="ep-hero-title">EASYPC ONE OASIS.</h1>
+    <?php elseif (!empty($categoryHeroTitle)): ?>
+    <div class="ep-category-hero">
+        <h1><?php echo htmlspecialchars($categoryHeroTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
+    </div>
     <?php endif; ?>
 
     <nav class="ep-nav">
@@ -87,8 +120,6 @@ $bodyClass            = $bodyClass ?? '';
            class="ep-nav-link<?php echo ($activePage ?? '') === 'desktop' ? ' active' : ''; ?>">DESKTOP</a>
         <a href="category.php?type=Laptops"
            class="ep-nav-link<?php echo ($activePage ?? '') === 'laptop' ? ' active' : ''; ?>">LAPTOP</a>
-        <a href="messages.php"
-           class="ep-nav-link<?php echo ($activePage ?? '') === 'easyfix' ? ' active' : ''; ?>">EASYFIX</a>
 
         <div class="ep-nav-dropdown">
             <button type="button"
@@ -96,24 +127,14 @@ $bodyClass            = $bodyClass ?? '';
                     onclick="epToggleDropdown(this)">
                 PERIPHERALS <i class="fas fa-chevron-down"></i>
             </button>
-            <div class="ep-dropdown-menu">
-                <?php foreach ($peripheralCategories as $pc): ?>
-                    <a href="category.php?type=<?php echo urlencode($pc); ?>"><?php echo htmlspecialchars($pc, ENT_QUOTES, 'UTF-8'); ?></a>
+            <div class="ep-dropdown-menu ep-dropdown-cols">
+                <?php foreach ($peripheralNavCategories as $label => $value): ?>
+                    <a href="category.php?type=<?php echo urlencode($value); ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></a>
                 <?php endforeach; ?>
             </div>
         </div>
 
-        <div class="ep-nav-dropdown">
-            <button type="button"
-                    class="ep-nav-link ep-nav-dropdown-btn<?php echo ($activePage ?? '') === 'brands' ? ' active' : ''; ?>"
-                    onclick="epToggleDropdown(this)">
-                BRANDS <i class="fas fa-chevron-down"></i>
-            </button>
-            <div class="ep-dropdown-menu">
-                <a href="products.php">All Sellers</a>
-                <a href="products.php">Top Rated</a>
-                <a href="products.php">New Arrivals</a>
-            </div>
-        </div>
+        <a href="category.php?type=Brands"
+           class="ep-nav-link<?php echo ($activePage ?? '') === 'brands' ? ' active' : ''; ?>">BRANDS</a>
     </nav>
 </section>

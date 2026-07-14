@@ -17,6 +17,24 @@ $categories = ['Accessories', 'Audio', 'Cables and Adapters', 'Camera', 'Combo',
 $deviceCategories     = ['Laptops', 'Desktop', 'Display'];
 $peripheralCategories = ['Mobile', 'Cameras', 'Accessories'];
 
+// Categories shown in the PERIPHERALS nav dropdown (label => actual category value).
+// Left column fills first (7 items), then the right column (6 items).
+$peripheralNavCategories = [
+    'CCTV'                 => 'CCTV',
+    'Headset'              => 'Headset',
+    'Keyboard'             => 'Keyboard',
+    'Keyboard And Mouse'   => 'Keyboard And Mouse',
+    'Display'              => 'Display',
+    'Mouse'                => 'Mouse',
+    'Network Device'       => 'Network Device',
+    'Printer & Scanner'    => 'Printer and Scanner',
+    'Projector'            => 'Projector',
+    'Recorder'             => 'Recorder',
+    'Speaker'              => 'Speaker',
+    'UPS & AVR'            => 'UPS & AVR',
+    'Web & Digital Camera' => 'Web & Digital Camera',
+];
+
 // Icon badges per category tile (decorative)
 $categoryIcons = [
     'Laptops'     => 'fa-laptop',
@@ -101,6 +119,17 @@ if (empty($recommendations)) {
             </ul>
         </div>
     </header>
+    <script>
+        // Keep page content clear of the fixed header at all viewport sizes.
+        (function () {
+            function epSetHeaderOffset() {
+                var header = document.querySelector('.ep-header');
+                if (header) document.body.style.paddingTop = header.offsetHeight + 'px';
+            }
+            epSetHeaderOffset();
+            window.addEventListener('resize', epSetHeaderOffset);
+        })();
+    </script>
 
     <section class="ep-hero full-width">
         <p class="ep-hero-kicker">SHOP NOW AT</p>
@@ -110,25 +139,17 @@ if (empty($recommendations)) {
             <a href="index.php" class="ep-nav-link active">HOME</a>
             <a href="category.php?type=Desktop" class="ep-nav-link">DESKTOP</a>
             <a href="category.php?type=Laptops" class="ep-nav-link">LAPTOP</a>
-            <a href="messages.php" class="ep-nav-link">EASYFIX</a>
 
             <div class="ep-nav-dropdown">
                 <button type="button" class="ep-nav-link ep-nav-dropdown-btn" onclick="epToggleDropdown(this)">PERIPHERALS <i class="fas fa-chevron-down"></i></button>
-                <div class="ep-dropdown-menu">
-                    <?php foreach ($peripheralCategories as $pc): ?>
-                        <a href="category.php?type=<?php echo urlencode($pc); ?>"><?php echo h($pc); ?></a>
+                <div class="ep-dropdown-menu ep-dropdown-cols">
+                    <?php foreach ($peripheralNavCategories as $label => $value): ?>
+                        <a href="category.php?type=<?php echo urlencode($value); ?>"><?php echo h($label); ?></a>
                     <?php endforeach; ?>
                 </div>
             </div>
 
-            <div class="ep-nav-dropdown">
-                <button type="button" class="ep-nav-link ep-nav-dropdown-btn" onclick="epToggleDropdown(this)">BRANDS <i class="fas fa-chevron-down"></i></button>
-                <div class="ep-dropdown-menu">
-                    <a href="products.php">All Sellers</a>
-                    <a href="products.php">Top Rated</a>
-                    <a href="products.php">New Arrivals</a>
-                </div>
-            </div>
+            <a href="category.php?type=Brands" class="ep-nav-link">BRANDS</a>
         </nav>
     </section>
 
@@ -172,18 +193,19 @@ if (empty($recommendations)) {
             </div>
         </section>
 
-        <section class="ep-categories-grid">
+        <div class="ep-section-head">
+                <h3>Categories</h3>
+        </div>
+        <section class="ep-categories-grid" id="epCategoriesGrid">
             <?php foreach ($categories as $cat): ?>
                 <a class="ep-cat-tile" href="category.php?type=<?php echo urlencode($cat); ?>">
                     <span class="ep-cat-badge"><i class="fas <?php echo h($categoryIcons[$cat] ?? 'fa-wrench'); ?>"></i></span>
                     <span class="ep-cat-label"><?php echo strtoupper(h($cat)); ?></span>
                 </a>
             <?php endforeach; ?>
-            <a class="ep-cat-tile ep-cat-tile-brand" href="messages.php">
-                <span class="ep-cat-badge"><i class="fas fa-tools"></i></span>
-                <span class="ep-cat-label ep-easyfix-label">EASYFIX</span>
-            </a>
+
         </section>
+        <nav class="ep-pagination" id="epCategoriesPagination" aria-label="Categories pagination"></nav>
 
         <section class="ep-tech-match">
             <h2 class="ep-match-title">Tech and Match</h2>
@@ -271,11 +293,10 @@ if (empty($recommendations)) {
                 <a href="index.php">Home</a>
                 <a href="cart.php">Cart</a>
                 <a href="user_dashboard.php">My Orders</a>
-                <a href="messages.php">EasyFix Support</a>
             </div>
             <div class="ep-footer-col">
                 <h5>Resources</h5>
-                <a href="../privacy_policy.php">Privacy Policy</a>
+                <a href="privacy_policy.php">Privacy Policy</a>
                 <a href="<?php echo $isLoggedIn ? 'user_dashboard.php' : '../login.php'; ?>">My Account</a>
                 <a href="messages.php">Help Center</a>
             </div>
@@ -292,6 +313,62 @@ if (empty($recommendations)) {
                 IAS_UI.alert('Added to cart!', 'success');
             }
         });
+
+        // ── Categories grid: paginate two rows at a time ────────────────────
+        (function () {
+            const grid = document.getElementById('epCategoriesGrid');
+            const pagination = document.getElementById('epCategoriesPagination');
+            if (!grid || !pagination) return;
+
+            const tiles = Array.from(grid.children);
+            const ROWS_PER_PAGE = 2;
+            let currentPage = 1;
+
+            function getColumnCount() {
+                const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
+                return Math.max(1, cols.length);
+            }
+
+            function render() {
+                const perPage = getColumnCount() * ROWS_PER_PAGE;
+                const totalPages = Math.max(1, Math.ceil(tiles.length / perPage));
+                if (currentPage > totalPages) currentPage = totalPages;
+
+                const start = (currentPage - 1) * perPage;
+                const end = start + perPage;
+                tiles.forEach((tile, i) => {
+                    tile.style.display = (i >= start && i < end) ? '' : 'none';
+                });
+
+                pagination.innerHTML = '';
+                if (totalPages <= 1) return;
+
+                const makeLink = (label, page, opts = {}) => {
+                    const a = document.createElement('a');
+                    a.href = '#';
+                    a.className = 'ep-page-link' + (opts.nav ? ' ep-page-nav' : '') +
+                        (opts.active ? ' active' : '') + (opts.disabled ? ' disabled' : '');
+                    a.innerHTML = label;
+                    a.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        if (opts.disabled) return;
+                        currentPage = page;
+                        render();
+                        grid.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    });
+                    return a;
+                };
+
+                pagination.appendChild(makeLink('<i class="fas fa-arrow-left"></i> Previous', currentPage - 1, { nav: true, disabled: currentPage <= 1 }));
+                for (let p = 1; p <= totalPages; p++) {
+                    pagination.appendChild(makeLink(String(p), p, { active: p === currentPage }));
+                }
+                pagination.appendChild(makeLink('Next <i class="fas fa-arrow-right"></i>', currentPage + 1, { nav: true, disabled: currentPage >= totalPages }));
+            }
+
+            render();
+            window.addEventListener('resize', render);
+        })();
 
         // ── Carousel scroll helper ──────────────────────────────────────────
         function epScroll(id, dir) {

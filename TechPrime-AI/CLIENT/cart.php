@@ -71,35 +71,86 @@ if (!empty($_SESSION['cart'])) {
         $cart_items[] = $row;
     }
 }
+
+$isLoggedIn           = isset($_SESSION['user_id']);
+$userName             = $isLoggedIn ? h($_SESSION['name'] ?? 'Customer') : 'Guest';
+$activePage           = 'cart';
+$pageTitle            = 'My Cart';
+$searchQuery          = '';
+$peripheralCategories = ['Mobile', 'Cameras', 'Accessories'];
+$bodyClass            = 'ep-cart-layout';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cart - IAS</title>
+    <title>My Cart | EasyPC</title>
     <link rel="stylesheet" href="../styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
-<body>
-    <header class="top-header full-width">
-        <div class="logo">IAS</div>
-        <div class="search-wrap"><input type="text" placeholder="Search here..."><span class="search-icon">⌕</span></div>
+<body class="ep-body ep-cart-layout">
+    <header class="top-header ep-header full-width">
+        <div class="logo ep-logo" onclick="location.href='index.php'" style="cursor:pointer;">
+            <img src="../assets/easypc-logo-transparent.png" alt="EasyPC" class="ep-logo-img">
+        </div>
+        <div class="search-wrap">
+            <form action="search.php" method="GET">
+                <input name="q" type="text" placeholder="Search products...">
+                <button type="submit" class="search-icon"><i class="fas fa-search"></i></button>
+            </form>
+        </div>
         <div class="header-icons">
-            <button class="icon-badge-btn" onclick="location.href='index.php'"><span class="icon-main">🏠</span></button>
-            <button class="icon-badge-btn" onclick="location.href='user_dashboard.php'"><span class="icon-main">👤</span></button>
+            <button class="icon-badge-btn" title="Wishlist" onclick="this.classList.toggle('active')">
+                <i class="far fa-heart"></i>
+            </button>
+            <button id="notifBtn" class="icon-badge-btn" title="Notifications"
+                    onclick="document.getElementById('notificationsPanel').classList.toggle('hidden')">
+                <i class="far fa-bell"></i>
+            </button>
+            <button id="cartBtn" class="icon-badge-btn" title="Cart" onclick="location.href='cart.php'">
+                <i class="fas fa-shopping-bag"></i>
+                <?php if (!empty($_SESSION['cart'])): ?>
+                    <span class="badge"><?php echo count($_SESSION['cart']); ?></span>
+                <?php endif; ?>
+            </button>
+            <button id="profileBtn" class="icon-badge-btn profile-outline-btn ep-account-btn"
+                    onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : '../login.php'; ?>'">
+                <i class="far fa-user"></i>
+                <span class="ep-account-label">
+                    <?php if ($isLoggedIn): ?>My Account<?php else: ?>Login /<br>Sign In<?php endif; ?>
+                </span>
+            </button>
+        </div>
+        <div id="notificationsPanel" class="notifications-panel hidden">
+            <strong>Notifications</strong>
+            <ul>
+                <li>Welcome to EasyPC, <?php echo $userName; ?>!</li>
+                <li>Track your orders anytime from your dashboard.</li>
+            </ul>
         </div>
     </header>
 
-    <main class="category-page-main">
-        <div class="page-header-row">
+    <section class="ep-nav-bar full-width">
+        <nav class="ep-nav">
+            <a href="index.php" class="ep-nav-link">HOME</a>
+            <a href="category.php?type=Desktop" class="ep-nav-link">DESKTOP</a>
+            <a href="category.php?type=Laptops" class="ep-nav-link">LAPTOP</a>
+            <a href="messages.php" class="ep-nav-link">EASYFIX</a>
+            <a href="products.php" class="ep-nav-link">BRANDS</a>
+        </nav>
+    </section>
+
+    <main class="ep-main ep-cart-main">
+        <div class="ep-page-header-row">
             <button class="back-home-btn" onclick="location.href='index.php'">← Back to Home</button>
-            <h2>My Cart</h2>
+            <h2 class="ep-page-title">My Cart</h2>
         </div>
 
-        <section class="profile-card">
+        <section class="profile-card ep-cart-panel">
             <?php if (empty($cart_items)): ?>
                 <div style="text-align: center; padding: 40px;">
                     <h3 style="color: #999; margin-bottom: 20px;">Your cart is empty</h3>
@@ -145,5 +196,4 @@ if (!empty($_SESSION['cart'])) {
     <footer class="full-width">© 2026 IAS. All Rights Reserved.</footer>
 
 <?php ias_alert_footer(); ?>
-</body>
-</html>
+<?php include __DIR__ . '/ep_footer.php'; ?>

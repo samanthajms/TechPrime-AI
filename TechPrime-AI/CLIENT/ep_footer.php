@@ -43,7 +43,7 @@
                 <a href="messages.php">Help Center</a>
             </div>
         </div>
-        <div class="ep-footer-bottom">&copy; 2026 EASYPC E-Commerce. All Rights Reserved.</div>
+        <div class="ep-footer-bottom">&copy; 2026 EASYPC One Oasis. All Rights Reserved.</div>
     </footer>
 
     <script src="../includes/ui_alerts.js"></script>
