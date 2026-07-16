@@ -23,7 +23,7 @@ $response = paymongoRequest('POST', '/links', [
     'data' => [
         'attributes' => [
             'amount'      => $amountCentavos,
-            'description' => 'IAS Ecommerce Order',
+            'description' => 'EasyPC Ecommerce Order',
             'remarks'     => 'Order for user ' . $_SESSION['user_id'],
         ]
     ]

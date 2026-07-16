@@ -120,11 +120,11 @@ if (isset($_POST['place_order'])) {
             <input type="hidden" name="total" value="<?php echo $total; ?>">
 
             <button type="submit" name="place_order" class="primary-btn" style="margin-bottom:10px;">
-                💵 Cash on Delivery
+                Cash on Delivery
             </button>
 
             <button type="submit" name="pay_online" formaction="../backend/api/create_payment.php" class="primary-btn" style="background:#5046e5;">
-                💳 Pay Online (GCash / Card)
+                Pay Online
             </button>
         </div>
     </form>
