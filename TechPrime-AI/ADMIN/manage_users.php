@@ -520,11 +520,6 @@ $users = $user_rows[$active_tab];
                 <div class="stat-icon">D</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Technician</div>
-                <div class="stat-num"><?php echo (int)$count_technician; ?></div>
-                <div class="stat-icon">D</div>
-            </div>
-            <div class="stat-card">
                 <div class="stat-label">Inventory Custodian</div>
                 <div class="stat-num"><?php echo (int)$count_custodian; ?></div>
                 <div class="stat-icon">D</div>
