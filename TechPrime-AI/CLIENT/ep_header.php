@@ -52,7 +52,7 @@ $peripheralNavCategories = [
 
 <header class="top-header ep-header full-width">
     <div class="logo ep-logo" onclick="location.href='index.php'" style="cursor:pointer;">
-        <img src="../assets/easypc-logo-transparent.png" alt="EasyPC" class="ep-logo-img">
+        <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img">
     </div>
     <div class="search-wrap">
         <form action="search.php" method="GET">

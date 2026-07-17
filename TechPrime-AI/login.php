@@ -264,6 +264,7 @@ function redirectByRole($role) {
     <div class="auth-visual">
         <div class="visual-brand">
             <img src="assets/logo.png" alt="EasyPC Logo" style="width: auto; height: 45px;">
+            <span>One Oasis</span>
         </div>
         <div class="visual-copy">
             <h2>Built to power what you build.</h2>
@@ -274,7 +275,7 @@ function redirectByRole($role) {
     <div class="auth-form">
         <div class="auth-form-inner">
             <p class="form-eyebrow">Secure Access Portal</p>
-            <h1>Welcome Back!</h1>
+            <h1>Welcome!</h1>
             <p class="subtitle">Enter your details below</p>
 
             <?php if ($error): ?>

@@ -140,7 +140,10 @@ $statusTitles = [
                 <div class="recent-grid">
                     <?php foreach ($recentProducts as $rp): ?>
                         <a class="mini-card" href="products.php?id=<?php echo (int)$rp['id']; ?>">
-                            <img src="<?php echo h(ias_client_product_image_url($rp)); ?>" alt="<?php echo h($rp['name']); ?>">
+                            <div class="mini-card-media">
+                                <span class="mini-card-badge">New</span>
+                                <img src="<?php echo h(ias_client_product_image_url($rp)); ?>" alt="<?php echo h($rp['name']); ?>">
+                            </div>
                             <div class="mini-card-body">
                                 <span class="mini-card-title"><?php echo h($rp['name']); ?></span>
                                 <span class="p-price">&#8369;<?php echo number_format((float)$rp['price'], 2); ?></span>

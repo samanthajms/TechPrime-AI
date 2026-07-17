@@ -13,7 +13,7 @@
         <div class="ep-footer-grid">
             <div class="ep-footer-brand">
                 <div class="ep-footer-logo">
-                    <img src="../assets/easypc-logo-transparent.png" alt="EasyPC" class="ep-footer-logo-img">
+                    <img src="../assets/logo.png" alt="EasyPC" class="ep-footer-logo-img">
                 </div>
                 <div class="ep-social-row">
                     <a href="#" aria-label="X"><i class="fab fa-twitter"></i></a>

@@ -1,6 +1,6 @@
 /**
- * IAS E-commerce — single shared alert modal (centered, close button).
- * IAS_UI.alert(message, type, durationMs) — durationMs 0 = until closed.
+ * EasyPC E-commerce — single shared alert modal (centered, close button).
+ * EasyPC_UI.alert(message, type, durationMs) — durationMs 0 = until closed.
  */
 const IAS_UI = {
     alert: function (message, type = 'success', duration = 0) {
@@ -32,8 +32,7 @@ const IAS_UI = {
         box.style.cssText = [
             'background:#fff', 'padding:28px 36px 24px', 'border-radius:14px',
             'box-shadow:0 20px 50px rgba(0,0,0,0.2)', 'text-align:center',
-            'max-width:400px', 'width:100%', 'position:relative',
-            'border-top:5px solid ' + color, 'font-family:Arial,sans-serif'
+            'max-width:400px', 'width:100%', 'position:relative', 'font-family:Arial,sans-serif'
         ].join(';');
 
         const closeBtn = document.createElement('button');
@@ -64,7 +63,7 @@ const IAS_UI = {
         box.innerHTML =
             '<div style="font-size:44px;color:' + color + ';margin-bottom:12px;font-weight:800;">' + icon + '</div>' +
             '<h3 style="margin:0 0 10px;color:#2c3e50;">' + title + '</h3>' +
-            '<p style="margin:0 0 20px;color:#555;line-height:1.5;font-size:15px;"></p>' +
+            '<p style="margin:0 0 20px;color:#555;line-height:ft1.5;font-size:15px;"></p>' +
             '<button type="button" class="ias-alert-ok" style="background:#0998a8;color:#fff;border:none;' +
             'padding:11px 28px;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;">OK</button>';
 
