@@ -1,6 +1,6 @@
 <?php
 /**
- * Shared EasyPC staff layout (Admin / Retail / Associate / Courier).
+ * Shared EasyPC staff layout (Admin / Retail / Inventory / Courier).
  * Design tokens match CLIENT/index.php.
  */
 
@@ -19,21 +19,15 @@ if (!function_exists('staff_nav_for_role')) {
             case 'retail_officer':
                 return [
                     ['key' => 'dashboard', 'href' => 'retail_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'products', 'href' => 'retail_products.php', 'label' => 'My Products', 'icon' => 'fa-box'],
-                    ['key' => 'orders', 'href' => 'retail_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-bag'],
-                    ['key' => 'messages', 'href' => 'retail_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
-                    ['key' => 'reviews', 'href' => 'retail_reviews.php', 'label' => 'Reviews', 'icon' => 'fa-star'],
-                    ['key' => 'profile', 'href' => 'retail_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user'],
-                    ['key' => 'settings', 'href' => 'retail_settings.php', 'label' => 'Settings', 'icon' => 'fa-cog'],
+                    ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'History', 'icon' => 'fa-history'],
+                    ['key' => 'profile', 'href' => 'retail_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
-            case 'technician':
             case 'inventory_custodian':
                 return [
-                    ['key' => 'dashboard', 'href' => 'associate_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'orders', 'href' => 'associate_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart'],
-                    ['key' => 'assign', 'href' => 'associate_assign.php', 'label' => 'Delivery Assignment', 'icon' => 'fa-truck'],
-                    ['key' => 'history', 'href' => 'associate_history.php', 'label' => 'History', 'icon' => 'fa-history'],
-                    ['key' => 'profile', 'href' => 'associate_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user'],
+                    ['key' => 'dashboard', 'href' => 'inventory_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
+                    ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes'],
+                    ['key' => 'orders', 'href' => 'inventory_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart'],
+                    ['key' => 'profile', 'href' => 'inventory_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
             case 'courier':
                 return [
@@ -54,8 +48,7 @@ if (!function_exists('staff_role_label')) {
         $map = [
             'admin' => 'Admin',
             'retail_officer' => 'Retail Officer',
-            'technician' => 'Technician',
-            'inventory_custodian' => 'Inventory Custodian',
+            'inventory_custodian' => 'Inventory',
             'courier' => 'Courier',
         ];
         return $map[$role] ?? 'Staff';
@@ -65,9 +58,8 @@ if (!function_exists('staff_role_label')) {
 if (!function_exists('staff_css_href')) {
     function staff_css_href(): string
     {
-        // Resolve relative path from current script dir depth
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
-        if (preg_match('#/(ADMIN|RETAIL|ASSOCIATE|courier)$#', $scriptDir)) {
+        if (preg_match('#/(ADMIN|RETAIL|INVENTORY|courier)$#', $scriptDir)) {
             return '../includes/staff_shared.css';
         }
         return 'includes/staff_shared.css';
@@ -78,7 +70,7 @@ if (!function_exists('staff_logo_href')) {
     function staff_logo_href(): string
     {
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
-        if (preg_match('#/(ADMIN|RETAIL|ASSOCIATE|courier)$#', $scriptDir)) {
+        if (preg_match('#/(ADMIN|RETAIL|INVENTORY|courier)$#', $scriptDir)) {
             return '../assets/easypc-logo-transparent.png';
         }
         return 'assets/easypc-logo-transparent.png';
@@ -89,7 +81,7 @@ if (!function_exists('staff_logout_href')) {
     function staff_logout_href(): string
     {
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
-        if (preg_match('#/(ADMIN|RETAIL|ASSOCIATE|courier)$#', $scriptDir)) {
+        if (preg_match('#/(ADMIN|RETAIL|INVENTORY|courier)$#', $scriptDir)) {
             return '../logout.php';
         }
         return 'logout.php';
@@ -186,7 +178,7 @@ if (!function_exists('staff_page_end')) {
 </div><!-- /.main -->
 <script src="<?php
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
-        echo preg_match('#/(ADMIN|RETAIL|ASSOCIATE|courier)$#', $scriptDir)
+        echo preg_match('#/(ADMIN|RETAIL|INVENTORY|courier)$#', $scriptDir)
             ? '../includes/ui_alerts.js'
             : 'includes/ui_alerts.js';
     ?>"></script>

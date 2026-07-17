@@ -292,7 +292,7 @@ function ias_alert_footer(): void
         || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/courier/') !== false
         || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/CLIENT/') !== false
         || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/RETAIL/') !== false
-        || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/ASSOCIATE/') !== false)
+        || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/INVENTORY/') !== false)
         ? '../includes/ui_alerts.js' : 'includes/ui_alerts.js';
     echo '<script src="' . h($root) . '"></script>';
     if ($msg) {

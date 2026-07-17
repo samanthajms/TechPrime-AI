@@ -49,52 +49,9 @@ staff_page_start([
                 <div class="stat-icon"><i class="fas fa-store"></i></div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Technician</div>
-                <div class="stat-num"><?php echo (int)$cnt['technician']; ?></div>
-                <div class="stat-icon"><i class="fas fa-tools"></i></div>
-            </div>
-            <div class="stat-card">
                 <div class="stat-label">Inventory Custodian</div>
                 <div class="stat-num"><?php echo (int)$cnt['inventory_custodian']; ?></div>
                 <div class="stat-icon"><i class="fas fa-warehouse"></i></div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <div>
-                    <h3><span class="card-icon"><i class="fas fa-clipboard-list"></i></span> Recent Activity</h3>
-                    <div class="card-subtitle">Latest system events</div>
-                </div>
-                <a href="view_logs.php" class="btn btn-outline btn-sm">View all</a>
-            </div>
-            <div class="card-body" style="padding-top:0;">
-                <div class="table-wrap">
-                    <table class="ias-table">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Action</th>
-                                <th>Details</th>
-                                <th>When</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        <?php if ($logs && $logs->num_rows): ?>
-                            <?php while ($row = $logs->fetch_assoc()): ?>
-                                <tr>
-                                    <td><?php echo h($row['name'] ?? 'System'); ?></td>
-                                    <td><span class="badge badge-action"><?php echo h($row['action'] ?? ''); ?></span></td>
-                                    <td><?php echo h($row['details'] ?? ''); ?></td>
-                                    <td class="text-muted text-small"><?php echo h($row['created_at'] ?? ''); ?></td>
-                                </tr>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <tr><td colspan="4" class="empty-state">No activity logged yet.</td></tr>
-                        <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
             </div>
         </div>
 
