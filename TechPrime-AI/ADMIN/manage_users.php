@@ -10,7 +10,6 @@ checkRole('admin');
 $admin_id = (int)$_SESSION['user_id'];
 $staffRoles = [
     'retail_officer' => 'Retail Officer',
-    'technician' => 'Technician',
     'inventory_custodian' => 'Inventory Custodian',
 ];
  
@@ -109,7 +108,6 @@ $all_users     = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at 
 $clients       = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='client' ORDER BY u.name ASC");
 $admins        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='admin' ORDER BY u.name ASC");
 $retail_officers        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='retail_officer' ORDER BY u.name ASC");
-$technicians        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='technician' ORDER BY u.name ASC");
 $inventory_custodians        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='inventory_custodian' ORDER BY u.name ASC");
 
  
@@ -118,14 +116,13 @@ $count_all     = $db->query("SELECT COUNT(*) as c FROM users")->fetch_assoc()['c
 $count_client  = $db->query("SELECT COUNT(*) as c FROM users WHERE role='client'")->fetch_assoc()['c'];
 $count_admin   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='admin'")->fetch_assoc()['c'];
 $count_officer   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='retail_officer'")->fetch_assoc()['c'];
-$count_technician   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='technician'")->fetch_assoc()['c'];
 $count_custodian   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='inventory_custodian'")->fetch_assoc()['c'];
 
  
 $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
 $csrf = generateCsrfToken();
 $active_tab = $_GET['tab'] ?? 'all';
-$valid_tabs = ['all', 'client', 'admin', 'retail_officer', 'technician', 'inventory_custodian'];
+$valid_tabs = ['all', 'client', 'admin', 'retail_officer', 'inventory_custodian'];
 if (!in_array($active_tab, $valid_tabs, true)) {
     $active_tab = 'all';
 }
@@ -141,7 +138,6 @@ $user_rows = [
     'client'  => fetchToArray($clients),
     'admin'   => fetchToArray($admins),
     'retail_officer' => fetchToArray($retail_officers),
-    'technician' => fetchToArray($technicians),
     'inventory_custodian' => fetchToArray($inventory_custodians),
     
 ];
@@ -469,7 +465,7 @@ $users = $user_rows[$active_tab];
 
 <div class="sidebar">
     <div class="sidebar-brand">
-        <img src="../assets/easypc-logo-transparent.png" alt="EasyPC" class="ep-logo-img brand-logo">
+        <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img brand-logo">
         <div>
             <div class="brand-text">EasyPC</div>
             <div class="brand-sub">Admin</div>
@@ -530,7 +526,7 @@ $users = $user_rows[$active_tab];
             <div class="card-header">
                 <div>
                     <h3><span class="card-icon">+</span> Create Staff Account</h3>
-                    <div class="card-subtitle">Create accounts for retail officers, technicians, and inventory custodians. New staff accounts are verified and ready to sign in.</div>
+                    <div class="card-subtitle">Create accounts for retail officers and inventory custodians. New staff accounts are verified and ready to sign in.</div>
                 </div>
             </div>
             <form method="post" class="staff-create-grid">
@@ -579,7 +575,6 @@ $users = $user_rows[$active_tab];
                 <a class="tab-btn <?php echo $active_tab === 'all' ? 'active' : ''; ?>" href="manage_users.php?tab=all">All <span class="tab-count"><?php echo (int)$count_all; ?></span></a>
                 <a class="tab-btn <?php echo $active_tab === 'client' ? 'active' : ''; ?>" href="manage_users.php?tab=client">Clients <span class="tab-count"><?php echo (int)$count_client; ?></span></a>
                 <a class="tab-btn <?php echo $active_tab === 'retail_officer' ? 'active' : ''; ?>" href="manage_users.php?tab=retail_officer">Retail Officers <span class="tab-count"><?php echo (int)$count_officer; ?></span></a>
-                <a class="tab-btn <?php echo $active_tab === 'technician' ? 'active' : ''; ?>" href="manage_users.php?tab=technician">Technician <span class="tab-count"><?php echo (int)$count_technician; ?></span></a>
                 <a class="tab-btn <?php echo $active_tab === 'inventory_custodian' ? 'active' : ''; ?>" href="manage_users.php?tab=inventory_custodian">Inventory Custodian <span class="tab-count"><?php echo (int)$count_custodian; ?></span></a>
             </div>
         </div>

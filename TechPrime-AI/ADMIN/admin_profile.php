@@ -103,7 +103,7 @@ $adminInitials = strtoupper(substr($admin['name'] ?? 'A', 0, 1));
 
 <div class="sidebar">
     <div class="sidebar-brand">
-        <img src="../assets/easypc-logo-transparent.png" alt="EasyPC" class="ep-logo-img brand-logo">
+        <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img brand-logo">
         <div>
             <div class="brand-text">EasyPC</div>
             <div class="brand-sub">Admin</div>

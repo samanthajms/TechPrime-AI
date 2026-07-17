@@ -71,7 +71,7 @@ if (!function_exists('staff_logo_href')) {
     {
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
         if (preg_match('#/(ADMIN|RETAIL|INVENTORY|courier)$#', $scriptDir)) {
-            return '../assets/easypc-logo-transparent.png';
+            return '../assets/logo.png';
         }
         return 'assets/easypc-logo-transparent.png';
     }
