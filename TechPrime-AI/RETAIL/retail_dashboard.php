@@ -96,11 +96,6 @@ staff_page_start([
                 <div class="stat-num"><?php echo $done; ?></div>
                 <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Product Demand Forecast</div>
-                <div class="stat-num" style="font-size:18px;padding-top:8px;">Coming Soon</div>
-                <div class="stat-icon"><i class="fas fa-chart-pie"></i></div>
-            </div>
         </div>
 
         <div class="card">

@@ -70,7 +70,7 @@ if (empty($recommendations)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EASYPC</title>
-    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="styles.css">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -534,11 +534,6 @@ if (empty($recommendations)) {
                 <i class="fas fa-vr-cardboard ep-duo-icon"></i>
                 <h3>New Arrivals</h3>
                 <span class="ep-btn ep-btn-primary">Shop New</span>
-            </a>
-            <a class="ep-duo-tile best-sellers" href="products.php">
-                <i class="fas fa-headphones ep-duo-icon"></i>
-                <h3>Best Sellers</h3>
-                <span class="ep-btn ep-btn-primary">Shop Bestsellers</span>
             </a>
         </div>
 

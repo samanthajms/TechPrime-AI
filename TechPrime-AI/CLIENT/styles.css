@@ -1798,9 +1798,6 @@ html { height: 100%; }
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.ep-product-cat { font-size: 12px; color: #888; margin-bottom: 4px; }
-.ep-product-price { font-size: 19px; font-weight: 800; color: var(--ep-yellow); -webkit-text-stroke: 0.4px #b38f00; margin-bottom: 10px; }
-
 .ep-card-actions { display: flex; align-items: center; gap: 10px; }
 .ep-heart-btn {
     flex: 0 0 auto;

@@ -19,6 +19,7 @@ if (!function_exists('staff_nav_for_role')) {
             case 'retail_officer':
                 return [
                     ['key' => 'dashboard', 'href' => 'retail_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
+                    ['key' => 'reports', 'href' => 'retail_reports.php', 'label' => 'Sales Report', 'icon' => 'fa-chart-bar'],
                     ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'History', 'icon' => 'fa-history'],
                     ['key' => 'profile', 'href' => 'retail_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
@@ -48,8 +49,7 @@ if (!function_exists('staff_role_label')) {
         $map = [
             'admin' => 'Admin',
             'retail_officer' => 'Retail Officer',
-            'inventory_custodian' => 'Inventory',
-            'courier' => 'Courier',
+            'inventory_custodian' => 'Inventory Custodian',
         ];
         return $map[$role] ?? 'Staff';
     }
@@ -128,7 +128,7 @@ if (!function_exists('staff_page_start')) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php echo $extraHead; ?>
 </head>
-<body>
+<body class="<?php echo $role === 'inventory_custodian' ? 'topnav-mode' : ''; ?>">
 <div class="sidebar">
     <div class="sidebar-brand">
         <img src="<?php echo h($logo); ?>" alt="EasyPC" class="ep-logo-img brand-logo">

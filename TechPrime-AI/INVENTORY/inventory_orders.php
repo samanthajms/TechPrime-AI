@@ -106,7 +106,6 @@ EXTRA
                                 <th>Customer</th>
                                 <th>Products</th>
                                 <th>Total</th>
-                                <th>Shipment</th>
                                 <th>Status</th>
                                 <th>Date</th>
                                 <th>Action</th>
@@ -128,11 +127,6 @@ EXTRA
                                 </td>
                                 <td><small><?php echo h($r['products'] ?? ''); ?></small></td>
                                 <td class="price-tag">₱<?php echo number_format((float)$r['total'], 2); ?></td>
-                                <td class="text-small"><?php
-                                    echo !empty($r['shipment_status'])
-                                        ? h(ias_order_display_status(null, $r['shipment_status']))
-                                        : '—';
-                                ?></td>
                                 <td><span class="status-pill <?php echo $pill; ?>"><?php echo h(ias_order_display_status($ost)); ?></span></td>
                                 <td class="text-muted text-small"><?php echo date('M d, Y', strtotime($r['created_at'])); ?></td>
                                 <td>

@@ -7,7 +7,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --ep-green: #61b337;
+  --ep-green: #62b236;
   --ep-green-dark: #4b8b2a;
   --ep-green-light: #eef8e6;
   --ep-yellow: #f3c400;
@@ -16,7 +16,7 @@
   --ep-gray-bg: #f3f4f5;
   --ep-card-bg: #ffffff;
   --ep-border: #e4e8ea;
-  --ep-footer-bg: #58595b;
+  --ep-footer-bg: #080808;
   --ep-muted: #64748b;
   --ep-text: #1f2328;
 
@@ -272,6 +272,7 @@ body {
   box-shadow: var(--card-shadow);
   border: 1px solid var(--border);
   margin-bottom: 22px;
+  padding: 20px;
 }
 
 .card-header {
@@ -714,3 +715,11 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   .page-content { padding: 18px 16px 32px; }
   .topbar { padding: 0 16px; }
 }
+
+/* ================================================================
+   TOPNAV MODE (legacy)
+   Inventory Custodian previously used a horizontal top-nav.
+   Requirement: use the standard left sidebar like Admin.
+   Keep this block empty to avoid altering sidebar layout.
+   ================================================================ */
+
