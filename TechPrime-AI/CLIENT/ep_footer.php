@@ -10,6 +10,16 @@
     </button>
 
     <footer class="ep-footer full-width">
+        <div class="ep-newsletter-bar">
+            <div>
+                <h4>Join Our Newsletter</h4>
+                <p>Get the latest deals &amp; updates</p>
+            </div>
+            <form class="ep-newsletter-form" action="#" method="POST" onsubmit="return false;">
+                <input type="email" name="newsletter_email" placeholder="Enter your email" required>
+                <button type="submit">Subscribe</button>
+            </form>
+        </div>
         <div class="ep-footer-grid">
             <div class="ep-footer-brand">
                 <div class="ep-footer-logo">

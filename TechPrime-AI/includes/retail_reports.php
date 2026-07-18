@@ -349,6 +349,167 @@ function ias_render_pct_badge(?float $pct): string
     return '<span class="pct-badge ' . $cls . '">' . $icon . ' ' . number_format(abs($pct), 1) . '%</span>';
 }
 
+/**
+ * Product demand forecast from historical sales in a date range.
+ * Uses average daily units sold × forecast horizon.
+ */
+function ias_product_demand_forecast(mysqli $db, ?int $sellerId, DateTime $from, DateTime $to, int $forecastDays = 30, array $filters = []): array
+{
+    $rows = $sellerId !== null
+        ? ias_fetch_sales_rows($db, $sellerId, $from, $to, $filters)
+        : ias_fetch_all_sales_rows($db, $from, $to, $filters);
+
+    $byProduct = [];
+    foreach ($rows as $r) {
+        $pid = (int)$r['product_id'];
+        if (!isset($byProduct[$pid])) {
+            $byProduct[$pid] = [
+                'product_id' => $pid,
+                'product_name' => $r['product_name'],
+                'category' => $r['category'] ?: 'Uncategorized',
+                'units_sold' => 0,
+                'revenue' => 0.0,
+            ];
+        }
+        $byProduct[$pid]['units_sold'] += (int)$r['quantity'];
+        $byProduct[$pid]['revenue'] += (float)$r['price'] * (int)$r['quantity'];
+    }
+
+    $periodDays = max(1, (int)$from->diff($to)->days + 1);
+    $forecast = [];
+    foreach ($byProduct as $p) {
+        $avgDaily = $p['units_sold'] / $periodDays;
+        $forecastUnits = (int)ceil($avgDaily * $forecastDays);
+        $avgPrice = $p['units_sold'] > 0 ? $p['revenue'] / $p['units_sold'] : 0.0;
+        $forecast[] = array_merge($p, [
+            'avg_daily_units' => round($avgDaily, 2),
+            'forecast_units' => $forecastUnits,
+            'forecast_revenue' => round($avgPrice * $forecastUnits, 2),
+        ]);
+    }
+
+    usort($forecast, fn($a, $b) => $b['forecast_units'] <=> $a['forecast_units']);
+    return $forecast;
+}
+
+/**
+ * Sales forecast: historical daily trend plus projected days using recent moving average.
+ */
+function ias_sales_forecast(mysqli $db, ?int $sellerId, DateTime $from, DateTime $to, int $forecastDays = 14, array $filters = []): array
+{
+    $rows = $sellerId !== null
+        ? ias_fetch_sales_rows($db, $sellerId, $from, $to, $filters)
+        : ias_fetch_all_sales_rows($db, $from, $to, $filters);
+
+    $historical = ias_sales_daily_trend($rows, $from, $to);
+    $values = array_values($historical);
+    $window = min(7, max(1, count($values)));
+    $recent = array_slice($values, -$window);
+    $avgDaily = count($recent) > 0 ? array_sum($recent) / count($recent) : 0.0;
+
+    $forecast = [];
+    $cursor = (clone $to)->modify('+1 day');
+    for ($i = 0; $i < $forecastDays; $i++) {
+        $forecast[$cursor->format('Y-m-d')] = round($avgDaily, 2);
+        $cursor->modify('+1 day');
+    }
+
+    return [
+        'historical' => $historical,
+        'forecast' => $forecast,
+        'avg_daily' => round($avgDaily, 2),
+    ];
+}
+
+/** Fetch all sales rows (admin scope — no seller filter). */
+function ias_fetch_all_sales_rows(mysqli $db, DateTime $from, DateTime $to, array $filters = []): array
+{
+    $sql = "SELECT o.id AS order_id, o.created_at, o.status,
+                   u.name AS customer_name, u.surname AS customer_surname, u.email AS customer_email,
+                   oi.id AS item_id, oi.quantity, oi.price,
+                   p.id AS product_id, p.name AS product_name, p.category
+            FROM order_items oi
+            INNER JOIN products p ON p.id = oi.product_id
+            INNER JOIN orders o ON o.id = oi.order_id
+            INNER JOIN users u ON u.id = o.user_id
+            WHERE o.created_at >= ? AND o.created_at < ?";
+    $types = 'ss';
+    $bind = [$from->format('Y-m-d 00:00:00'), (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00')];
+
+    if (!empty($filters['category'])) {
+        $sql .= ' AND p.category = ?';
+        $types .= 's';
+        $bind[] = $filters['category'];
+    }
+    if (!empty($filters['customer'])) {
+        $sql .= ' AND (u.name LIKE ? OR u.surname LIKE ? OR u.email LIKE ?)';
+        $needle = '%' . $filters['customer'] . '%';
+        $types .= 'sss';
+        $bind[] = $needle;
+        $bind[] = $needle;
+        $bind[] = $needle;
+    }
+
+    $sql .= ' ORDER BY o.created_at DESC, o.id DESC';
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param($types, ...$bind);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $rows;
+}
+
+/** Resolve a named report section's date range from GET params. */
+function ias_resolve_section_range(array $params, string $prefix, string $defaultPreset = 'this_month'): array
+{
+    $sectionParams = [
+        'preset' => $params[$prefix . '_preset'] ?? $defaultPreset,
+        'date_from' => $params[$prefix . '_from'] ?? '',
+        'date_to' => $params[$prefix . '_to'] ?? '',
+    ];
+    return ias_resolve_report_range($sectionParams);
+}
+
+/** Monthly sales breakdown from order line items (real-time). */
+function ias_monthly_sales_report(mysqli $db, ?int $sellerId, int $monthsBack = 12): array
+{
+    $out = [];
+    $today = new DateTime('today');
+
+    for ($i = $monthsBack - 1; $i >= 0; $i--) {
+        $monthStart = (new DateTime('first day of this month'))->modify("-$i months");
+        $monthEnd = (clone $monthStart)->modify('last day of this month');
+        if ($monthEnd > $today) {
+            $monthEnd = clone $today;
+        }
+
+        $rows = $sellerId !== null
+            ? ias_fetch_sales_rows($db, $sellerId, $monthStart, $monthEnd)
+            : ias_fetch_all_sales_rows($db, $monthStart, $monthEnd);
+        $summary = ias_summarize_sales($rows);
+
+        $out[] = [
+            'month' => $monthStart->format('M Y'),
+            'month_key' => $monthStart->format('Y-m'),
+            'from' => $monthStart->format('Y-m-d'),
+            'to' => $monthEnd->format('Y-m-d'),
+            'total_sales' => $summary['total_sales'],
+            'transactions' => $summary['transactions'],
+            'units_sold' => $summary['units_sold'],
+            'avg_transaction' => $summary['avg_transaction'],
+            'orders' => ias_group_sales_by_order($rows),
+        ];
+    }
+
+    return $out;
+}
+
+/** Build dashboard query string while preserving unrelated GET params. */
+function ias_dashboard_qs(array $overrides = []): string
+{
+    return h(http_build_query(array_merge($_GET, $overrides)));
+}
+
 /* -------------------------------------------------------------------------
  * Export emitters — CSV (native) and Excel (HTML-table served as .xls,
  * which Microsoft Excel opens natively; no external library required).

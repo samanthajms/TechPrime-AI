@@ -1,45 +1,44 @@
 <?php
 session_start();
 require_once __DIR__ . '/../includes/security.php';
+require_once __DIR__ . '/../backend/config/database.php';
 
-// FIX: Cast order_id to int, format total as float — neither can contain malicious scripts
 $orderId = isset($_GET['order_id']) ? (int)$_GET['order_id'] : 0;
-$total   = isset($_GET['total'])    ? number_format((float)$_GET['total'], 2) : '0.00';
+$total   = isset($_GET['total']) ? number_format((float)$_GET['total'], 2) : '0.00';
+
+$isLoggedIn = isset($_SESSION['user_id']);
+$activePage = '';
+$pageTitle  = 'Order Confirmed';
+$bodyClass  = 'ep-success-layout';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Confirmed | IAS</title>
-    <link rel="stylesheet" href="../styles.css">
-</head>
-<body>
-    <main class="category-page-main">
-        <div class="page-card order-confirm-wrapper">
-            <div class="card-title">✅ Order Confirmed</div>
-            <p class="info-note">Your items are now being prepared for shipment.</p>
+<?php include __DIR__ . '/ep_header.php'; ?>
 
-            <div class="summary-box">
-                <div class="info-row">
-                    <span class="label">Order Number</span>
-                    <!-- FIX: $orderId is now cast to int — no XSS possible -->
-                    <span class="value">#<?php echo $orderId; ?></span>
-                </div>
-                <div class="info-row">
-                    <span class="label">Payment Method</span>
-                    <span class="value">Cash on Delivery</span>
-                </div>
-                <div class="info-row summary-row">
-                    <span class="label">Total Paid</span>
-                    <!-- FIX: $total is number_format'd float — safe -->
-                    <span class="value summary-total">₱<?php echo $total; ?></span>
-                </div>
+<main class="ep-main">
+    <div class="ep-panel ep-success-card">
+        <div class="ep-success-icon"><i class="fas fa-check"></i></div>
+        <h2 class="ep-page-title">Order Confirmed</h2>
+        <p class="ep-info-note" style="margin-bottom:20px;">Your items are now being prepared for shipment.</p>
+
+        <div class="ep-panel" style="text-align:left;margin-bottom:0;">
+            <div class="ep-order-line">
+                <span>Order Number</span>
+                <strong>#<?php echo $orderId; ?></strong>
             </div>
-
-            <button class="primary-btn" onclick="location.href='user_dashboard.php?status=To Ship'">Track My Order</button>
-            <button class="primary-btn secondary-btn" onclick="location.href='index.php'">Return to Homepage</button>
+            <div class="ep-order-line">
+                <span>Payment Method</span>
+                <strong>Cash on Delivery</strong>
+            </div>
+            <div class="ep-order-total" style="border-top:1px solid var(--ep-border);">
+                <span>Total Paid</span>
+                <strong>₱<?php echo $total; ?></strong>
+            </div>
         </div>
-    </main>
-</body>
-</html>
+
+        <div class="ep-success-actions">
+            <a href="user_dashboard.php?status=To Ship" class="ep-btn ep-btn-primary">Track My Order</a>
+            <a href="index.php" class="ep-btn ep-btn-yellow">Return to Homepage</a>
+        </div>
+    </div>
+</main>
+
+<?php include __DIR__ . '/ep_footer.php'; ?>

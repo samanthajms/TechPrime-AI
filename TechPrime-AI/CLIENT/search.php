@@ -62,16 +62,12 @@ if (!empty($query)) {
                             <div class="ep-product-cat">Store: <?php echo h($p['seller_name']); ?></div>
                             <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
                             <div class="ep-card-actions">
-                                <button type="button" class="ep-heart-btn"
-                                        onclick="this.classList.toggle('active')" aria-label="Save">
-                                    <i class="far fa-heart"></i>
-                                </button>
                                 <form action="products.php" method="POST" class="ep-buy-form">
                                     <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                    <input type="hidden" name="add_to_cart" value="1">
+                                    <input type="hidden" name="return_to" value="<?php echo h('search.php?q=' . urlencode($query)); ?>">
                                     <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                    <span class="ep-cart-icon"><i class="fas fa-shopping-cart"></i></span>
-                                    <button type="submit" class="ep-buy-btn">BUY NOW</button>
+                                    <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
+                                    <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
                                 </form>
                             </div>
                         </div>

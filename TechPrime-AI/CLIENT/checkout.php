@@ -6,7 +6,6 @@ require_once __DIR__ . '/../backend/config/database.php';
 $db = getDbConnection();
 checkSessionTimeout();
 
-// Redirect if not logged in or cart is empty
 if (empty($_SESSION['user_id']) || empty($_SESSION['cart'])) {
     header('Location: products.php');
     exit;
@@ -16,7 +15,6 @@ $user_id = (int)$_SESSION['user_id'];
 $total = 0;
 $items = [];
 
-// FIX: All IDs already cast to int — safe to use in IN()
 $ids = array_map('intval', array_keys($_SESSION['cart']));
 $ids_str = implode(',', $ids);
 
@@ -35,24 +33,22 @@ if (empty($items)) {
 
 if (isset($_POST['place_order'])) {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-        die("Invalid CSRF token.");
+        die('Invalid CSRF token.');
     }
 
-    // FIX: Use prepared statement instead of real_escape_string
     $stmt = $db->prepare("INSERT INTO orders (user_id, total, status, shipping_address, customer_phone) VALUES (?, ?, 'to_ship', ?, ?)");
     $address = $_POST['address'];
     $phone   = $_POST['phone'];
-    $stmt->bind_param("idss", $user_id, $total, $address, $phone);
+    $stmt->bind_param('idss', $user_id, $total, $address, $phone);
 
     if ($stmt->execute()) {
         $order_id = $stmt->insert_id;
 
         foreach ($items as $item) {
-            $stmt_item = $db->prepare("INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
-            $stmt_item->bind_param("iiid", $order_id, $item['id'], $item['qty'], $item['price']);
+            $stmt_item = $db->prepare('INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)');
+            $stmt_item->bind_param('iiid', $order_id, $item['id'], $item['qty'], $item['price']);
             $stmt_item->execute();
 
-            // FIX: Cast to int before using in raw query
             $qty = (int)$item['qty'];
             $pid = (int)$item['id'];
             $db->query("UPDATE products SET stock = stock - $qty WHERE id = $pid");
@@ -60,74 +56,76 @@ if (isset($_POST['place_order'])) {
 
         unset($_SESSION['cart']);
 
-        // FIX: Use prepared statement
-        $stmt_del = $db->prepare("DELETE FROM cart WHERE user_id = ?");
-        $stmt_del->bind_param("i", $user_id);
+        $stmt_del = $db->prepare('DELETE FROM cart WHERE user_id = ?');
+        $stmt_del->bind_param('i', $user_id);
         $stmt_del->execute();
 
         header("Location: order_success.php?order_id=$order_id&total=$total");
         exit;
     }
 }
+
+$isLoggedIn = true;
+$activePage = '';
+$pageTitle  = 'Checkout';
+$bodyClass  = 'ep-checkout-layout';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Secure Checkout | IAS</title>
-    <link rel="stylesheet" href="../styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-</head>
-<body>
-<main class="category-page-main">
-    <div class="page-header-row">
-        <h1>Checkout</h1>
-        <button type="button" class="back-home-btn" onclick="location.href='cart.php'">← Back to Cart</button>
+<?php include __DIR__ . '/ep_header.php'; ?>
+
+<main class="ep-main">
+    <div class="ep-page-header-row">
+        <a href="cart.php" class="ep-back-link"><i class="fas fa-arrow-left"></i> Back to Cart</a>
+        <h2 class="ep-page-title">Secure Checkout</h2>
     </div>
 
-    <form method="POST" class="grid-2">
-        <div class="page-card">
-            <div class="card-title">📍 Shipping Details</div>
+    <form method="POST" class="ep-checkout-grid">
+        <div class="ep-panel">
+            <h3 class="ep-panel-title"><i class="fas fa-map-marker-alt"></i> Shipping Details</h3>
             <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+            <input type="hidden" name="total" value="<?php echo htmlspecialchars($total, ENT_QUOTES); ?>">
 
-            <label class="auth-label">Phone Number</label>
-            <input class="form-control" type="text" name="phone" placeholder="09123456789" required>
+            <?php if (!empty($_GET['error'])): ?>
+                <div class="ep-info-note" style="color:#c0392b; border-color:#c0392b;">
+                    <?php
+                    $epPayErrors = [
+                        'payment_failed' => 'We couldn\'t start the online payment. Please try again.',
+                        'not_paid'       => 'Your payment was not confirmed as paid. Please try again.',
+                        'cancelled'      => 'The payment was cancelled.',
+                    ];
+                    echo h($epPayErrors[$_GET['error']] ?? 'Something went wrong with your payment. Please try again.');
+                    ?>
+                </div>
+            <?php endif; ?>
 
-            <label class="auth-label">Delivery Address</label>
-            <textarea class="form-control" name="address" placeholder="House No., Street, City..." required style="min-height: 100px;"></textarea>
+            <label class="ep-form-label" for="checkoutPhone">Phone Number</label>
+            <input class="ep-form-control" id="checkoutPhone" type="text" name="phone" placeholder="09123456789" required>
 
-            <div class="info-note">Choose your payment method below.</div>
+            <label class="ep-form-label" for="checkoutAddress">Delivery Address</label>
+            <textarea class="ep-form-control" id="checkoutAddress" name="address" rows="4" placeholder="House No., Street, City..." required></textarea>
+
+            <div class="ep-info-note">Choose your payment method on the right.</div>
         </div>
 
-        <div class="page-card">
-            <div class="card-title">🛍️ Order Summary</div>
-            <div class="order-summary">
-                <?php foreach ($items as $item): ?>
-                <div class="order-summary item">
-                    <span><b><?php echo h($item['name']); ?></b> (x<?php echo $item['qty']; ?>)</span>
+        <div class="ep-panel">
+            <h3 class="ep-panel-title"><i class="fas fa-shopping-bag"></i> Order Summary</h3>
+            <?php foreach ($items as $item): ?>
+                <div class="ep-order-line">
+                    <span><strong><?php echo h($item['name']); ?></strong> (×<?php echo (int)$item['qty']; ?>)</span>
                     <span>₱<?php echo number_format($item['subtotal'], 2); ?></span>
                 </div>
-                <?php endforeach; ?>
+            <?php endforeach; ?>
 
-                <div class="order-summary total-box">
-                    <span style="font-weight:700; color:#888;">Total Amount</span>
-                    <span style="font-size:24px; font-weight:800; color:var(--ias-teal);">₱<?php echo number_format($total, 2); ?></span>
-                </div>
+            <div class="ep-order-total">
+                <span>Total Amount</span>
+                <strong>₱<?php echo number_format($total, 2); ?></strong>
             </div>
 
-            <input type="hidden" name="total" value="<?php echo $total; ?>">
-
-            <button type="submit" name="place_order" class="primary-btn" style="margin-bottom:10px;">
-                Cash on Delivery
-            </button>
-
-            <button type="submit" name="pay_online" formaction="../backend/api/create_payment.php" class="primary-btn" style="background:#5046e5;">
-                Pay Online
-            </button>
+            <div class="ep-checkout-actions">
+                <button type="submit" name="place_order" class="ep-btn ep-btn-primary ep-btn-block">Cash on Delivery</button>
+                <button type="submit" name="pay_online" formaction="../backend/api/create_payment.php" class="ep-btn ep-btn-secondary ep-btn-block">Pay Online</button>
+            </div>
         </div>
     </form>
 </main>
-</body>
-</html>
+
+<?php include __DIR__ . '/ep_footer.php'; ?>

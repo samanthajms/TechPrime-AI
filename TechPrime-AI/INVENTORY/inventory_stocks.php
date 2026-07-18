@@ -554,12 +554,16 @@ EXTRA
                 <button type="button" class="close" onclick="document.getElementById('addModal').classList.remove('open')">&times;</button>
                 <h3><i class="fas fa-plus"></i> Add New Product</h3>
                 <form method="post" enctype="multipart/form-data">
-                    <?php if ($hasSku): ?>
                     <div class="form-group">
-                        <label class="form-label">Barcode / SKU (optional)</label>
-                        <input type="text" name="sku" class="form-control" placeholder="Scan or type a barcode/SKU">
+                        <label class="form-label">Barcode (optional)</label>
+                        <div class="barcode-input-row" style="display:flex;gap:8px;align-items:center;">
+                            <input type="text" name="sku" id="add_barcode" class="form-control" placeholder="Scan or type barcode">
+                            <button type="button" class="btn btn-outline btn-scan" onclick="focusBarcodeField('add_barcode')"><i class="fas fa-barcode"></i> Scan</button>
+                        </div>
+                        <?php if (!$hasSku): ?>
+                        <p class="text-small text-muted" style="margin:6px 0 0;">Barcode is optional; apply SKU migration to persist scanned codes.</p>
+                        <?php endif; ?>
                     </div>
-                    <?php endif; ?>
                     <div class="form-group">
                         <label class="form-label">Product Name</label>
                         <input type="text" name="name" class="form-control" placeholder="e.g. Wireless Keyboard" required>
@@ -700,6 +704,14 @@ $mainScript = <<<SCRIPTS
 var ALL_PRODUCTS = {$productsJson};
 var LOW_STOCK_MAX = {$lowMax};
 var CRITICAL_STOCK_MAX = {$criticalMax};
+
+function focusBarcodeField(id) {
+    var input = document.getElementById(id);
+    if (!input) return;
+    input.focus();
+    input.select();
+    if (typeof IAS_UI !== 'undefined') IAS_UI.alert('Ready to scan — point your barcode scanner at the field.', 'success', 0);
+}
 
 var state = {
     status: 'all',

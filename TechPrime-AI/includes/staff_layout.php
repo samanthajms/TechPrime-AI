@@ -19,7 +19,6 @@ if (!function_exists('staff_nav_for_role')) {
             case 'retail_officer':
                 return [
                     ['key' => 'dashboard', 'href' => 'retail_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'reports', 'href' => 'retail_reports.php', 'label' => 'Sales Report', 'icon' => 'fa-chart-bar'],
                     ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'History', 'icon' => 'fa-history'],
                     ['key' => 'profile', 'href' => 'retail_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
