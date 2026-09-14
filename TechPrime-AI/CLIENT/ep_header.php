@@ -4,23 +4,12 @@
  *
  * Expected: $isLoggedIn (bool), $activePage (string), optional $searchQuery, $pageTitle, $bodyClass
  * Home-only: $isHomePage = true
- * Category pages: $categoryHeroTitle (string)
+ * Category pages: $categoryHeroTitle (string), $currentCategory (string)
  */
-$peripheralNavCategories = $peripheralNavCategories ?? [
-    'CCTV'                 => 'CCTV',
-    'Headset'              => 'Headset',
-    'Keyboard'             => 'Keyboard',
-    'Keyboard And Mouse'   => 'Keyboard And Mouse',
-    'Display'              => 'Display',
-    'Mouse'                => 'Mouse',
-    'Network Device'       => 'Network Device',
-    'Printer & Scanner'    => 'Printer and Scanner',
-    'Projector'            => 'Projector',
-    'Recorder'             => 'Recorder',
-    'Speaker'              => 'Speaker',
-    'UPS & AVR'            => 'UPS & AVR',
-    'Web & Digital Camera' => 'Web & Digital Camera',
-];
+if (!function_exists('ias_inventory_allowed_categories')) {
+    require_once __DIR__ . '/../includes/product_categories.php';
+}
+$currentCategory = $currentCategory ?? '';
 
 $searchQuery = $searchQuery ?? '';
 $isHomePage  = ($activePage ?? '') === 'home' || !empty($isHomePage);
@@ -57,26 +46,40 @@ $epCartCount  = $epCartPreview['count'];
     <div class="logo ep-logo" onclick="location.href='index.php'">
         <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img">
     </div>
+
     <div class="search-wrap">
         <form action="search.php" method="GET">
             <input name="q" type="text" placeholder="Search products..."
-                   value="<?php echo h($searchQuery); ?>">
-            <button type="submit" class="search-icon"><i class="fas fa-search"></i></button>
+                   value="<?php echo h($searchQuery); ?>" aria-label="Search products">
+            <button type="submit" class="search-icon" aria-label="Search"><i class="fas fa-search"></i></button>
         </form>
     </div>
-    <div class="header-icons">
-        <button id="notifBtn" class="icon-badge-btn" title="Notifications"
-                onclick="document.getElementById('epNotifPanel').classList.toggle('hidden')">
-            <i class="far fa-bell"></i>
-        </button>
+
+    <nav class="ep-nav-actions" aria-label="Primary">
+        <a href="index.php"
+           class="ep-nav-item<?php echo ($activePage ?? '') === 'home' ? ' active' : ''; ?>"
+           <?php echo ($activePage ?? '') === 'home' ? 'aria-current="page"' : ''; ?>>
+            <span class="ep-nav-item-icon"><i class="fas fa-home" aria-hidden="true"></i></span>
+            <span class="ep-nav-item-label">Home</span>
+        </a>
+
+        <a href="shop.php"
+           class="ep-nav-item<?php echo ($activePage ?? '') === 'shop' ? ' active' : ''; ?>"
+           <?php echo ($activePage ?? '') === 'shop' ? 'aria-current="page"' : ''; ?>>
+            <span class="ep-nav-item-icon"><i class="fas fa-store" aria-hidden="true"></i></span>
+            <span class="ep-nav-item-label">Shop Now</span>
+        </a>
 
         <div class="ep-cart-wrap" id="epCartWrap">
-            <button id="cartBtn" type="button" class="icon-badge-btn ep-cart-trigger" title="Cart"
+            <button id="cartBtn" type="button" class="ep-nav-item ep-cart-trigger"
                     aria-haspopup="true" aria-expanded="false" aria-controls="epCartDropdown">
-                <i class="fas fa-shopping-bag"></i>
-                <?php if ($epCartCount > 0): ?>
-                    <span class="badge"><?php echo (int)$epCartCount; ?></span>
-                <?php endif; ?>
+                <span class="ep-nav-item-icon">
+                    <i class="fas fa-shopping-bag" aria-hidden="true"></i>
+                    <?php if ($epCartCount > 0): ?>
+                        <span class="badge"><?php echo (int)$epCartCount; ?></span>
+                    <?php endif; ?>
+                </span>
+                <span class="ep-nav-item-label">Cart</span>
             </button>
             <div id="epCartDropdown" class="ep-cart-dropdown" role="menu" aria-label="Cart preview">
                 <?php if (!empty($epCartItems)): ?>
@@ -96,19 +99,24 @@ $epCartCount  = $epCartPreview['count'];
                     <a href="cart.php" class="ep-cart-view-link">View full cart</a>
                 <?php else: ?>
                     <p class="ep-cart-empty">Your cart is empty.</p>
-                    <a href="products.php" class="ep-cart-view-link">Browse products</a>
+                    <a href="shop.php" class="ep-cart-view-link">Browse products</a>
                 <?php endif; ?>
             </div>
         </div>
 
-        <button id="profileBtn" class="icon-badge-btn profile-outline-btn ep-account-btn"
-                onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : '../login.php'; ?>'">
-            <i class="far fa-user"></i>
-            <span class="ep-account-label">
-                <?php if ($isLoggedIn): ?>My Account<?php else: ?>Login /<br>Sign In<?php endif; ?>
-            </span>
+        <button id="notifBtn" type="button" class="ep-nav-item"
+                onclick="document.getElementById('epNotifPanel').classList.toggle('hidden')">
+            <span class="ep-nav-item-icon"><i class="far fa-bell" aria-hidden="true"></i></span>
+            <span class="ep-nav-item-label">Notifications</span>
         </button>
-    </div>
+
+        <button id="profileBtn" type="button" class="ep-nav-item"
+                onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : '../login.php'; ?>'">
+            <span class="ep-nav-item-icon"><i class="far fa-user" aria-hidden="true"></i></span>
+            <span class="ep-nav-item-label">My Profile</span>
+        </button>
+    </nav>
+
     <div id="epNotifPanel" class="notifications-panel hidden">
         <strong>Notifications</strong>
         <ul>
@@ -122,8 +130,7 @@ $epCartCount  = $epCartPreview['count'];
 (function () {
     function epSetHeaderOffset() {
         var header = document.querySelector('.ep-header');
-        var nav = document.querySelector('.ep-nav-bar');
-        var h = (header ? header.offsetHeight : 0) + (nav ? nav.offsetHeight : 0);
+        var h = header ? header.offsetHeight : 0;
         document.body.style.paddingTop = h + 'px';
     }
     epSetHeaderOffset();
@@ -155,34 +162,12 @@ $epCartCount  = $epCartPreview['count'];
 })();
 </script>
 
-<nav class="ep-nav ep-nav-bar full-width">
-    <a href="index.php" class="ep-nav-link<?php echo ($activePage ?? '') === 'home' ? ' active' : ''; ?>">HOME</a>
-    <a href="category.php?type=Desktop" class="ep-nav-link<?php echo ($activePage ?? '') === 'desktop' ? ' active' : ''; ?>">DESKTOP</a>
-    <a href="category.php?type=Laptops" class="ep-nav-link<?php echo ($activePage ?? '') === 'laptop' ? ' active' : ''; ?>">LAPTOP</a>
-
-    <div class="ep-nav-dropdown">
-        <button type="button"
-                class="ep-nav-link ep-nav-dropdown-btn<?php echo ($activePage ?? '') === 'peripherals' ? ' active' : ''; ?>"
-                onclick="epToggleDropdown(this)">
-            PERIPHERALS <i class="fas fa-chevron-down"></i>
-        </button>
-        <div class="ep-dropdown-menu ep-dropdown-cols">
-            <?php foreach ($peripheralNavCategories as $label => $value): ?>
-                <a href="category.php?type=<?php echo urlencode($value); ?>"><?php echo h($label); ?></a>
-            <?php endforeach; ?>
-        </div>
-    </div>
-
-    <a href="category.php?type=Brands" class="ep-nav-link<?php echo ($activePage ?? '') === 'brands' ? ' active' : ''; ?>">BRANDS</a>
-</nav>
-
 <?php if ($isHomePage): ?>
 <section class="ep-hero full-width">
     <div class="ep-hero-content">
         <p class="ep-hero-kicker">TECH IT EASY AT</p>
         <h1 class="ep-hero-title">Easy PC<br>One Oasis Branch</h1>
         <p class="ep-hero-subtitle">Explore the latest PCs, laptops &amp; accessories from EasyPC.</p>
-        <a href="products.php" class="ep-btn ep-btn-primary">Shop Now</a>
     </div>
     <div class="ep-hero-visual" aria-hidden="true">
         <span class="ep-hero-icon md"><img src="../assets/headset.png" alt="Headset"></span>

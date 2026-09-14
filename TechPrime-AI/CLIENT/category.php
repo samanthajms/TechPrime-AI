@@ -7,7 +7,8 @@ $db = getDbConnection();
 
 $type       = isset($_GET['type']) ? trim($_GET['type']) : 'Laptops';
 $isLoggedIn = isset($_SESSION['user_id']);
-$activePage = strtolower($type) === 'desktop' ? 'desktop' : (strtolower($type) === 'laptops' ? 'laptop' : '');
+$currentCategory = $type;
+$activePage = '';
 $pageTitle  = h($type);
 $searchQuery = '';
 $bodyClass = 'ep-category-layout';

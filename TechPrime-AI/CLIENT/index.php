@@ -11,17 +11,9 @@ $userName = $isLoggedIn ? h($_SESSION['name']) : 'Guest';
 $activePage = 'home';
 $isHomePage = true;
 
-$categories = ['Accessories', 'Audio', 'Cables and Adapters', 'Camera', 'Combo', 'Cooling', 'Customization', 'Display', 'Gaming Surface', 'Graphic Card', 'Hard Disk', 'Home & Office Furniture',
-'Keyboard', 'Laptop GA2', 'Laptop GA3', 'Laptop PR2', 'Laptop PR3', 'Memory', 'Mini PC', 'Motherboard', 'Mouse', 'Network Device', 'PC Case', 'Power Station', 'Power Supply', 'Printer and Scanner',
-'Processor', 'Promotional', 'Recorder', 'Services', 'Software', 'Solid State Drive', 'Speaker', 'UPS & AVR', 'Value Plus'];
-
-$categoryIcons = [
-    'Laptops'     => 'fa-laptop',
-    'Desktop'     => 'fa-desktop',
-    'Mobile'      => 'fa-mobile-alt',
-    'Cameras'     => 'fa-camera',
-    'Accessories' => 'fa-headphones',
-];
+$categories = ['Accessories', 'Audio', 'Cables and Adapters', 'Camera', 'Combo', 'Cooling', 'Customization', 'Display', 'Gaming Surface', 'GPU', 'Graphic Card', 'Hard Disk', 'Home & Office Furniture',
+'Keyboard', 'Laptop GA2', 'Laptop GA3', 'Laptop PR2', 'Laptop PR3', 'Memory', 'Mini PC', 'Motherboard', 'Mouse', 'Network Device', 'Others', 'PC Case', 'Power Station', 'Power Supply', 'Printer and Scanner', 'Printers and Scanners',
+'Processor', 'Promotional', 'RAM', 'Recorder', 'Services', 'Software', 'Solid State Drive', 'Speaker', 'UPS & AVR', 'Value Plus'];
 
 $productQuery = "SELECT p.*, u.name AS seller_name
                  FROM products p
@@ -36,15 +28,32 @@ $allDisplayProducts = ias_client_filter_products_for_display(
 );
 $topSellers = array_slice($allDisplayProducts, 0, 8);
 
+// New Arrivals: products added within the last 7 days (uses existing created_at)
+$newArrivalsQuery = "SELECT p.*, u.name AS seller_name
+                     FROM products p
+                     INNER JOIN users u ON p.seller_id = u.id
+                     WHERE " . ias_client_product_list_sql_condition('p') . "
+                       AND p.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                     ORDER BY p.created_at DESC
+                     LIMIT 12";
+$newArrivalsResult = $db->query($newArrivalsQuery);
+$newArrivals = ias_client_filter_products_for_display(
+    $newArrivalsResult ? $newArrivalsResult->fetch_all(MYSQLI_ASSOC) : [],
+    6
+);
+
 $returnTo = 'index.php';
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main">
-    <section class="ep-section">
-        <div class="ep-section-head">
-            <h3>Featured Products</h3>
-            <a href="products.php" class="ep-see-more">See more</a>
+<main class="ep-main ep-home-main">
+    <section class="ep-section ep-featured-section">
+        <div class="ep-featured-head">
+            <div>
+                <p class="ep-featured-kicker">Curated for you</p>
+                <h3>Featured Products</h3>
+                <p class="ep-featured-subtitle">Handpicked items from EasyPC inventory, ready for your next build.</p>
+            </div>
         </div>
 
         <div class="ep-carousel-wrap">
@@ -52,19 +61,23 @@ $returnTo = 'index.php';
             <div class="ep-carousel" id="topSellersRow">
                 <?php if (!empty($topSellers)): ?>
                     <?php foreach ($topSellers as $p): ?>
-                        <div class="ep-product-card">
-                            <img src="<?php echo h(ias_client_product_image_url($p)); ?>" class="ep-product-img" alt="<?php echo h($p['name']); ?>">
-                            <div class="ep-product-name"><?php echo h($p['name']); ?></div>
-                            <div class="ep-product-cat"><?php echo h($p['category'] ?: 'Uncategorized'); ?></div>
-                            <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
-                            <div class="ep-card-actions">
-                                <form action="products.php" method="POST" class="ep-buy-form">
-                                    <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                    <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
-                                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                    <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
-                                    <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
-                                </form>
+                        <div class="ep-product-card ep-featured-card">
+                            <div class="ep-featured-card-media">
+                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>" class="ep-product-img" alt="<?php echo h($p['name']); ?>">
+                            </div>
+                            <div class="ep-featured-card-body">
+                                <div class="ep-product-name"><?php echo h($p['name']); ?></div>
+                                <div class="ep-product-cat"><?php echo h($p['category'] ?: 'Uncategorized'); ?></div>
+                                <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
+                                <div class="ep-card-actions">
+                                    <form action="products.php" method="POST" class="ep-buy-form">
+                                        <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
+                                        <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
+                                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                        <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
+                                        <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -80,7 +93,7 @@ $returnTo = 'index.php';
         <div>
             <h2>Boost Your Productivity</h2>
             <p>Essential accessories for work &amp; play.</p>
-            <a href="category.php?type=Accessories" class="ep-btn ep-btn-primary">Browse Now</a>
+            <a href="category.php?type=Accessories" class="ep-btn ep-btn-primary">Browse Accessories</a>
         </div>
         <div class="ep-promo-icons" aria-hidden="true">
             <i class="fas fa-laptop"></i>
@@ -89,24 +102,32 @@ $returnTo = 'index.php';
         </div>
     </div>
 
-    <div class="ep-duo-grid">
-        <a class="ep-duo-tile new-arrivals" href="products.php">
-            <i class="fas fa-vr-cardboard ep-duo-icon"></i>
-            <h3>New Arrivals</h3>
-            <span class="ep-btn ep-btn-primary">Shop New</span>
-        </a>
-    </div>
-
-    <div class="ep-section-head"><h3>Categories</h3></div>
-    <section class="ep-categories-grid" id="epCategoriesGrid">
-        <?php foreach ($categories as $cat): ?>
-            <a class="ep-cat-tile" href="category.php?type=<?php echo urlencode($cat); ?>">
-                <span class="ep-cat-badge"><i class="fas <?php echo h($categoryIcons[$cat] ?? 'fa-wrench'); ?>"></i></span>
-                <span class="ep-cat-label"><?php echo strtoupper(h($cat)); ?></span>
-            </a>
-        <?php endforeach; ?>
+    <section class="ep-promo-banner ep-new-arrivals-banner" aria-labelledby="epNewArrivalsTitle">
+        <div class="ep-new-arrivals-copy">
+            <h2 id="epNewArrivalsTitle">New Arrivals</h2>
+            <p>Fresh stock added by EasyPC inventory within the last 7 days.</p>
+            <a href="shop.php" class="ep-btn ep-btn-primary">CHECK NEW ARRIVALS</a>
+        </div>
+        <div class="ep-new-arrivals-products">
+            <?php if (!empty($newArrivals)): ?>
+                <?php foreach ($newArrivals as $p): ?>
+                    <article class="ep-new-arrival-card">
+                        <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
+                             alt="<?php echo h($p['name']); ?>">
+                        <div class="ep-new-arrival-card-body">
+                            <div class="ep-new-arrival-name"><?php echo h($p['name']); ?></div>
+                            <div class="ep-new-arrival-price">₱<?php echo number_format((float) $p['price'], 2); ?></div>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="ep-new-arrivals-empty">
+                    <i class="fas fa-box-open" aria-hidden="true"></i>
+                    <span>No new arrivals in the last 7 days. Check back soon.</span>
+                </div>
+            <?php endif; ?>
+        </div>
     </section>
-    <nav class="ep-pagination" id="epCategoriesPagination" aria-label="Categories pagination"></nav>
 
     <section class="ep-tech-match">
         <h2 class="ep-match-title">Tech and Match</h2>
@@ -145,47 +166,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (urlParams.has('added') && typeof IAS_UI !== 'undefined') {
         IAS_UI.alert('Added to cart!', 'success');
     }
-
-    (function () {
-        const grid = document.getElementById('epCategoriesGrid');
-        const pagination = document.getElementById('epCategoriesPagination');
-        if (!grid || !pagination) return;
-        const tiles = Array.from(grid.children);
-        const ROWS_PER_PAGE = 2;
-        let currentPage = 1;
-        function getColumnCount() {
-            const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
-            return Math.max(1, cols.length);
-        }
-        function render() {
-            const perPage = getColumnCount() * ROWS_PER_PAGE;
-            const totalPages = Math.max(1, Math.ceil(tiles.length / perPage));
-            if (currentPage > totalPages) currentPage = totalPages;
-            const start = (currentPage - 1) * perPage;
-            tiles.forEach((tile, i) => { tile.style.display = (i >= start && i < start + perPage) ? '' : 'none'; });
-            pagination.innerHTML = '';
-            if (totalPages <= 1) return;
-            const makeLink = (label, page, opts = {}) => {
-                const a = document.createElement('a');
-                a.href = '#';
-                a.className = 'ep-page-link' + (opts.nav ? ' ep-page-nav' : '') + (opts.active ? ' active' : '') + (opts.disabled ? ' disabled' : '');
-                a.innerHTML = label;
-                a.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    if (opts.disabled) return;
-                    currentPage = page;
-                    render();
-                    grid.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                });
-                return a;
-            };
-            pagination.appendChild(makeLink('<i class="fas fa-arrow-left"></i> Previous', currentPage - 1, { nav: true, disabled: currentPage <= 1 }));
-            for (let p = 1; p <= totalPages; p++) pagination.appendChild(makeLink(String(p), p, { active: p === currentPage }));
-            pagination.appendChild(makeLink('Next <i class="fas fa-arrow-right"></i>', currentPage + 1, { nav: true, disabled: currentPage >= totalPages }));
-        }
-        render();
-        window.addEventListener('resize', render);
-    })();
 
     const catSelect = document.getElementById('epMatchCategory');
     const browseBtn = document.getElementById('epMatchBrowse');

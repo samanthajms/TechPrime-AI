@@ -9,7 +9,7 @@ checkSessionTimeout();
 checkRole('retail_officer');
 
 $retail_id = (int)$_SESSION['user_id'];
-$allowed_categories = ['Laptops', 'Desktop', 'Mobile', 'Cameras', 'Accessories'];
+$allowed_categories = ['Laptops', 'Desktop', 'Mobile', 'Cameras', 'Accessories', 'GPU', 'Printers and Scanners', 'Audio', 'Cables and Adapters', 'RAM', 'Motherboard', 'Power Supply', 'Processor', 'Others'];
 
 function retail_product_category(array $allowed): string
 {

@@ -94,3 +94,19 @@ function ep_add_product_to_cart(mysqli $db, int $productId, int $qty = 1): bool
 
     return true;
 }
+
+/**
+ * Derive a brand label from real product name text (first token).
+ * No hardcoded brand list — values come from existing product names.
+ */
+function ias_client_product_brand(array $p): string
+{
+    $name = trim((string) ($p['name'] ?? ''));
+    if ($name === '') {
+        return '';
+    }
+    if (preg_match('/^([A-Za-z0-9][A-Za-z0-9&+.\-]*)/', $name, $m)) {
+        return $m[1];
+    }
+    return '';
+}

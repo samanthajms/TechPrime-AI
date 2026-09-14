@@ -12,6 +12,7 @@ function ias_product_categories(): array
         'Customization',
         'Display',
         'Gaming Surface',
+        'GPU',
         'Graphic Card',
         'Hard Disk',
         'Home & Office Furniture',
@@ -19,12 +20,15 @@ function ias_product_categories(): array
         'Motherboard',
         'Mouse',
         'Network Device',
+        'Others',
         'PC Case',
         'Power Station',
         'Power Supply',
         'Printer and Scanner',
+        'Printers and Scanners',
         'Processor',
         'Promotional',
+        'RAM',
         'Recorder',
         'Services',
         'Software',
@@ -32,6 +36,30 @@ function ias_product_categories(): array
         'Speaker',
         'UPS & AVR',
         'Value Plus',
+    ];
+}
+
+/**
+ * Product categories available when inventory staff add/edit products.
+ * Shared with client category navigation.
+ */
+function ias_inventory_allowed_categories(): array
+{
+    return [
+        'Laptops',
+        'Desktop',
+        'Mobile',
+        'Cameras',
+        'Accessories',
+        'GPU',
+        'Printers and Scanners',
+        'Audio',
+        'Cables and Adapters',
+        'RAM',
+        'Motherboard',
+        'Power Supply',
+        'Processor',
+        'Others',
     ];
 }
 

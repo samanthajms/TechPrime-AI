@@ -12,7 +12,10 @@ const CATEGORY_META = {
     Cameras: { icon: "📷", page: "category_cameras.html", image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80" },
     Accessories: { icon: "🎧", page: "category_accessories.html", image: "https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=900&q=80" },
     Desktop: { icon: "🖥️", page: "category_desktop.html", image: "https://images.unsplash.com/photo-1593640408182-31c228c1d5c7?auto=format&fit=crop&w=900&q=80" },
-    Laptops: { icon: "💻", page: "category_laptops.html", image: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=900&q=80" }
+    Laptops: { icon: "💻", page: "category_laptops.html", image: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=900&q=80" },
+    GPU: { icon: "🎮", page: "category_gpu.html", image: "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=900&q=80" },
+    "Printers and Scanners": { icon: "🖨️", page: "category_printers_and_scanners.html", image: "https://images.unsplash.com/photo-1612815154859-1809c3f65e9b?auto=format&fit=crop&w=900&q=80" },
+    Audio: { icon: "🔊", page: "category_audio.html", image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=900&q=80" }
 };
 
 function currency(value) {
