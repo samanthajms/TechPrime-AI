@@ -7,7 +7,7 @@ header('Content-Type: application/json');
 
 $db = getDbConnection();
 
-$allowed = ['Laptops', 'Desktop', 'Mobile', 'Cameras', 'Accessories'];
+$allowed = ['Laptops', 'Desktop', 'Mobile', 'Cameras', 'Accessories', 'GPU', 'Printers and Scanners', 'Audio', 'Cables and Adapters', 'RAM', 'Motherboard', 'Power Supply', 'Processor', 'Others'];
 $type = isset($_GET['type']) ? $_GET['type'] : '';
 
 if (!in_array($type, $allowed)) {

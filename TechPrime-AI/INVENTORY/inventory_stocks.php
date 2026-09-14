@@ -9,7 +9,7 @@ checkSessionTimeout();
 checkRole('inventory_custodian');
 
 $uid = (int)$_SESSION['user_id'];
-$allowed_categories = ['Laptops', 'Desktop', 'Mobile', 'Cameras', 'Accessories'];
+$allowed_categories = ias_inventory_allowed_categories();
 
 /* Stock alert thresholds (qty-based; no per-product config in the schema). */
 const CRITICAL_STOCK_MAX = 5;   // 0 < stock <= 5

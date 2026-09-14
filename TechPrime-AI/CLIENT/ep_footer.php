@@ -37,7 +37,7 @@
                 <a href="category.php?type=Desktop">Desktop</a>
                 <a href="category.php?type=Laptops">Laptop</a>
                 <a href="category.php?type=Accessories">Accessories</a>
-                <a href="products.php">All Products</a>
+                <a href="shop.php">Shop Now</a>
             </div>
             <div class="ep-footer-col">
                 <h5>Explore</h5>
