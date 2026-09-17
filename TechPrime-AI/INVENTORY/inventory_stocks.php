@@ -275,14 +275,98 @@ staff_page_start([
     'subtitle' => 'Manage product inventory',
     'extra_head' => <<<'EXTRA'
 <style>
-.stocks-layout { display: grid; grid-template-columns: 260px 1fr; gap: 24px; align-items: start; }
-@media (max-width: 980px) { .stocks-layout { grid-template-columns: 1fr; } }
+.stocks-page { display: flex; flex-direction: column; gap: 18px; }
+.stocks-shell {
+    display: flex; flex-direction: column; gap: 0;
+    background: linear-gradient(180deg, #ffffff 0%, #f7faf5 100%);
+    border: 1px solid var(--ep-border);
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    overflow: visible;
+}
+.stocks-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: linear-gradient(to bottom, #fff 0%, #f4f9f0 100%);
+    border-bottom: 1px solid var(--ep-border);
+    padding: 16px 20px;
+    border-radius: 16px 16px 0 0;
+}
+.stocks-section-title-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1 1 auto;
+    background: linear-gradient(180deg, #ffffff 0%, var(--ep-green-light) 100%);
+    border: 1.5px solid var(--teal-light, #c6e6b3);
+    border-left: 4px solid var(--ep-green);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 2px 8px rgba(75, 139, 42, 0.08);
+}
+.stocks-section-title-box h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--ep-green-dark);
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.stocks-section-title-box .card-icon {
+    width: 32px; height: 32px; border-radius: 9px;
+}
+.stocks-section-title-box .card-subtitle {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ep-muted);
+    font-weight: 500;
+}
+.stocks-shell > .card-body {
+    padding: 18px 24px 24px;
+    background: transparent;
+}
 
-/* ---- Filter sidebar ---- */
-.filter-card { position: sticky; top: 16px; }
-.filter-card .card-body { display: flex; flex-direction: column; gap: 18px; }
-.filter-title { font-size: 13px; font-weight: 700; color: var(--ep-text); margin-bottom: 8px; display: block; }
-.filter-count { font-size: 13px; color: var(--ep-muted); font-weight: 600; }
+.stocks-filter-wrap { position: relative; flex-shrink: 0; margin-left: auto; }
+.stocks-filter-btn {
+    display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px;
+    border-radius: 10px; border: 1px solid var(--ep-border); background: #fff;
+    color: var(--ep-text); font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease, color .15s ease;
+}
+.stocks-filter-btn:hover,
+.stocks-filter-btn.open {
+    border-color: var(--ep-green); background: var(--ep-green-light); color: var(--ep-green-dark);
+    box-shadow: 0 4px 12px rgba(75, 139, 42, 0.12);
+}
+.stocks-filter-btn .filter-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--ep-green); display: none;
+}
+.stocks-filter-btn.has-active .filter-dot { display: inline-block; }
+.stocks-filter-btn .fa-chevron-down { font-size: 11px; opacity: 0.7; margin-left: 2px; }
+
+.stocks-filter-panel {
+    display: none; position: absolute; right: 0; left: auto; top: calc(100% + 8px); z-index: 90;
+    width: min(360px, calc(100vw - 48px)); background: #fff; border: 1px solid var(--ep-border);
+    border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,0.12); padding: 16px;
+}
+.stocks-filter-panel.open { display: flex; flex-direction: column; gap: 14px; }
+.stocks-filter-panel-title {
+    margin: 0 0 2px; font-size: 14px; font-weight: 800; color: var(--ep-green-dark);
+}
+.filter-title {
+    font-size: 12px; font-weight: 700; color: var(--ep-text); margin-bottom: 8px; display: block;
+    text-transform: uppercase; letter-spacing: .04em;
+}
+.stocks-category-select {
+    width: 100%; height: 40px; border-radius: 10px !important; border: 1px solid var(--ep-border);
+    font-weight: 600; font-size: 13px; background: #fff;
+}
 .status-toggle { display: flex; flex-direction: column; gap: 6px; }
 .status-btn {
     display: flex; justify-content: space-between; align-items: center;
@@ -297,10 +381,12 @@ staff_page_start([
 .price-range input { width: 100%; }
 .btn-reset { width: 100%; }
 
-/* ---- Main content ---- */
-.stocks-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.stocks-toolbar {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+    margin: 0 0 16px; padding: 12px 14px; background: #fff; border: 1px solid var(--ep-border); border-radius: 14px;
+}
 .search-wrap {
-    flex: 1 1 320px; display: flex; align-items: center; gap: 6px;
+    flex: 1 1 280px; display: flex; align-items: center; gap: 6px;
     background: var(--ep-gray-bg); border: 1px solid var(--ep-border); border-radius: 999px; padding: 4px 6px 4px 16px;
 }
 .search-wrap i.fa-search { color: var(--ep-muted); }
@@ -311,61 +397,123 @@ staff_page_start([
     border: 1px solid var(--ep-green) !important; color: var(--ep-green-dark) !important; font-weight: 700;
 }
 .toolbar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.view-toggle { display: flex; border: 1px solid var(--ep-border); border-radius: 999px; overflow: hidden; }
-.view-toggle button {
-    border: none; background: #fff; padding: 8px 12px; cursor: pointer; color: var(--ep-muted);
-}
+.view-toggle { display: flex; border: 1px solid var(--ep-border); border-radius: 999px; overflow: hidden; background: #fff; }
+.view-toggle button { border: none; background: transparent; padding: 8px 12px; cursor: pointer; color: var(--ep-muted); }
 .view-toggle button.active { background: var(--ep-green); color: #fff; }
-#addProductBtn { border-radius: 999px; }
+#addProductBtn { border-radius: 10px; height: 40px; padding: 0 16px; font-weight: 700; }
 
-.select-row {
-    display: flex; align-items: center; gap: 18px; margin-bottom: 12px; flex-wrap: wrap;
-}
+.select-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .select-chip {
     display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ep-text);
     border: 1px solid var(--ep-border); border-radius: 999px; padding: 6px 14px; background: #fff; cursor: pointer;
 }
 .select-chip.active { border-color: var(--ep-green); color: var(--ep-green-dark); background: var(--ep-green-light); }
 .select-chip input { width: 16px; height: 16px; }
-.selection-bar {
-    display: none; align-items: center; gap: 10px; margin-left: auto;
-}
+.selection-bar { display: none; align-items: center; gap: 10px; margin-left: auto; }
 .selection-bar.show { display: flex; }
 
-.thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 10px; background: var(--ep-green-light); flex-shrink: 0; }
-.category-pill {
-    background: var(--ep-green-light); color: var(--ep-green-dark);
-    padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
+/* Table-style product layout */
+.stocks-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    background: #fff;
+    border: 1px solid var(--ep-border);
+    border-radius: 14px;
 }
-.variant-pill {
-    background: #eaf0ff; color: #2527a8; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
+.stocks-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    min-width: 720px;
 }
-.stock-type { color: var(--ep-muted); display: inline-flex; align-items: center; gap: 4px; }
-.stock-pill { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-.stock-pill.out { background: #fdecea; color: #c0392b; }
-.stock-pill.critical { background: #fdecea; color: #c0392b; }
-.stock-pill.low { background: #fff8db; color: var(--ep-yellow-dark); }
-.stock-pill.ok { background: var(--ep-green-light); color: var(--ep-green-dark); }
-.price-tag { color: var(--ep-green-dark); font-weight: 800; }
-.price-label { font-size: 11px; color: var(--ep-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.stocks-table thead tr {
+    background: var(--ep-green-light);
+    border-bottom: 2px solid var(--teal-light, #c6e6b3);
+}
+.stocks-table th {
+    padding: 13px 16px;
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.75px;
+    color: var(--teal-deeper, var(--ep-green-dark));
+    white-space: nowrap;
+}
+.stocks-table th.col-chk { width: 44px; }
+.stocks-table th.col-stock { width: 100px; }
+.stocks-table th.col-status { width: 150px; }
+.stocks-table th.col-price { width: 120px; }
+.stocks-table th.col-actions { width: 72px; text-align: center; }
+.stocks-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--ep-border);
+    vertical-align: middle;
+}
+.stocks-table tbody tr:last-child td { border-bottom: none; }
+.stocks-table tbody tr {
+    transition: background 0.15s ease;
+}
+.stocks-table tbody tr:hover { background: rgba(238, 248, 230, 0.75); }
+.stocks-table tbody tr.selected { background: rgba(238, 248, 230, 0.95); }
+.stocks-table .chk { width: 18px; height: 18px; accent-color: var(--ep-green); }
+.stocks-pname {
+    font-weight: 700;
+    color: var(--ep-text);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.stocks-pcat {
+    display: block;
+    margin-top: 3px;
+    font-size: 11.5px;
+    color: var(--ep-muted);
+    font-weight: 600;
+}
+.stocks-qty {
+    font-weight: 800;
+    font-size: 15px;
+    color: var(--ep-text);
+    font-variant-numeric: tabular-nums;
+}
+.stocks-qty.warn { color: #b45309; }
+.stocks-qty.out { color: #c0392b; }
+.price-tag { color: var(--ep-green-dark); font-weight: 800; white-space: nowrap; }
 
-/* Product list rows */
-.product-list { display: flex; flex-direction: column; gap: 10px; }
-.product-row {
-    display: flex; align-items: center; gap: 14px; padding: 14px; border: 1.5px solid var(--ep-border);
-    border-radius: 14px; background: #fff; transition: border-color .15s ease, box-shadow .15s ease;
+.stock-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 100px;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    border: 1px solid transparent;
 }
-.product-row.selected { border-color: var(--ep-green); box-shadow: 0 0 0 1px var(--ep-green) inset; }
-.product-row .chk { flex-shrink: 0; width: 18px; height: 18px; accent-color: var(--ep-green); }
-.product-main { flex: 1; min-width: 0; }
-.product-main .pname { font-weight: 700; color: var(--ep-text); }
-.product-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: 12px; color: var(--ep-muted); }
-.stock-qty { font-weight: 700; }
-.stock-qty.warn { color: #c0392b; }
-.low-flag { color: #c0392b; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
-.low-flag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #c0392b; display: inline-block; }
-.product-price { text-align: right; min-width: 100px; }
-.ellipsis-wrap { position: relative; flex-shrink: 0; }
+.stock-status-pill.ok {
+    background: #f0fdf4;
+    color: #15803d;
+    border-color: #bbf7d0;
+}
+.stock-status-pill.low {
+    background: #fffbeb;
+    color: #b45309;
+    border-color: #fde68a;
+}
+.stock-status-pill.critical {
+    background: #fff1f2;
+    color: #be123c;
+    border-color: #fecdd3;
+}
+.stock-status-pill.out {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.ellipsis-wrap { position: relative; display: inline-flex; justify-content: center; width: 100%; }
 .ellipsis-btn {
     border: none; background: none; font-size: 18px; color: var(--ep-muted); cursor: pointer;
     width: 32px; height: 32px; border-radius: 999px;
@@ -383,29 +531,57 @@ staff_page_start([
 .ellipsis-menu button:hover { background: var(--ep-gray-bg); }
 .ellipsis-menu button.danger { color: #c0392b; }
 
-/* Grid view */
+/* Grid view (preserved) */
+.product-list { display: flex; flex-direction: column; gap: 10px; }
 .product-list.grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.product-row {
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+    border: 1.5px solid var(--ep-border); border-radius: 14px; background: #fff;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
 .product-list.grid-view .product-row { flex-direction: column; align-items: stretch; text-align: center; position: relative; }
 .product-list.grid-view .thumb { width: 100%; height: 120px; margin: 0 auto; }
 .product-list.grid-view .product-main { text-align: left; margin-top: 6px; }
 .product-list.grid-view .product-price { text-align: left; margin-top: 6px; }
 .product-list.grid-view .chk { position: absolute; top: 10px; left: 10px; }
-.product-list.grid-view .ellipsis-wrap { position: absolute; top: 6px; right: 6px; }
-
-.empty-state-row { text-align: center; padding: 40px 0; color: var(--ep-muted); }
-
-/* Pagination */
-.pagination-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
-.pagination-bar .pg-info { font-size: 13px; color: var(--ep-muted); }
-.pagination-bar .pg-controls { display: flex; gap: 6px; align-items: center; }
-.pagination-bar button {
-    border: 1px solid var(--ep-border); background: #fff; border-radius: 6px; padding: 6px 12px;
-    cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ep-text);
+.product-list.grid-view .ellipsis-wrap { position: absolute; top: 6px; right: 6px; width: auto; }
+.thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 10px; background: var(--ep-green-light); flex-shrink: 0; border: 1px solid var(--ep-border); }
+.product-main { flex: 1; min-width: 0; }
+.product-main .pname { font-weight: 700; color: var(--ep-text); }
+.product-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: 12px; color: var(--ep-muted); }
+.product-price { text-align: right; min-width: 100px; }
+.price-label { font-size: 11px; color: var(--ep-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.category-pill {
+    background: var(--ep-green-light); color: var(--ep-green-dark);
+    padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    border: 1px solid var(--teal-light, #c6e6b3);
 }
-.pagination-bar button.active { background: var(--ep-green); border-color: var(--ep-green); color: #fff; }
+
+.empty-state-row {
+    text-align: center; padding: 52px 16px; color: var(--ep-muted); font-weight: 500;
+    background: #fff; border: 1px dashed var(--ep-border); border-radius: 14px;
+}
+
+.pagination-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px;
+    padding: 14px 4px 0; border-top: 1px solid var(--ep-border); flex-wrap: wrap;
+}
+.pagination-bar .pg-info { font-size: 13px; color: var(--ep-muted); font-weight: 500; }
+.pagination-bar .pg-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pagination-bar button {
+    border: 1px solid var(--ep-border); background: #fff; border-radius: 10px; min-width: 36px; height: 36px;
+    padding: 0 12px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ep-text);
+    transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.pagination-bar button:hover:not(:disabled):not(.active) {
+    border-color: var(--ep-green); color: var(--ep-green-dark); background: var(--ep-green-light);
+}
+.pagination-bar button.active {
+    background: var(--ep-green); border-color: var(--ep-green); color: #fff;
+    box-shadow: 0 4px 12px rgba(75, 139, 42, 0.22);
+}
 .pagination-bar button:disabled { opacity: .4; cursor: not-allowed; }
 
-/* Modals */
 .modal {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     z-index: 2000; align-items: center; justify-content: center;
@@ -426,126 +602,123 @@ staff_page_start([
 .details-grid dt { color: var(--ep-muted); font-weight: 600; }
 .details-grid dd { margin: 0; color: var(--ep-text); font-weight: 600; }
 .details-img { width: 100%; max-height: 220px; object-fit: contain; background: var(--ep-green-light); border-radius: 10px; margin-bottom: 16px; }
+
+@media (max-width: 640px) {
+    .stocks-shell > .card-body { padding: 14px 14px 18px; }
+    .stocks-section-header { padding: 12px 14px; }
+    .stocks-filter-panel { right: 0; left: auto; }
+    .stocks-toolbar { padding: 10px; }
+}
 </style>
 EXTRA
 ]);
 ?>
 
-        <div class="stocks-layout">
-            <!-- ============================== FILTER SIDEBAR ============================== -->
-            <div class="card filter-card">
-                <div class="card-header">
-                    <div>
-                        <h3><i class="fas fa-sliders-h"></i> Product</h3>
-                        <div class="card-subtitle"><span id="totalCountLabel"><?php echo (int)$totalCount; ?></span> Products</div>
-                    </div>
+        <div class="stocks-page">
+        <div class="card stocks-shell">
+            <div class="card-header stocks-section-header">
+                <div class="stocks-section-title-box">
+                    <h3><span class="card-icon"><i class="fas fa-boxes"></i></span> Stock Products</h3>
+                    <div class="card-subtitle"><span id="totalCountLabel"><?php echo (int)$totalCount; ?></span> products in inventory</div>
                 </div>
-                <div class="card-body">
-                    <div>
-                        <span class="filter-title">Product Status</span>
-                        <div class="status-toggle" id="statusToggle">
-                            <button type="button" class="status-btn active" data-status="all">All <span class="cnt"><?php echo (int)$totalCount; ?></span></button>
-                            <button type="button" class="status-btn" data-status="instock">In stock <span class="cnt"><?php echo (int)$inStockCount; ?></span></button>
-                            <button type="button" class="status-btn" data-status="outofstock">Out of Stock <span class="cnt"><?php echo (int)$outOfStockCount; ?></span></button>
+                <div class="stocks-filter-wrap">
+                    <button type="button" id="filterToggleBtn" class="stocks-filter-btn" aria-expanded="false" aria-controls="stocksFilterPanel">
+                        <i class="fas fa-filter"></i> Filter <i class="fas fa-chevron-down"></i> <span class="filter-dot" aria-hidden="true"></span>
+                    </button>
+                    <div id="stocksFilterPanel" class="stocks-filter-panel" role="dialog" aria-label="Stock filters">
+                        <h4 class="stocks-filter-panel-title">Filter Stock</h4>
+                        <div>
+                            <span class="filter-title">Category</span>
+                            <select id="categorySelect" class="form-control stocks-category-select" aria-label="Product category">
+                                <option value="">All Categories</option>
+                                <?php foreach ($categoryOptions as $cat): ?>
+                                    <option value="<?php echo h($cat); ?>"><?php echo h($cat); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
-                    </div>
-
-                    <div>
-                        <span class="filter-title">Product Category</span>
-                        <input type="text" id="categoryFilter" class="form-control" list="categoryOptions" placeholder="All Categories" autocomplete="off">
-                        <datalist id="categoryOptions">
-                            <?php foreach ($categoryOptions as $cat): ?>
-                                <option value="<?php echo h($cat); ?>">
-                            <?php endforeach; ?>
-                        </datalist>
-                    </div>
-
-                    <div>
-                        <span class="filter-title">Sort By</span>
-                        <select id="sortBy" class="form-control">
-                            <option value="name_asc" selected>Alphabetical (A-Z)</option>
-                            <option value="name_desc">Alphabetical (Z-A)</option>
-                            <option value="price_asc">Price (Low to High)</option>
-                            <option value="price_desc">Price (High to Low)</option>
-                            <option value="stock_asc">Stock Quantity (Low to High)</option>
-                            <option value="stock_desc">Stock Quantity (High to Low)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <span class="filter-title">Stock Alert</span>
-                        <select id="stockAlert" class="form-control">
-                            <option value="all" selected>All Stock</option>
-                            <option value="low">Low Stock (&le; <?php echo LOW_STOCK_MAX; ?>)</option>
-                            <option value="critical">Critical Stock (&le; <?php echo CRITICAL_STOCK_MAX; ?>)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <span class="filter-title">Price Range</span>
-                        <div class="price-range">
-                            <input type="number" min="0" step="0.01" id="priceMin" class="form-control" placeholder="Min">
-                            <span>&ndash;</span>
-                            <input type="number" min="0" step="0.01" id="priceMax" class="form-control" placeholder="Max">
-                        </div>
-                    </div>
-
-                    <button type="button" id="resetFilters" class="btn btn-outline btn-reset">Reset Filters</button>
-                </div>
-            </div>
-
-            <!-- ============================== MAIN CONTENT ============================== -->
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <h3><span class="card-icon"><i class="fas fa-boxes"></i></span> Current Inventory</h3>
-                        <div class="card-subtitle">All stocked products</div>
-                    </div>
-                </div>
-                <div class="card-body" style="padding-top:0;">
-
-                    <div class="stocks-toolbar">
-                        <div class="search-wrap">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="searchInput" class="form-control" placeholder="Search by name, category or SKU...">
-                            <button type="button" id="scanBtn" class="btn btn-outline btn-scan" title="Focus this field, then use a barcode scanner (acts as keyboard input ending in Enter)">
-                                <i class="fas fa-barcode"></i> Scan
-                            </button>
-                        </div>
-                        <div class="toolbar-actions">
-                            <div class="view-toggle">
-                                <button type="button" id="listViewBtn" class="active" title="List view"><i class="fas fa-list"></i></button>
-                                <button type="button" id="gridViewBtn" title="Grid view"><i class="fas fa-th-large"></i></button>
+                        <div>
+                            <span class="filter-title">Product Status</span>
+                            <div class="status-toggle" id="statusToggle">
+                                <button type="button" class="status-btn active" data-status="all">All <span class="cnt"><?php echo (int)$totalCount; ?></span></button>
+                                <button type="button" class="status-btn" data-status="instock">In stock <span class="cnt"><?php echo (int)$inStockCount; ?></span></button>
+                                <button type="button" class="status-btn" data-status="outofstock">Out of Stock <span class="cnt"><?php echo (int)$outOfStockCount; ?></span></button>
                             </div>
-                            <button type="button" id="addProductBtn" class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">
-                                <i class="fas fa-plus"></i> Add Product
-                            </button>
                         </div>
-                    </div>
-
-                    <div class="select-row">
-                        <label class="select-chip" id="selectedChip">
-                            <input type="checkbox" id="selectedIndicator" checked disabled>
-                            Selected (<span id="selectedCount">0</span>)
-                        </label>
-                        <label class="select-chip" for="selectAll">
-                            <input type="checkbox" id="selectAll">
-                            Select All (<span id="pageCount">0</span>)
-                        </label>
-                        <div class="selection-bar" id="selectionBar">
-                            <button type="button" class="btn btn-danger btn-sm" id="bulkDeleteBtn"><i class="fas fa-trash"></i> Delete</button>
+                        <div>
+                            <span class="filter-title">Sort By</span>
+                            <select id="sortBy" class="form-control">
+                                <option value="name_asc" selected>Alphabetical (A-Z)</option>
+                                <option value="name_desc">Alphabetical (Z-A)</option>
+                                <option value="price_asc">Price (Low to High)</option>
+                                <option value="price_desc">Price (High to Low)</option>
+                                <option value="stock_asc">Stock Quantity (Low to High)</option>
+                                <option value="stock_desc">Stock Quantity (High to Low)</option>
+                            </select>
                         </div>
-                    </div>
-
-                    <div id="productList" class="product-list"><!-- rows injected by JS --></div>
-                    <div id="emptyState" class="empty-state-row" style="display:none;">No products match your filters.</div>
-
-                    <div class="pagination-bar">
-                        <div class="pg-info" id="pgInfo"></div>
-                        <div class="pg-controls" id="pgControls"></div>
+                        <div>
+                            <span class="filter-title">Stock Alert</span>
+                            <select id="stockAlert" class="form-control">
+                                <option value="all" selected>All Stock</option>
+                                <option value="low">Low Stock (&le; <?php echo LOW_STOCK_MAX; ?>)</option>
+                                <option value="critical">Critical Stock (&le; <?php echo CRITICAL_STOCK_MAX; ?>)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="filter-title">Price Range</span>
+                            <div class="price-range">
+                                <input type="number" min="0" step="0.01" id="priceMin" class="form-control" placeholder="Min">
+                                <span>&ndash;</span>
+                                <input type="number" min="0" step="0.01" id="priceMax" class="form-control" placeholder="Max">
+                            </div>
+                        </div>
+                        <button type="button" id="resetFilters" class="btn btn-outline btn-reset">Reset Filters</button>
                     </div>
                 </div>
             </div>
+            <div class="card-body">
+
+                <div class="stocks-toolbar">
+                    <div class="search-wrap">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search by name, category or SKU...">
+                        <button type="button" id="scanBtn" class="btn btn-outline btn-scan" title="Focus this field, then use a barcode scanner (acts as keyboard input ending in Enter)">
+                            <i class="fas fa-barcode"></i> Scan
+                        </button>
+                    </div>
+                    <div class="toolbar-actions">
+                        <div class="view-toggle">
+                            <button type="button" id="listViewBtn" class="active" title="List view"><i class="fas fa-list"></i></button>
+                            <button type="button" id="gridViewBtn" title="Grid view"><i class="fas fa-th-large"></i></button>
+                        </div>
+                        <button type="button" id="addProductBtn" class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">
+                            <i class="fas fa-plus"></i> Add Product
+                        </button>
+                    </div>
+                </div>
+
+                <div class="select-row">
+                    <label class="select-chip" id="selectedChip">
+                        <input type="checkbox" id="selectedIndicator" checked disabled>
+                        Selected (<span id="selectedCount">0</span>)
+                    </label>
+                    <label class="select-chip" for="selectAll">
+                        <input type="checkbox" id="selectAll">
+                        Select All (<span id="pageCount">0</span>)
+                    </label>
+                    <div class="selection-bar" id="selectionBar">
+                        <button type="button" class="btn btn-danger btn-sm" id="bulkDeleteBtn"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+
+                <div id="productList" class="stocks-table-wrap"><!-- rows injected by JS --></div>
+                <div id="emptyState" class="empty-state-row" style="display:none;">No products match your filters.</div>
+
+                <div class="pagination-bar">
+                    <div class="pg-info" id="pgInfo"></div>
+                    <div class="pg-controls" id="pgControls"></div>
+                </div>
+            </div>
+        </div>
         </div>
 
         <!-- ============================== ADD PRODUCT MODAL ============================== -->
@@ -785,10 +958,28 @@ function render() {
 
     if (pageItems.length === 0) {
         listEl.innerHTML = '';
+        listEl.className = state.view === 'grid' ? 'product-list grid-view' : 'stocks-table-wrap';
         emptyEl.style.display = 'block';
     } else {
         emptyEl.style.display = 'none';
-        listEl.innerHTML = pageItems.map(rowHtml).join('');
+        if (state.view === 'grid') {
+            listEl.className = 'product-list grid-view';
+            listEl.innerHTML = pageItems.map(cardHtml).join('');
+        } else {
+            listEl.className = 'stocks-table-wrap';
+            listEl.innerHTML =
+                '<table class="stocks-table">' +
+                    '<thead><tr>' +
+                        '<th class="col-chk"></th>' +
+                        '<th>Product Name</th>' +
+                        '<th class="col-stock">Stock</th>' +
+                        '<th class="col-status">Status</th>' +
+                        '<th class="col-price">Price</th>' +
+                        '<th class="col-actions">Action</th>' +
+                    '</tr></thead>' +
+                    '<tbody>' + pageItems.map(rowHtml).join('') + '</tbody>' +
+                '</table>';
+        }
     }
 
     document.getElementById('pgInfo').textContent = filtered.length === 0
@@ -802,21 +993,42 @@ function render() {
     selectAllBox.checked = pageItems.length > 0 && pageItems.every(function (p) { return state.selected[p.id]; });
 }
 
+function statusPillHtml(status) {
+    var label = statusLabel(status);
+    var cls = status === 'out' ? 'out' : (status === 'critical' ? 'critical' : (status === 'low' ? 'low' : 'ok'));
+    var icon = status === 'out' ? 'fa-times-circle' : (status === 'critical' ? 'fa-exclamation-circle' : (status === 'low' ? 'fa-exclamation-triangle' : 'fa-check-circle'));
+    return '<span class="stock-status-pill ' + cls + '"><i class="fas ' + icon + '"></i> ' + label + '</span>';
+}
+
 function rowHtml(p) {
-    var warnClass = (p.status === 'low' || p.status === 'critical') ? ' warn' : '';
-    var img = p.img ? '<img src="' + escapeHtml(p.img) + '" class="thumb" alt="">' : '<div class="thumb"></div>';
     var checked = state.selected[p.id] ? 'checked' : '';
+    var qtyClass = p.status === 'out' ? ' out' : ((p.status === 'low' || p.status === 'critical') ? ' warn' : '');
+    return '' +
+    '<tr class="' + (checked ? 'selected' : '') + '" data-id="' + p.id + '">' +
+        '<td><input type="checkbox" class="chk row-chk" data-id="' + p.id + '" ' + checked + '></td>' +
+        '<td>' +
+            '<div class="stocks-pname" title="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</div>' +
+            '<span class="stocks-pcat">' + escapeHtml(p.category) + '</span>' +
+        '</td>' +
+        '<td><span class="stocks-qty' + qtyClass + '">' + p.stock + '</span></td>' +
+        '<td>' + statusPillHtml(p.status) + '</td>' +
+        '<td class="price-tag">' + peso(p.price) + '</td>' +
+        '<td>' +
+            '<div class="ellipsis-wrap">' +
+                '<button type="button" class="ellipsis-btn" onclick="toggleMenu(event, ' + p.id + ')"><i class="fas fa-ellipsis-h"></i></button>' +
+                '<div class="ellipsis-menu" id="menu-' + p.id + '">' +
+                    '<button type="button" onclick="viewDetails(' + p.id + ')"><i class="fas fa-eye"></i> View Details</button>' +
+                    '<button type="button" onclick="openEditModal(' + p.id + ')"><i class="fas fa-edit"></i> Edit</button>' +
+                    '<button type="button" class="danger" onclick="deleteOne(' + p.id + ')"><i class="fas fa-trash"></i> Delete</button>' +
+                '</div>' +
+            '</div>' +
+        '</td>' +
+    '</tr>';
+}
 
-    var stockBit;
-    if (p.status === 'out') {
-        stockBit = '<span class="stock-pill out">Out of Stock</span>';
-    } else {
-        var flag = (p.status === 'critical')
-            ? '<span class="low-flag">critical</span>'
-            : (p.status === 'low' ? '<span class="low-flag">low</span>' : '');
-        stockBit = '<span class="stock-qty' + warnClass + '">' + p.stock + ' in stock</span>' + (flag ? '&nbsp;' + flag : '');
-    }
-
+function cardHtml(p) {
+    var checked = state.selected[p.id] ? 'checked' : '';
+    var img = p.img ? '<img src="' + escapeHtml(p.img) + '" class="thumb" alt="">' : '<div class="thumb"></div>';
     return '' +
     '<div class="product-row' + (checked ? ' selected' : '') + '" data-id="' + p.id + '">' +
         '<input type="checkbox" class="chk row-chk" data-id="' + p.id + '" ' + checked + '>' +
@@ -825,12 +1037,13 @@ function rowHtml(p) {
             '<div class="pname">' + escapeHtml(p.name) + '</div>' +
             '<div class="product-meta">' +
                 '<span class="category-pill">' + escapeHtml(p.category) + '</span>' +
-                '<span class="stock-type"><i class="fas fa-box"></i> Stocked Product:</span>' +
-                stockBit +
+                statusPillHtml(p.status) +
             '</div>' +
         '</div>' +
         '<div class="product-price">' +
-            '<div class="price-label">Price</div>' +
+            '<div class="price-label">Stock</div>' +
+            '<div class="stocks-qty">' + p.stock + '</div>' +
+            '<div class="price-label" style="margin-top:6px;">Price</div>' +
             '<div class="price-tag">' + peso(p.price) + '</div>' +
         '</div>' +
         '<div class="ellipsis-wrap">' +
@@ -927,7 +1140,8 @@ function updateSelectionUI() {
 document.getElementById('productList').addEventListener('change', function (e) {
     if (e.target.classList.contains('row-chk')) {
         state.selected[e.target.dataset.id] = e.target.checked;
-        e.target.closest('.product-row').classList.toggle('selected', e.target.checked);
+        var row = e.target.closest('tr') || e.target.closest('.product-row');
+        if (row) row.classList.toggle('selected', e.target.checked);
         updateSelectionUI();
         var selectAllBox = document.getElementById('selectAll');
         var visible = document.querySelectorAll('.row-chk');
@@ -938,7 +1152,8 @@ document.getElementById('productList').addEventListener('change', function (e) {
 document.getElementById('selectAll').addEventListener('change', function () {
     var checked = this.checked;
     document.querySelectorAll('.row-chk').forEach(function (c) {
-        c.closest('.product-row').classList.toggle('selected', checked);
+        var row = c.closest('tr') || c.closest('.product-row');
+        if (row) row.classList.toggle('selected', checked);
         c.checked = checked;
         state.selected[c.dataset.id] = checked;
     });
@@ -954,6 +1169,28 @@ document.getElementById('bulkDeleteBtn').addEventListener('click', function () {
     document.getElementById('bulkDeleteForm').submit();
 });
 
+function updateFilterBtnState() {
+    var btn = document.getElementById('filterToggleBtn');
+    var active = state.status !== 'all' || state.category !== '' || state.alert !== 'all' || state.sort !== 'name_asc'
+        || state.priceMin !== null || state.priceMax !== null;
+    btn.classList.toggle('has-active', active);
+}
+
+var filterBtn = document.getElementById('filterToggleBtn');
+var filterPanel = document.getElementById('stocksFilterPanel');
+filterBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var open = filterPanel.classList.toggle('open');
+    filterBtn.classList.toggle('open', open);
+    filterBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+});
+filterPanel.addEventListener('click', function (e) { e.stopPropagation(); });
+document.addEventListener('click', function () {
+    filterPanel.classList.remove('open');
+    filterBtn.classList.remove('open');
+    filterBtn.setAttribute('aria-expanded', 'false');
+});
+
 /* ---- Filter/sort/search controls ---- */
 document.getElementById('statusToggle').addEventListener('click', function (e) {
     var btn = e.target.closest('.status-btn');
@@ -962,34 +1199,40 @@ document.getElementById('statusToggle').addEventListener('click', function (e) {
     btn.classList.add('active');
     state.status = btn.dataset.status;
     state.page = 1;
+    updateFilterBtnState();
     render();
 });
 
-document.getElementById('categoryFilter').addEventListener('input', function () {
+document.getElementById('categorySelect').addEventListener('change', function () {
     state.category = this.value.trim();
     state.page = 1;
+    updateFilterBtnState();
     render();
 });
 
 document.getElementById('sortBy').addEventListener('change', function () {
     state.sort = this.value;
+    updateFilterBtnState();
     render();
 });
 
 document.getElementById('stockAlert').addEventListener('change', function () {
     state.alert = this.value;
     state.page = 1;
+    updateFilterBtnState();
     render();
 });
 
 document.getElementById('priceMin').addEventListener('input', function () {
     state.priceMin = this.value === '' ? null : parseFloat(this.value);
     state.page = 1;
+    updateFilterBtnState();
     render();
 });
 document.getElementById('priceMax').addEventListener('input', function () {
     state.priceMax = this.value === '' ? null : parseFloat(this.value);
     state.page = 1;
+    updateFilterBtnState();
     render();
 });
 
@@ -1009,15 +1252,15 @@ document.getElementById('scanBtn').addEventListener('click', function () {
 
 document.getElementById('resetFilters').addEventListener('click', function () {
     state.status = 'all'; state.category = ''; state.sort = 'name_asc'; state.alert = 'all';
-    state.priceMin = null; state.priceMax = null; state.search = ''; state.page = 1;
+    state.priceMin = null; state.priceMax = null; state.page = 1;
     document.querySelectorAll('.status-btn').forEach(function (b) { b.classList.remove('active'); });
     document.querySelector('.status-btn[data-status="all"]').classList.add('active');
-    document.getElementById('categoryFilter').value = '';
+    document.getElementById('categorySelect').value = '';
     document.getElementById('sortBy').value = 'name_asc';
     document.getElementById('stockAlert').value = 'all';
     document.getElementById('priceMin').value = '';
     document.getElementById('priceMax').value = '';
-    document.getElementById('searchInput').value = '';
+    updateFilterBtnState();
     render();
 });
 
@@ -1025,15 +1268,16 @@ document.getElementById('listViewBtn').addEventListener('click', function () {
     state.view = 'list';
     this.classList.add('active');
     document.getElementById('gridViewBtn').classList.remove('active');
-    document.getElementById('productList').classList.remove('grid-view');
+    render();
 });
 document.getElementById('gridViewBtn').addEventListener('click', function () {
     state.view = 'grid';
     this.classList.add('active');
     document.getElementById('listViewBtn').classList.remove('active');
-    document.getElementById('productList').classList.add('grid-view');
+    render();
 });
 
+updateFilterBtnState();
 render();
 </script>
 SCRIPTS;

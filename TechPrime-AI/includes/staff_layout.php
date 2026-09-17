@@ -116,6 +116,24 @@ if (!function_exists('staff_page_start')) {
         $css = staff_css_href();
         $logo = staff_logo_href();
         $logout = staff_logout_href();
+        $invTitleIcons = [
+            'inventory_dashboard.php' => 'fa-tachometer-alt',
+            'inventory_stocks.php' => 'fa-boxes',
+            'inventory_orders.php' => 'fa-shopping-cart',
+            'inventory_profile.php' => 'fa-user',
+        ];
+        $invActiveIcons = [
+            'dashboard' => 'fa-tachometer-alt',
+            'stocks' => 'fa-boxes',
+            'orders' => 'fa-shopping-cart',
+            'profile' => 'fa-user',
+        ];
+        $currentScript = strtolower(basename($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? ''));
+        $useInvPageTitle = ($role === 'inventory_custodian' && (
+            isset($invTitleIcons[$currentScript]) || isset($invActiveIcons[$active])
+        ));
+        $invTitleIcon = $invTitleIcons[$currentScript]
+            ?? ($invActiveIcons[$active] ?? 'fa-tachometer-alt');
         ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -123,11 +141,108 @@ if (!function_exists('staff_page_start')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo h($title); ?> — EasyPC</title>
-    <link rel="stylesheet" href="<?php echo h($css); ?>">
+    <link rel="stylesheet" href="<?php echo h($css); ?>?v=inv-banner-3">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <?php if ($useInvPageTitle): ?>
+    <style>
+      /* Guaranteed Inventory page title banner (reference design) */
+      body.inv-title-mode .topbar.topbar-inv-compact {
+        height: 56px !important;
+        min-height: 56px !important;
+      }
+      .inv-page-banner {
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        width: auto !important;
+        box-sizing: border-box !important;
+        margin: 18px 28px 8px !important;
+        padding: 22px 28px !important;
+        min-height: 96px !important;
+        border-radius: 18px !important;
+        background: linear-gradient(135deg, #62b236 0%, #4b8b2a 55%, #3d7422 100%) !important;
+        color: #ffffff !important;
+        box-shadow: 0 14px 34px rgba(75, 139, 42, 0.35) !important;
+        overflow: hidden !important;
+        border: none !important;
+      }
+      .inv-page-banner-inner {
+        position: relative !important;
+        z-index: 2 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 16px !important;
+        min-width: 0 !important;
+      }
+      .inv-page-banner-icon {
+        width: 54px !important;
+        height: 54px !important;
+        border-radius: 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: rgba(255, 255, 255, 0.2) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        color: #fff !important;
+        font-size: 22px !important;
+        flex-shrink: 0 !important;
+      }
+      .inv-page-banner-text h1,
+      .inv-page-banner-text .inv-page-banner-title {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 28px !important;
+        font-weight: 800 !important;
+        line-height: 1.15 !important;
+        color: #ffffff !important;
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .inv-page-banner-text p,
+      .inv-page-banner-text .inv-page-banner-sub {
+        margin: 6px 0 0 !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        color: rgba(255, 255, 255, 0.92) !important;
+        background: none !important;
+        border: none !important;
+      }
+      .inv-page-banner-deco {
+        position: absolute !important;
+        inset: 0 !important;
+        z-index: 1 !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+      }
+      .inv-page-banner-deco::before,
+      .inv-page-banner-deco::after {
+        content: '' !important;
+        position: absolute !important;
+        top: -70% !important;
+        width: 200px !important;
+        height: 240% !important;
+        border-radius: 28px !important;
+        transform: rotate(28deg) !important;
+      }
+      .inv-page-banner-deco::before {
+        right: 56px !important;
+        background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.02)) !important;
+      }
+      .inv-page-banner-deco::after {
+        right: -20px !important;
+        width: 150px !important;
+        background: linear-gradient(180deg, rgba(196, 230, 160, 0.4), rgba(255,255,255,0.04)) !important;
+      }
+      @media (max-width: 900px) {
+        .inv-page-banner { margin: 14px 16px 6px !important; padding: 18px 16px !important; }
+        .inv-page-banner-text h1, .inv-page-banner-text .inv-page-banner-title { font-size: 22px !important; }
+      }
+    </style>
+    <?php endif; ?>
     <?php echo $extraHead; ?>
 </head>
-<body class="<?php echo $role === 'inventory_custodian' ? 'topnav-mode' : ''; ?>">
+<body class="<?php echo trim(($role === 'inventory_custodian' ? 'topnav-mode' : '') . ($useInvPageTitle ? ' inv-title-mode' : '')); ?>">
 <div class="sidebar">
     <div class="sidebar-brand">
         <img src="<?php echo h($logo); ?>" alt="EasyPC" class="ep-logo-img brand-logo">
@@ -150,13 +265,17 @@ if (!function_exists('staff_page_start')) {
 </div>
 
 <div class="main">
-    <div class="topbar">
+    <div class="topbar<?php echo $useInvPageTitle ? ' topbar-inv-compact' : ''; ?>">
+        <?php if (!$useInvPageTitle): ?>
         <div class="topbar-left">
             <h2><?php echo h($heading); ?></h2>
             <?php if ($subtitle !== ''): ?>
                 <div class="breadcrumb"><?php echo h($subtitle); ?></div>
             <?php endif; ?>
         </div>
+        <?php else: ?>
+        <div class="topbar-left topbar-left-spacer" aria-hidden="true"></div>
+        <?php endif; ?>
         <div class="topbar-right">
             <div class="admin-badge user-badge">
                 <div class="avatar"><?php echo h($initials); ?></div>
@@ -164,6 +283,23 @@ if (!function_exists('staff_page_start')) {
             </div>
         </div>
     </div>
+    <?php if ($useInvPageTitle): ?>
+    <div class="inv-page-banner" role="banner"
+         style="background:linear-gradient(135deg,#62b236 0%,#4b8b2a 55%,#3d7422 100%);color:#fff;border-radius:18px;box-shadow:0 14px 34px rgba(75,139,42,.35);">
+        <div class="inv-page-banner-inner">
+            <div class="inv-page-banner-icon" aria-hidden="true">
+                <i class="fas <?php echo h($invTitleIcon); ?>"></i>
+            </div>
+            <div class="inv-page-banner-text">
+                <h1 class="inv-page-banner-title"><?php echo h($heading); ?></h1>
+                <?php if ($subtitle !== ''): ?>
+                <p class="inv-page-banner-sub"><?php echo h($subtitle); ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="inv-page-banner-deco" aria-hidden="true"></div>
+    </div>
+    <?php endif; ?>
     <div class="page-content">
         <?php
     }

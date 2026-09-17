@@ -231,6 +231,113 @@ body {
   font-weight: 500;
 }
 
+/* Inventory Custodian — large green page title banner */
+body.inv-title-mode .topbar.topbar-inv-compact {
+  height: 56px;
+  min-height: 56px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+body.inv-title-mode .topbar-left-spacer {
+  flex: 1;
+}
+.inv-page-banner {
+  position: relative;
+  margin: 18px 28px 8px;
+  padding: 22px 28px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #62b236 0%, #4b8b2a 55%, #3d7422 100%);
+  color: #fff;
+  box-shadow: 0 14px 34px rgba(75, 139, 42, 0.35);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 96px;
+}
+.inv-page-banner-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.inv-page-banner-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font-size: 22px;
+  color: #fff;
+  flex-shrink: 0;
+}
+.inv-page-banner-text {
+  min-width: 0;
+}
+.inv-page-banner-text h1,
+.inv-page-banner-text .inv-page-banner-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+.inv-page-banner-text p,
+.inv-page-banner-text .inv-page-banner-sub {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
+}
+.inv-page-banner-deco {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.inv-page-banner-deco::before,
+.inv-page-banner-deco::after {
+  content: '';
+  position: absolute;
+  top: -70%;
+  width: 200px;
+  height: 240%;
+  border-radius: 28px;
+  transform: rotate(28deg);
+}
+.inv-page-banner-deco::before {
+  right: 56px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.02));
+}
+.inv-page-banner-deco::after {
+  right: -20px;
+  width: 150px;
+  background: linear-gradient(180deg, rgba(196, 230, 160, 0.4), rgba(255,255,255,0.04));
+}
+
+@media (max-width: 900px) {
+  .inv-page-banner {
+    margin: 14px 16px 0;
+    padding: 20px 18px;
+    min-height: 92px;
+  }
+  .inv-page-banner-text h1 { font-size: 24px; }
+  .inv-page-banner-icon { width: 48px; height: 48px; font-size: 18px; border-radius: 14px; }
+}
+@media (max-width: 640px) {
+  .inv-page-banner-text h1 { font-size: 20px; }
+  .inv-page-banner-text p { font-size: 13px; }
+  .inv-page-banner-inner { gap: 12px; }
+}
+
 .topbar-right { display: flex; align-items: center; gap: 14px; }
 
 .admin-badge,

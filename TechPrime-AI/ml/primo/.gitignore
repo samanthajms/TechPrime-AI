@@ -1,0 +1,5 @@
+# Primo SVM local environment / artifacts
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -10,6 +10,7 @@ $isLoggedIn = isset($_SESSION['user_id']);
 $userName = $isLoggedIn ? h($_SESSION['name']) : 'Guest';
 $activePage = 'home';
 $isHomePage = true;
+$extraHead = '<link rel="stylesheet" href="primo.css">';
 
 $categories = ['Accessories', 'Audio', 'Cables and Adapters', 'Camera', 'Combo', 'Cooling', 'Customization', 'Display', 'Gaming Surface', 'GPU', 'Graphic Card', 'Hard Disk', 'Home & Office Furniture',
 'Keyboard', 'Laptop GA2', 'Laptop GA3', 'Laptop PR2', 'Laptop PR3', 'Memory', 'Mini PC', 'Motherboard', 'Mouse', 'Network Device', 'Others', 'PC Case', 'Power Station', 'Power Supply', 'Printer and Scanner', 'Printers and Scanners',
@@ -186,8 +187,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+<script src="primo.js" defer></script>
 SCRIPTS;
 ?>
 
+<?php include __DIR__ . '/primo.php'; ?>
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>
