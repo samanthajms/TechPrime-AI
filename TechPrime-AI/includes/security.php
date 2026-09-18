@@ -31,8 +31,7 @@ function h($string) {
 function logActivity($db, $user_id, $action, $details) {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $stmt = $db->prepare("INSERT INTO logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("isss", $user_id, $action, $details, $ip);
-    $stmt->execute();
+    $stmt->execute([$user_id, $action, $details, $ip]);
 }
 
 // Role Based Access Control
@@ -56,8 +55,6 @@ function checkSessionTimeout() {
 }
 
 // Password Complexity Check
-// Reads rules from site_settings table if a DB connection is provided;
-// falls back to safe hardcoded defaults if the table doesn't exist yet.
 function isPasswordComplex($password, $db = null) {
     // Default rules (safe fallback)
     $minLen      = 8;
@@ -67,20 +64,24 @@ function isPasswordComplex($password, $db = null) {
     $reqSpecial  = true;
 
     if ($db !== null) {
-        $res = @$db->query(
-            "SELECT setting_key, setting_value FROM site_settings
-             WHERE setting_key IN ('pw_min_length','pw_require_upper','pw_require_lower','pw_require_number','pw_require_special')"
-        );
-        if ($res) {
-            while ($row = $res->fetch_assoc()) {
-                switch ($row['setting_key']) {
-                    case 'pw_min_length':     $minLen     = max(6, (int)$row['setting_value']); break;
-                    case 'pw_require_upper':  $reqUpper   = $row['setting_value'] === '1';       break;
-                    case 'pw_require_lower':  $reqLower   = $row['setting_value'] === '1';       break;
-                    case 'pw_require_number': $reqNumber  = $row['setting_value'] === '1';       break;
-                    case 'pw_require_special':$reqSpecial = $row['setting_value'] === '1';       break;
+        try {
+            $res = $db->query(
+                "SELECT setting_key, setting_value FROM site_settings
+                 WHERE setting_key IN ('pw_min_length','pw_require_upper','pw_require_lower','pw_require_number','pw_require_special')"
+            );
+            if ($res) {
+                while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
+                    switch ($row['setting_key']) {
+                        case 'pw_min_length':     $minLen     = max(6, (int)$row['setting_value']); break;
+                        case 'pw_require_upper':  $reqUpper   = $row['setting_value'] === '1';       break;
+                        case 'pw_require_lower':  $reqLower   = $row['setting_value'] === '1';       break;
+                        case 'pw_require_number': $reqNumber  = $row['setting_value'] === '1';       break;
+                        case 'pw_require_special':$reqSpecial = $row['setting_value'] === '1';       break;
+                    }
                 }
             }
+        } catch (Throwable $e) {
+            // Fallback to defaults if table doesn't exist or query fails
         }
     }
 
@@ -102,20 +103,24 @@ function getPasswordRules($db = null) {
         'require_special' => true,
     ];
     if ($db !== null) {
-        $res = @$db->query(
-            "SELECT setting_key, setting_value FROM site_settings
-             WHERE setting_key IN ('pw_min_length','pw_require_upper','pw_require_lower','pw_require_number','pw_require_special')"
-        );
-        if ($res) {
-            while ($row = $res->fetch_assoc()) {
-                switch ($row['setting_key']) {
-                    case 'pw_min_length':     $rules['min_length']      = max(6, (int)$row['setting_value']); break;
-                    case 'pw_require_upper':  $rules['require_upper']   = $row['setting_value'] === '1';       break;
-                    case 'pw_require_lower':  $rules['require_lower']   = $row['setting_value'] === '1';       break;
-                    case 'pw_require_number': $rules['require_number']  = $row['setting_value'] === '1';       break;
-                    case 'pw_require_special':$rules['require_special'] = $row['setting_value'] === '1';       break;
+        try {
+            $res = $db->query(
+                "SELECT setting_key, setting_value FROM site_settings
+                 WHERE setting_key IN ('pw_min_length','pw_require_upper','pw_require_lower','pw_require_number','pw_require_special')"
+            );
+            if ($res) {
+                while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
+                    switch ($row['setting_key']) {
+                        case 'pw_min_length':     $rules['min_length']      = max(6, (int)$row['setting_value']); break;
+                        case 'pw_require_upper':  $rules['require_upper']   = $row['setting_value'] === '1';       break;
+                        case 'pw_require_lower':  $rules['require_lower']   = $row['setting_value'] === '1';       break;
+                        case 'pw_require_number': $rules['require_number']  = $row['setting_value'] === '1';       break;
+                        case 'pw_require_special':$rules['require_special'] = $row['setting_value'] === '1';       break;
+                    }
                 }
             }
+        } catch (Throwable $e) {
+            // Fallback to defaults
         }
     }
     return $rules;

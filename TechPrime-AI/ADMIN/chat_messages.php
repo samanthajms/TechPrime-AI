@@ -38,12 +38,10 @@ if ($action === 'get_sellers') {
             ORDER BY last_time DESC, u.name ASC";
 
     $stmt = $db->prepare($sql);
-    $stmt->bind_param("iiiii", $userId, $userId, $userId, $userId, $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
+    $stmt->execute([$userId, $userId, $userId, $userId, $userId]);
+    $result = $stmt;
     $sellers = [];
-    while ($row = $result->fetch_assoc()) {
+    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
         $sellers[] = [
             'id'          => (int)$row['id'],
             'name'        => $row['name'],
@@ -65,8 +63,7 @@ if ($action === 'get_history') {
 
     // Mark messages from seller as read
     $mark = $db->prepare("UPDATE messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ?");
-    $mark->bind_param("ii", $sellerId, $userId);
-    $mark->execute();
+    $mark->execute([$sellerId, $userId]);
 
     $sql = "SELECT id, sender_id, message, created_at 
             FROM messages 
@@ -74,12 +71,10 @@ if ($action === 'get_history') {
             ORDER BY created_at ASC
             LIMIT 100";
     $stmt = $db->prepare($sql);
-    $stmt->bind_param("iiii", $userId, $sellerId, $sellerId, $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
+    $stmt->execute([$userId, $sellerId, $sellerId, $userId]);
+    $result = $stmt;
     $msgs = [];
-    while ($row = $result->fetch_assoc()) {
+    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
         $msgs[] = [
             'id'         => (int)$row['id'],
             'sender_id'  => (int)$row['sender_id'],
@@ -103,16 +98,14 @@ if ($action === 'send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Verify target is actually a seller
     $check = $db->prepare("SELECT id FROM users WHERE id = ? AND role = 'seller' AND is_locked = 0");
-    $check->bind_param("i", $sellerId);
-    $check->execute();
-    if (!$check->get_result()->num_rows) {
+    $check->execute([$sellerId]);
+    if (!$check->fetch(PDO::FETCH_ASSOC)) {
         echo json_encode(['error' => 'Seller not found']); exit;
     }
 
     $stmt = $db->prepare("INSERT INTO messages (sender_id, receiver_id, message, created_at) VALUES (?, ?, ?, NOW())");
-    $stmt->bind_param("iis", $userId, $sellerId, $message);
-    if ($stmt->execute()) {
-        $newId = $db->insert_id;
+    if ($stmt->execute([$userId, $sellerId, $message])) {
+        $newId = $db->lastInsertId();
         echo json_encode([
             'ok'         => true,
             'id'         => $newId,
@@ -138,17 +131,14 @@ if ($action === 'poll') {
               AND id > ?
             ORDER BY created_at ASC";
     $stmt = $db->prepare($sql);
-    $stmt->bind_param("iiiii", $userId, $sellerId, $sellerId, $userId, $lastMsgId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
+    $stmt->execute([$userId, $sellerId, $sellerId, $userId, $lastMsgId]);
+    $result = $stmt;
     $msgs = [];
-    while ($row = $result->fetch_assoc()) {
+    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
         // mark incoming as read
         if ((int)$row['sender_id'] === $sellerId) {
             $mark = $db->prepare("UPDATE messages SET is_read = 1 WHERE id = ?");
-            $mark->bind_param("i", $row['id']);
-            $mark->execute();
+            $mark->execute([$row['id']]);
         }
         $msgs[] = [
             'id'         => (int)$row['id'],

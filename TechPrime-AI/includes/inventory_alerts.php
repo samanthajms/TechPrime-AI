@@ -5,7 +5,7 @@
  */
 
 if (!function_exists('inv_notifications_ensure_schema')) {
-    function inv_notifications_ensure_schema(mysqli $db): void
+    function inv_notifications_ensure_schema(PDO $db): void
     {
         static $done = false;
         if ($done) {
@@ -13,26 +13,29 @@ if (!function_exists('inv_notifications_ensure_schema')) {
         }
         $done = true;
         $cols = [];
-        $res = $db->query('SHOW COLUMNS FROM notifications');
+        $res = $db->query(
+            "SELECT column_name FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'notifications'"
+        );
         if ($res) {
-            while ($row = $res->fetch_assoc()) {
-                $cols[strtolower((string)$row['Field'])] = true;
+            while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
+                $cols[strtolower((string)$row['column_name'])] = true;
             }
         }
         if (empty($cols['is_read'])) {
-            @$db->query('ALTER TABLE notifications ADD COLUMN is_read TINYINT(1) NOT NULL DEFAULT 0 AFTER message');
+            @$db->query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read SMALLINT NOT NULL DEFAULT 0');
         }
         if (empty($cols['type'])) {
-            @$db->query("ALTER TABLE notifications ADD COLUMN type VARCHAR(40) NULL DEFAULT 'info' AFTER is_read");
+            @$db->query("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS type VARCHAR(40) NULL DEFAULT 'info'");
         }
         if (empty($cols['link'])) {
-            @$db->query('ALTER TABLE notifications ADD COLUMN link VARCHAR(255) NULL DEFAULT NULL AFTER type');
+            @$db->query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link VARCHAR(255) NULL DEFAULT NULL');
         }
     }
 }
 
 if (!function_exists('inv_notify_user')) {
-    function inv_notify_user(mysqli $db, int $userId, string $message, string $type = 'info', ?string $link = null): bool
+    function inv_notify_user(PDO $db, int $userId, string $message, string $type = 'info', ?string $link = null): bool
     {
         if ($userId <= 0 || trim($message) === '') {
             return false;
@@ -46,54 +49,48 @@ if (!function_exists('inv_notify_user')) {
         if (!$stmt) {
             return false;
         }
-        $stmt->bind_param('isss', $userId, $message, $type, $link);
-        $ok = $stmt->execute();
-        $stmt->close();
+        $ok = $stmt->execute([$userId, $message, $type, $link]);
         return (bool)$ok;
     }
 }
 
 if (!function_exists('inv_notify_role')) {
     /** Notify all active users with a given role (e.g. inventory_custodian). */
-    function inv_notify_role(mysqli $db, string $role, string $message, string $type = 'info', ?string $link = null): int
+    function inv_notify_role(PDO $db, string $role, string $message, string $type = 'info', ?string $link = null): int
     {
         $count = 0;
         $stmt = $db->prepare('SELECT id FROM users WHERE role = ? AND COALESCE(is_locked, 0) = 0');
         if (!$stmt) {
             return 0;
         }
-        $stmt->bind_param('s', $role);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        while ($row = $res->fetch_assoc()) {
+        $stmt->execute([$role]);
+        $res = $stmt;
+        while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
             if (inv_notify_user($db, (int)$row['id'], $message, $type, $link)) {
                 $count++;
             }
         }
-        $stmt->close();
         return $count;
     }
 }
 
 if (!function_exists('inv_notification_recent_exists')) {
     /** Avoid duplicate alerts for the same product/type within N hours. */
-    function inv_notification_recent_exists(mysqli $db, int $userId, string $needle, string $type, int $hours = 24): bool
+    function inv_notification_recent_exists(PDO $db, int $userId, string $needle, string $type, int $hours = 24): bool
     {
         inv_notifications_ensure_schema($db);
         $like = '%' . $needle . '%';
         $stmt = $db->prepare(
-            'SELECT id FROM notifications
+            "SELECT id FROM notifications
              WHERE user_id = ? AND type = ? AND message LIKE ?
-               AND created_at >= (NOW() - INTERVAL ? HOUR)
-             LIMIT 1'
+               AND created_at >= (NOW() - (? * INTERVAL '1 hour'))
+             LIMIT 1"
         );
         if (!$stmt) {
             return false;
         }
-        $stmt->bind_param('issi', $userId, $type, $like, $hours);
-        $stmt->execute();
-        $exists = $stmt->get_result()->num_rows > 0;
-        $stmt->close();
+        $stmt->execute([$userId, $type, $like, $hours]);
+        $exists = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
         return $exists;
     }
 }
@@ -120,7 +117,7 @@ if (!function_exists('inv_notify_stock_change')) {
      * or when stock is replenished from a low/out state.
      */
     function inv_notify_stock_change(
-        mysqli $db,
+        PDO $db,
         string $productName,
         int $productId,
         int $oldStock,
@@ -153,7 +150,7 @@ if (!function_exists('inv_notify_stock_change')) {
 
 if (!function_exists('inv_notify_custodians_deduped')) {
     function inv_notify_custodians_deduped(
-        mysqli $db,
+        PDO $db,
         string $needle,
         string $message,
         string $type,
@@ -164,17 +161,15 @@ if (!function_exists('inv_notify_custodians_deduped')) {
             return;
         }
         $role = 'inventory_custodian';
-        $stmt->bind_param('s', $role);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        while ($row = $res->fetch_assoc()) {
+        $stmt->execute([$role]);
+        $res = $stmt;
+        while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
             $uid = (int)$row['id'];
             if (inv_notification_recent_exists($db, $uid, $needle, $type, 12)) {
                 continue;
             }
             inv_notify_user($db, $uid, $message, $type, $link);
         }
-        $stmt->close();
     }
 }
 
@@ -183,13 +178,13 @@ if (!function_exists('inv_sync_stock_alerts')) {
      * On dashboard load: ensure current low/out products have a recent alert.
      * Deduped so it does not flood the inbox.
      */
-    function inv_sync_stock_alerts(mysqli $db): void
+    function inv_sync_stock_alerts(PDO $db): void
     {
         $res = $db->query('SELECT id, name, stock FROM products WHERE stock <= 15 ORDER BY stock ASC, name ASC LIMIT 40');
         if (!$res) {
             return;
         }
-        while ($row = $res->fetch_assoc()) {
+        while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
             $stock = (int)$row['stock'];
             $name = trim((string)$row['name']);
             $id = (int)$row['id'];
@@ -216,17 +211,15 @@ if (!function_exists('inv_sync_stock_alerts')) {
 
 if (!function_exists('inv_user_notifications')) {
     /** @return array{items: array<int,array>, unread: int} */
-    function inv_user_notifications(mysqli $db, int $userId, int $limit = 20): array
+    function inv_user_notifications(PDO $db, int $userId, int $limit = 20): array
     {
         inv_notifications_ensure_schema($db);
         $items = [];
         $unread = 0;
         $cnt = $db->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
         if ($cnt) {
-            $cnt->bind_param('i', $userId);
-            $cnt->execute();
-            $unread = (int)($cnt->get_result()->fetch_row()[0] ?? 0);
-            $cnt->close();
+            $cnt->execute([$userId]);
+            $unread = (int)($cnt->fetchColumn() ?? 0);
         }
         $limit = max(1, min(50, $limit));
         $stmt = $db->prepare(
@@ -235,44 +228,38 @@ if (!function_exists('inv_user_notifications')) {
              ORDER BY created_at DESC, id DESC LIMIT ' . $limit
         );
         if ($stmt) {
-            $stmt->bind_param('i', $userId);
-            $stmt->execute();
-            $res = $stmt->get_result();
-            while ($row = $res->fetch_assoc()) {
+            $stmt->execute([$userId]);
+            $res = $stmt;
+            while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
                 $items[] = $row;
             }
-            $stmt->close();
         }
         return ['items' => $items, 'unread' => $unread];
     }
 }
 
 if (!function_exists('inv_mark_notification_read')) {
-    function inv_mark_notification_read(mysqli $db, int $userId, int $notifId): bool
+    function inv_mark_notification_read(PDO $db, int $userId, int $notifId): bool
     {
         inv_notifications_ensure_schema($db);
         $stmt = $db->prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?');
         if (!$stmt) {
             return false;
         }
-        $stmt->bind_param('ii', $notifId, $userId);
-        $ok = $stmt->execute();
-        $stmt->close();
+        $ok = $stmt->execute([$notifId, $userId]);
         return (bool)$ok;
     }
 }
 
 if (!function_exists('inv_mark_all_notifications_read')) {
-    function inv_mark_all_notifications_read(mysqli $db, int $userId): bool
+    function inv_mark_all_notifications_read(PDO $db, int $userId): bool
     {
         inv_notifications_ensure_schema($db);
         $stmt = $db->prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0');
         if (!$stmt) {
             return false;
         }
-        $stmt->bind_param('i', $userId);
-        $ok = $stmt->execute();
-        $stmt->close();
+        $ok = $stmt->execute([$userId]);
         return (bool)$ok;
     }
 }

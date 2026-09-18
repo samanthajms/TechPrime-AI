@@ -25,7 +25,7 @@ $productQuery = "SELECT p.*, u.name AS seller_name
                  LIMIT 40";
 $productResult = $db->query($productQuery);
 $allDisplayProducts = ias_client_filter_products_for_display(
-    $productResult ? $productResult->fetch_all(MYSQLI_ASSOC) : [],
+    $productResult ? $productResult->fetchAll(PDO::FETCH_ASSOC) : [],
     12
 );
 $topSellers = array_slice($allDisplayProducts, 0, 8);
@@ -35,12 +35,12 @@ $newArrivalsQuery = "SELECT p.*, u.name AS seller_name
                      FROM products p
                      INNER JOIN users u ON p.seller_id = u.id
                      WHERE " . ias_client_product_list_sql_condition('p') . "
-                       AND p.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                       AND p.created_at >= (NOW() - INTERVAL '7 day')
                      ORDER BY p.created_at DESC
                      LIMIT 12";
 $newArrivalsResult = $db->query($newArrivalsQuery);
 $newArrivals = ias_client_filter_products_for_display(
-    $newArrivalsResult ? $newArrivalsResult->fetch_all(MYSQLI_ASSOC) : [],
+    $newArrivalsResult ? $newArrivalsResult->fetchAll(PDO::FETCH_ASSOC) : [],
     6
 );
 

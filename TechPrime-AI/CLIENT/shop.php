@@ -63,7 +63,7 @@ $productResult = $db->query(
      ORDER BY p.id DESC"
 );
 $allProducts = ias_client_filter_products_for_display(
-    $productResult ? $productResult->fetch_all(MYSQLI_ASSOC) : []
+    $productResult ? $productResult->fetchAll(PDO::FETCH_ASSOC) : []
 );
 
 foreach ($allProducts as &$prod) {

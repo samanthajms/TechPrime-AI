@@ -43,11 +43,9 @@ if (!$stmt) {
     echo json_encode(['suggestions' => []]);
     exit;
 }
-$stmt->bind_param('sssss', $like, $like, $like, $prefix, $prefix);
-$stmt->execute();
-$res = $stmt->get_result();
-
-while ($row = $res->fetch_assoc()) {
+$stmt->execute([$like, $like, $like, $prefix, $prefix]);
+$res = $stmt;
+while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
     $name = trim((string)($row['name'] ?? ''));
     $cat = trim((string)($row['category'] ?? ''));
 
@@ -69,8 +67,6 @@ while ($row = $res->fetch_assoc()) {
         break;
     }
 }
-$stmt->close();
-
 /* If still short, add remaining product names from the result set even if only description matched. */
 if (count($suggestions) < 8) {
     $stmt2 = $db->prepare(
@@ -82,10 +78,9 @@ if (count($suggestions) < 8) {
          LIMIT 8"
     );
     if ($stmt2) {
-        $stmt2->bind_param('sss', $like, $like, $like);
-        $stmt2->execute();
-        $r2 = $stmt2->get_result();
-        while ($row = $r2->fetch_assoc()) {
+        $stmt2->execute([$like, $like, $like]);
+        $r2 = $stmt2;
+        while ($row = $r2->fetch(PDO::FETCH_ASSOC)) {
             $name = trim((string)($row['name'] ?? ''));
             if ($name === '') {
                 continue;
@@ -100,7 +95,6 @@ if (count($suggestions) < 8) {
                 break;
             }
         }
-        $stmt2->close();
     }
 }
 

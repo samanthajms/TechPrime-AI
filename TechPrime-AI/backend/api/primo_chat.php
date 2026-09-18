@@ -175,7 +175,7 @@ function primo_store_context(string $intent, string $message, array $products): 
 /**
  * @return array{reply:string,products?:array,show_tech_match?:bool}
  */
-function primo_handle_intent(mysqli $db, string $intent, string $message, float $confidence, ?string $originalMessage = null): array
+function primo_handle_intent(PDO $db, string $intent, string $message, float $confidence, ?string $originalMessage = null): array
 {
     $displayMsg = $originalMessage !== null ? $originalMessage : $message;
 
@@ -264,7 +264,7 @@ function primo_handle_intent(mysqli $db, string $intent, string $message, float 
 /**
  * @return array{reply:string,products?:array}
  */
-function primo_order_status(mysqli $db, string $message): array
+function primo_order_status(PDO $db, string $message): array
 {
     if (empty($_SESSION['user_id'])) {
         return [
@@ -290,10 +290,8 @@ function primo_order_status(mysqli $db, string $message): array
              WHERE o.id = ? AND o.user_id = ?
              LIMIT 1"
         );
-        $stmt->bind_param('ii', $orderId, $uid);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+        $stmt->execute([$orderId, $uid]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
             return ['reply' => "I couldn't find order #{$orderId} on your account. Double-check the number or open My Orders."];
         }
@@ -310,12 +308,9 @@ function primo_order_status(mysqli $db, string $message): array
          ORDER BY o.created_at DESC
          LIMIT 3"
     );
-    $stmt->bind_param('i', $uid);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    $rows = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
-    $stmt->close();
-
+    $stmt->execute([$uid]);
+    $res = $stmt;
+    $rows = $res ? $res->fetchAll(PDO::FETCH_ASSOC) : [];
     if (empty($rows)) {
         return ['reply' => "You don't have any orders on your account yet. Browse Shop Now when you're ready to buy."];
     }
@@ -347,7 +342,7 @@ function primo_format_order_line(array $row): string
 /**
  * @return array{reply:string,products:array,show_tech_match?:bool}
  */
-function primo_product_intent(mysqli $db, string $intent, string $message, ?string $displayMessage = null): array
+function primo_product_intent(PDO $db, string $intent, string $message, ?string $displayMessage = null): array
 {
     $products = primo_find_products($db, $message, $intent);
     $wantsBuild = (bool) preg_match('/\b(build|components?|tech\s*&?\s*match|customize|parts?\s+to\s+choose)\b/i', $message . ' ' . (string) $displayMessage);
@@ -422,7 +417,7 @@ function primo_product_intent(mysqli $db, string $intent, string $message, ?stri
  * Search real products using existing client visibility rules.
  * @return list<array{id:int,name:string,price:float,stock:int,category:string}>
  */
-function primo_find_products(mysqli $db, string $message, string $intent): array
+function primo_find_products(PDO $db, string $message, string $intent): array
 {
     $condition = ias_client_product_list_sql_condition('p');
     $lower = mb_strtolower($message);
@@ -573,7 +568,7 @@ function primo_rank_products(array $rows, array $keywords): array
  * @param list<string> $keywords
  * @return list<array>
  */
-function primo_query_products(mysqli $db, string $condition, ?string $category, ?array $cats, array $keywords): array
+function primo_query_products(PDO $db, string $condition, ?string $category, ?array $cats, array $keywords): array
 {
     $sql = "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url
             FROM products p
@@ -621,15 +616,13 @@ function primo_query_products(mysqli $db, string $condition, ?string $category, 
         if (!$stmt) {
             return [];
         }
-        $stmt->bind_param($types, ...$params);
-        $stmt->execute();
-        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         return $rows ?: [];
     }
 
     $res = $db->query($sql);
-    return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
+    return $res ? $res->fetchAll(PDO::FETCH_ASSOC) : [];
 }
 
 /**

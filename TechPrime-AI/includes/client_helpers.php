@@ -4,7 +4,7 @@
  */
 
 /** Load cart preview rows for header dropdown. */
-function ep_get_cart_preview(mysqli $db): array
+function ep_get_cart_preview(PDO $db): array
 {
     if (empty($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
         return ['items' => [], 'total' => 0.0, 'count' => 0];
@@ -22,7 +22,7 @@ function ep_get_cart_preview(mysqli $db): array
     $count = 0;
 
     if ($res) {
-        while ($row = $res->fetch_assoc()) {
+        while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
             $pid = (int)$row['id'];
             $qty = (int)($_SESSION['cart'][$pid] ?? 0);
             if ($qty <= 0) {
@@ -45,7 +45,7 @@ function ep_get_cart_preview(mysqli $db): array
 }
 
 /** Add a product to session (and DB cart when logged in). Returns false if invalid. */
-function ep_add_product_to_cart(mysqli $db, int $productId, int $qty = 1): bool
+function ep_add_product_to_cart(PDO $db, int $productId, int $qty = 1): bool
 {
     if ($productId <= 0 || $qty < 1) {
         return false;
@@ -54,11 +54,8 @@ function ep_add_product_to_cart(mysqli $db, int $productId, int $qty = 1): bool
     $chk = $db->prepare(
         'SELECT p.* FROM products p WHERE p.id = ? AND ' . ias_client_product_list_sql_condition('p') . ' LIMIT 1'
     );
-    $chk->bind_param('i', $productId);
-    $chk->execute();
-    $productRow = $chk->get_result()->fetch_assoc();
-    $chk->close();
-
+    $chk->execute([$productId]);
+    $productRow = $chk->fetch(PDO::FETCH_ASSOC);
     if (!$productRow || ias_client_product_image_url($productRow) === '') {
         return false;
     }
@@ -76,20 +73,14 @@ function ep_add_product_to_cart(mysqli $db, int $productId, int $qty = 1): bool
     if (!empty($_SESSION['user_id'])) {
         $uid = (int)$_SESSION['user_id'];
         $chk = $db->prepare('SELECT id FROM cart WHERE user_id = ? AND product_id = ?');
-        $chk->bind_param('ii', $uid, $productId);
-        $chk->execute();
-        if ($chk->get_result()->num_rows > 0) {
+        $chk->execute([$uid, $productId]);
+        if ($chk->fetch(PDO::FETCH_ASSOC)) {
             $stmt = $db->prepare('UPDATE cart SET quantity = quantity + ? WHERE user_id = ? AND product_id = ?');
-            $stmt->bind_param('iii', $qty, $uid, $productId);
-            $stmt->execute();
-            $stmt->close();
+            $stmt->execute([$qty, $uid, $productId]);
         } else {
             $stmt = $db->prepare('INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)');
-            $stmt->bind_param('iii', $uid, $productId, $qty);
-            $stmt->execute();
-            $stmt->close();
+            $stmt->execute([$uid, $productId, $qty]);
         }
-        $chk->close();
     }
 
     return true;

@@ -16,14 +16,18 @@ $connection = getDbConnection();
 $pwRules = getPasswordRules($connection);
 
 /** Detect optional users.phone column (added by migration_users_phone.sql). */
-function register_users_has_phone(mysqli $db): bool
+function register_users_has_phone(PDO $db): bool
 {
     static $has = null;
     if ($has !== null) {
         return $has;
     }
-    $res = $db->query("SHOW COLUMNS FROM users LIKE 'phone'");
-    $has = $res && $res->num_rows > 0;
+    $stmt = $db->prepare(
+        "SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'phone'"
+    );
+    $stmt->execute();
+    $has = (bool)$stmt->fetchColumn();
     return $has;
 }
 
@@ -88,9 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $checkEmail = $connection->prepare("SELECT email FROM users WHERE email = ? LIMIT 1");
-    $checkEmail->bind_param("s", $email);
-    $checkEmail->execute();
-    if ($checkEmail->get_result()->num_rows > 0) {
+    $checkEmail->execute([$email]);
+    if ($checkEmail->fetch(PDO::FETCH_ASSOC)) {
         header("Location: register.php?error=Email already in use.");
         exit;
     }
@@ -104,17 +107,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "INSERT INTO users (name, surname, age, address, phone, email, password, role, is_verified, activation_token)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)"
         );
-        $stmt->bind_param("ssissssss", $name, $surname, $age, $address, $phone, $email, $hashedPassword, $role, $activationToken);
+        $ok = $stmt->execute([$name, $surname, $age, $address, $phone, $email, $hashedPassword, $role, $activationToken]);
     } else {
         // Fallback if migration not applied yet: keep address, skip phone column.
         $stmt = $connection->prepare(
             "INSERT INTO users (name, surname, age, address, email, password, role, is_verified, activation_token)
              VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)"
         );
-        $stmt->bind_param("ssisssss", $name, $surname, $age, $address, $email, $hashedPassword, $role, $activationToken);
+        $ok = $stmt->execute([$name, $surname, $age, $address, $email, $hashedPassword, $role, $activationToken]);
     }
 
-    if ($stmt->execute()) {
+    if ($ok) {
         // Send activation email
         $activationLink = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
             . '://' . $_SERVER['HTTP_HOST']

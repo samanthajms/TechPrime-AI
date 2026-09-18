@@ -31,10 +31,7 @@ if (isset($_POST['add_product'])) {
             'INSERT INTO products (seller_id, name, price, stock, description, image, image_url, category)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->bind_param('isdissss', $retail_id, $name, $price, $stock, $desc, $imageFile, $emptyUrl, $category);
-        $stmt->execute();
-        $stmt->close();
-
+        $stmt->execute([$retail_id, $name, $price, $stock, $desc, $imageFile, $emptyUrl, $category]);
         logActivity($db, $retail_id, 'add_product', "Added product: $name");
         header('Location: retail_products.php?alert=added');
         exit;
@@ -63,21 +60,15 @@ if (isset($_POST['edit_product'])) {
 
         if ($newImage !== null) {
             $oldSt = $db->prepare('SELECT image FROM products WHERE id = ? AND seller_id = ?');
-            $oldSt->bind_param('ii', $id, $retail_id);
-            $oldSt->execute();
-            $oldRow = $oldSt->get_result()->fetch_assoc();
-            $oldSt->close();
-
+            $oldSt->execute([$id, $retail_id]);
+            $oldRow = $oldSt->fetch(PDO::FETCH_ASSOC);
             $emptyUrl = '';
             $stmt = $db->prepare(
                 'UPDATE products
                  SET name = ?, price = ?, stock = ?, description = ?, category = ?, image = ?, image_url = ?
                  WHERE id = ? AND seller_id = ?'
             );
-            $stmt->bind_param('sdissssii', $name, $price, $stock, $desc, $category, $newImage, $emptyUrl, $id, $retail_id);
-            $stmt->execute();
-            $stmt->close();
-
+            $stmt->execute([$name, $price, $stock, $desc, $category, $newImage, $emptyUrl, $id, $retail_id]);
             if (!empty($oldRow['image'])) {
                 $oldPath = dirname(__DIR__) . '/uploads/products/' . basename($oldRow['image']);
                 if (is_file($oldPath)) {
@@ -90,9 +81,7 @@ if (isset($_POST['edit_product'])) {
                  SET name = ?, price = ?, stock = ?, description = ?, category = ?
                  WHERE id = ? AND seller_id = ?'
             );
-            $stmt->bind_param('sdissii', $name, $price, $stock, $desc, $category, $id, $retail_id);
-            $stmt->execute();
-            $stmt->close();
+            $stmt->execute([$name, $price, $stock, $desc, $category, $id, $retail_id]);
         }
 
         logActivity($db, $retail_id, 'edit_product', "Updated product #$id");
@@ -108,21 +97,12 @@ if (isset($_POST['action']) && $_POST['action'] === 'delete') {
     $pid = (int)($_POST['id'] ?? 0);
     if ($pid > 0) {
         $imgSt = $db->prepare('SELECT image FROM products WHERE id = ? AND seller_id = ?');
-        $imgSt->bind_param('ii', $pid, $retail_id);
-        $imgSt->execute();
-        $row = $imgSt->get_result()->fetch_assoc();
-        $imgSt->close();
-
+        $imgSt->execute([$pid, $retail_id]);
+        $row = $imgSt->fetch(PDO::FETCH_ASSOC);
         $del = $db->prepare('DELETE FROM products WHERE id = ? AND seller_id = ?');
-        $del->bind_param('ii', $pid, $retail_id);
-        $del->execute();
-        $del->close();
-
+        $del->execute([$pid, $retail_id]);
         $cart = $db->prepare('DELETE FROM cart WHERE product_id = ?');
-        $cart->bind_param('i', $pid);
-        $cart->execute();
-        $cart->close();
-
+        $cart->execute([$pid]);
         if (!empty($row['image'])) {
             $path = dirname(__DIR__) . '/uploads/products/' . basename($row['image']);
             if (is_file($path)) {
@@ -137,10 +117,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'delete') {
 }
 
 $stmt = $db->prepare('SELECT * FROM products WHERE seller_id = ? ORDER BY id DESC');
-$stmt->bind_param('i', $retail_id);
-$stmt->execute();
-$products = $stmt->get_result();
-
+$stmt->execute([$retail_id]);
+$products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 staff_page_start([
     'role' => 'retail_officer',
     'title' => 'My Products',
@@ -200,8 +178,8 @@ EXTRA
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php if ($products->num_rows > 0): ?>
-                                    <?php while ($p = $products->fetch_assoc()):
+                                <?php if (count($products) > 0): ?>
+                                    <?php foreach ($products as $p):
                                         $imgSrc = ias_product_image_url($p);
                                         $editProduct = [
                                             'id' => (int)$p['id'],
@@ -229,7 +207,7 @@ EXTRA
                                             </div>
                                         </td>
                                     </tr>
-                                    <?php endwhile; ?>
+                                    <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr><td colspan="6" class="empty-state">No products yet.</td></tr>
                                 <?php endif; ?>

@@ -99,7 +99,7 @@ function ias_year_ago_period(DateTime $from, DateTime $to): array
  * Fetch sales line items for a retail officer's products within a date range.
  * Optional filters: category, product_id, customer (name/email search).
  */
-function ias_fetch_sales_rows(mysqli $db, int $sellerId, DateTime $from, DateTime $to, array $filters = []): array
+function ias_fetch_sales_rows(PDO $db, int $sellerId, DateTime $from, DateTime $to, array $filters = []): array
 {
     $sql = "SELECT o.id AS order_id, o.created_at, o.status,
                    u.name AS customer_name, u.surname AS customer_surname, u.email AS customer_email,
@@ -136,10 +136,8 @@ function ias_fetch_sales_rows(mysqli $db, int $sellerId, DateTime $from, DateTim
     $sql .= " ORDER BY o.created_at DESC, o.id DESC";
 
     $stmt = $db->prepare($sql);
-    $stmt->bind_param($types, ...$bind);
-    $stmt->execute();
-    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    $stmt->execute($bind);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     return $rows;
 }
 
@@ -233,15 +231,15 @@ function ias_sales_daily_trend(array $rows, DateTime $from, DateTime $to): array
  * Fetch completed (delivered) shipments for a retail officer's products within a date range.
  * Optional filters: customer, product_id.
  */
-function ias_fetch_delivery_rows(mysqli $db, int $sellerId, DateTime $from, DateTime $to, array $filters = []): array
+function ias_fetch_delivery_rows(PDO $db, int $sellerId, DateTime $from, DateTime $to, array $filters = []): array
 {
     $sql = "SELECT s.id AS shipment_id, s.carrier, s.shipment_status, s.updated_at, s.created_at AS shipment_created,
                    o.id AS order_id, o.total, o.created_at AS order_created,
                    u.name AS customer_name, u.surname AS customer_surname, u.email AS customer_email,
-                   (SELECT GROUP_CONCAT(CONCAT(pr.name, ' x', oi.quantity) SEPARATOR ', ')
+                   (SELECT STRING_AGG(pr.name || ' x' || oi.quantity::text, ', ')
                     FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
                     WHERE oi.order_id = o.id AND pr.seller_id = ?) AS products,
-                   (SELECT GROUP_CONCAT(DISTINCT pr2.category SEPARATOR ', ')
+                   (SELECT STRING_AGG(DISTINCT pr2.category, ', ')
                     FROM order_items oi2 INNER JOIN products pr2 ON pr2.id = oi2.product_id
                     WHERE oi2.order_id = o.id AND pr2.seller_id = ?) AS categories
             FROM shipments s
@@ -277,15 +275,13 @@ function ias_fetch_delivery_rows(mysqli $db, int $sellerId, DateTime $from, Date
     $sql .= " ORDER BY s.updated_at DESC";
 
     $stmt = $db->prepare($sql);
-    $stmt->bind_param($types, ...$bind);
-    $stmt->execute();
-    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    $stmt->execute($bind);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     return $rows;
 }
 
 /** Summary metrics for the delivery history module (success rate needs all shipments, not just delivered ones) */
-function ias_summarize_deliveries(mysqli $db, int $sellerId, DateTime $from, DateTime $to, int $deliveredCount): array
+function ias_summarize_deliveries(PDO $db, int $sellerId, DateTime $from, DateTime $to, int $deliveredCount): array
 {
     $sql = "SELECT COUNT(DISTINCT s.id) FROM shipments s
             INNER JOIN orders o ON s.order_id = o.id
@@ -297,11 +293,8 @@ function ias_summarize_deliveries(mysqli $db, int $sellerId, DateTime $from, Dat
     $stmt = $db->prepare($sql);
     $fromStr = $from->format('Y-m-d 00:00:00');
     $toStr = (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00');
-    $stmt->bind_param('ssi', $fromStr, $toStr, $sellerId);
-    $stmt->execute();
-    $totalInRange = (int)($stmt->get_result()->fetch_row()[0] ?? 0);
-    $stmt->close();
-
+    $stmt->execute([$fromStr, $toStr, $sellerId]);
+    $totalInRange = (int)($stmt->fetchColumn() ?? 0);
     return [
         'delivered' => $deliveredCount,
         'total_shipments_in_range' => $totalInRange,
@@ -353,7 +346,7 @@ function ias_render_pct_badge(?float $pct): string
  * Product demand forecast from historical sales in a date range.
  * Uses average daily units sold × forecast horizon.
  */
-function ias_product_demand_forecast(mysqli $db, ?int $sellerId, DateTime $from, DateTime $to, int $forecastDays = 30, array $filters = []): array
+function ias_product_demand_forecast(PDO $db, ?int $sellerId, DateTime $from, DateTime $to, int $forecastDays = 30, array $filters = []): array
 {
     $rows = $sellerId !== null
         ? ias_fetch_sales_rows($db, $sellerId, $from, $to, $filters)
@@ -395,7 +388,7 @@ function ias_product_demand_forecast(mysqli $db, ?int $sellerId, DateTime $from,
 /**
  * Sales forecast: historical daily trend plus projected days using recent moving average.
  */
-function ias_sales_forecast(mysqli $db, ?int $sellerId, DateTime $from, DateTime $to, int $forecastDays = 14, array $filters = []): array
+function ias_sales_forecast(PDO $db, ?int $sellerId, DateTime $from, DateTime $to, int $forecastDays = 14, array $filters = []): array
 {
     $rows = $sellerId !== null
         ? ias_fetch_sales_rows($db, $sellerId, $from, $to, $filters)
@@ -422,7 +415,7 @@ function ias_sales_forecast(mysqli $db, ?int $sellerId, DateTime $from, DateTime
 }
 
 /** Fetch all sales rows (admin scope — no seller filter). */
-function ias_fetch_all_sales_rows(mysqli $db, DateTime $from, DateTime $to, array $filters = []): array
+function ias_fetch_all_sales_rows(PDO $db, DateTime $from, DateTime $to, array $filters = []): array
 {
     $sql = "SELECT o.id AS order_id, o.created_at, o.status,
                    u.name AS customer_name, u.surname AS customer_surname, u.email AS customer_email,
@@ -452,10 +445,8 @@ function ias_fetch_all_sales_rows(mysqli $db, DateTime $from, DateTime $to, arra
 
     $sql .= ' ORDER BY o.created_at DESC, o.id DESC';
     $stmt = $db->prepare($sql);
-    $stmt->bind_param($types, ...$bind);
-    $stmt->execute();
-    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    $stmt->execute($bind);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     return $rows;
 }
 
@@ -471,7 +462,7 @@ function ias_resolve_section_range(array $params, string $prefix, string $defaul
 }
 
 /** Monthly sales breakdown from order line items (real-time). */
-function ias_monthly_sales_report(mysqli $db, ?int $sellerId, int $monthsBack = 12): array
+function ias_monthly_sales_report(PDO $db, ?int $sellerId, int $monthsBack = 12): array
 {
     $out = [];
     $today = new DateTime('today');

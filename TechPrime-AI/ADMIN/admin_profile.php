@@ -11,11 +11,8 @@ $success  = '';
 $error    = '';
 
 $q = $db->prepare('SELECT name, surname, age, address, email, password FROM users WHERE id = ? LIMIT 1');
-$q->bind_param('i', $admin_id);
-$q->execute();
-$admin = $q->get_result()->fetch_assoc();
-$q->close();
-
+$q->execute([$admin_id]);
+$admin = $q->fetch(PDO::FETCH_ASSOC);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
         die('Invalid CSRF token.');
@@ -33,8 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Please fill in all required fields. Age must be 13 or older.';
         } else {
             $upd = $db->prepare('UPDATE users SET name = ?, surname = ?, age = ?, address = ? WHERE id = ?');
-            $upd->bind_param('ssisi', $name, $surname, $age, $address, $admin_id);
-            if ($upd->execute()) {
+            if ($upd->execute([$name, $surname, $age, $address, $admin_id])) {
                 $_SESSION['name'] = $name; $_SESSION['surname'] = $surname;
                 $admin['name'] = $name; $admin['surname'] = $surname;
                 $admin['age'] = $age; $admin['address'] = $address;
@@ -43,7 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $error = 'Failed to update profile. Please try again.';
             }
-            $upd->close();
         }
     }
 
@@ -63,15 +58,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $hash = password_hash($new, PASSWORD_DEFAULT);
             $upd  = $db->prepare('UPDATE users SET password = ? WHERE id = ?');
-            $upd->bind_param('si', $hash, $admin_id);
-            if ($upd->execute()) {
+            if ($upd->execute([$hash, $admin_id])) {
                 $admin['password'] = $hash;
                 logActivity($db, $admin_id, 'password_change', 'Admin changed their password');
                 $success = 'Password changed successfully.';
             } else {
                 $error = 'Failed to update password. Please try again.';
             }
-            $upd->close();
         }
     }
 }

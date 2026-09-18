@@ -23,15 +23,18 @@ function inventory_product_category(array $allowed): string
 }
 
 /** Feature-detect optional columns so this page works with or without migration_inventory_sku.sql applied. */
-function inventory_products_has_column(mysqli $db, string $column): bool
+function inventory_products_has_column(PDO $db, string $column): bool
 {
     static $cache = [];
     if (isset($cache[$column])) {
         return $cache[$column];
     }
-    $col = $db->real_escape_string($column);
-    $res = $db->query("SHOW COLUMNS FROM products LIKE '$col'");
-    $has = $res && $res->num_rows > 0;
+    $stmt = $db->prepare(
+        "SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'products' AND column_name = ?"
+    );
+    $stmt->execute([$column]);
+    $has = (bool)$stmt->fetchColumn();
     $cache[$column] = $has;
     return $has;
 }
@@ -66,18 +69,15 @@ if (isset($_POST['add_product'])) {
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $skuVal = $sku !== '' ? $sku : null;
-            $stmt->bind_param('isdisssss', $uid, $name, $price, $stock, $desc, $imageFile, $emptyUrl, $category, $skuVal);
+            $stmt->execute([$uid, $name, $price, $stock, $desc, $imageFile, $emptyUrl, $category, $skuVal]);
         } else {
             $stmt = $db->prepare(
                 'INSERT INTO products (seller_id, name, price, stock, description, image, image_url, category)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $stmt->bind_param('isdissss', $uid, $name, $price, $stock, $desc, $imageFile, $emptyUrl, $category);
+            $stmt->execute([$uid, $name, $price, $stock, $desc, $imageFile, $emptyUrl, $category]);
         }
-        $stmt->execute();
-        $newId = (int)$db->insert_id;
-        $stmt->close();
-
+        $newId = (int)$db->lastInsertId();
         logActivity($db, $uid, 'add_product', 'Added product: ' . $name . ' (stock: ' . $stock . ')');
         if ($newId > 0 && $stock <= 15) {
             inv_notify_stock_change($db, $name, $newId, 999, $stock);
@@ -112,10 +112,8 @@ if (isset($_POST['edit_product'])) {
         }
 
         $oldSt = $db->prepare('SELECT name, stock, image FROM products WHERE id = ?');
-        $oldSt->bind_param('i', $id);
-        $oldSt->execute();
-        $oldRow = $oldSt->get_result()->fetch_assoc() ?: [];
-        $oldSt->close();
+        $oldSt->execute([$id]);
+        $oldRow = $oldSt->fetch(PDO::FETCH_ASSOC) ?: [];
         $oldStock = (int)($oldRow['stock'] ?? 0);
         $oldName = trim((string)($oldRow['name'] ?? $name));
 
@@ -128,18 +126,15 @@ if (isset($_POST['edit_product'])) {
                      WHERE id = ?'
                 );
                 $skuVal = $sku !== '' ? $sku : null;
-                $stmt->bind_param('sdisssssi', $name, $price, $stock, $desc, $category, $newImage, $emptyUrl, $skuVal, $id);
+                $stmt->execute([$name, $price, $stock, $desc, $category, $newImage, $emptyUrl, $skuVal, $id]);
             } else {
                 $stmt = $db->prepare(
                     'UPDATE products
                      SET name = ?, price = ?, stock = ?, description = ?, category = ?, image = ?, image_url = ?
                      WHERE id = ?'
                 );
-                $stmt->bind_param('sdissssi', $name, $price, $stock, $desc, $category, $newImage, $emptyUrl, $id);
+                $stmt->execute([$name, $price, $stock, $desc, $category, $newImage, $emptyUrl, $id]);
             }
-            $stmt->execute();
-            $stmt->close();
-
             if (!empty($oldRow['image'])) {
                 $oldPath = dirname(__DIR__) . '/uploads/products/' . basename($oldRow['image']);
                 if (is_file($oldPath)) {
@@ -154,17 +149,15 @@ if (isset($_POST['edit_product'])) {
                      WHERE id = ?'
                 );
                 $skuVal = $sku !== '' ? $sku : null;
-                $stmt->bind_param('sdisssi', $name, $price, $stock, $desc, $category, $skuVal, $id);
+                $stmt->execute([$name, $price, $stock, $desc, $category, $skuVal, $id]);
             } else {
                 $stmt = $db->prepare(
                     'UPDATE products
                      SET name = ?, price = ?, stock = ?, description = ?, category = ?
                      WHERE id = ?'
                 );
-                $stmt->bind_param('sdissi', $name, $price, $stock, $desc, $category, $id);
+                $stmt->execute([$name, $price, $stock, $desc, $category, $id]);
             }
-            $stmt->execute();
-            $stmt->close();
         }
 
         $logName = $name !== '' ? $name : $oldName;
@@ -184,24 +177,15 @@ if (isset($_POST['edit_product'])) {
 }
 
 /** Delete a single product row (id already validated as int > 0) plus its image + cart refs. */
-function inventory_delete_product(mysqli $db, int $pid): void
+function inventory_delete_product(PDO $db, int $pid): void
 {
     $imgSt = $db->prepare('SELECT image FROM products WHERE id = ?');
-    $imgSt->bind_param('i', $pid);
-    $imgSt->execute();
-    $row = $imgSt->get_result()->fetch_assoc();
-    $imgSt->close();
-
+    $imgSt->execute([$pid]);
+    $row = $imgSt->fetch(PDO::FETCH_ASSOC);
     $del = $db->prepare('DELETE FROM products WHERE id = ?');
-    $del->bind_param('i', $pid);
-    $del->execute();
-    $del->close();
-
+    $del->execute([$pid]);
     $cart = $db->prepare('DELETE FROM cart WHERE product_id = ?');
-    $cart->bind_param('i', $pid);
-    $cart->execute();
-    $cart->close();
-
+    $cart->execute([$pid]);
     if (!empty($row['image'])) {
         $path = dirname(__DIR__) . '/uploads/products/' . basename($row['image']);
         if (is_file($path)) {
@@ -217,10 +201,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'delete') {
     $pid = (int)($_POST['id'] ?? 0);
     if ($pid > 0) {
         $nmSt = $db->prepare('SELECT name FROM products WHERE id = ?');
-        $nmSt->bind_param('i', $pid);
-        $nmSt->execute();
-        $nmRow = $nmSt->get_result()->fetch_assoc();
-        $nmSt->close();
+        $nmSt->execute([$pid]);
+        $nmRow = $nmSt->fetch(PDO::FETCH_ASSOC);
         $pname = trim((string)($nmRow['name'] ?? ''));
         inventory_delete_product($db, $pid);
         logActivity(
@@ -266,7 +248,7 @@ $categoriesInUse = [];
 $rows = [];
 
 if ($products) {
-    while ($p = $products->fetch_assoc()) {
+    while ($p = $products->fetch(PDO::FETCH_ASSOC)) {
         $stock = (int)$p['stock'];
         $status = inventory_stock_status($stock);
         $totalCount++;

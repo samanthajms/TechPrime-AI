@@ -12,15 +12,13 @@ $error    = '';
 
 // Ensure settings table & default rows exist (idempotent)
 $db->query("
-    CREATE TABLE IF NOT EXISTS `site_settings` (
-        `id`            INT(11)      NOT NULL AUTO_INCREMENT,
-        `setting_key`   VARCHAR(100) NOT NULL,
-        `setting_value` TEXT         NOT NULL,
-        `updated_by`    INT(11)      DEFAULT NULL,
-        `updated_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (`id`),
-        UNIQUE KEY `uq_setting_key` (`setting_key`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    CREATE TABLE IF NOT EXISTS site_settings (
+        id SERIAL PRIMARY KEY,
+        setting_key VARCHAR(100) NOT NULL UNIQUE,
+        setting_value TEXT NOT NULL,
+        updated_by INTEGER DEFAULT NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
 ");
 
 $defaults = [
@@ -32,16 +30,14 @@ $defaults = [
     'max_failed_attempts'=> '3',
 ];
 foreach ($defaults as $k => $v) {
-    $ins = $db->prepare("INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES (?, ?)");
-    $ins->bind_param('ss', $k, $v);
-    $ins->execute();
-    $ins->close();
+    $ins = $db->prepare("INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT (setting_key) DO NOTHING");
+    $ins->execute([$k, $v]);
 }
 
 function getSettings($db) {
     $res = $db->query("SELECT setting_key, setting_value FROM site_settings");
     $out = [];
-    while ($row = $res->fetch_assoc()) {
+    while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
         $out[$row['setting_key']] = $row['setting_value'];
     }
     return $out;
@@ -72,9 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ok = true;
     foreach ($updates as $k => $v) {
         $upd = $db->prepare("UPDATE site_settings SET setting_value = ?, updated_by = ? WHERE setting_key = ?");
-        $upd->bind_param('sis', $v, $admin_id, $k);
-        if (!$upd->execute()) { $ok = false; }
-        $upd->close();
+        if (!$upd->execute([$v, $admin_id, $k])) { $ok = false; }
     }
 
     if ($ok) {

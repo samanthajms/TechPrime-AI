@@ -22,16 +22,14 @@ if (isset($_POST['update_cart'])) {
             if ($uid > 0) {
                 // FIX: Use prepared statement
                 $stmt = $db->prepare("DELETE FROM cart WHERE user_id = ? AND product_id = ?");
-                $stmt->bind_param("ii", $uid, $id);
-                $stmt->execute();
+                $stmt->execute([$uid, $id]);
             }
         } else {
             $_SESSION['cart'][$id] = $q;
             if ($uid > 0) {
                 // FIX: Use prepared statement
                 $stmt = $db->prepare("UPDATE cart SET quantity = ? WHERE user_id = ? AND product_id = ?");
-                $stmt->bind_param("iii", $q, $uid, $id);
-                $stmt->execute();
+                $stmt->execute([$q, $uid, $id]);
             }
         }
     }
@@ -48,8 +46,7 @@ if (isset($_GET['remove'])) {
         $uid = (int)$_SESSION['user_id'];
         // FIX: Use prepared statement
         $stmt = $db->prepare("DELETE FROM cart WHERE user_id = ? AND product_id = ?");
-        $stmt->bind_param("ii", $uid, $remove_id);
-        $stmt->execute();
+        $stmt->execute([$uid, $remove_id]);
     }
     logActivity($db, $_SESSION['user_id'] ?? null, 'remove_from_cart', "Product ID $remove_id removed from cart");
     header("Location: cart.php?removed=1");
@@ -64,7 +61,7 @@ if (!empty($_SESSION['cart'])) {
     $ids = array_map('intval', array_keys($_SESSION['cart']));
     $ids_str = implode(',', $ids);
     $res = $db->query("SELECT * FROM products WHERE id IN ($ids_str) AND COALESCE(stock, 0) > 0");
-    while ($row = $res->fetch_assoc()) {
+    while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
         $row['qty'] = (int)$_SESSION['cart'][$row['id']];
         $row['subtotal'] = $row['price'] * $row['qty'];
         $total += $row['subtotal'];

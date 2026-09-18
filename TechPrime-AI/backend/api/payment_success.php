@@ -28,31 +28,32 @@ $db      = getDbConnection();
 $userId  = (int) $_SESSION['user_id'];
 $order   = $_SESSION['pending_order'];
 $total   = $order['total'];
-$address = $db->real_escape_string($order['address']);
-$phone   = $db->real_escape_string($order['phone']);
+$address = $order['address'];
+$phone   = $order['phone'];
 
 $stmt = $db->prepare("INSERT INTO orders (user_id, total, status, shipping_address, customer_phone) VALUES (?, ?, 'to_ship', ?, ?)");
-$stmt->bind_param("idss", $userId, $total, $address, $phone);
 
-if ($stmt->execute()) {
-    $orderId = $stmt->insert_id;
+if ($stmt->execute([$userId, $total, $address, $phone])) {
+    $orderId = $db->lastInsertId();
 
     foreach ($_SESSION['cart'] as $productId => $qty) {
         $qty = (int) $qty;
         $productId = (int) $productId;
-        $res = $db->query("SELECT price FROM products WHERE id = $productId");
-        $product = $res->fetch_assoc();
+        $priceStmt = $db->prepare("SELECT price FROM products WHERE id = ?");
+        $priceStmt->execute([$productId]);
+        $product = $priceStmt->fetch(PDO::FETCH_ASSOC);
         $price = $product['price'];
 
         $itemStmt = $db->prepare("INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
-        $itemStmt->bind_param("iiid", $orderId, $productId, $qty, $price);
-        $itemStmt->execute();
+        $itemStmt->execute([$orderId, $productId, $qty, $price]);
 
-        $db->query("UPDATE products SET stock = stock - $qty WHERE id = $productId");
+        $stockStmt = $db->prepare("UPDATE products SET stock = stock - ? WHERE id = ?");
+        $stockStmt->execute([$qty, $productId]);
     }
 
     unset($_SESSION['cart'], $_SESSION['pending_order'], $_SESSION['paymongo_link_id']);
-    $db->query("DELETE FROM cart WHERE user_id = $userId");
+    $delCart = $db->prepare("DELETE FROM cart WHERE user_id = ?");
+    $delCart->execute([$userId]);
 
     header("Location: ../../CLIENT/order_success.php?order_id=$orderId&total=$total");
     exit;
