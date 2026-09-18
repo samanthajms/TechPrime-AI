@@ -120,12 +120,9 @@ if (!$stmt) {
     echo json_encode(['ok' => false, 'products' => [], 'error' => 'query_failed']);
     exit;
 }
-$stmt->bind_param($types, ...$params);
-$stmt->execute();
-$res = $stmt->get_result();
-$rows = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
-$stmt->close();
-
+$stmt->execute($params);
+$res = $stmt;
+$rows = $res ? $res->fetchAll(PDO::FETCH_ASSOC) : [];
 $rows = ias_client_filter_products_for_display($rows);
 $products = [];
 $seen = [];

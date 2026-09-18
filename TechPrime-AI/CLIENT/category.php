@@ -28,10 +28,9 @@ $stmt = $db->prepare(
      JOIN users u ON p.seller_id = u.id
      WHERE p.category = ? AND " . ias_client_product_list_sql_condition('p')
 );
-$stmt->bind_param('s', $type);
-$stmt->execute();
-$baseResult = $stmt->get_result();
-$baseRows = $baseResult ? $baseResult->fetch_all(MYSQLI_ASSOC) : [];
+$stmt->execute([$type]);
+$baseResult = $stmt;
+$baseRows = $baseResult ? $baseResult->fetchAll(PDO::FETCH_ASSOC) : [];
 $baseProducts = ias_client_filter_products_for_display($baseRows);
 
 // ---- Facet data (brands + price bounds) from the whole category ----

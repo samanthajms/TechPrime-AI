@@ -17,26 +17,24 @@ $pageTitle   = 'EasyFix Support';
 $searchQuery = '';
 $peripheralCategories = ['Mobile', 'Cameras', 'Accessories'];
 
-$convQuery = "SELECT DISTINCT u.id, u.name
+$convQuery = "SELECT u.id, u.name
               FROM users u
               INNER JOIN messages m ON (u.id = m.sender_id OR u.id = m.receiver_id)
               WHERE (m.sender_id = ? OR m.receiver_id = ?)
               AND u.id != ?
-              ORDER BY m.created_at DESC";
+              GROUP BY u.id, u.name
+              ORDER BY MAX(m.created_at) DESC";
 $stmt = $db->prepare($convQuery);
-$stmt->bind_param('iii', $userId, $userId, $userId);
-$stmt->execute();
-$contacts = $stmt->get_result();
-
+$stmt->execute([$userId, $userId, $userId]);
+$contacts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $activeContactId = isset($_GET['contact_id']) ? (int)$_GET['contact_id'] : null;
 $chatPartnerName = 'Select a Chat';
 $messages        = [];
 
 if ($activeContactId) {
     $nameStmt = $db->prepare('SELECT name FROM users WHERE id = ?');
-    $nameStmt->bind_param('i', $activeContactId);
-    $nameStmt->execute();
-    if ($row = $nameStmt->get_result()->fetch_assoc()) {
+    $nameStmt->execute([$activeContactId]);
+    if ($row = $nameStmt->fetch(PDO::FETCH_ASSOC)) {
         $chatPartnerName = $row['name'];
     }
 
@@ -46,9 +44,8 @@ if ($activeContactId) {
             OR (sender_id = ? AND receiver_id = ?)
          ORDER BY created_at ASC"
     );
-    $mStmt->bind_param('iiii', $userId, $activeContactId, $activeContactId, $userId);
-    $mStmt->execute();
-    $messages = $mStmt->get_result();
+    $mStmt->execute([$userId, $activeContactId, $activeContactId, $userId]);
+    $messages = $mStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
@@ -65,14 +62,14 @@ if ($activeContactId) {
             <!-- Contacts sidebar -->
             <aside class="ep-contacts-list">
                 <div class="ep-contacts-title"><i class="fas fa-comments"></i> Chats</div>
-                <?php if ($contacts && $contacts->num_rows > 0): ?>
-                    <?php while ($c = $contacts->fetch_assoc()): ?>
+                <?php if (!empty($contacts)): ?>
+                    <?php foreach ($contacts as $c): ?>
                         <a href="messages.php?contact_id=<?php echo (int)$c['id']; ?>"
                            class="ep-contact-item <?php echo ($activeContactId == $c['id']) ? 'active' : ''; ?>">
                             <div class="ep-contact-avatar"><?php echo strtoupper(substr(h($c['name']), 0, 1)); ?></div>
                             <strong><?php echo h($c['name']); ?></strong>
                         </a>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 <?php else: ?>
                     <div class="ep-contacts-empty">No messages yet.</div>
                 <?php endif; ?>
@@ -89,12 +86,12 @@ if ($activeContactId) {
 
                 <div class="ep-message-stream" id="epMsgStream">
                     <?php if ($activeContactId): ?>
-                        <?php while ($m = $messages->fetch_assoc()): ?>
+                        <?php foreach ($messages as $m): ?>
                             <div class="ep-msg-bubble <?php echo ($m['sender_id'] == $userId) ? 'ep-sent' : 'ep-received'; ?>">
                                 <?php echo h($m['message']); ?>
                                 <span class="ep-msg-time"><?php echo date('g:i a', strtotime($m['created_at'])); ?></span>
                             </div>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     <?php else: ?>
                         <div class="ep-chat-placeholder">
                             <i class="fas fa-comment-dots" style="font-size:48px;color:#ccc;"></i>

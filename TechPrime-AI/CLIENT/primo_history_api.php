@@ -19,54 +19,53 @@ function ph_json(array $payload, int $code = 200): void
     exit;
 }
 
-function ph_ensure_tables(mysqli $db): void
+function ph_ensure_tables(PDO $db): void
 {
     static $done = false;
     if ($done) {
         return;
     }
     $done = true;
-    $db->query(
+    $db->exec(
         "CREATE TABLE IF NOT EXISTS primo_conversations (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NOT NULL,
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
             title VARCHAR(160) NOT NULL DEFAULT 'Chat',
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX idx_primo_conv_user_updated (user_id, updated_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )"
     );
-    $db->query(
+    $db->exec("CREATE INDEX IF NOT EXISTS idx_primo_conv_user_updated ON primo_conversations (user_id, updated_at)");
+    $db->exec(
         "CREATE TABLE IF NOT EXISTS primo_messages (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            conversation_id INT NOT NULL,
-            role ENUM('user','bot') NOT NULL,
-            content MEDIUMTEXT NOT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_primo_msg_conv (conversation_id, id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            id SERIAL PRIMARY KEY,
+            conversation_id INTEGER NOT NULL,
+            role VARCHAR(10) NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )"
     );
+    $db->exec("CREATE INDEX IF NOT EXISTS idx_primo_msg_conv ON primo_messages (conversation_id, id)");
 }
 
 /** Remove expired conversations for this user (and orphans older than retention). */
-function ph_cleanup(mysqli $db, int $uid): void
+function ph_cleanup(PDO $db, int $uid): void
 {
     $days = PRIMO_HISTORY_DAYS;
     $stmt = $db->prepare(
         "DELETE FROM primo_conversations
          WHERE user_id = ?
-           AND updated_at < (NOW() - INTERVAL {$days} DAY)"
+           AND updated_at < (NOW() - make_interval(days => {$days}))"
     );
     if ($stmt) {
-        $stmt->bind_param('i', $uid);
-        $stmt->execute();
-        $stmt->close();
+        $stmt->execute([$uid]);
     }
     /* Drop orphan messages whose parent was deleted (no FK in runtime CREATE). */
-    $db->query(
-        'DELETE m FROM primo_messages m
-         LEFT JOIN primo_conversations c ON c.id = m.conversation_id
-         WHERE c.id IS NULL'
+    $db->exec(
+        'DELETE FROM primo_messages
+         WHERE NOT EXISTS (
+            SELECT 1 FROM primo_conversations c WHERE c.id = primo_messages.conversation_id
+         )'
     );
 }
 
@@ -127,16 +126,15 @@ if ($action === 'list') {
         "SELECT id, title, created_at, updated_at
          FROM primo_conversations
          WHERE user_id = ?
-           AND updated_at >= (NOW() - INTERVAL {$days} DAY)
+           AND updated_at >= (NOW() - make_interval(days => {$days}))
          ORDER BY updated_at DESC, id DESC
          LIMIT 50"
     );
-    $stmt->bind_param('i', $uid);
-    $stmt->execute();
-    $res = $stmt->get_result();
+    $stmt->execute([$uid]);
+    $res = $stmt;
     $groups = [];
     $conversations = [];
-    while ($row = $res->fetch_assoc()) {
+    while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
         $label = ph_day_label((string)$row['updated_at']);
         $item = [
             'id' => (int)$row['id'],
@@ -151,7 +149,6 @@ if ($action === 'list') {
         }
         $groups[$label][] = $item;
     }
-    $stmt->close();
     $grouped = [];
     foreach ($groups as $label => $items) {
         $grouped[] = ['label' => $label, 'items' => $items];
@@ -168,10 +165,8 @@ if ($action === 'get') {
         'SELECT id, title, created_at, updated_at
          FROM primo_conversations WHERE id = ? AND user_id = ? LIMIT 1'
     );
-    $stmt->bind_param('ii', $id, $uid);
-    $stmt->execute();
-    $conv = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+    $stmt->execute([$id, $uid]);
+    $conv = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$conv) {
         ph_json(['ok' => false, 'error' => 'not_found'], 404);
     }
@@ -180,11 +175,10 @@ if ($action === 'get') {
         'SELECT id, role, content, created_at
          FROM primo_messages WHERE conversation_id = ? ORDER BY id ASC'
     );
-    $mstmt->bind_param('i', $id);
-    $mstmt->execute();
-    $mres = $mstmt->get_result();
+    $mstmt->execute([$id]);
+    $mres = $mstmt;
     $messages = [];
-    while ($m = $mres->fetch_assoc()) {
+    while ($m = $mres->fetch(PDO::FETCH_ASSOC)) {
         $messages[] = [
             'id' => (int)$m['id'],
             'role' => (string)$m['role'],
@@ -192,8 +186,6 @@ if ($action === 'get') {
             'created_at' => (string)$m['created_at'],
         ];
     }
-    $mstmt->close();
-
     ph_json([
         'ok' => true,
         'conversation' => [
@@ -222,10 +214,8 @@ if ($action === 'append' && $method === 'POST') {
 
     if ($convId > 0) {
         $chk = $db->prepare('SELECT id FROM primo_conversations WHERE id = ? AND user_id = ? LIMIT 1');
-        $chk->bind_param('ii', $convId, $uid);
-        $chk->execute();
-        $owned = $chk->get_result()->fetch_assoc();
-        $chk->close();
+        $chk->execute([$convId, $uid]);
+        $owned = $chk->fetch(PDO::FETCH_ASSOC);
         if (!$owned) {
             ph_json(['ok' => false, 'error' => 'not_found'], 404);
         }
@@ -239,13 +229,10 @@ if ($action === 'append' && $method === 'POST') {
             $title = 'Chat';
         }
         $ins = $db->prepare('INSERT INTO primo_conversations (user_id, title) VALUES (?, ?)');
-        $ins->bind_param('is', $uid, $title);
-        if (!$ins->execute()) {
-            $ins->close();
+        if (!$ins->execute([$uid, $title])) {
             ph_json(['ok' => false, 'error' => 'create_failed'], 500);
         }
-        $convId = (int)$db->insert_id;
-        $ins->close();
+        $convId = (int)$db->lastInsertId();
     }
 
     $msgIns = $db->prepare(
@@ -253,21 +240,14 @@ if ($action === 'append' && $method === 'POST') {
     );
     if ($userMsg !== '') {
         $role = 'user';
-        $msgIns->bind_param('iss', $convId, $role, $userMsg);
-        $msgIns->execute();
+        $msgIns->execute([$convId, $role, $userMsg]);
     }
     if ($botMsg !== '') {
         $role = 'bot';
-        $msgIns->bind_param('iss', $convId, $role, $botMsg);
-        $msgIns->execute();
+        $msgIns->execute([$convId, $role, $botMsg]);
     }
-    $msgIns->close();
-
     $touch = $db->prepare('UPDATE primo_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?');
-    $touch->bind_param('ii', $convId, $uid);
-    $touch->execute();
-    $touch->close();
-
+    $touch->execute([$convId, $uid]);
     ph_json(['ok' => true, 'conversation_id' => $convId]);
 }
 
@@ -277,19 +257,17 @@ if ($action === 'delete' && $method === 'POST') {
         ph_json(['ok' => false, 'error' => 'invalid_id'], 400);
     }
     $delMsg = $db->prepare(
-        'DELETE m FROM primo_messages m
-         INNER JOIN primo_conversations c ON c.id = m.conversation_id
-         WHERE m.conversation_id = ? AND c.user_id = ?'
+        'DELETE FROM primo_messages
+         WHERE conversation_id = ?
+           AND EXISTS (
+                SELECT 1 FROM primo_conversations c
+                WHERE c.id = primo_messages.conversation_id AND c.user_id = ?
+           )'
     );
-    $delMsg->bind_param('ii', $id, $uid);
-    $delMsg->execute();
-    $delMsg->close();
-
+    $delMsg->execute([$id, $uid]);
     $del = $db->prepare('DELETE FROM primo_conversations WHERE id = ? AND user_id = ?');
-    $del->bind_param('ii', $id, $uid);
-    $del->execute();
-    $affected = $del->affected_rows;
-    $del->close();
+    $del->execute([$id, $uid]);
+    $affected = $del->rowCount();
     if ($affected <= 0) {
         ph_json(['ok' => false, 'error' => 'not_found'], 404);
     }

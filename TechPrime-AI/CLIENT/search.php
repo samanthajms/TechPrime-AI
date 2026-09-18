@@ -22,11 +22,10 @@ if (!empty($query)) {
          WHERE (p.name LIKE ? OR p.description LIKE ?) AND " . ias_client_product_list_sql_condition('p') . "
          ORDER BY p.id DESC"
     );
-    $stmt->bind_param('ss', $searchTerm, $searchTerm);
-    $stmt->execute();
-    $resultSet = $stmt->get_result();
+    $stmt->execute([$searchTerm, $searchTerm]);
+    $resultSet = $stmt;
     $displayProducts = ias_client_filter_products_for_display(
-        $resultSet ? $resultSet->fetch_all(MYSQLI_ASSOC) : []
+        $resultSet ? $resultSet->fetchAll(PDO::FETCH_ASSOC) : []
     );
 }
 ?>

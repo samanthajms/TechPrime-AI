@@ -10,25 +10,25 @@ require_once __DIR__ . '/../backend/config/database.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
-function sb_ensure_table(mysqli $db): void
+function sb_ensure_table(PDO $db): void
 {
     static $done = false;
     if ($done) {
         return;
     }
     $done = true;
-    $db->query(
+    $db->exec(
         "CREATE TABLE IF NOT EXISTS saved_builds (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NOT NULL,
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
             build_name VARCHAR(150) NOT NULL,
-            components_json MEDIUMTEXT NOT NULL,
+            components_json TEXT NOT NULL,
             total_price DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-            component_count INT NOT NULL DEFAULT 0,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_saved_builds_user (user_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            component_count INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )"
     );
+    $db->exec("CREATE INDEX IF NOT EXISTS idx_saved_builds_user ON saved_builds (user_id)");
 }
 
 function sb_json(array $payload, int $code = 200): void
@@ -69,11 +69,10 @@ if ($action === 'list') {
         'SELECT id, build_name, components_json, total_price, component_count, created_at
          FROM saved_builds WHERE user_id = ? ORDER BY created_at DESC, id DESC'
     );
-    $stmt->bind_param('i', $uid);
-    $stmt->execute();
-    $res = $stmt->get_result();
+    $stmt->execute([$uid]);
+    $res = $stmt;
     $builds = [];
-    while ($row = $res->fetch_assoc()) {
+    while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
         $comps = json_decode((string)$row['components_json'], true);
         $builds[] = [
             'id' => (int)$row['id'],
@@ -84,7 +83,6 @@ if ($action === 'list') {
             'components' => is_array($comps) ? $comps : new stdClass(),
         ];
     }
-    $stmt->close();
     sb_json(['ok' => true, 'builds' => $builds]);
 }
 
@@ -97,10 +95,8 @@ if ($action === 'get') {
         'SELECT id, build_name, components_json, total_price, component_count, created_at
          FROM saved_builds WHERE id = ? AND user_id = ? LIMIT 1'
     );
-    $stmt->bind_param('ii', $id, $uid);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+    $stmt->execute([$id, $uid]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         sb_json(['ok' => false, 'error' => 'not_found'], 404);
     }
@@ -172,20 +168,16 @@ if ($action === 'save' && $method === 'POST') {
              SET build_name = ?, components_json = ?, total_price = ?, component_count = ?
              WHERE id = ? AND user_id = ?'
         );
-        $stmt->bind_param('ssdiii', $name, $json, $total, $count, $updateId, $uid);
-        $ok = $stmt->execute();
-        $affected = $stmt->affected_rows;
-        $stmt->close();
+        $ok = $stmt->execute([$name, $json, $total, $count, $updateId, $uid]);
+        $affected = $stmt->rowCount();
         if (!$ok || $affected < 0) {
             sb_json(['ok' => false, 'error' => 'save_failed', 'message' => 'Could not update your build. Please try again.'], 500);
         }
         if ($affected === 0) {
             /* Verify ownership — 0 rows may mean values unchanged or not found. */
             $chk = $db->prepare('SELECT id FROM saved_builds WHERE id = ? AND user_id = ? LIMIT 1');
-            $chk->bind_param('ii', $updateId, $uid);
-            $chk->execute();
-            $exists = $chk->get_result()->fetch_assoc();
-            $chk->close();
+            $chk->execute([$updateId, $uid]);
+            $exists = $chk->fetch(PDO::FETCH_ASSOC);
             if (!$exists) {
                 sb_json(['ok' => false, 'error' => 'not_found', 'message' => 'Build not found.'], 404);
             }
@@ -204,10 +196,8 @@ if ($action === 'save' && $method === 'POST') {
         'INSERT INTO saved_builds (user_id, build_name, components_json, total_price, component_count)
          VALUES (?, ?, ?, ?, ?)'
     );
-    $stmt->bind_param('issdi', $uid, $name, $json, $total, $count);
-    $ok = $stmt->execute();
-    $newId = (int)$db->insert_id;
-    $stmt->close();
+    $ok = $stmt->execute([$uid, $name, $json, $total, $count]);
+    $newId = (int)$db->lastInsertId();
     if (!$ok) {
         sb_json(['ok' => false, 'error' => 'save_failed', 'message' => 'Could not save your build. Please try again.'], 500);
     }
@@ -229,10 +219,8 @@ if ($action === 'add_to_cart' && $method === 'POST') {
     $stmt = $db->prepare(
         'SELECT id, build_name, components_json FROM saved_builds WHERE id = ? AND user_id = ? LIMIT 1'
     );
-    $stmt->bind_param('ii', $id, $uid);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+    $stmt->execute([$id, $uid]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         sb_json(['ok' => false, 'error' => 'not_found', 'message' => 'Build not found.'], 404);
     }
@@ -294,10 +282,8 @@ if ($action === 'delete' && $method === 'POST') {
         sb_json(['ok' => false, 'error' => 'invalid_id'], 400);
     }
     $stmt = $db->prepare('DELETE FROM saved_builds WHERE id = ? AND user_id = ?');
-    $stmt->bind_param('ii', $id, $uid);
-    $stmt->execute();
-    $affected = $stmt->affected_rows;
-    $stmt->close();
+    $stmt->execute([$id, $uid]);
+    $affected = $stmt->rowCount();
     if ($affected <= 0) {
         sb_json(['ok' => false, 'error' => 'not_found'], 404);
     }

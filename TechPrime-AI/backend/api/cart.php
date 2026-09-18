@@ -18,9 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
     
     // Fetch product details from DB to ensure price is accurate
     $stmt = $db->prepare("SELECT id, name, price FROM products WHERE id = ?");
-    $stmt->bind_param("i", $productId);
-    $stmt->execute();
-    $product = $stmt->get_result()->fetch_assoc();
+    $stmt->execute([$productId]);
+    $product = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($product) {
         if (!isset($_SESSION['cart'])) { $_SESSION['cart'] = []; }

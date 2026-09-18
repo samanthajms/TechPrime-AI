@@ -61,16 +61,16 @@ if ($q !== '') {
 
 switch ($range) {
     case 'today':
-        $where[] = 'DATE(l.created_at) = CURDATE()';
+        $where[] = "DATE(l.created_at) = CURRENT_DATE";
         break;
     case '7d':
-        $where[] = 'l.created_at >= (NOW() - INTERVAL 7 DAY)';
+        $where[] = "l.created_at >= (NOW() - INTERVAL '7 day')";
         break;
     case '30d':
-        $where[] = 'l.created_at >= (NOW() - INTERVAL 30 DAY)';
+        $where[] = "l.created_at >= (NOW() - INTERVAL '30 day')";
         break;
     case 'month':
-        $where[] = 'YEAR(l.created_at) = YEAR(CURDATE()) AND MONTH(l.created_at) = MONTH(CURDATE())';
+        $where[] = "date_trunc('month', l.created_at) = date_trunc('month', CURRENT_DATE)";
         break;
 }
 
@@ -80,12 +80,8 @@ $countSql = "SELECT COUNT(*) FROM logs l LEFT JOIN users u ON u.id = l.user_id W
 $countStmt = $db->prepare($countSql);
 $totalRows = 0;
 if ($countStmt) {
-    if ($types !== '') {
-        $countStmt->bind_param($types, ...$params);
-    }
-    $countStmt->execute();
-    $totalRows = (int)($countStmt->get_result()->fetch_row()[0] ?? 0);
-    $countStmt->close();
+    $countStmt->execute($params);
+    $totalRows = (int)($countStmt->fetchColumn() ?? 0);
 }
 
 $totalPages = max(1, (int)ceil($totalRows / $perPage));
@@ -99,19 +95,12 @@ $listSql = "SELECT l.*, u.name AS user_name, u.role AS user_role
             LEFT JOIN users u ON u.id = l.user_id
             WHERE {$whereSql}
             ORDER BY l.created_at DESC, l.id DESC
-            LIMIT ? OFFSET ?";
+            LIMIT " . (int)$perPage . " OFFSET " . (int)$offset;
 $listStmt = $db->prepare($listSql);
 $rows = [];
 if ($listStmt) {
-    $bindTypes = $types . 'ii';
-    $bindParams = array_merge($params, [$perPage, $offset]);
-    $listStmt->bind_param($bindTypes, ...$bindParams);
-    $listStmt->execute();
-    $res = $listStmt->get_result();
-    while ($r = $res->fetch_assoc()) {
-        $rows[] = $r;
-    }
-    $listStmt->close();
+    $listStmt->execute($params);
+    $rows = $listStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function inv_audit_url(int $page, string $q, string $action, string $range): string

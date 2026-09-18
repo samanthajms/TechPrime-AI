@@ -15,11 +15,11 @@ checkRole('admin');
 $admin_id = (int)$_SESSION['user_id'];
 
 $cnt = [];
-$cnt['clients'] = $db->query("SELECT COUNT(*) FROM users WHERE role='client'")->fetch_row()[0];
-$cnt['retail_officer'] = $db->query("SELECT COUNT(*) FROM users WHERE role='retail_officer'")->fetch_row()[0];
-$cnt['technician'] = $db->query("SELECT COUNT(*) FROM users WHERE role='technician'")->fetch_row()[0];
-$cnt['inventory_custodian'] = $db->query("SELECT COUNT(*) FROM users WHERE role='inventory_custodian'")->fetch_row()[0];
-$cnt['orders'] = $db->query("SELECT COUNT(*) FROM orders")->fetch_row()[0];
+$cnt['clients'] = $db->query("SELECT COUNT(*) FROM users WHERE role='client'")->fetchColumn();
+$cnt['retail_officer'] = $db->query("SELECT COUNT(*) FROM users WHERE role='retail_officer'")->fetchColumn();
+$cnt['technician'] = $db->query("SELECT COUNT(*) FROM users WHERE role='technician'")->fetchColumn();
+$cnt['inventory_custodian'] = $db->query("SELECT COUNT(*) FROM users WHERE role='inventory_custodian'")->fetchColumn();
+$cnt['orders'] = $db->query("SELECT COUNT(*) FROM orders")->fetchColumn();
 
 $presets = ias_report_date_presets();
 $categories = ias_product_categories();

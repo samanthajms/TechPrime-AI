@@ -19,7 +19,7 @@ $ids = array_map('intval', array_keys($_SESSION['cart']));
 $ids_str = implode(',', $ids);
 
 $res = $db->query("SELECT * FROM products WHERE id IN ($ids_str) AND COALESCE(stock, 0) > 0");
-while ($row = $res->fetch_assoc()) {
+while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
     $row['qty'] = (int)$_SESSION['cart'][$row['id']];
     $row['subtotal'] = $row['price'] * $row['qty'];
     $total += $row['subtotal'];
@@ -39,26 +39,23 @@ if (isset($_POST['place_order'])) {
     $stmt = $db->prepare("INSERT INTO orders (user_id, total, status, shipping_address, customer_phone) VALUES (?, ?, 'to_ship', ?, ?)");
     $address = $_POST['address'];
     $phone   = $_POST['phone'];
-    $stmt->bind_param('idss', $user_id, $total, $address, $phone);
-
-    if ($stmt->execute()) {
-        $order_id = $stmt->insert_id;
+    if ($stmt->execute([$user_id, $total, $address, $phone])) {
+        $order_id = $db->lastInsertId();
 
         foreach ($items as $item) {
             $stmt_item = $db->prepare('INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)');
-            $stmt_item->bind_param('iiid', $order_id, $item['id'], $item['qty'], $item['price']);
-            $stmt_item->execute();
+            $stmt_item->execute([$order_id, $item['id'], $item['qty'], $item['price']]);
 
             $qty = (int)$item['qty'];
             $pid = (int)$item['id'];
-            $db->query("UPDATE products SET stock = stock - $qty WHERE id = $pid");
+            $stockStmt = $db->prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
+            $stockStmt->execute([$qty, $pid]);
         }
 
         unset($_SESSION['cart']);
 
         $stmt_del = $db->prepare('DELETE FROM cart WHERE user_id = ?');
-        $stmt_del->bind_param('i', $user_id);
-        $stmt_del->execute();
+        $stmt_del->execute([$user_id]);
 
         header("Location: order_success.php?order_id=$order_id&total=$total");
         exit;

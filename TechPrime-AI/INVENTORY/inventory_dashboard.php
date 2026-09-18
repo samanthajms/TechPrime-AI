@@ -10,12 +10,12 @@ checkRole('inventory_custodian');
 
 $uid = (int)$_SESSION['user_id'];
 
-$total = (int)($db->query('SELECT COUNT(*) FROM shipments')->fetch_row()[0] ?? 0);
-$pending = (int)($db->query("SELECT COUNT(*) FROM shipments WHERE shipment_status != 'delivered'")->fetch_row()[0] ?? 0);
-$done = (int)($db->query("SELECT COUNT(*) FROM shipments WHERE shipment_status = 'delivered'")->fetch_row()[0] ?? 0);
+$total = (int)($db->query('SELECT COUNT(*) FROM shipments')->fetchColumn() ?? 0);
+$pending = (int)($db->query("SELECT COUNT(*) FROM shipments WHERE shipment_status != 'delivered'")->fetchColumn() ?? 0);
+$done = (int)($db->query("SELECT COUNT(*) FROM shipments WHERE shipment_status = 'delivered'")->fetchColumn() ?? 0);
 
 $products = $db->query('SELECT id, name, category, stock, price, created_at FROM products ORDER BY id DESC');
-$productRows = ($products && $products->num_rows > 0) ? $products->fetch_all(MYSQLI_ASSOC) : [];
+$productRows = $products ? $products->fetchAll(PDO::FETCH_ASSOC) : [];
 
 $productCount = count($productRows);
 $totalStock = 0;

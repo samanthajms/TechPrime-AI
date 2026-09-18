@@ -15,18 +15,18 @@ $isHomePage = false;
 $pageTitle = 'Saved Build';
 $csrf = generateCsrfToken();
 
-$db->query(
+$db->exec(
     "CREATE TABLE IF NOT EXISTS saved_builds (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
         build_name VARCHAR(150) NOT NULL,
-        components_json MEDIUMTEXT NOT NULL,
+        components_json TEXT NOT NULL,
         total_price DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-        component_count INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_saved_builds_user (user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        component_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )"
 );
+$db->exec("CREATE INDEX IF NOT EXISTS idx_saved_builds_user ON saved_builds (user_id)");
 
 $slotLabels = [
     'processor' => 'Processor',
@@ -46,11 +46,10 @@ $stmt = $db->prepare(
     'SELECT id, build_name, components_json, total_price, component_count, created_at
      FROM saved_builds WHERE user_id = ? ORDER BY created_at DESC, id DESC'
 );
-$stmt->bind_param('i', $uid);
-$stmt->execute();
-$res = $stmt->get_result();
+$stmt->execute([$uid]);
+$res = $stmt;
 $builds = [];
-while ($row = $res->fetch_assoc()) {
+while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
     $comps = json_decode((string)$row['components_json'], true);
     $builds[] = [
         'id' => (int)$row['id'],
@@ -61,8 +60,6 @@ while ($row = $res->fetch_assoc()) {
         'components' => is_array($comps) ? $comps : [],
     ];
 }
-$stmt->close();
-
 $buildsJson = json_encode($builds, JSON_UNESCAPED_UNICODE);
 $slotsJson = json_encode($slotLabels, JSON_UNESCAPED_UNICODE);
 

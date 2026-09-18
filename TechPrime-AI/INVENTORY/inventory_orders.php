@@ -27,23 +27,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
     if ($oid > 0 && in_array($status, $allowed, true)) {
         $up = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
-        $up->bind_param('si', $status, $oid);
-        $up->execute();
-        $up->close();
-
+        $up->execute([$status, $oid]);
         // Ensure a shipment row exists for fulfillment tracking (no courier assignment)
         $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
-        $chk->bind_param('i', $oid);
-        $chk->execute();
-        $ship = $chk->get_result()->fetch_assoc();
-        $chk->close();
-
+        $chk->execute([$oid]);
+        $ship = $chk->fetch(PDO::FETCH_ASSOC);
         if (!$ship) {
             $shipStatus = $status === 'to_review' ? 'delivered' : 'pending';
             $ins = $db->prepare('INSERT INTO shipments (order_id, shipment_status) VALUES (?, ?)');
-            $ins->bind_param('is', $oid, $shipStatus);
-            $ins->execute();
-            $ins->close();
+            $ins->execute([$oid, $shipStatus]);
         } else {
             $shipMap = [
                 'to_pay' => 'pending',
@@ -54,9 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
             $shipStatus = $shipMap[$status] ?? 'pending';
             $sid = (int)$ship['id'];
             $su = $db->prepare('UPDATE shipments SET shipment_status = ? WHERE id = ?');
-            $su->bind_param('si', $shipStatus, $sid);
-            $su->execute();
-            $su->close();
+            $su->execute([$shipStatus, $sid]);
         }
 
         logActivity($db, $uid, 'update_order_status', "Order #$oid -> $status");
@@ -73,14 +63,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
 
 $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.customer_phone,
                u.name, u.surname, u.email, u.address AS user_address,
-               (SELECT GROUP_CONCAT(CONCAT(pr.name, ' x', oi.quantity) SEPARATOR ', ')
+               (SELECT STRING_AGG(pr.name || ' x' || oi.quantity::text, ', ')
                 FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
                 WHERE oi.order_id = o.id) AS products,
                (SELECT shipment_status FROM shipments WHERE order_id = o.id ORDER BY id DESC LIMIT 1) AS shipment_status
         FROM orders o
         INNER JOIN users u ON u.id = o.user_id
         ORDER BY o.id DESC";
-$allRows = $db->query($sql)->fetch_all(MYSQLI_ASSOC);
+$allRows = $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
 $selectedStatus = trim((string)($_GET['status'] ?? ''));
 if ($selectedStatus !== '' && !isset($orderStatusOptions[$selectedStatus])) {
@@ -126,22 +116,20 @@ for ($i = 0; $i < 8; $i++) {
     $weekLabels[] = $ws->format('M d');
 }
 $rangeStart = array_key_first($weekMap);
-$weeklySql = "SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) AS week_start, COUNT(*) AS cnt
+$weeklySql = "SELECT date_trunc('week', created_at)::date AS week_start, COUNT(*) AS cnt
               FROM shipments
               WHERE created_at >= ?
               GROUP BY week_start
               ORDER BY week_start";
 $weeklyStmt = $db->prepare($weeklySql);
-$weeklyStmt->bind_param('s', $rangeStart);
-$weeklyStmt->execute();
-$weeklyRes = $weeklyStmt->get_result();
-while ($w = $weeklyRes->fetch_assoc()) {
+$weeklyStmt->execute([$rangeStart]);
+$weeklyRes = $weeklyStmt;
+while ($w = $weeklyRes->fetch(PDO::FETCH_ASSOC)) {
     $key = substr((string)($w['week_start'] ?? ''), 0, 10);
     if ($key !== '' && isset($weekMap[$key])) {
         $weekMap[$key] = (int)$w['cnt'];
     }
 }
-$weeklyStmt->close();
 $weekCounts = array_values($weekMap);
 $weekLabelsJson = json_encode($weekLabels);
 $weekCountsJson = json_encode($weekCounts);

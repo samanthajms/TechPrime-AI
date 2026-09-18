@@ -43,12 +43,12 @@ if ($current_filter !== 'All') {
 if ($search_query !== '') {
     $like = '%' . $search_query . '%';
     $sql .= " AND (
-        CAST(o.id AS CHAR) LIKE ?
-        OR CAST(o.total AS CHAR) LIKE ?
+        CAST(o.id AS TEXT) LIKE ?
+        OR CAST(o.total AS TEXT) LIKE ?
         OR o.status LIKE ?
         OR o.shipping_address LIKE ?
         OR o.customer_phone LIKE ?
-        OR DATE_FORMAT(o.created_at, '%M %d, %Y') LIKE ?
+        OR to_char(o.created_at, 'Month DD, YYYY') LIKE ?
     )";
     array_push($params, $like, $like, $like, $like, $like, $like);
     $types .= 'ssssss';
@@ -56,10 +56,8 @@ if ($search_query !== '') {
 
 $sql .= ' ORDER BY o.id DESC';
 $stOrders = $db->prepare($sql);
-$stOrders->bind_param($types, ...$params);
-$stOrders->execute();
-$orders = $stOrders->get_result();
-
+$stOrders->execute($params);
+$orders = $stOrders->fetchAll(PDO::FETCH_ASSOC);
 $recentResult = $db->query(
     "SELECT p.*, u.name AS seller_name FROM products p
      INNER JOIN users u ON p.seller_id = u.id
@@ -67,7 +65,7 @@ $recentResult = $db->query(
      ORDER BY p.id DESC LIMIT 20"
 );
 $recentProducts = ias_client_filter_products_for_display(
-    $recentResult ? $recentResult->fetch_all(MYSQLI_ASSOC) : [],
+    $recentResult ? $recentResult->fetchAll(PDO::FETCH_ASSOC) : [],
     4
 );
 
@@ -118,16 +116,16 @@ $statusTitles = [
                             <tr><th>ID</th><th>Date</th><th>Total</th><th>Status</th></tr>
                         </thead>
                         <tbody>
-                        <?php while ($o = $orders->fetch_assoc()): ?>
+                        <?php foreach ($orders as $o): ?>
                             <tr>
                                 <td><strong>#ORD-<?php echo (int)$o['id']; ?></strong></td>
                                 <td><span class="meta-text"><?php echo date('M d, Y', strtotime($o['created_at'])); ?></span></td>
                                 <td><b class="dash-price">&#8369;<?php echo number_format((float)$o['total'], 2); ?></b></td>
                                 <td><span class="status-tag"><?php echo h(ias_order_display_status($o['status'] ?? '', $o['shipment_status'] ?? null)); ?></span></td>
                             </tr>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
 
-                        <?php if ($orders->num_rows === 0): ?>
+                        <?php if (count($orders) === 0): ?>
                             <tr><td colspan="4" class="empty-state">No transactions found.</td></tr>
                         <?php endif; ?>
                         </tbody>

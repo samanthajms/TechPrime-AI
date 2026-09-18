@@ -23,14 +23,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 3. Insert into database (Matching your NEW structure)
     $query = "INSERT INTO messages (sender_id, receiver_id, message, created_at) VALUES (?, ?, ?, NOW())";
     $stmt = $db->prepare($query);
-    $stmt->bind_param("iis", $sender_id, $receiver_id, $message);
 
-    if ($stmt->execute()) {
+    if ($stmt->execute([$sender_id, $receiver_id, $message])) {
         // 4. Redirect back to where the user was (Client or Seller page)
         header("Location: " . $_SERVER['HTTP_REFERER']);
         exit();
     } else {
-        echo "Error sending message: " . $db->error;
+        echo "Error sending message.";
     }
 } else {
     // If someone tries to access this file directly without POST
