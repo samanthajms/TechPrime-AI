@@ -27,6 +27,7 @@ if (!function_exists('staff_nav_for_role')) {
                     ['key' => 'dashboard', 'href' => 'inventory_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
                     ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes'],
                     ['key' => 'orders', 'href' => 'inventory_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart'],
+                    ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list'],
                     ['key' => 'profile', 'href' => 'inventory_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
             case 'courier':
@@ -120,12 +121,15 @@ if (!function_exists('staff_page_start')) {
             'inventory_dashboard.php' => 'fa-tachometer-alt',
             'inventory_stocks.php' => 'fa-boxes',
             'inventory_orders.php' => 'fa-shopping-cart',
+            'inventory_audit.php' => 'fa-clipboard-list',
+            'inventory_details.php' => 'fa-shopping-cart',
             'inventory_profile.php' => 'fa-user',
         ];
         $invActiveIcons = [
             'dashboard' => 'fa-tachometer-alt',
             'stocks' => 'fa-boxes',
             'orders' => 'fa-shopping-cart',
+            'activity' => 'fa-clipboard-list',
             'profile' => 'fa-user',
         ];
         $currentScript = strtolower(basename($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? ''));
@@ -134,6 +138,30 @@ if (!function_exists('staff_page_start')) {
         ));
         $invTitleIcon = $invTitleIcons[$currentScript]
             ?? ($invActiveIcons[$active] ?? 'fa-tachometer-alt');
+
+        /* Inventory notifications (existing notifications table) */
+        $staffNotifItems = [];
+        $staffNotifUnread = 0;
+        if ($role === 'inventory_custodian' && function_exists('getDbConnection') && isset($_SESSION['user_id'])) {
+            if (!function_exists('inv_user_notifications')) {
+                $alertsPath = __DIR__ . '/inventory_alerts.php';
+                if (is_file($alertsPath)) {
+                    require_once $alertsPath;
+                }
+            }
+            if (function_exists('inv_user_notifications')) {
+                try {
+                    $nDb = getDbConnection();
+                    $pack = inv_user_notifications($nDb, (int)$_SESSION['user_id'], 15);
+                    $staffNotifItems = $pack['items'];
+                    $staffNotifUnread = (int)$pack['unread'];
+                } catch (Throwable $e) {
+                    $staffNotifItems = [];
+                    $staffNotifUnread = 0;
+                }
+            }
+        }
+        $staffNotifCsrf = function_exists('generateCsrfToken') ? generateCsrfToken() : '';
         ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -141,7 +169,7 @@ if (!function_exists('staff_page_start')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo h($title); ?> — EasyPC</title>
-    <link rel="stylesheet" href="<?php echo h($css); ?>?v=inv-banner-3">
+    <link rel="stylesheet" href="<?php echo h($css); ?>?v=inv-notif-1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if ($useInvPageTitle): ?>
     <style>
@@ -277,6 +305,170 @@ if (!function_exists('staff_page_start')) {
         <div class="topbar-left topbar-left-spacer" aria-hidden="true"></div>
         <?php endif; ?>
         <div class="topbar-right">
+            <?php if ($role === 'inventory_custodian'): ?>
+            <div class="staff-notif-wrap" id="staffNotifWrap">
+                <button type="button" class="staff-notif-btn" id="staffNotifBtn"
+                        aria-haspopup="true" aria-expanded="false" aria-controls="staffNotifPanel"
+                        title="Notifications">
+                    <i class="fas fa-bell" aria-hidden="true"></i>
+                    <?php if ($staffNotifUnread > 0): ?>
+                    <span class="staff-notif-badge" id="staffNotifBadge"><?php echo $staffNotifUnread > 99 ? '99+' : (int)$staffNotifUnread; ?></span>
+                    <?php else: ?>
+                    <span class="staff-notif-badge" id="staffNotifBadge" hidden>0</span>
+                    <?php endif; ?>
+                </button>
+                <div class="staff-notif-panel" id="staffNotifPanel" role="menu" aria-label="Inventory notifications" hidden>
+                    <div class="staff-notif-panel-head">
+                        <strong>Notifications</strong>
+                        <button type="button" class="staff-notif-markall" id="staffNotifMarkAll" title="Mark all as read">
+                            <i class="fas fa-check-double" aria-hidden="true"></i>
+                            <span>Mark all</span>
+                        </button>
+                    </div>
+                    <ul class="staff-notif-list" id="staffNotifList">
+                        <?php if (empty($staffNotifItems)): ?>
+                        <li class="staff-notif-empty">
+                            <i class="fas fa-bell-slash" aria-hidden="true"></i>
+                            <span>No inventory notifications yet.</span>
+                        </li>
+                        <?php else: ?>
+                            <?php foreach ($staffNotifItems as $n):
+                                $nType = (string)($n['type'] ?? 'info');
+                                $nRead = (int)($n['is_read'] ?? 0) === 1;
+                                $nIcon = 'fa-info-circle';
+                                $nLabel = 'Update';
+                                if ($nType === 'low_stock') { $nIcon = 'fa-exclamation-triangle'; $nLabel = 'Low Stock'; }
+                                elseif ($nType === 'out_of_stock') { $nIcon = 'fa-times-circle'; $nLabel = 'Out of Stock'; }
+                                elseif ($nType === 'stock_updated') { $nIcon = 'fa-check-circle'; $nLabel = 'Stock Updated'; }
+                                $when = function_exists('inv_relative_time')
+                                    ? inv_relative_time((string)$n['created_at'])
+                                    : (string)$n['created_at'];
+                                $href = trim((string)($n['link'] ?? ''));
+                                if ($href === '') {
+                                    $href = 'inventory_stocks.php';
+                                }
+                                ?>
+                        <li class="staff-notif-item<?php echo $nRead ? ' is-read' : ' is-unread'; ?>"
+                            data-id="<?php echo (int)$n['id']; ?>"
+                            data-type="<?php echo h($nType); ?>"
+                            data-href="<?php echo h($href); ?>">
+                            <button type="button" class="staff-notif-item-btn">
+                                <span class="staff-notif-icon type-<?php echo h($nType); ?>" aria-hidden="true">
+                                    <i class="fas <?php echo h($nIcon); ?>"></i>
+                                </span>
+                                <span class="staff-notif-body">
+                                    <span class="staff-notif-type"><?php echo h($nLabel); ?></span>
+                                    <span class="staff-notif-msg"><?php echo h((string)$n['message']); ?></span>
+                                    <span class="staff-notif-time"><?php echo h($when); ?></span>
+                                </span>
+                                <?php if (!$nRead): ?><span class="staff-notif-dot" aria-hidden="true"></span><?php endif; ?>
+                            </button>
+                        </li>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+            </div>
+            <script>
+            (function () {
+                var wrap = document.getElementById('staffNotifWrap');
+                var btn = document.getElementById('staffNotifBtn');
+                var panel = document.getElementById('staffNotifPanel');
+                var badge = document.getElementById('staffNotifBadge');
+                var markAll = document.getElementById('staffNotifMarkAll');
+                var list = document.getElementById('staffNotifList');
+                var csrf = <?php echo json_encode($staffNotifCsrf); ?>;
+                if (!wrap || !btn || !panel) return;
+
+                function setBadge(n) {
+                    if (!badge) return;
+                    n = Math.max(0, parseInt(n, 10) || 0);
+                    if (n <= 0) {
+                        badge.hidden = true;
+                        badge.textContent = '0';
+                    } else {
+                        badge.hidden = false;
+                        badge.textContent = n > 99 ? '99+' : String(n);
+                    }
+                }
+                function unreadCount() {
+                    return list ? list.querySelectorAll('.staff-notif-item.is-unread').length : 0;
+                }
+                function closePanel() {
+                    panel.hidden = true;
+                    btn.setAttribute('aria-expanded', 'false');
+                    wrap.classList.remove('open');
+                }
+                function openPanel() {
+                    panel.hidden = false;
+                    btn.setAttribute('aria-expanded', 'true');
+                    wrap.classList.add('open');
+                }
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    if (panel.hidden) openPanel(); else closePanel();
+                });
+                document.addEventListener('click', function (e) {
+                    if (!wrap.contains(e.target)) closePanel();
+                });
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape') closePanel();
+                });
+
+                function postNotif(action, id) {
+                    var body = new URLSearchParams();
+                    body.set('action', action);
+                    body.set('csrf_token', csrf);
+                    if (id) body.set('id', String(id));
+                    return fetch('inventory_notif_api.php', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: body.toString()
+                    }).then(function (r) { return r.json(); }).catch(function () { return null; });
+                }
+
+                if (list) {
+                    list.addEventListener('click', function (e) {
+                        var item = e.target.closest('.staff-notif-item');
+                        if (!item) return;
+                        var id = item.getAttribute('data-id');
+                        var href = item.getAttribute('data-href') || 'inventory_stocks.php';
+                        var go = function () { window.location.href = href; };
+                        if (item.classList.contains('is-unread')) {
+                            postNotif('read', id).then(function () {
+                                item.classList.remove('is-unread');
+                                item.classList.add('is-read');
+                                var dot = item.querySelector('.staff-notif-dot');
+                                if (dot) dot.remove();
+                                setBadge(unreadCount());
+                                go();
+                            });
+                        } else {
+                            go();
+                        }
+                    });
+                }
+                if (markAll) {
+                    markAll.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        postNotif('read_all').then(function (data) {
+                            if (!data || !data.ok) return;
+                            if (list) {
+                                list.querySelectorAll('.staff-notif-item.is-unread').forEach(function (el) {
+                                    el.classList.remove('is-unread');
+                                    el.classList.add('is-read');
+                                    var dot = el.querySelector('.staff-notif-dot');
+                                    if (dot) dot.remove();
+                                });
+                            }
+                            setBadge(0);
+                        });
+                    });
+                }
+            })();
+            </script>
+            <?php endif; ?>
             <div class="admin-badge user-badge">
                 <div class="avatar"><?php echo h($initials); ?></div>
                 <?php echo h($userName); ?>

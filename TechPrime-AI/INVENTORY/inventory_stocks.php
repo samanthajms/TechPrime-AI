@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 require_once __DIR__ . '/../includes/product_categories.php';
+require_once __DIR__ . '/../includes/inventory_alerts.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -74,9 +75,13 @@ if (isset($_POST['add_product'])) {
             $stmt->bind_param('isdissss', $uid, $name, $price, $stock, $desc, $imageFile, $emptyUrl, $category);
         }
         $stmt->execute();
+        $newId = (int)$db->insert_id;
         $stmt->close();
 
-        logActivity($db, $uid, 'add_product', "Added product: $name");
+        logActivity($db, $uid, 'add_product', 'Added product: ' . $name . ' (stock: ' . $stock . ')');
+        if ($newId > 0 && $stock <= 15) {
+            inv_notify_stock_change($db, $name, $newId, 999, $stock);
+        }
         header('Location: inventory_stocks.php?alert=added');
         exit;
     }
@@ -106,13 +111,15 @@ if (isset($_POST['edit_product'])) {
             exit;
         }
 
-        if ($newImage !== null) {
-            $oldSt = $db->prepare('SELECT image FROM products WHERE id = ?');
-            $oldSt->bind_param('i', $id);
-            $oldSt->execute();
-            $oldRow = $oldSt->get_result()->fetch_assoc();
-            $oldSt->close();
+        $oldSt = $db->prepare('SELECT name, stock, image FROM products WHERE id = ?');
+        $oldSt->bind_param('i', $id);
+        $oldSt->execute();
+        $oldRow = $oldSt->get_result()->fetch_assoc() ?: [];
+        $oldSt->close();
+        $oldStock = (int)($oldRow['stock'] ?? 0);
+        $oldName = trim((string)($oldRow['name'] ?? $name));
 
+        if ($newImage !== null) {
             $emptyUrl = '';
             if ($hasSku) {
                 $stmt = $db->prepare(
@@ -160,7 +167,14 @@ if (isset($_POST['edit_product'])) {
             $stmt->close();
         }
 
-        logActivity($db, $uid, 'edit_product', "Updated product #$id");
+        $logName = $name !== '' ? $name : $oldName;
+        logActivity(
+            $db,
+            $uid,
+            'edit_product',
+            'Updated product #' . $id . ' "' . $logName . '": stock ' . $oldStock . ' → ' . $stock
+        );
+        inv_notify_stock_change($db, $logName, $id, $oldStock, $stock);
         header('Location: inventory_stocks.php?alert=updated');
         exit;
     }
@@ -202,8 +216,19 @@ function inventory_delete_product(mysqli $db, int $pid): void
 if (isset($_POST['action']) && $_POST['action'] === 'delete') {
     $pid = (int)($_POST['id'] ?? 0);
     if ($pid > 0) {
+        $nmSt = $db->prepare('SELECT name FROM products WHERE id = ?');
+        $nmSt->bind_param('i', $pid);
+        $nmSt->execute();
+        $nmRow = $nmSt->get_result()->fetch_assoc();
+        $nmSt->close();
+        $pname = trim((string)($nmRow['name'] ?? ''));
         inventory_delete_product($db, $pid);
-        logActivity($db, $uid, 'delete_product', "Deleted product #$pid");
+        logActivity(
+            $db,
+            $uid,
+            'delete_product',
+            $pname !== '' ? ('Deleted product: ' . $pname . ' (#' . $pid . ')') : ("Deleted product #$pid")
+        );
         header('Location: inventory_stocks.php?alert=deleted');
         exit;
     }

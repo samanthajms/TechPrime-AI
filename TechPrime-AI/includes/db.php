@@ -4,7 +4,7 @@ function getDb() {
     $host = 'localhost';
     $user = 'root';
     $pass = '';
-    $db   = 'ias_ecommerce';
+    $db   = 'techprime_ai';
     
     $conn = new mysqli($host, $user, $pass, $db);
     if ($conn->connect_error) {

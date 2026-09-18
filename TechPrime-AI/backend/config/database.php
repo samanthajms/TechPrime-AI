@@ -8,7 +8,7 @@ function getDbConnection(): mysqli
     $host = 'localhost';
     $username = 'root';
     $password = '';
-    $database = 'ias_ecommerce';
+    $database = 'techprime_ai';
 
     $connection = new mysqli($host, $username, $password, $database);
 

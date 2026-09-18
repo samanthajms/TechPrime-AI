@@ -33,7 +33,7 @@
             <span class="primo-label">Primo</span>
         </button>
         <button type="button" class="primo-tuck" id="primoTuck" aria-label="Hide Primo" title="Hide Primo" hidden>
-            <i class="fas fa-chevron-left" aria-hidden="true"></i>
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
         </button>
     </div>
 
@@ -54,13 +54,35 @@
                     <p>AI Product Assistant</p>
                 </div>
             </div>
-            <button type="button" class="primo-panel-close" id="primoClose" aria-label="Close Primo chat">
-                <i class="fas fa-times" aria-hidden="true"></i>
-            </button>
+            <div class="primo-panel-actions">
+                <button type="button" class="primo-panel-history" id="primoHistoryBtn" aria-label="Recent chats" title="Recent chats">
+                    <i class="fas fa-clock" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="primo-panel-reset" id="primoResetBtn" aria-label="Reset chat" title="Reset Chat">
+                    <i class="fas fa-redo-alt" aria-hidden="true"></i>
+                    <span>Reset</span>
+                </button>
+                <button type="button" class="primo-panel-close" id="primoClose" aria-label="Close Primo chat">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
         </header>
 
+        <div class="primo-history" id="primoHistory" hidden>
+            <div class="primo-history-head">
+                <strong>Recent Chats</strong>
+                <button type="button" class="primo-history-back" id="primoHistoryBack" aria-label="Back to chat">
+                    <i class="fas fa-arrow-left" aria-hidden="true"></i> Back
+                </button>
+            </div>
+            <div class="primo-history-body" id="primoHistoryBody">
+                <p class="primo-history-empty">Loading…</p>
+            </div>
+            <p class="primo-history-note">Kept for 7 days. Reset Chat clears the current chat only.</p>
+        </div>
+
         <div class="primo-panel-body" id="primoPanelBody">
-            <div class="primo-msg primo-msg-bot">
+            <div class="primo-msg primo-msg-bot" id="primoWelcomeMsg">
                 <div class="primo-msg-avatar" aria-hidden="true">
                     <span class="primo-mini primo-mini-sm">
                         <span class="primo-mini-head">
@@ -70,10 +92,9 @@
                         <span class="primo-mini-body"></span>
                     </span>
                 </div>
-                <div class="primo-msg-bubble">
-                    Hi! I&rsquo;m <strong>Primo</strong>.<br>
-                    Your AI Product Assistant.<br><br>
-                    I can help you with TechPrime products and hardware.
+                <div class="primo-msg-bubble" id="primoWelcomeBubble">
+                    Hi! 👋 I&rsquo;m <strong>Primo</strong>, your EasyPC assistant!<br><br>
+                    How can I help you today? 💚
                 </div>
             </div>
         </div>

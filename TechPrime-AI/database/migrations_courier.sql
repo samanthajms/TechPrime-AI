@@ -1,4 +1,4 @@
-USE ias_ecommerce;
+USE techprime_ai;
 
 ALTER TABLE users MODIFY COLUMN role ENUM('admin','seller','client','courier') DEFAULT 'client';
 

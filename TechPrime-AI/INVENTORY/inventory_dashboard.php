@@ -42,6 +42,10 @@ sort($categoryTabs);
 $completionRate = $total > 0 ? (int)round(($done / $total) * 100) : 0;
 
 $stockYear = (int)date('Y');
+
+require_once __DIR__ . '/../includes/inventory_alerts.php';
+inv_sync_stock_alerts($db);
+
 $jsStockProducts = array_map(static function ($p) {
     return [
         'category' => trim((string)($p['category'] ?? 'Accessories')) ?: 'Accessories',
@@ -279,6 +283,20 @@ staff_page_start([
     border-radius: 14px; padding: 12px 10px 8px;
 }
 
+.inv-period-select {
+    height: 38px; padding: 0 12px; border-radius: 999px;
+    border: 1px solid var(--teal-light, #c6e6b3); background: #fff;
+    font-family: inherit; font-size: 12.5px; font-weight: 700;
+    color: var(--ep-green-dark); outline: none; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(75, 139, 42, 0.06);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.inv-period-select:focus {
+    border-color: var(--ep-green);
+    box-shadow: 0 0 0 3px rgba(97, 179, 55, 0.15);
+}
+.inv-stockin-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
 @media (max-width: 1100px) {
     .inv-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .inv-overview { grid-template-columns: 1fr; }
@@ -407,9 +425,18 @@ EXTRA
                 <div class="inv-stockin-header">
                     <div>
                         <h3><span class="card-icon"><i class="fas fa-chart-area"></i></span> Products Stocked Per Month</h3>
-                        <div class="inv-stockin-meta">Total number of products stocked each month · <?php echo (int)$stockYear; ?></div>
+                        <div class="inv-stockin-meta">Total number of products stocked each month · based on real catalog data</div>
                     </div>
-                    <span class="inv-stockin-badge" id="invStockinBadge"><i class="fas fa-layer-group"></i> All categories</span>
+                    <div class="inv-stockin-tools">
+                        <label class="sr-only" for="invPeriodSelect">Time period</label>
+                        <select id="invPeriodSelect" class="inv-period-select" aria-label="Time period filter">
+                            <option value="month">This Month</option>
+                            <option value="last">Last Month</option>
+                            <option value="3m">Last 3 Months</option>
+                            <option value="year" selected>This Year</option>
+                        </select>
+                        <span class="inv-stockin-badge" id="invStockinBadge"><i class="fas fa-layer-group"></i> All categories</span>
+                    </div>
                 </div>
 
                 <div class="inv-category-nav" aria-label="Product category navigation">
@@ -493,20 +520,62 @@ $chartScript = <<<SCRIPT
     var STOCK_PRODUCTS = {$stockProductsJson};
     var STOCK_YEAR = {$stockYear};
     var MONTH_LABELS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     var selectedCategory = '';
+    var selectedPeriod = 'year';
     var stockinChart = null;
+    var now = new Date();
+    var currentMonth = now.getMonth();
+    var currentYear = now.getFullYear();
 
-    function monthCountsForCategory(category) {
-        var counts = [0,0,0,0,0,0,0,0,0,0,0,0];
+    function monthIndexInRange(d) {
+        return { y: d.getFullYear(), m: d.getMonth() };
+    }
+
+    function buildSeries(category, period) {
+        var labels = [];
+        var values = [];
+        var points = [];
+
+        if (period === 'month') {
+            labels = [MONTH_LABELS[currentMonth]];
+            points = [{ y: currentYear, m: currentMonth }];
+        } else if (period === 'last') {
+            var lm = currentMonth - 1;
+            var ly = currentYear;
+            if (lm < 0) { lm = 11; ly -= 1; }
+            labels = [MONTH_LABELS[lm] + (ly !== currentYear ? ' ' + ly : '')];
+            points = [{ y: ly, m: lm }];
+        } else if (period === '3m') {
+            for (var i = 2; i >= 0; i--) {
+                var mm = currentMonth - i;
+                var yy = currentYear;
+                if (mm < 0) { mm += 12; yy -= 1; }
+                labels.push(MONTH_SHORT[mm] + ' ' + yy);
+                points.push({ y: yy, m: mm });
+            }
+        } else {
+            labels = MONTH_LABELS.slice();
+            for (var m = 0; m < 12; m++) {
+                points.push({ y: currentYear, m: m });
+            }
+        }
+
+        values = points.map(function () { return 0; });
         STOCK_PRODUCTS.forEach(function (p) {
             if (category && String(p.category) !== category) return;
             if (!p.created_at) return;
             var d = new Date(String(p.created_at).replace(' ', 'T'));
             if (isNaN(d.getTime())) return;
-            if (d.getFullYear() !== STOCK_YEAR) return;
-            counts[d.getMonth()] += 1;
+            var info = monthIndexInRange(d);
+            for (var i = 0; i < points.length; i++) {
+                if (points[i].y === info.y && points[i].m === info.m) {
+                    values[i] += 1;
+                    break;
+                }
+            }
         });
-        return counts;
+        return { labels: labels, values: values };
     }
 
     function updateBadge() {
@@ -518,20 +587,21 @@ $chartScript = <<<SCRIPT
     function renderStockinChart() {
         var canvas = document.getElementById('invStockinChart');
         if (!canvas || typeof Chart === 'undefined') return;
-        var values = monthCountsForCategory(selectedCategory);
+        var series = buildSeries(selectedCategory, selectedPeriod);
         updateBadge();
         if (stockinChart) {
-            stockinChart.data.datasets[0].data = values;
+            stockinChart.data.labels = series.labels;
+            stockinChart.data.datasets[0].data = series.values;
             stockinChart.update();
             return;
         }
         stockinChart = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: {
-                labels: MONTH_LABELS,
+                labels: series.labels,
                 datasets: [{
                     label: 'Products Stocked',
-                    data: values,
+                    data: series.values,
                     backgroundColor: 'rgba(75, 139, 42, 0.78)',
                     borderColor: 'rgba(75, 139, 42, 1)',
                     borderWidth: 1,
@@ -584,6 +654,14 @@ $chartScript = <<<SCRIPT
                     }
                 }
             }
+        });
+    }
+
+    var periodSelect = document.getElementById('invPeriodSelect');
+    if (periodSelect) {
+        periodSelect.addEventListener('change', function () {
+            selectedPeriod = periodSelect.value || 'year';
+            renderStockinChart();
         });
     }
 

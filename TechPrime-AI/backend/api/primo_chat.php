@@ -47,15 +47,22 @@ if ($svm === null) {
 
 $intent = (string) ($svm['intent'] ?? 'fallback');
 $confidence = (float) ($svm['confidence'] ?? 0);
+$rawIntent = (string) ($svm['raw_intent'] ?? $intent);
 $db = getDbConnection();
-$result = primo_handle_intent($db, $intent, $message, $confidence);
+
+/* Short follow-ups like "how much?" reuse the last product topic from this session. */
+$messageForLookup = primo_apply_context($message, $intent);
+$result = primo_handle_intent($db, $intent, $messageForLookup, $confidence, $message);
+primo_store_context($intent, $messageForLookup, $result['products'] ?? []);
 
 echo json_encode([
     'ok' => true,
     'intent' => $intent,
     'confidence' => round($confidence, 4),
+    'raw_intent' => $rawIntent,
     'reply' => $result['reply'],
     'products' => $result['products'] ?? [],
+    'show_tech_match' => !empty($result['show_tech_match']),
 ], JSON_UNESCAPED_UNICODE);
 
 /**
@@ -105,45 +112,132 @@ function primo_call_svm(string $message): ?array
 }
 
 /**
- * @return array{reply:string,products?:array}
+ * If the message is a vague follow-up, append last topic keywords from session.
  */
-function primo_handle_intent(mysqli $db, string $intent, string $message, float $confidence): array
+function primo_apply_context(string $message, string $intent): string
 {
+    $ctx = $_SESSION['primo_ctx'] ?? null;
+    if (!is_array($ctx) || empty($ctx['topic'])) {
+        return $message;
+    }
+
+    $vague = (bool) preg_match(
+        '/^(how\s+much(\s+is\s+this)?|what.?s\s+the\s+price|price\s+please|is\s+(this|it)\s+(available|in\s+stock)|do\s+you\s+have\s+(this|it)|any\s+left|specs?\s*(please)?|tell\s+me\s+more|more\s+info)$/i',
+        trim($message)
+    );
+    $productIntents = ['product_price', 'stock_inquiry', 'product_search', 'product_category', 'product_recommendation'];
+    if ($vague || (in_array($intent, $productIntents, true) && mb_strlen(trim($message)) < 18)) {
+        $topic = trim((string) $ctx['topic']);
+        if ($topic !== '' && stripos($message, $topic) === false) {
+            return trim($message . ' ' . $topic);
+        }
+    }
+    return $message;
+}
+
+/**
+ * Remember last product topic for short follow-up questions.
+ * @param list<array>|array $products
+ */
+function primo_store_context(string $intent, string $message, array $products): void
+{
+    $keep = [
+        'product_search', 'product_category', 'product_price', 'stock_inquiry',
+        'product_recommendation', 'compatibility_question', 'saved_build',
+    ];
+    if (!in_array($intent, $keep, true)) {
+        return;
+    }
+
+    $topic = '';
+    if (!empty($products[0]['name'])) {
+        $topic = (string) $products[0]['name'];
+    } else {
+        $lower = mb_strtolower($message);
+        if (preg_match('/\b(ryzen\s*\d+|rtx\s*\d+|gtx\s*\d+|i[3579]-\d+\w*|1tb|500gb|ssd|ram|gpu|motherboard|processor|cpu)\b/i', $message, $m)) {
+            $topic = $m[0];
+        } elseif (preg_match('/\b(ssd|ram|gpu|monitor|laptop|desktop|headset|keyboard|mouse)\b/i', $lower, $m)) {
+            $topic = $m[0];
+        }
+    }
+
+    if ($topic === '') {
+        return;
+    }
+
+    $_SESSION['primo_ctx'] = [
+        'intent' => $intent,
+        'topic' => $topic,
+        'at' => time(),
+    ];
+}
+
+/**
+ * @return array{reply:string,products?:array,show_tech_match?:bool}
+ */
+function primo_handle_intent(mysqli $db, string $intent, string $message, float $confidence, ?string $originalMessage = null): array
+{
+    $displayMsg = $originalMessage !== null ? $originalMessage : $message;
+
     switch ($intent) {
         case 'greeting':
+            $greetings = [
+                "Hey! 👋 What can I help you find today?",
+                "Hi! 👋 I'm Primo, your EasyPC assistant. Looking for a product or want to build a PC?",
+                "Hello! 💚 Welcome to EasyPC. What are you shopping for?",
+                "Hey there! 👋 Ready to find parts or check a product for you.",
+            ];
             return [
-                'reply' => "Hi! I'm Primo. How can I help you find a product today?",
+                'reply' => $greetings[array_rand($greetings)],
+                'show_tech_match' => true,
             ];
 
         case 'goodbye':
-            return [
-                'reply' => "Goodbye! Feel free to come back if you need help finding a product.",
+            $byes = [
+                "See you next time! 👋",
+                "Bye! Come back anytime you need help with EasyPC products. 👋",
+                "Take care! Happy building. 💚",
             ];
+            return ['reply' => $byes[array_rand($byes)]];
 
         case 'gratitude':
-            return [
-                'reply' => "You're welcome! I'm happy to help.",
+            $thanks = [
+                "You're welcome! 😊 Let me know if you need anything else.",
+                "Happy to help! 💚 Anything else I can check for you?",
+                "Anytime! Feel free to ask about products, prices, or builds.",
             ];
+            return ['reply' => $thanks[array_rand($thanks)]];
 
         case 'help':
             return [
-                'reply' => "I can help you find products, check prices and availability, compare product options, answer compatibility questions, and help with order-related questions.",
+                'reply' => "I can help with EasyPC products — search, prices, stock, compatibility, orders, Tech & Match PC builds, and your Saved Builds. What would you like to do?",
+                'show_tech_match' => true,
             ];
 
         case 'store_information':
             return [
-                'reply' => "EasyPC One Oasis Branch is our TechPrime storefront brand. You can shop online on this site, open Shop Now for products, or use Messages / EasyFix Support for help. Specific walk-in hours and phone details aren't listed in the system yet—please contact support through the Messages page.",
+                'reply' => "EasyPC One Oasis Branch is our TechPrime storefront. You can shop online here, open Shop Now for products, or use Messages / EasyFix Support for help. Walk-in hours and phone details aren't listed in the system yet—please contact support through Messages.",
             ];
 
         case 'return_refund':
             return [
-                'reply' => "EasyPC offers a 30-Day Money Back Guarantee on eligible orders (see the homepage feature strip). To start a return or refund, open My Orders from your profile or contact EasyFix Support via Messages with your order number. I can't process returns directly in chat.",
+                'reply' => "EasyPC offers a 30-Day Money Back Guarantee on eligible orders. To start a return or refund, open My Orders from your profile or contact EasyFix Support via Messages with your order number. I can't process returns directly in chat.",
             ];
 
         case 'compatibility_question':
-            // No Random Forest module exists yet — guide to existing Tech & Match UI.
             return [
-                'reply' => "I can tell you're asking about hardware compatibility. TechPrime doesn't run an automated compatibility predictor in chat yet. Use the Tech and Match section on the home dashboard to browse related categories, or ask about a specific product name and I'll share what's in our catalog. Tip: match CPU socket (e.g. AM4/AM5), RAM type (DDR4/DDR5), and PSU wattage to your GPU.",
+                'reply' => "Good question! 💻 For parts to work together, match CPU socket (e.g. AM4/AM5), RAM type (DDR4/DDR5), and PSU wattage to your GPU. Tech & Match is the easiest way to pick compatible components — I can also look up specific products if you name them.",
+                'show_tech_match' => true,
+            ];
+
+        case 'saved_build':
+            if (empty($_SESSION['user_id'])) {
+                return [
+                    'reply' => "To view your Saved Builds, please log in to your client account, then open Saved Build in the top navigation.",
+                ];
+            }
+            return [
+                'reply' => "You can open your saved PC builds anytime from Saved Build in the top navigation. That page lists every build you've saved, and you can load one back into Tech & Match.",
             ];
 
         case 'order_status':
@@ -154,13 +248,16 @@ function primo_handle_intent(mysqli $db, string $intent, string $message, float 
         case 'product_price':
         case 'stock_inquiry':
         case 'product_recommendation':
-            return primo_product_intent($db, $intent, $message);
+            return primo_product_intent($db, $intent, $message, $displayMsg);
 
         case 'fallback':
         default:
-            return [
-                'reply' => "I'm mainly here to help with TechPrime products, prices, availability, compatibility, and orders. What product can I help you with?",
+            $clarify = [
+                "I'm not completely sure what you're looking for. 😊 Are you asking about a product, price, stock, compatibility, or building a PC?",
+                "I might need a bit more detail. Are you looking for a product, checking a price/stock, compatibility, or help building a PC?",
+                "I'm mainly here for EasyPC products and PC builds. 😊 Want help with a product, price, stock, compatibility, or Tech & Match?",
             ];
+            return ['reply' => $clarify[array_rand($clarify)]];
     }
 }
 
@@ -248,15 +345,37 @@ function primo_format_order_line(array $row): string
 }
 
 /**
- * @return array{reply:string,products:array}
+ * @return array{reply:string,products:array,show_tech_match?:bool}
  */
-function primo_product_intent(mysqli $db, string $intent, string $message): array
+function primo_product_intent(mysqli $db, string $intent, string $message, ?string $displayMessage = null): array
 {
     $products = primo_find_products($db, $message, $intent);
+    $wantsBuild = (bool) preg_match('/\b(build|components?|tech\s*&?\s*match|customize|parts?\s+to\s+choose)\b/i', $message . ' ' . (string) $displayMessage);
+
     if (empty($products)) {
+        if ($intent === 'product_recommendation' || $wantsBuild) {
+            return [
+                'reply' => "Sure! 💻 I can help you choose components. Try Tech & Match to build a full PC, or tell me a specific part (like Ryzen 5, RTX 4060, or 1TB SSD).",
+                'products' => [],
+                'show_tech_match' => true,
+            ];
+        }
+        if ($intent === 'product_price') {
+            return [
+                'reply' => "I can check the product price for you. Which product are you referring to? (name or category works)",
+                'products' => [],
+            ];
+        }
+        if ($intent === 'stock_inquiry') {
+            return [
+                'reply' => "I can check availability — which product or category should I look up?",
+                'products' => [],
+            ];
+        }
         return [
-            'reply' => "I couldn't find matching products in the TechPrime catalog for that request. Try another name, brand, or category (Desktop, Laptops, Audio, Accessories, etc.).",
+            'reply' => "I couldn't find matching products in the EasyPC catalog for that. Try another name, brand, or category — or open Tech & Match to browse by component.",
             'products' => [],
+            'show_tech_match' => true,
         ];
     }
 
@@ -271,26 +390,32 @@ function primo_product_intent(mysqli $db, string $intent, string $message): arra
 
     switch ($intent) {
         case 'product_price':
-            $intro = 'Here are real prices from our catalog:';
+            $intro = 'Here are the current prices from our catalog:';
             break;
         case 'stock_inquiry':
-            $intro = 'Here is current availability from inventory:';
+            $intro = 'Here is current availability:';
             break;
         case 'product_category':
-            $intro = 'Products in related categories:';
+            $intro = 'Here are products in that category:';
             break;
         case 'product_recommendation':
-            $intro = 'Based on your request, here are real TechPrime products you can consider:';
+            $intro = $wantsBuild
+                ? "Great — here are real EasyPC options you can use while building. Tech & Match can help you put a full setup together:"
+                : 'Based on what you asked, here are real EasyPC products to consider:';
             break;
         default:
-            $intro = 'Here are matching products from TechPrime:';
+            $intro = 'Here are matching products from EasyPC:';
     }
 
-    $outro = "\nOpen Shop Now to filter further or buy.";
-    return [
+    $outro = "\nOpen Shop Now to buy, or ask me about price, stock, or compatibility.";
+    $out = [
         'reply' => $intro . "\n" . implode("\n", $lines) . $outro,
         'products' => $products,
     ];
+    if ($intent === 'product_recommendation' || $wantsBuild) {
+        $out['show_tech_match'] = true;
+    }
+    return $out;
 }
 
 /**
@@ -321,9 +446,19 @@ function primo_find_products(mysqli $db, string $message, string $intent): array
         'gpu' => 'GPU',
         'graphics' => 'GPU',
         'ram' => 'RAM',
+        'memory' => 'RAM',
         'motherboard' => 'Motherboard',
         'processor' => 'Processor',
         'cpu' => 'Processor',
+        'ryzen' => 'Processor',
+        'ssd' => 'Storage',
+        'hdd' => 'Storage',
+        'storage' => 'Storage',
+        'psu' => 'PSU',
+        'power supply' => 'PSU',
+        'cooler' => 'Cooling',
+        'monitor' => 'Monitor',
+        'case' => 'Case',
     ];
 
     $matchedCategory = null;

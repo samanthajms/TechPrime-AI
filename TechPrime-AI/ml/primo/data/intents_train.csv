@@ -437,3 +437,114 @@ Who will win the lottery,fallback
 Who won the basketball game,fallback
 Write a poem about cats,fallback
 Write me a poem,fallback
+do u have this,stock_inquiry
+do you have this,stock_inquiry
+do you still have this?,stock_inquiry
+is this available?,stock_inquiry
+Is this available?,stock_inquiry
+is this in stock?,stock_inquiry
+Is this item available?,stock_inquiry
+Do you have any left?,stock_inquiry
+Is the product currently in stock?,stock_inquiry
+can i buy this now,stock_inquiry
+Can I buy this now?,stock_inquiry
+do you have RTX 4060,stock_inquiry
+do u still have rtx 4060,stock_inquiry
+got any left of this,stock_inquiry
+how much?,product_price
+How much?,product_price
+how much is this,product_price
+How much is this?,product_price
+what's the price?,product_price
+Whats the price,product_price
+how much does this cost,product_price
+How much does the RTX 4060 cost?,product_price
+What's the cheapest SSD?,product_price
+how much is this product,product_price
+price please,product_price
+Do you have a Ryzen 5?,product_search
+I'm looking for a 1TB SSD.,product_search
+Show me graphics cards.,product_search
+What processors do you have?,product_search
+Do you have RAM?,product_search
+do you have ryzen 5,product_search
+i need an ssd,product_search
+looking for 1tb ssd,product_search
+show me gpus,product_search
+find me a motherboard,product_search
+do u sell monitors,product_category
+Do you sell gaming monitors?,product_category
+Show me motherboards,product_category
+what ram do you sell,product_category
+Tell me about this product.,product_search
+What are the specs?,product_search
+What is this used for?,product_search
+Can you give me more information about this?,product_search
+What's included with this product?,product_search
+tell me more about this,product_search
+specs please,product_search
+Will this RAM work with this motherboard?,compatibility_question
+Is this GPU compatible with my build?,compatibility_question
+Can I use this processor with this motherboard?,compatibility_question
+Will this PSU be enough?,compatibility_question
+Is this SSD compatible?,compatibility_question
+will this work with my motherboard?,compatibility_question
+can this work with my motherboard,compatibility_question
+can I use this RAM?,compatibility_question
+is this compatible with my build?,compatibility_question
+will this fit my pc,compatibility_question
+I want to build a PC.,product_recommendation
+Help me build a PC.,product_recommendation
+help me build a pc,product_recommendation
+I need a computer for work.,product_recommendation
+Can you help me choose components?,product_recommendation
+What PC should I build?,product_recommendation
+Help me find the right components.,product_recommendation
+I don't know which parts to choose.,product_recommendation
+what gpu should i get,product_recommendation
+i need a pc for work,product_recommendation
+help me choose a pc,product_recommendation
+what do you recommend,product_recommendation
+what components should I get?,product_recommendation
+help me customize a build,product_recommendation
+open tech and match,product_recommendation
+try tech and match,product_recommendation
+Show my saved builds.,saved_build
+Where are my saved PCs?,saved_build
+Can I see my saved build?,saved_build
+I want to open my saved build.,saved_build
+What PC builds did I save?,saved_build
+show my saved builds,saved_build
+where can i see my saved build,saved_build
+where are my saved builds?,saved_build
+open my saved build,saved_build
+where can I find my saved PC?,saved_build
+my saved builds please,saved_build
+list my saved pc builds,saved_build
+show saved build,saved_build
+i want to view my saved builds,saved_build
+load my saved build,saved_build
+where is saved build,saved_build
+check my saved builds,saved_build
+see my pc builds i saved,saved_build
+hey primo,greeting
+Hey! Primo,greeting
+good morning,greeting
+good afternoon,greeting
+yo,greeting
+sup primo,greeting
+hiya,greeting
+hellooo,greeting
+thanks,gratitude
+thx,gratitude
+ty,gratitude
+thank u,gratitude
+thanks a bunch,gratitude
+bye,goodbye
+goodbye,goodbye
+see you later,goodbye
+cya,goodbye
+ttyl,goodbye
+What can Primo do?,help
+how do i use this chat,help
+what can you do,help
