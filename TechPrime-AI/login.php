@@ -268,7 +268,6 @@ function redirectByRole($role) {
         </div>
         <div class="visual-copy">
             <h2>Built to power what you build.</h2>
-            <p>Sign in to manage orders, inventory, and service tickets across the EasyPC network.</p>
         </div>
     </div>
 
