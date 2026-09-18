@@ -3204,9 +3204,9 @@ body.ep-tm-modal-open { overflow: hidden; }
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 18px;
-    padding: 30px 40px;
+    padding: 30px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    max-width: 1280px;
+    max-width: 1680px;
     margin: 0 auto;
 }
 .ep-newsletter-bar h4 { margin: 0 0 4px; color: #fff; font-size: 1.15rem; font-weight: 800; }

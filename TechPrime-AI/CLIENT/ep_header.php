@@ -170,6 +170,64 @@ $epCartCount  = $epCartPreview['count'];
         });
     }
 
+    /* Update header Cart badge + dropdown from cart preview JSON (no page reload). */
+    window.epUpdateCartPreview = function (preview) {
+        preview = preview || { items: [], total: 0, count: 0 };
+        var cartWrap = document.getElementById('epCartWrap');
+        var cartBtn = document.getElementById('cartBtn');
+        var dropdown = document.getElementById('epCartDropdown');
+        if (!cartWrap || !dropdown) return;
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+        function money(n) {
+            return Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        var icon = cartBtn ? cartBtn.querySelector('.ep-nav-item-icon') : null;
+        if (icon) {
+            var badge = icon.querySelector('.badge');
+            var count = parseInt(preview.count, 10) || 0;
+            if (count > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'badge';
+                    icon.appendChild(badge);
+                }
+                badge.textContent = String(count);
+            } else if (badge) {
+                badge.remove();
+            }
+        }
+
+        var items = Array.isArray(preview.items) ? preview.items : [];
+        var html = '';
+        if (items.length) {
+            html += '<ul class="ep-cart-dropdown-list">';
+            items.forEach(function (ci) {
+                html += '<li>' +
+                    '<span class="ep-cart-item-name">' + escapeHtml(ci.name || '') + '</span>' +
+                    '<span class="ep-cart-item-meta">×' + (parseInt(ci.qty, 10) || 0) +
+                    ' · ₱' + money(ci.subtotal) + '</span>' +
+                    '</li>';
+            });
+            html += '</ul>';
+            html += '<div class="ep-cart-dropdown-total"><span>Total</span><strong>₱' +
+                money(preview.total) + '</strong></div>';
+            html += '<a href="checkout.php" class="ep-btn ep-btn-primary ep-cart-checkout-btn">Checkout</a>';
+            html += '<a href="cart.php" class="ep-cart-view-link">View full cart</a>';
+        } else {
+            html = '<p class="ep-cart-empty">Your cart is empty.</p>' +
+                '<a href="shop.php" class="ep-cart-view-link">Browse products</a>';
+        }
+        dropdown.innerHTML = html;
+    };
+
     /* ---- Search recommendations (existing search bar) ---- */
     var searchInput = document.getElementById('epSearchInput');
     var searchSuggest = document.getElementById('epSearchSuggest');

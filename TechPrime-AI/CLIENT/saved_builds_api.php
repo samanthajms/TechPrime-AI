@@ -284,6 +284,7 @@ if ($action === 'add_to_cart' && $method === 'POST') {
         'added' => count($added),
         'skipped' => $skipped,
         'message' => $msg,
+        'cart' => ep_get_cart_preview($db),
     ]);
 }
 
