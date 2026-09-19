@@ -1,14 +1,17 @@
 <?php
-/**
- * Backend-ready PostgreSQL connection helper for TechPrime-AI (Supabase).
- */
+
+require_once __DIR__ . '/../../vendor/autoload.php';
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../../');
+$dotenv->load();
+
 function getDbConnection(): PDO
 {
-    $host = 'aws-0-ap-northeast-2.pooler.supabase.com';
-    $port = '6543';
-    $database = 'postgres';
-    $username = 'postgres.ttirxnljpoqkroisuyks';
-    $password = 'TechprimeCapstone2026';
+    $host = $_ENV['DB_HOST'];
+    $port = $_ENV['DB_PORT'];
+    $database = $_ENV['DB_NAME'];
+    $username = $_ENV['DB_USER'];
+    $password = $_ENV['DB_PASS'];
 
     try {
         $dsn = "pgsql:host=$host;port=$port;dbname=$database;sslmode=require";
@@ -21,4 +24,3 @@ function getDbConnection(): PDO
         die('Database connection failed: ' . $e->getMessage());
     }
 }
-?>
