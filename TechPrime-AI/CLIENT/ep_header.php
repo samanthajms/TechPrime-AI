@@ -113,11 +113,11 @@ $epCartCount  = $epCartPreview['count'];
             <span class="ep-nav-item-label">Notifications</span>
         </button>
 
-        <a href="<?php echo $isLoggedIn ? 'saved_builds.php' : '../login.php'; ?>"
-           class="ep-nav-item<?php echo ($activePage ?? '') === 'saved_builds' ? ' active' : ''; ?>"
-           <?php echo ($activePage ?? '') === 'saved_builds' ? 'aria-current="page"' : ''; ?>>
+        <a href="<?php echo $isLoggedIn ? 'build_a_pc.php' : '../login.php'; ?>"
+           class="ep-nav-item<?php echo (($activePage ?? '') === 'build_a_pc' || ($activePage ?? '') === 'saved_builds') ? ' active' : ''; ?>"
+           <?php echo (($activePage ?? '') === 'build_a_pc' || ($activePage ?? '') === 'saved_builds') ? 'aria-current="page"' : ''; ?>>
             <span class="ep-nav-item-icon"><i class="fas fa-desktop" aria-hidden="true"></i></span>
-            <span class="ep-nav-item-label">Saved Build</span>
+            <span class="ep-nav-item-label">Build a PC</span>
         </a>
 
         <button id="profileBtn" type="button" class="ep-nav-item"

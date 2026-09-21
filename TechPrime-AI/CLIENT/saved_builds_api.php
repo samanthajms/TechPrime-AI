@@ -6,6 +6,7 @@
 session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/pc_compatibility.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -151,12 +152,19 @@ if ($action === 'save' && $method === 'POST') {
             'price' => round($price, 2),
             'image' => mb_substr((string)($item['image'] ?? ''), 0, 255),
             'category' => mb_substr((string)($item['category'] ?? ''), 0, 100),
+            'description' => mb_substr((string)($item['description'] ?? ''), 0, 500),
         ];
         $total += $price;
         $count++;
     }
     if ($count <= 0) {
         sb_json(['ok' => false, 'error' => 'empty_build', 'message' => 'Select at least one component before saving.'], 400);
+    }
+
+    $compat = ep_pc_compat_validate_build($clean);
+    if (!$compat['ok']) {
+        $msg = "This build has incompatible components:\n• " . implode("\n• ", array_slice($compat['issues'], 0, 5));
+        sb_json(['ok' => false, 'error' => 'incompatible', 'message' => $msg, 'issues' => $compat['issues']], 400);
     }
 
     $json = json_encode($clean, JSON_UNESCAPED_UNICODE);
@@ -227,6 +235,12 @@ if ($action === 'add_to_cart' && $method === 'POST') {
     $comps = json_decode((string)$row['components_json'], true);
     if (!is_array($comps) || empty($comps)) {
         sb_json(['ok' => false, 'error' => 'empty_build', 'message' => 'This build has no components.'], 400);
+    }
+
+    $compat = ep_pc_compat_validate_build($comps);
+    if (!$compat['ok']) {
+        $msg = "This saved build has incompatible components and cannot be added to cart:\n• " . implode("\n• ", array_slice($compat['issues'], 0, 5));
+        sb_json(['ok' => false, 'error' => 'incompatible', 'message' => $msg, 'issues' => $compat['issues']], 400);
     }
 
     $added = [];

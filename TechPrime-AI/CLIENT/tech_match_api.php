@@ -6,6 +6,7 @@
 session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/pc_compatibility.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -132,14 +133,19 @@ foreach ($rows as $p) {
         continue;
     }
     $seen[$id] = true;
+    $name = (string)($p['name'] ?? '');
+    $category = (string)($p['category'] ?? '');
+    $description = (string)($p['description'] ?? '');
     $products[] = [
         'id' => $id,
-        'name' => (string)($p['name'] ?? ''),
+        'name' => $name,
         'price' => (float)($p['price'] ?? 0),
         'stock' => (int)($p['stock'] ?? 0),
-        'category' => (string)($p['category'] ?? ''),
+        'category' => $category,
+        'description' => $description,
         'image' => ias_client_product_image_url($p),
         'seller' => (string)($p['seller_name'] ?? ''),
+        'compat' => ep_pc_compat_tags($name, $description, $category),
     ];
 }
 

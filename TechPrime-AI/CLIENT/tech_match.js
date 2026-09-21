@@ -233,6 +233,129 @@
         renderRight();
     }
 
+    function inferCompatFromText(name, description, category) {
+        var raw = String(name || '' + ' ' + (description || '') + ' ' + (category || '')).toLowerCase();
+        /* Fix concat: */
+        raw = String((name || '') + ' ' + (description || '') + ' ' + (category || '')).toLowerCase();
+        var tags = { socket: null, ddr: null, form: null, storage: null, watts: null, raw: raw };
+        if (/\bam5\b/.test(raw)) tags.socket = 'AM5';
+        else if (/\bam4\b/.test(raw)) tags.socket = 'AM4';
+        else if (/\blga\s*1700\b/.test(raw)) tags.socket = 'LGA1700';
+        else if (/\blga\s*1200\b/.test(raw)) tags.socket = 'LGA1200';
+        else if (/\blga\s*1151\b/.test(raw)) tags.socket = 'LGA1151';
+        if (/\bddr5\b/.test(raw)) tags.ddr = 'DDR5';
+        else if (/\bddr4\b/.test(raw)) tags.ddr = 'DDR4';
+        else if (/\bddr3\b/.test(raw)) tags.ddr = 'DDR3';
+        if (/\bmini[\s\-]?itx\b|\bitx\b/.test(raw)) tags.form = 'ITX';
+        else if (/\bmicro[\s\-]?atx\b|\bmatx\b|\bm\-atx\b/.test(raw)) tags.form = 'MATX';
+        else if (/\beatx\b/.test(raw)) tags.form = 'EATX';
+        else if (/\batx\b/.test(raw)) tags.form = 'ATX';
+        var wm = raw.match(/\b(\d{3,4})\s*w\b/);
+        if (wm) {
+            var w = parseInt(wm[1], 10);
+            if (w >= 200 && w <= 2000) tags.watts = w;
+        }
+        return tags;
+    }
+
+    function ensureCompat(item) {
+        if (!item) return item;
+        if (!item.compat) {
+            item.compat = inferCompatFromText(item.name, item.description, item.category);
+        }
+        return item;
+    }
+
+    function buildCompatMap() {
+        var map = {};
+        Object.keys(build).forEach(function (slot) {
+            var item = ensureCompat(build[slot]);
+            if (!item) return;
+            map[slot] = {
+                name: item.name || '',
+                category: item.category || '',
+                compat: item.compat
+            };
+        });
+        return map;
+    }
+
+    function candidateIncompatible(slotId, product) {
+        if (!product) return null;
+        ensureCompat(product);
+        var tags = product.compat || null;
+        if (!tags) return null;
+        var map = buildCompatMap();
+        /* Mirror server-side checks for socket / DDR / form / PSU. */
+        var cpu = map.processor && map.processor.compat;
+        var mobo = map.motherboard && map.motherboard.compat;
+        var ram = map.memory && map.memory.compat;
+        var caseT = map.case && map.case.compat;
+        var psu = map.psu && map.psu.compat;
+
+        if (slotId === 'processor' && mobo && mobo.socket && tags.socket && mobo.socket !== tags.socket) {
+            return 'Not compatible with the selected motherboard — CPU socket mismatch.';
+        }
+        if (slotId === 'motherboard' && cpu && cpu.socket && tags.socket && cpu.socket !== tags.socket) {
+            return 'Not compatible with the selected processor — CPU socket mismatch.';
+        }
+        if (slotId === 'motherboard' && ram && ram.ddr && tags.ddr && ram.ddr !== tags.ddr) {
+            return 'Not compatible with the selected memory — RAM type mismatch.';
+        }
+        if (slotId === 'memory' && mobo && mobo.ddr && tags.ddr && mobo.ddr !== tags.ddr) {
+            return 'Not compatible with the selected motherboard — RAM type mismatch.';
+        }
+        if (slotId === 'cooler') {
+            var ref = (cpu && cpu.socket) || (mobo && mobo.socket) || null;
+            if (ref && tags.socket && tags.socket !== ref) {
+                return 'Not compatible with the selected CPU/motherboard — cooler socket mismatch.';
+            }
+        }
+        if (slotId === 'case' && mobo && mobo.form && tags.form) {
+            var rank = { ITX: 1, MATX: 2, ATX: 3, EATX: 4 };
+            if (rank[tags.form] && rank[mobo.form] && rank[tags.form] < rank[mobo.form]) {
+                return 'Not compatible with the selected motherboard — case form factor too small.';
+            }
+        }
+        if (slotId === 'motherboard' && caseT && caseT.form && tags.form) {
+            var rank2 = { ITX: 1, MATX: 2, ATX: 3, EATX: 4 };
+            if (rank2[caseT.form] && rank2[tags.form] && rank2[caseT.form] < rank2[tags.form]) {
+                return 'Not compatible with the selected case — motherboard form factor too large.';
+            }
+        }
+        if (slotId === 'psu') {
+            var estimate = 0;
+            if (map.processor) estimate += 65;
+            if (map.motherboard) estimate += 40;
+            if (map.gpu) estimate += 180;
+            if (map.memory) estimate += 10;
+            if (map.ssd || map.ssd_sata || map.hdd) estimate += 15;
+            if (tags.watts && tags.watts < estimate) {
+                return 'Not compatible with the current build — PSU wattage too low for estimated power draw.';
+            }
+        }
+        if (slotId === 'gpu' && psu && psu.watts) {
+            var est2 = 180 + (map.processor ? 65 : 0) + (map.motherboard ? 40 : 0) + 25;
+            if (psu.watts < est2) {
+                return 'Not compatible with the selected power supply — estimated GPU build draw exceeds PSU wattage.';
+            }
+        }
+        return null;
+    }
+
+    function validateCurrentBuild() {
+        var issues = [];
+        Object.keys(build).forEach(function (slot) {
+            var item = build[slot];
+            if (!item) return;
+            var reason = candidateIncompatible(slot, item);
+            if (reason) {
+                issues.push((item.name || slot) + ': ' + reason);
+            }
+        });
+        return issues;
+    }
+
     function loadProducts(slotId, q) {
         var grid = $('tmProductGrid');
         if (!grid) return;
@@ -250,14 +373,18 @@
                 }
                 grid.innerHTML = products.map(function (p) {
                     var out = Number(p.stock || 0) <= 0;
-                    return '<article class="tm-product-card" data-id="' + p.id + '">' +
+                    var reason = candidateIncompatible(slotId, p);
+                    var blocked = out || !!reason;
+                    return '<article class="tm-product-card' + (reason ? ' is-incompatible' : '') + '" data-id="' + p.id + '">' +
                         '<img src="' + escapeHtml(p.image || '') + '" alt="' + escapeHtml(p.name || '') + '">' +
                         '<h4>' + escapeHtml(p.name || '') + '</h4>' +
                         '<div class="tm-product-meta">' +
                         '<span class="tm-product-price">' + peso(p.price) + '</span>' +
                         '<span class="tm-product-stock' + (out ? ' out' : '') + '">' + (out ? 'Out of stock' : ('Stock: ' + p.stock)) + '</span>' +
                         '</div>' +
-                        '<button type="button" class="tm-select-btn" data-select="' + p.id + '"' + (out ? ' disabled' : '') + '>Select</button>' +
+                        (reason ? '<p class="tm-compat-warn">' + escapeHtml(reason) + '</p>' : '') +
+                        '<button type="button" class="tm-select-btn" data-select="' + p.id + '"' + (blocked ? ' disabled' : '') + '>' +
+                        (reason ? 'Not compatible' : 'Select') + '</button>' +
                         '</article>';
                 }).join('');
                 grid._products = products;
@@ -270,17 +397,40 @@
 
     function selectProduct(product) {
         if (!activeSlot || !product) return;
+        var reason = candidateIncompatible(activeSlot, product);
+        if (reason) {
+            if (typeof IAS_UI !== 'undefined') IAS_UI.alert(reason, 'error');
+            return;
+        }
         build[activeSlot] = {
             id: product.id,
             name: product.name,
             price: product.price,
             image: product.image,
-            category: product.category
+            category: product.category,
+            description: product.description || '',
+            compat: product.compat || null
         };
+        /* Revalidate other selected parts after this change. */
+        var cleared = [];
+        Object.keys(build).forEach(function (slot) {
+            if (slot === activeSlot) return;
+            var conflict = candidateIncompatible(slot, build[slot]);
+            if (conflict) {
+                cleared.push(build[slot].name || slot);
+                delete build[slot];
+            }
+        });
         var meta = SLOTS.find(function (s) { return s.id === activeSlot; });
         if (meta) activeStep = meta.step;
         showBuilder();
         refresh();
+        if (cleared.length && typeof IAS_UI !== 'undefined') {
+            IAS_UI.alert(
+                'Removed incompatible selected parts after your change:\n• ' + cleared.slice(0, 5).join('\n• '),
+                'info'
+            );
+        }
     }
 
     function bind() {
@@ -372,6 +522,13 @@
         if (filledCount() <= 0) {
             if (typeof IAS_UI !== 'undefined') {
                 IAS_UI.alert('Select at least one component before saving.', 'info');
+            }
+            return;
+        }
+        var issues = validateCurrentBuild();
+        if (issues.length) {
+            if (typeof IAS_UI !== 'undefined') {
+                IAS_UI.alert('This build has incompatible components:\n• ' + issues.slice(0, 5).join('\n• '), 'error');
             }
             return;
         }
@@ -509,7 +666,9 @@
                 name: item.name,
                 price: item.price,
                 image: item.image || '',
-                category: item.category || ''
+                category: item.category || '',
+                description: item.description || '',
+                compat: item.compat || null
             };
         });
         showBuilder();

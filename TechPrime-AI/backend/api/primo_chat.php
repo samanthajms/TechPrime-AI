@@ -189,7 +189,6 @@ function primo_handle_intent(PDO $db, string $intent, string $message, float $co
             ];
             return [
                 'reply' => $greetings[array_rand($greetings)],
-                'show_tech_match' => true,
             ];
 
         case 'goodbye':
@@ -210,8 +209,7 @@ function primo_handle_intent(PDO $db, string $intent, string $message, float $co
 
         case 'help':
             return [
-                'reply' => "I can help with EasyPC products — search, prices, stock, compatibility, orders, Tech & Match PC builds, and your Saved Builds. What would you like to do?",
-                'show_tech_match' => true,
+                'reply' => "I can help with EasyPC products — search, prices, stock, compatibility, orders, and PC builds. Open Build a PC in the top navigation to customize a setup, or ask me about a product.",
             ];
 
         case 'store_information':
@@ -226,18 +224,17 @@ function primo_handle_intent(PDO $db, string $intent, string $message, float $co
 
         case 'compatibility_question':
             return [
-                'reply' => "Good question! 💻 For parts to work together, match CPU socket (e.g. AM4/AM5), RAM type (DDR4/DDR5), and PSU wattage to your GPU. Tech & Match is the easiest way to pick compatible components — I can also look up specific products if you name them.",
-                'show_tech_match' => true,
+                'reply' => "Good question! 💻 For parts to work together, match CPU socket (e.g. AM4/AM5), RAM type (DDR4/DDR5), and PSU wattage to your GPU. Open Build a PC in the top navigation — it blocks incompatible parts when product details allow it. I can also look up specific products if you name them.",
             ];
 
         case 'saved_build':
             if (empty($_SESSION['user_id'])) {
                 return [
-                    'reply' => "To view your Saved Builds, please log in to your client account, then open Saved Build in the top navigation.",
+                    'reply' => "To view your Saved Builds, please log in to your client account, then open Build a PC → View Saved Build.",
                 ];
             }
             return [
-                'reply' => "You can open your saved PC builds anytime from Saved Build in the top navigation. That page lists every build you've saved, and you can load one back into Tech & Match.",
+                'reply' => "Open Build a PC in the top navigation, then use View Saved Build (bottom right) to see every build you've saved. You can also edit a build back into Build a PC from there.",
             ];
 
         case 'order_status':
@@ -255,7 +252,7 @@ function primo_handle_intent(PDO $db, string $intent, string $message, float $co
             $clarify = [
                 "I'm not completely sure what you're looking for. 😊 Are you asking about a product, price, stock, compatibility, or building a PC?",
                 "I might need a bit more detail. Are you looking for a product, checking a price/stock, compatibility, or help building a PC?",
-                "I'm mainly here for EasyPC products and PC builds. 😊 Want help with a product, price, stock, compatibility, or Tech & Match?",
+                "I'm mainly here for EasyPC products and PC builds. 😊 Want help with a product, price, stock, compatibility, or Build a PC?",
             ];
             return ['reply' => $clarify[array_rand($clarify)]];
     }
@@ -350,9 +347,8 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
     if (empty($products)) {
         if ($intent === 'product_recommendation' || $wantsBuild) {
             return [
-                'reply' => "Sure! 💻 I can help you choose components. Try Tech & Match to build a full PC, or tell me a specific part (like Ryzen 5, RTX 4060, or 1TB SSD).",
+                'reply' => "Sure! 💻 I can help you choose components. Open Build a PC in the top navigation to customize a full setup, or tell me a specific part (like Ryzen 5, RTX 4060, or 1TB SSD).",
                 'products' => [],
-                'show_tech_match' => true,
             ];
         }
         if ($intent === 'product_price') {
@@ -368,9 +364,8 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
             ];
         }
         return [
-            'reply' => "I couldn't find matching products in the EasyPC catalog for that. Try another name, brand, or category — or open Tech & Match to browse by component.",
+            'reply' => "I couldn't find matching products in the EasyPC catalog for that. Try another name, brand, or category — or open Build a PC to browse by component.",
             'products' => [],
-            'show_tech_match' => true,
         ];
     }
 
@@ -395,7 +390,7 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
             break;
         case 'product_recommendation':
             $intro = $wantsBuild
-                ? "Great — here are real EasyPC options you can use while building. Tech & Match can help you put a full setup together:"
+                ? "Great — here are real EasyPC options you can use while building. Open Build a PC in the top navigation to put a full setup together:"
                 : 'Based on what you asked, here are real EasyPC products to consider:';
             break;
         default:
@@ -403,14 +398,10 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
     }
 
     $outro = "\nOpen Shop Now to buy, or ask me about price, stock, or compatibility.";
-    $out = [
+    return [
         'reply' => $intro . "\n" . implode("\n", $lines) . $outro,
         'products' => $products,
     ];
-    if ($intent === 'product_recommendation' || $wantsBuild) {
-        $out['show_tech_match'] = true;
-    }
-    return $out;
 }
 
 /**

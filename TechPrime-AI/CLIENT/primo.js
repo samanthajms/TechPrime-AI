@@ -101,9 +101,7 @@
 
     function openTechMatchFromPrimo(e) {
         if (e) e.preventDefault();
-        if (typeof window.epOpenTechMatch === 'function') {
-            window.epOpenTechMatch();
-        }
+        window.location.href = 'build_a_pc.php';
     }
 
     function pickWelcomeGreeting() {
@@ -120,14 +118,8 @@
     }
 
     function scheduleTechMatchPromo() {
+        /* Tech & Match promo removed — Build a PC is in the top navbar. */
         clearPromoTimer();
-        if (promoShown) return;
-        promoTimer = window.setTimeout(function () {
-            promoTimer = null;
-            if (!promoShown && !userEngaged) {
-                appendTechMatchPromo();
-            }
-        }, 1800);
     }
 
     function hideHistory() {
@@ -273,30 +265,9 @@
     }
 
     function appendTechMatchPromo() {
-        if (!body || promoShown) return;
+        /* Intentionally no-op: Build a PC is opened from the navbar, not Primo. */
         promoShown = true;
         clearPromoTimer();
-
-        var wrap = document.createElement('div');
-        wrap.className = 'primo-msg primo-msg-bot';
-        wrap.innerHTML =
-            miniAvatarHtml() +
-            '<div class="primo-msg-bubble primo-msg-bubble-stack">' +
-            '<p class="primo-promo-lead">By the way! 💻✨<br><br>' +
-            'Want to build and customize your own setup?<br><br>' +
-            'You can try <strong>Tech &amp; Match</strong>! I can help you find and match the right PC parts, laptops, and accessories based on what you need and your budget.</p>' +
-            '<div class="primo-tm-card">' +
-            '<div class="primo-tm-card-head"><span class="primo-tm-bolt" aria-hidden="true">⚡</span> TECH &amp; MATCH</div>' +
-            '<p class="primo-tm-tagline">Build easy. Match smart.</p>' +
-            '<p class="primo-tm-copy">Customize your setup with real EasyPC products.</p>' +
-            '<button type="button" class="primo-tm-btn" id="primoTryTechMatch">' +
-            '<span aria-hidden="true">⚡</span> Try Tech &amp; Match</button>' +
-            '</div></div>';
-
-        body.appendChild(wrap);
-        body.scrollTop = body.scrollHeight;
-        var tmBtn = wrap.querySelector('#primoTryTechMatch, .primo-tm-btn');
-        if (tmBtn) tmBtn.addEventListener('click', openTechMatchFromPrimo);
     }
 
     function setBusy(on) {
@@ -460,9 +431,7 @@
                 replyText = data.reply;
                 appendMessage('bot', data.reply);
                 if (data.show_tech_match && !promoShown) {
-                    window.setTimeout(function () {
-                        appendTechMatchPromo();
-                    }, 450);
+                    /* Build a PC is no longer opened from Primo. */
                 }
             }
             persistExchange(message, replyText);

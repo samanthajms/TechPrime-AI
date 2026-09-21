@@ -126,14 +126,22 @@ function getPasswordRules($db = null) {
     return $rules;
 }
 
-/** Product image path for seller uploads or legacy URL */
+/** Product image path for catalog assets, seller uploads, or legacy URL */
 function ias_product_image_url(array $p): string
 {
     if (!empty($p['image'])) {
-        return '../uploads/products/' . basename($p['image']);
+        $raw = str_replace('\\', '/', trim((string) $p['image']));
+        if (str_starts_with($raw, 'assets/products/')) {
+            return '../' . $raw;
+        }
+        return '../uploads/products/' . basename($raw);
     }
     if (!empty($p['image_url'])) {
-        return $p['image_url'];
+        $url = str_replace('\\', '/', trim((string) $p['image_url']));
+        if (str_starts_with($url, 'assets/products/')) {
+            return '../' . $url;
+        }
+        return $url;
     }
     return '';
 }
@@ -147,16 +155,31 @@ function ias_client_product_list_sql_condition(string $alias = 'p'): string
         AND {$a}.image IS NOT NULL AND TRIM({$a}.image) <> ''";
 }
 
-/** Client shop: only seller-uploaded files that exist on disk (no image_url / placeholders) */
+/** Client shop: catalog assets/products paths or seller uploads that exist on disk */
 function ias_client_product_image_url(array $p): string
 {
     if (empty($p['image']) || !is_string($p['image'])) {
         return '';
     }
-    $filename = basename($p['image']);
-    if ($filename === '' || preg_match('/^(no[_-]?image|placeholder|default|demo|mock|fake)/i', $filename)) {
+    $raw = str_replace('\\', '/', trim($p['image']));
+    if ($raw === '' || preg_match('/(no[_-]?image|placeholder|default|demo|mock|fake)/i', basename($raw))) {
         return '';
     }
+
+    // Git-synced catalog images under assets/products/{Category}/...
+    if (str_starts_with($raw, 'assets/products/')) {
+        $path = dirname(__DIR__) . '/' . $raw;
+        if (!is_file($path) || !is_readable($path)) {
+            return '';
+        }
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            return '';
+        }
+        return '../' . $raw;
+    }
+
+    $filename = basename($raw);
     $path = dirname(__DIR__) . '/uploads/products/' . $filename;
     if (!is_file($path) || !is_readable($path)) {
         return '';

@@ -228,8 +228,8 @@ include __DIR__ . '/ep_header.php';
         <div class="sb-empty" id="sbEmpty">
             <i class="fas fa-box-open" aria-hidden="true"></i>
             <h3>No saved builds yet</h3>
-            <p>Open Tech &amp; Match from Primo, select components, then click Save Build.</p>
-            <a class="sb-btn-primary" href="index.php#ep-tech-match">Go to Home &amp; open Tech &amp; Match</a>
+            <p>Open Build a PC, select components, then click Save Build.</p>
+            <a class="sb-btn-primary" href="build_a_pc.php">Go to Build a PC</a>
         </div>
     <?php else: ?>
         <div class="sb-stage" id="sbStage">
@@ -253,8 +253,8 @@ include __DIR__ . '/ep_header.php';
         <div class="sb-empty" id="sbEmpty" hidden>
             <i class="fas fa-box-open" aria-hidden="true"></i>
             <h3>No saved builds yet</h3>
-            <p>Open Tech &amp; Match from Primo, select components, then click Save Build.</p>
-            <a class="sb-btn-primary" href="index.php#ep-tech-match">Go to Home &amp; open Tech &amp; Match</a>
+            <p>Open Build a PC, select components, then click Save Build.</p>
+            <a class="sb-btn-primary" href="build_a_pc.php">Go to Build a PC</a>
         </div>
     <?php endif; ?>
 </main>
@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         sessionStorage.removeItem('ep_tm_edit_id');
                     }
                 } catch (e) {}
-                window.location.href = 'index.php#ep-tech-match';
+                window.location.href = 'build_a_pc.php';
             })
             .catch(function () {
                 if (typeof IAS_UI !== 'undefined') IAS_UI.alert('Could not open this build.', 'error');

@@ -13,13 +13,13 @@ $pageTitle  = 'Shop';
 $searchQuery = '';
 $bodyClass  = 'ep-shop-page-body';
 
-/** Category header labels → existing DB category value(s) */
+/** Final client Shop categories (exact order). */
 $shopCategoryNav = [
-    'Desktop' => ['Desktop'],
+    'Display' => ['Display'],
     'Laptops' => ['Laptops'],
     'Audio' => ['Audio'],
-    'Printers and Scanners' => ['Printers and Scanners', 'Printer and Scanner'],
     'Cooling' => ['Cooling'],
+    'Speaker' => ['Speaker'],
     'Accessories' => ['Accessories'],
     'Others' => ['Others'],
 ];
