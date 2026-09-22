@@ -1,0 +1,11 @@
+# Environment variables (contains live database credentials — never commit this)
+.env
+
+# Composer dependencies (auto-generated — regenerated via `composer install`)
+/vendor
+
+# Common OS/editor clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

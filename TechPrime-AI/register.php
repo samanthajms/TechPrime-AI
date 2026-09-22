@@ -15,6 +15,22 @@ $registeredEmail = '';
 $connection = getDbConnection();
 $pwRules = getPasswordRules($connection);
 
+/** Detect optional users.phone column (added by migration_users_phone.sql). */
+function register_users_has_phone(PDO $db): bool
+{
+    static $has = null;
+    if ($has !== null) {
+        return $has;
+    }
+    $stmt = $db->prepare(
+        "SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'phone'"
+    );
+    $stmt->execute();
+    $has = (bool)$stmt->fetchColumn();
+    return $has;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Public registration is limited to customer accounts. Never trust a
     // role submitted by the browser, as it could be modified outside the form.
@@ -23,9 +39,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $surname         = trim($_POST['surname'] ?? '');
     $age             = intval($_POST['age'] ?? 0);
     $address         = trim($_POST['address'] ?? '');
+    $phone           = trim($_POST['phone'] ?? '');
     $email           = strtolower(trim($_POST['email'] ?? ''));
     $password        = $_POST['password'] ?? '';
     $confirm         = $_POST['confirm_password'] ?? '';
+
+    if ($name === '' || $surname === '') {
+        header("Location: register.php?error=" . urlencode('First name and surname are required.'));
+        exit;
+    }
+    if ($age < 13) {
+        header("Location: register.php?error=" . urlencode('Age must be 13 or older.'));
+        exit;
+    }
+    if ($address === '') {
+        header("Location: register.php?error=" . urlencode('Address is required.'));
+        exit;
+    }
+    if ($phone === '') {
+        header("Location: register.php?error=" . urlencode('Phone number is required.'));
+        exit;
+    }
+    // Keep phone reasonably sane without being overly strict by country.
+    $phoneDigits = preg_replace('/\D+/', '', $phone);
+    if (strlen($phoneDigits) < 7 || strlen($phoneDigits) > 15) {
+        header("Location: register.php?error=" . urlencode('Please enter a valid phone number.'));
+        exit;
+    }
+    if (strlen($phone) > 30) {
+        header("Location: register.php?error=" . urlencode('Phone number is too long.'));
+        exit;
+    }
 
     if (empty($password) || $password !== $confirm) {
         header("Location: register.php?error=Passwords do not match!");
@@ -48,20 +92,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $checkEmail = $connection->prepare("SELECT email FROM users WHERE email = ? LIMIT 1");
-    $checkEmail->bind_param("s", $email);
-    $checkEmail->execute();
-    if ($checkEmail->get_result()->num_rows > 0) {
+    $checkEmail->execute([$email]);
+    if ($checkEmail->fetch(PDO::FETCH_ASSOC)) {
         header("Location: register.php?error=Email already in use.");
         exit;
     }
 
     $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
     $activationToken = bin2hex(random_bytes(32));
+    $hasPhone = register_users_has_phone($connection);
 
-    $stmt = $connection->prepare("INSERT INTO users (name, surname, age, address, email, password, role, is_verified, activation_token) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)");
-    $stmt->bind_param("ssisssss", $name, $surname, $age, $address, $email, $hashedPassword, $role, $activationToken);
+    if ($hasPhone) {
+        $stmt = $connection->prepare(
+            "INSERT INTO users (name, surname, age, address, phone, email, password, role, is_verified, activation_token)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)"
+        );
+        $ok = $stmt->execute([$name, $surname, $age, $address, $phone, $email, $hashedPassword, $role, $activationToken]);
+    } else {
+        // Fallback if migration not applied yet: keep address, skip phone column.
+        $stmt = $connection->prepare(
+            "INSERT INTO users (name, surname, age, address, email, password, role, is_verified, activation_token)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)"
+        );
+        $ok = $stmt->execute([$name, $surname, $age, $address, $email, $hashedPassword, $role, $activationToken]);
+    }
 
-    if ($stmt->execute()) {
+    if ($ok) {
         // Send activation email
         $activationLink = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
             . '://' . $_SERVER['HTTP_HOST']
@@ -148,8 +204,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="form-grid">
                 <div><label>Age</label><input type="number" name="age" min="13" required></div>
-                <div><label>Location</label><input type="text" name="address" placeholder="City, Country" required></div>
+                <div><label>Phone Number</label><input type="tel" name="phone" placeholder="e.g. 09171234567" required></div>
             </div>
+
+            <label>Address</label>
+            <input type="text" name="address" placeholder="Street, City, Province" style="margin-bottom: 15px;" required>
 
             <label>Email Address</label>
             <input type="email" name="email" style="margin-bottom: 15px;" required>

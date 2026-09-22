@@ -22,12 +22,10 @@ $stmt = $db->prepare(
      WHERE p.category = ?
      ORDER BY p.id DESC"
 );
-$stmt->bind_param("s", $type);
-$stmt->execute();
-$result = $stmt->get_result();
-
+$stmt->execute([$type]);
+$result = $stmt;
 $products = [];
-while ($row = $result->fetch_assoc()) {
+while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
     // Attach a fresh CSRF token so each Add-to-Cart form is protected
     $row['csrf'] = generateCsrfToken();
     $products[] = $row;

@@ -41,9 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $check = $db->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
-        $check->bind_param('s', $email);
-        $check->execute();
-        if ($check->get_result()->num_rows > 0) {
+        $check->execute([$email]);
+        if ($check->fetch(PDO::FETCH_ASSOC)) {
             header('Location: manage_users.php?error=' . urlencode('That email address is already in use.'));
             exit;
         }
@@ -52,8 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Staff accounts are created by an administrator and are ready to use
         // immediately; email activation remains exclusive to client sign-up.
         $insert = $db->prepare('INSERT INTO users (name, surname, age, address, email, password, role, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, 1)');
-        $insert->bind_param('ssissss', $name, $surname, $age, $address, $email, $hash, $role);
-        if (!$insert->execute()) {
+        if (!$insert->execute([$name, $surname, $age, $address, $email, $hash, $role])) {
             header('Location: manage_users.php?error=' . urlencode('Unable to create the staff account. Please try again.'));
             exit;
         }
@@ -67,24 +65,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'block') {
         // FIX: Use prepared statements
         $stmt = $db->prepare("UPDATE users SET is_locked = 1 WHERE id = ?");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
+        $stmt->execute([$id]);
 
         $stmt2 = $db->prepare("INSERT INTO locked_accounts (user_id, reason) VALUES (?, 'Admin manual block')");
-        $stmt2->bind_param("i", $id);
-        $stmt2->execute();
+        $stmt2->execute([$id]);
 
         logActivity($db, $admin_id, 'block_user', "Admin blocked user ID $id");
 
     } elseif ($action === 'unblock') {
         // FIX: Use prepared statements
         $stmt = $db->prepare("UPDATE users SET is_locked = 0, failed_attempts = 0 WHERE id = ?");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
+        $stmt->execute([$id]);
 
         $stmt2 = $db->prepare("DELETE FROM locked_accounts WHERE user_id = ?");
-        $stmt2->bind_param("i", $id);
-        $stmt2->execute();
+        $stmt2->execute([$id]);
 
         logActivity($db, $admin_id, 'unblock_user', "Admin unblocked user ID $id");
 
@@ -92,8 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($id !== $admin_id) {
             // FIX: Use prepared statement
             $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
-            $stmt->bind_param("i", $id);
-            $stmt->execute();
+            $stmt->execute([$id]);
 
             logActivity($db, $admin_id, 'delete_user', "Admin deleted user ID $id");
         }
@@ -112,11 +105,11 @@ $inventory_custodians        = $db->query("SELECT u.*, la.reason as lock_reason,
 
  
 // Counts
-$count_all     = $db->query("SELECT COUNT(*) as c FROM users")->fetch_assoc()['c'];
-$count_client  = $db->query("SELECT COUNT(*) as c FROM users WHERE role='client'")->fetch_assoc()['c'];
-$count_admin   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='admin'")->fetch_assoc()['c'];
-$count_officer   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='retail_officer'")->fetch_assoc()['c'];
-$count_custodian   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='inventory_custodian'")->fetch_assoc()['c'];
+$count_all     = $db->query("SELECT COUNT(*) as c FROM users")->fetch(PDO::FETCH_ASSOC)['c'];
+$count_client  = $db->query("SELECT COUNT(*) as c FROM users WHERE role='client'")->fetch(PDO::FETCH_ASSOC)['c'];
+$count_admin   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='admin'")->fetch(PDO::FETCH_ASSOC)['c'];
+$count_officer   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='retail_officer'")->fetch(PDO::FETCH_ASSOC)['c'];
+$count_custodian   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='inventory_custodian'")->fetch(PDO::FETCH_ASSOC)['c'];
 
  
 $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
@@ -130,7 +123,7 @@ if (!in_array($active_tab, $valid_tabs, true)) {
 // Helper: fetch all users to PHP arrays for JS injection
 function fetchToArray($result) {
     $arr = [];
-    while ($row = $result->fetch_assoc()) $arr[] = $row;
+    while ($row = $result->fetch(PDO::FETCH_ASSOC)) $arr[] = $row;
     return $arr;
 }
 $user_rows = [

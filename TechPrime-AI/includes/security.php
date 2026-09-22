@@ -31,8 +31,7 @@ function h($string) {
 function logActivity($db, $user_id, $action, $details) {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $stmt = $db->prepare("INSERT INTO logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("isss", $user_id, $action, $details, $ip);
-    $stmt->execute();
+    $stmt->execute([$user_id, $action, $details, $ip]);
 }
 
 // Role Based Access Control
@@ -56,8 +55,6 @@ function checkSessionTimeout() {
 }
 
 // Password Complexity Check
-// Reads rules from site_settings table if a DB connection is provided;
-// falls back to safe hardcoded defaults if the table doesn't exist yet.
 function isPasswordComplex($password, $db = null) {
     // Default rules (safe fallback)
     $minLen      = 8;
@@ -67,20 +64,24 @@ function isPasswordComplex($password, $db = null) {
     $reqSpecial  = true;
 
     if ($db !== null) {
-        $res = @$db->query(
-            "SELECT setting_key, setting_value FROM site_settings
-             WHERE setting_key IN ('pw_min_length','pw_require_upper','pw_require_lower','pw_require_number','pw_require_special')"
-        );
-        if ($res) {
-            while ($row = $res->fetch_assoc()) {
-                switch ($row['setting_key']) {
-                    case 'pw_min_length':     $minLen     = max(6, (int)$row['setting_value']); break;
-                    case 'pw_require_upper':  $reqUpper   = $row['setting_value'] === '1';       break;
-                    case 'pw_require_lower':  $reqLower   = $row['setting_value'] === '1';       break;
-                    case 'pw_require_number': $reqNumber  = $row['setting_value'] === '1';       break;
-                    case 'pw_require_special':$reqSpecial = $row['setting_value'] === '1';       break;
+        try {
+            $res = $db->query(
+                "SELECT setting_key, setting_value FROM site_settings
+                 WHERE setting_key IN ('pw_min_length','pw_require_upper','pw_require_lower','pw_require_number','pw_require_special')"
+            );
+            if ($res) {
+                while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
+                    switch ($row['setting_key']) {
+                        case 'pw_min_length':     $minLen     = max(6, (int)$row['setting_value']); break;
+                        case 'pw_require_upper':  $reqUpper   = $row['setting_value'] === '1';       break;
+                        case 'pw_require_lower':  $reqLower   = $row['setting_value'] === '1';       break;
+                        case 'pw_require_number': $reqNumber  = $row['setting_value'] === '1';       break;
+                        case 'pw_require_special':$reqSpecial = $row['setting_value'] === '1';       break;
+                    }
                 }
             }
+        } catch (Throwable $e) {
+            // Fallback to defaults if table doesn't exist or query fails
         }
     }
 
@@ -102,33 +103,45 @@ function getPasswordRules($db = null) {
         'require_special' => true,
     ];
     if ($db !== null) {
-        $res = @$db->query(
-            "SELECT setting_key, setting_value FROM site_settings
-             WHERE setting_key IN ('pw_min_length','pw_require_upper','pw_require_lower','pw_require_number','pw_require_special')"
-        );
-        if ($res) {
-            while ($row = $res->fetch_assoc()) {
-                switch ($row['setting_key']) {
-                    case 'pw_min_length':     $rules['min_length']      = max(6, (int)$row['setting_value']); break;
-                    case 'pw_require_upper':  $rules['require_upper']   = $row['setting_value'] === '1';       break;
-                    case 'pw_require_lower':  $rules['require_lower']   = $row['setting_value'] === '1';       break;
-                    case 'pw_require_number': $rules['require_number']  = $row['setting_value'] === '1';       break;
-                    case 'pw_require_special':$rules['require_special'] = $row['setting_value'] === '1';       break;
+        try {
+            $res = $db->query(
+                "SELECT setting_key, setting_value FROM site_settings
+                 WHERE setting_key IN ('pw_min_length','pw_require_upper','pw_require_lower','pw_require_number','pw_require_special')"
+            );
+            if ($res) {
+                while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
+                    switch ($row['setting_key']) {
+                        case 'pw_min_length':     $rules['min_length']      = max(6, (int)$row['setting_value']); break;
+                        case 'pw_require_upper':  $rules['require_upper']   = $row['setting_value'] === '1';       break;
+                        case 'pw_require_lower':  $rules['require_lower']   = $row['setting_value'] === '1';       break;
+                        case 'pw_require_number': $rules['require_number']  = $row['setting_value'] === '1';       break;
+                        case 'pw_require_special':$rules['require_special'] = $row['setting_value'] === '1';       break;
+                    }
                 }
             }
+        } catch (Throwable $e) {
+            // Fallback to defaults
         }
     }
     return $rules;
 }
 
-/** Product image path for seller uploads or legacy URL */
+/** Product image path for catalog assets, seller uploads, or legacy URL */
 function ias_product_image_url(array $p): string
 {
     if (!empty($p['image'])) {
-        return '../uploads/products/' . basename($p['image']);
+        $raw = str_replace('\\', '/', trim((string) $p['image']));
+        if (str_starts_with($raw, 'assets/products/')) {
+            return '../' . $raw;
+        }
+        return '../uploads/products/' . basename($raw);
     }
     if (!empty($p['image_url'])) {
-        return $p['image_url'];
+        $url = str_replace('\\', '/', trim((string) $p['image_url']));
+        if (str_starts_with($url, 'assets/products/')) {
+            return '../' . $url;
+        }
+        return $url;
     }
     return '';
 }
@@ -142,16 +155,31 @@ function ias_client_product_list_sql_condition(string $alias = 'p'): string
         AND {$a}.image IS NOT NULL AND TRIM({$a}.image) <> ''";
 }
 
-/** Client shop: only seller-uploaded files that exist on disk (no image_url / placeholders) */
+/** Client shop: catalog assets/products paths or seller uploads that exist on disk */
 function ias_client_product_image_url(array $p): string
 {
     if (empty($p['image']) || !is_string($p['image'])) {
         return '';
     }
-    $filename = basename($p['image']);
-    if ($filename === '' || preg_match('/^(no[_-]?image|placeholder|default|demo|mock|fake)/i', $filename)) {
+    $raw = str_replace('\\', '/', trim($p['image']));
+    if ($raw === '' || preg_match('/(no[_-]?image|placeholder|default|demo|mock|fake)/i', basename($raw))) {
         return '';
     }
+
+    // Git-synced catalog images under assets/products/{Category}/...
+    if (str_starts_with($raw, 'assets/products/')) {
+        $path = dirname(__DIR__) . '/' . $raw;
+        if (!is_file($path) || !is_readable($path)) {
+            return '';
+        }
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            return '';
+        }
+        return '../' . $raw;
+    }
+
+    $filename = basename($raw);
     $path = dirname(__DIR__) . '/uploads/products/' . $filename;
     if (!is_file($path) || !is_readable($path)) {
         return '';

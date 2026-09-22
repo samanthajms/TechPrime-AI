@@ -47,12 +47,15 @@ $epCartCount  = $epCartPreview['count'];
         <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img">
     </div>
 
-    <div class="search-wrap">
-        <form action="search.php" method="GET">
-            <input name="q" type="text" placeholder="Search products..."
-                   value="<?php echo h($searchQuery); ?>" aria-label="Search products">
+    <div class="search-wrap" id="epSearchWrap">
+        <form action="search.php" method="GET" id="epSearchForm" autocomplete="off">
+            <input id="epSearchInput" name="q" type="text" placeholder="Search products..."
+                   value="<?php echo h($searchQuery); ?>" aria-label="Search products"
+                   aria-autocomplete="list" aria-controls="epSearchSuggest" aria-expanded="false"
+                   autocomplete="off">
             <button type="submit" class="search-icon" aria-label="Search"><i class="fas fa-search"></i></button>
         </form>
+        <div id="epSearchSuggest" class="ep-search-suggest" role="listbox" hidden></div>
     </div>
 
     <nav class="ep-nav-actions" aria-label="Primary">
@@ -110,6 +113,13 @@ $epCartCount  = $epCartPreview['count'];
             <span class="ep-nav-item-label">Notifications</span>
         </button>
 
+        <a href="<?php echo $isLoggedIn ? 'build_a_pc.php' : '../login.php'; ?>"
+           class="ep-nav-item<?php echo (($activePage ?? '') === 'build_a_pc' || ($activePage ?? '') === 'saved_builds') ? ' active' : ''; ?>"
+           <?php echo (($activePage ?? '') === 'build_a_pc' || ($activePage ?? '') === 'saved_builds') ? 'aria-current="page"' : ''; ?>>
+            <span class="ep-nav-item-icon"><i class="fas fa-desktop" aria-hidden="true"></i></span>
+            <span class="ep-nav-item-label">Build a PC</span>
+        </a>
+
         <button id="profileBtn" type="button" class="ep-nav-item"
                 onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : '../login.php'; ?>'">
             <span class="ep-nav-item-icon"><i class="far fa-user" aria-hidden="true"></i></span>
@@ -157,6 +167,189 @@ $epCartCount  = $epCartPreview['count'];
                 wrap.classList.remove('open');
                 trigger.setAttribute('aria-expanded', 'false');
             }
+        });
+    }
+
+    /* Update header Cart badge + dropdown from cart preview JSON (no page reload). */
+    window.epUpdateCartPreview = function (preview) {
+        preview = preview || { items: [], total: 0, count: 0 };
+        var cartWrap = document.getElementById('epCartWrap');
+        var cartBtn = document.getElementById('cartBtn');
+        var dropdown = document.getElementById('epCartDropdown');
+        if (!cartWrap || !dropdown) return;
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+        function money(n) {
+            return Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        var icon = cartBtn ? cartBtn.querySelector('.ep-nav-item-icon') : null;
+        if (icon) {
+            var badge = icon.querySelector('.badge');
+            var count = parseInt(preview.count, 10) || 0;
+            if (count > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'badge';
+                    icon.appendChild(badge);
+                }
+                badge.textContent = String(count);
+            } else if (badge) {
+                badge.remove();
+            }
+        }
+
+        var items = Array.isArray(preview.items) ? preview.items : [];
+        var html = '';
+        if (items.length) {
+            html += '<ul class="ep-cart-dropdown-list">';
+            items.forEach(function (ci) {
+                html += '<li>' +
+                    '<span class="ep-cart-item-name">' + escapeHtml(ci.name || '') + '</span>' +
+                    '<span class="ep-cart-item-meta">×' + (parseInt(ci.qty, 10) || 0) +
+                    ' · ₱' + money(ci.subtotal) + '</span>' +
+                    '</li>';
+            });
+            html += '</ul>';
+            html += '<div class="ep-cart-dropdown-total"><span>Total</span><strong>₱' +
+                money(preview.total) + '</strong></div>';
+            html += '<a href="checkout.php" class="ep-btn ep-btn-primary ep-cart-checkout-btn">Checkout</a>';
+            html += '<a href="cart.php" class="ep-cart-view-link">View full cart</a>';
+        } else {
+            html = '<p class="ep-cart-empty">Your cart is empty.</p>' +
+                '<a href="shop.php" class="ep-cart-view-link">Browse products</a>';
+        }
+        dropdown.innerHTML = html;
+    };
+
+    /* ---- Search recommendations (existing search bar) ---- */
+    var searchInput = document.getElementById('epSearchInput');
+    var searchSuggest = document.getElementById('epSearchSuggest');
+    var searchForm = document.getElementById('epSearchForm');
+    var searchWrap = document.getElementById('epSearchWrap');
+    if (searchInput && searchSuggest && searchForm) {
+        var suggestTimer = null;
+        var suggestAbort = null;
+        var activeIdx = -1;
+
+        function hideSuggest() {
+            searchSuggest.hidden = true;
+            searchSuggest.innerHTML = '';
+            searchInput.setAttribute('aria-expanded', 'false');
+            activeIdx = -1;
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        function highlightMatch(label, q) {
+            var safe = escapeHtml(label);
+            var qi = String(q || '').trim();
+            if (!qi) return safe;
+            try {
+                var re = new RegExp('(' + qi.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+                return safe.replace(re, '<mark>$1</mark>');
+            } catch (e) {
+                return safe;
+            }
+        }
+
+        function renderSuggest(items, q) {
+            if (!items || !items.length) {
+                hideSuggest();
+                return;
+            }
+            activeIdx = -1;
+            searchSuggest.innerHTML = items.map(function (item, i) {
+                return '<button type="button" class="ep-search-suggest-item" role="option" data-idx="' + i + '" data-label="' + escapeHtml(item.label) + '">' +
+                    '<i class="fas fa-search" aria-hidden="true"></i>' +
+                    '<span>' + highlightMatch(item.label, q) + '</span>' +
+                    '</button>';
+            }).join('');
+            searchSuggest.hidden = false;
+            searchInput.setAttribute('aria-expanded', 'true');
+        }
+
+        function runSearch(term) {
+            var t = String(term || '').trim();
+            if (!t) return;
+            hideSuggest();
+            window.location.href = 'search.php?q=' + encodeURIComponent(t);
+        }
+
+        function fetchSuggest(q) {
+            if (suggestAbort && suggestAbort.abort) {
+                try { suggestAbort.abort(); } catch (e) {}
+            }
+            var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            suggestAbort = controller;
+            var url = 'search_suggest.php?q=' + encodeURIComponent(q);
+            fetch(url, { signal: controller ? controller.signal : undefined, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (searchInput.value.trim() !== q) return;
+                    renderSuggest((data && data.suggestions) || [], q);
+                })
+                .catch(function () { /* ignore abort/network */ });
+        }
+
+        searchInput.addEventListener('input', function () {
+            var q = searchInput.value.trim();
+            if (suggestTimer) clearTimeout(suggestTimer);
+            if (!q) {
+                hideSuggest();
+                return;
+            }
+            suggestTimer = setTimeout(function () { fetchSuggest(q); }, 180);
+        });
+
+        searchInput.addEventListener('keydown', function (e) {
+            var items = searchSuggest.querySelectorAll('.ep-search-suggest-item');
+            if (e.key === 'Escape') {
+                hideSuggest();
+                return;
+            }
+            if (searchSuggest.hidden || !items.length) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeIdx = Math.min(items.length - 1, activeIdx + 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeIdx = Math.max(0, activeIdx - 1);
+            } else if (e.key === 'Enter' && activeIdx >= 0 && items[activeIdx]) {
+                e.preventDefault();
+                runSearch(items[activeIdx].getAttribute('data-label'));
+                return;
+            } else {
+                return;
+            }
+            items.forEach(function (el, i) {
+                el.classList.toggle('active', i === activeIdx);
+            });
+        });
+
+        searchSuggest.addEventListener('mousedown', function (e) {
+            var btn = e.target.closest('.ep-search-suggest-item');
+            if (!btn) return;
+            e.preventDefault();
+            runSearch(btn.getAttribute('data-label'));
+        });
+
+        searchForm.addEventListener('submit', function () {
+            hideSuggest();
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!searchWrap.contains(e.target)) hideSuggest();
         });
     }
 })();

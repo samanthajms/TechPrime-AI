@@ -13,36 +13,33 @@ $db = getDbConnection();
 $retailId = (int)$_SESSION['user_id'];
 
 // --- 1. FETCH CUSTOMERS ---
-$convQuery = "SELECT DISTINCT u.id, u.name 
+$convQuery = "SELECT u.id, u.name 
               FROM users u
               INNER JOIN messages m ON (u.id = m.sender_id OR u.id = m.receiver_id)
               WHERE (m.sender_id = ? OR m.receiver_id = ?) 
               AND u.id != ?
-              ORDER BY m.created_at DESC";
+              GROUP BY u.id, u.name
+              ORDER BY MAX(m.created_at) DESC";
 
 $stmt = $db->prepare($convQuery);
-$stmt->bind_param("iii", $retailId, $retailId, $retailId);
-$stmt->execute();
-$contacts = $stmt->get_result();
-
+$stmt->execute([$retailId, $retailId, $retailId]);
+$contacts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $activeClientId = isset($_GET['client_id']) ? (int)$_GET['client_id'] : null;
 $clientName = "Select a Customer";
 $messages = [];
 
 if ($activeClientId) {
     $nameStmt = $db->prepare("SELECT name FROM users WHERE id = ?");
-    $nameStmt->bind_param("i", $activeClientId);
-    $nameStmt->execute();
-    if($row = $nameStmt->get_result()->fetch_assoc()) $clientName = $row['name'];
+    $nameStmt->execute([$activeClientId]);
+    if($row = $nameStmt->fetch(PDO::FETCH_ASSOC)) $clientName = $row['name'];
 
     $msgQuery = "SELECT * FROM messages 
                  WHERE (sender_id = ? AND receiver_id = ?) 
                  OR (sender_id = ? AND receiver_id = ?) 
                  ORDER BY created_at ASC";
     $mStmt = $db->prepare($msgQuery);
-    $mStmt->bind_param("iiii", $retailId, $activeClientId, $activeClientId, $retailId);
-    $mStmt->execute();
-    $messages = $mStmt->get_result();
+    $mStmt->execute([$retailId, $activeClientId, $activeClientId, $retailId]);
+    $messages = $mStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 staff_page_start([
@@ -125,13 +122,13 @@ EXTRA
                 <aside class="contacts-column">
                     <div class="column-head"><i class="fas fa-comments"></i> Customer Inquiries</div>
                     <div style="overflow-y: auto; flex: 1;">
-                        <?php while($c = $contacts->fetch_assoc()): ?>
+                        <?php foreach ($contacts as $c): ?>
                             <a href="retail_messages.php?client_id=<?php echo $c['id']; ?>"
                                class="contact-link <?php echo ($activeClientId == $c['id']) ? 'active' : ''; ?>">
                                 <?php echo h($c['name']); ?>
                             </a>
-                        <?php endwhile; ?>
-                        <?php if($contacts->num_rows == 0): ?>
+                        <?php endforeach; ?>
+                        <?php if (count($contacts) == 0): ?>
                             <p style="padding: 20px; color: #bbb; font-size: 13px; text-align: center;">No conversations yet.</p>
                         <?php endif; ?>
                     </div>
@@ -147,14 +144,14 @@ EXTRA
 
                     <div class="chat-messages" id="chatWindow">
                         <?php if($activeClientId): ?>
-                            <?php while($m = $messages->fetch_assoc()): ?>
+                            <?php foreach ($messages as $m): ?>
                                 <div class="bubble <?php echo ($m['sender_id'] == $retailId) ? 'sent' : 'received'; ?>">
                                     <?php echo h($m['message']); ?>
                                     <div style="font-size: 9px; margin-top: 5px; opacity: 0.7; text-align: right;">
                                         <?php echo date('h:i A', strtotime($m['created_at'])); ?>
                                     </div>
                                 </div>
-                            <?php endwhile; ?>
+                            <?php endforeach; ?>
                         <?php else: ?>
                             <div class="chat-empty">
                                 <i class="fas fa-envelope-open-text"></i>

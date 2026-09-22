@@ -1,5 +1,5 @@
 -- Migration: site_settings table for admin-configurable password complexity rules
--- Run once against your ias_ecommerce database.
+-- Run once against your techprime_ai database.
 -- Safe to re-run (uses IF NOT EXISTS / INSERT IGNORE).
 
 CREATE TABLE IF NOT EXISTS `site_settings` (

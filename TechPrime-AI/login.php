@@ -14,9 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
 
     $q = $connection->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');
-    $q->bind_param('s', $email);
-    $q->execute();
-    $user = $q->get_result()->fetch_assoc();
+    $q->execute([$email]);
+    $user = $q->fetch(PDO::FETCH_ASSOC);
 
     if (!$user) {
         header("Location: login.php?error=" . urlencode("Invalid email or password."));
@@ -37,13 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $failed = (int)$user['failed_attempts'] + 1;
         $locked = $failed >= 3 ? 1 : 0;
         $up = $connection->prepare('UPDATE users SET failed_attempts = ?, is_locked = ? WHERE id = ?');
-        $up->bind_param('iii', $failed, $locked, $user['id']);
-        $up->execute();
+        $up->execute([$failed, $locked, $user['id']]);
 
         if ($locked === 1) {
             $s = $connection->prepare("INSERT INTO locked_accounts (user_id, reason) VALUES (?, '3 failed login attempts')");
-            $s->bind_param('i', $user['id']);
-            $s->execute();
+            $s->execute([$user['id']]);
             logActivity($connection, $user['id'], 'account_locked', 'Account locked after 3 failed attempts');
             header("Location: login.php?error=" . urlencode("Account locked after 3 failed attempts. Contact support."));
         } else {
@@ -54,8 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $up = $connection->prepare('UPDATE users SET failed_attempts = 0 WHERE id = ?');
-    $up->bind_param('i', $user['id']);
-    $up->execute();
+    $up->execute([$user['id']]);
 
     $_SESSION['user_id']       = $user['id'];
     $_SESSION['role']          = $user['role'];
@@ -268,7 +264,6 @@ function redirectByRole($role) {
         </div>
         <div class="visual-copy">
             <h2>Built to power what you build.</h2>
-            <p>Sign in to manage orders, inventory, and service tickets across the EasyPC network.</p>
         </div>
     </div>
 

@@ -49,7 +49,7 @@ staff_page_start([
                             </tr>
                         </thead>
                         <tbody>
-                            <?php while ($l = $logs->fetch_assoc()): ?>
+                            <?php while ($l = $logs->fetch(PDO::FETCH_ASSOC)): ?>
                             <tr>
                                 <td class="mono text-small text-muted" style="white-space:nowrap"><?php echo h($l['created_at']); ?></td>
                                 <td>

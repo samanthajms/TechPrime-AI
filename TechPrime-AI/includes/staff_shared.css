@@ -231,6 +231,113 @@ body {
   font-weight: 500;
 }
 
+/* Inventory Custodian — large green page title banner */
+body.inv-title-mode .topbar.topbar-inv-compact {
+  height: 56px;
+  min-height: 56px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+body.inv-title-mode .topbar-left-spacer {
+  flex: 1;
+}
+.inv-page-banner {
+  position: relative;
+  margin: 18px 28px 8px;
+  padding: 22px 28px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #62b236 0%, #4b8b2a 55%, #3d7422 100%);
+  color: #fff;
+  box-shadow: 0 14px 34px rgba(75, 139, 42, 0.35);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 96px;
+}
+.inv-page-banner-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.inv-page-banner-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font-size: 22px;
+  color: #fff;
+  flex-shrink: 0;
+}
+.inv-page-banner-text {
+  min-width: 0;
+}
+.inv-page-banner-text h1,
+.inv-page-banner-text .inv-page-banner-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+.inv-page-banner-text p,
+.inv-page-banner-text .inv-page-banner-sub {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
+}
+.inv-page-banner-deco {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.inv-page-banner-deco::before,
+.inv-page-banner-deco::after {
+  content: '';
+  position: absolute;
+  top: -70%;
+  width: 200px;
+  height: 240%;
+  border-radius: 28px;
+  transform: rotate(28deg);
+}
+.inv-page-banner-deco::before {
+  right: 56px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.02));
+}
+.inv-page-banner-deco::after {
+  right: -20px;
+  width: 150px;
+  background: linear-gradient(180deg, rgba(196, 230, 160, 0.4), rgba(255,255,255,0.04));
+}
+
+@media (max-width: 900px) {
+  .inv-page-banner {
+    margin: 14px 16px 0;
+    padding: 20px 18px;
+    min-height: 92px;
+  }
+  .inv-page-banner-text h1 { font-size: 24px; }
+  .inv-page-banner-icon { width: 48px; height: 48px; font-size: 18px; border-radius: 14px; }
+}
+@media (max-width: 640px) {
+  .inv-page-banner-text h1 { font-size: 20px; }
+  .inv-page-banner-text p { font-size: 13px; }
+  .inv-page-banner-inner { gap: 12px; }
+}
+
 .topbar-right { display: flex; align-items: center; gap: 14px; }
 
 .admin-badge,
@@ -722,4 +829,218 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
    Requirement: use the standard left sidebar like Admin.
    Keep this block empty to avoid altering sidebar layout.
    ================================================================ */
+
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
+
+/* ================================================================
+   STAFF NOTIFICATIONS (Inventory Custodian)
+   ================================================================ */
+.staff-notif-wrap {
+  position: relative;
+  z-index: 1400;
+}
+.staff-notif-btn {
+  position: relative;
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ep-green-dark);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+.staff-notif-btn:hover,
+.staff-notif-wrap.open .staff-notif-btn {
+  background: var(--ep-green-light);
+  border-color: var(--ep-green);
+  box-shadow: 0 4px 14px rgba(75, 139, 42, 0.16);
+}
+.staff-notif-badge {
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 18px; height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.35);
+}
+.staff-notif-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(360px, calc(100vw - 28px));
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  overflow: hidden;
+  z-index: 1500;
+}
+.staff-notif-panel[hidden] { display: none !important; }
+.staff-notif-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #eef8e6 0%, #ffffff 75%);
+  border-bottom: 1px solid rgba(75, 139, 42, 0.12);
+}
+.staff-notif-panel-head strong {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ep-green-dark);
+}
+.staff-notif-markall {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--ep-green-dark);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+.staff-notif-markall:hover { background: rgba(97, 179, 55, 0.12); }
+.staff-notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+}
+.staff-notif-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 36px 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}
+.staff-notif-empty i {
+  font-size: 22px;
+  color: var(--ep-green-dark);
+  opacity: 0.55;
+}
+.staff-notif-item-btn {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-family: inherit;
+  position: relative;
+  transition: background 0.15s ease;
+}
+.staff-notif-item.is-unread .staff-notif-item-btn {
+  background: rgba(238, 248, 230, 0.55);
+}
+.staff-notif-item.is-read .staff-notif-item-btn {
+  opacity: 0.82;
+}
+.staff-notif-item-btn:hover {
+  background: #eef8e6 !important;
+}
+.staff-notif-icon {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  border: 1px solid transparent;
+}
+.staff-notif-icon.type-low_stock {
+  background: var(--yellow-pale, #fffbeb);
+  color: #b45309;
+  border-color: #fde68a;
+}
+.staff-notif-icon.type-out_of_stock {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+.staff-notif-icon.type-stock_updated,
+.staff-notif-icon.type-info {
+  background: var(--ep-green-light);
+  color: var(--ep-green-dark);
+  border-color: var(--teal-light);
+}
+.staff-notif-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.staff-notif-type {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ep-green-dark);
+}
+.staff-notif-item[data-type="low_stock"] .staff-notif-type { color: #b45309; }
+.staff-notif-item[data-type="out_of_stock"] .staff-notif-type { color: #dc2626; }
+.staff-notif-msg {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.staff-notif-time {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.staff-notif-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ep-green);
+  flex-shrink: 0;
+  margin-top: 6px;
+  box-shadow: 0 0 0 3px rgba(97, 179, 55, 0.18);
+}
+
+@media (max-width: 640px) {
+  .staff-notif-panel {
+    right: -40px;
+    width: min(340px, calc(100vw - 20px));
+  }
+}
+
 

@@ -18,11 +18,8 @@ $st = $db->prepare(
             u.name, u.surname, u.email, u.address AS user_address
      FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = ? LIMIT 1"
 );
-$st->bind_param('i', $oid);
-$st->execute();
-$order = $st->get_result()->fetch_assoc();
-$st->close();
-
+$st->execute([$oid]);
+$order = $st->fetch(PDO::FETCH_ASSOC);
 if (!$order) {
     header('Location: inventory_orders.php');
     exit;
@@ -31,17 +28,11 @@ if (!$order) {
 $itemStmt = $db->prepare(
     'SELECT p.name, p.price, oi.quantity FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?'
 );
-$itemStmt->bind_param('i', $oid);
-$itemStmt->execute();
-$itemRows = $itemStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$itemStmt->close();
-
+$itemStmt->execute([$oid]);
+$itemRows = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
 $shipStmt = $db->prepare('SELECT * FROM shipments WHERE order_id = ? LIMIT 1');
-$shipStmt->bind_param('i', $oid);
-$shipStmt->execute();
-$ship = $shipStmt->get_result()->fetch_assoc();
-$shipStmt->close();
-
+$shipStmt->execute([$oid]);
+$ship = $shipStmt->fetch(PDO::FETCH_ASSOC);
 $addr = $order['shipping_address'] ?: $order['user_address'];
 
 staff_page_start([

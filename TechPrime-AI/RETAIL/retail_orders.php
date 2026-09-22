@@ -24,34 +24,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pass_to_courier'])) {
                 WHERE oi.order_id = o.id AND p.seller_id = ?
             ) LIMIT 1'
         );
-        $verify->bind_param('ii', $orderId, $retailId);
-        $verify->execute();
-        if ($verify->get_result()->fetch_assoc()) {
+        $verify->execute([$orderId, $retailId]);
+        if ($verify->fetch(PDO::FETCH_ASSOC)) {
             $up = $db->prepare("UPDATE orders SET status = 'to_receive' WHERE id = ?");
-            $up->bind_param('i', $orderId);
-            $up->execute();
-            $up->close();
+            $up->execute([$orderId]);
             $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
-            $chk->bind_param('i', $orderId);
-            $chk->execute();
-            if (!$chk->get_result()->fetch_assoc()) {
+            $chk->execute([$orderId]);
+            if (!$chk->fetch(PDO::FETCH_ASSOC)) {
                 $ins = $db->prepare("INSERT INTO shipments (order_id, shipment_status) VALUES (?, 'pending')");
-                $ins->bind_param('i', $orderId);
-                $ins->execute();
-                $ins->close();
+                $ins->execute([$orderId]);
             }
-            $chk->close();
             logActivity($db, $retailId, 'pass_to_courier', "Order #$orderId passed to courier");
             header('Location: retail_orders.php?alert=passed');
             exit;
         }
-        $verify->close();
     }
 }
 
 $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.customer_phone,
                u.name, u.surname, u.email,
-               (SELECT GROUP_CONCAT(CONCAT(pr.name, ' x', oi.quantity) SEPARATOR ', ')
+               (SELECT STRING_AGG(pr.name || ' x' || oi.quantity::text, ', ')
                 FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
                 WHERE oi.order_id = o.id AND pr.seller_id = ?) AS products,
                (SELECT shipment_status FROM shipments WHERE order_id = o.id ORDER BY id DESC LIMIT 1) AS shipment_status,
@@ -64,11 +56,8 @@ $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.cust
         )
         ORDER BY o.id DESC";
 $st = $db->prepare($sql);
-$st->bind_param('ii', $retailId, $retailId);
-$st->execute();
-$rows = $st->get_result()->fetch_all(MYSQLI_ASSOC);
-$st->close();
-
+$st->execute([$retailId, $retailId]);
+$rows = $st->fetchAll(PDO::FETCH_ASSOC);
 staff_page_start([
     'role' => 'retail_officer',
     'title' => 'Store Orders',

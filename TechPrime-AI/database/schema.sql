@@ -1,5 +1,5 @@
-CREATE DATABASE ias_ecommerce;
-USE ias_ecommerce;
+CREATE DATABASE techprime_ai;
+USE techprime_ai;
 
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -7,6 +7,7 @@ CREATE TABLE users (
     surname VARCHAR(100),
     age INT,
     address TEXT,
+    phone VARCHAR(30) NULL DEFAULT NULL,
     email VARCHAR(150) UNIQUE,
     password VARCHAR(255),
     role ENUM('admin','seller','client','courier') DEFAULT 'client',

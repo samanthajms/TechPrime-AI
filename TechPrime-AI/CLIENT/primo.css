@@ -1,0 +1,868 @@
+/**
+ * Primo — EasyPC AI Product Assistant mascot (visual prototype only)
+ * CSS-shaped robot + panel. No images.
+ */
+
+.primo-root .sr-only,
+.primo-panel .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.primo-root {
+    --primo-green: var(--ep-green, #62b236);
+    --primo-green-dark: var(--ep-green-dark, #4b8b2a);
+    --primo-green-light: var(--ep-green-light, #eef8e6);
+    --primo-yellow: var(--ep-yellow, #fed700);
+    --primo-black: var(--ep-black, #171717);
+    --primo-soft: var(--ep-black-soft, #1e1f26);
+    --primo-size: 108px;
+    position: fixed;
+    left: auto;
+    right: 0;
+    top: auto;
+    /* Sit clearly above the EasyFix message float (bottom-right ~56px). */
+    bottom: 96px;
+    z-index: 45;
+    pointer-events: none;
+    font-family: 'Poppins', 'Inter', Arial, sans-serif;
+}
+
+.primo-stage {
+    position: relative;
+    pointer-events: auto;
+    transform: translateX(calc(var(--primo-size) * 0.52));
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+}
+
+.primo-root.is-expanded .primo-stage {
+    transform: translateX(-12px);
+}
+
+.primo-mascot {
+    width: var(--primo-size);
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.22));
+    outline: none;
+}
+
+.primo-mascot:focus-visible {
+    outline: 3px solid var(--primo-green);
+    outline-offset: 4px;
+    border-radius: 16px;
+}
+
+.primo-figure {
+    position: relative;
+    width: 86px;
+    height: 118px;
+    display: block;
+    animation: primo-bob 3.2s ease-in-out infinite;
+    transform-origin: center bottom;
+}
+
+.primo-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #fff;
+    background: var(--primo-green-dark);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    padding: 3px 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+    opacity: 0.92;
+}
+
+/* ---- Robot parts ---- */
+.primo-antenna {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 3px;
+    height: 12px;
+    margin-left: -1.5px;
+    background: #c5c8ce;
+    border-radius: 2px;
+    z-index: 2;
+}
+
+.primo-antenna-tip {
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    border-radius: 50%;
+    background: var(--primo-green);
+    box-shadow: 0 0 8px rgba(98, 178, 54, 0.85);
+    animation: primo-pulse 2.4s ease-in-out infinite;
+}
+
+.primo-head {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    width: 58px;
+    height: 42px;
+    margin-left: -29px;
+    background: linear-gradient(180deg, #f4f5f7 0%, #e1e3e8 100%);
+    border-radius: 18px 18px 14px 14px;
+    border: 2px solid #cfd3da;
+    box-sizing: border-box;
+    z-index: 3;
+}
+
+.primo-visor {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    top: 8px;
+    height: 24px;
+    background: var(--primo-soft);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    overflow: hidden;
+}
+
+.primo-eye {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primo-green);
+    box-shadow: 0 0 8px rgba(98, 178, 54, 0.95), 0 0 2px #fff;
+    transition: transform 0.18s ease, height 0.18s ease, opacity 0.18s ease;
+}
+
+.primo-mouth {
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    width: 12px;
+    height: 3px;
+    margin-left: -6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.primo-neck {
+    position: absolute;
+    top: 50px;
+    left: 50%;
+    width: 12px;
+    height: 8px;
+    margin-left: -6px;
+    background: #b8bcc4;
+    border-radius: 3px;
+    z-index: 2;
+}
+
+.primo-torso {
+    position: absolute;
+    top: 56px;
+    left: 50%;
+    width: 52px;
+    height: 40px;
+    margin-left: -26px;
+    background: linear-gradient(160deg, var(--primo-green) 0%, var(--primo-green-dark) 100%);
+    border-radius: 16px 16px 12px 12px;
+    border: 2px solid #3f7524;
+    box-sizing: border-box;
+    z-index: 2;
+}
+
+.primo-chest-light {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    border-radius: 50%;
+    background: var(--primo-yellow);
+    box-shadow: 0 0 8px rgba(254, 215, 0, 0.7);
+}
+
+.primo-arm {
+    position: absolute;
+    top: 8px;
+    width: 12px;
+    height: 28px;
+    background: #e8eaee;
+    border: 2px solid #cfd3da;
+    box-sizing: border-box;
+    border-radius: 999px;
+    z-index: 1;
+}
+
+.primo-arm-l {
+    left: -10px;
+    transform-origin: top center;
+}
+
+.primo-arm-r {
+    right: -10px;
+    transform-origin: top center;
+}
+
+.primo-hand {
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    border-radius: 50%;
+    background: #dfe2e8;
+    border: 2px solid #cfd3da;
+    box-sizing: border-box;
+}
+
+.primo-base {
+    position: absolute;
+    top: 94px;
+    left: 50%;
+    width: 44px;
+    height: 16px;
+    margin-left: -22px;
+    z-index: 1;
+}
+
+.primo-foot {
+    position: absolute;
+    bottom: 0;
+    width: 18px;
+    height: 12px;
+    background: var(--primo-black);
+    border-radius: 8px 8px 6px 6px;
+}
+
+.primo-foot-l { left: 2px; }
+.primo-foot-r { right: 2px; }
+
+/* ---- Expressions ---- */
+.primo-figure.is-winking .primo-eye-r {
+    height: 2px;
+    border-radius: 2px;
+    transform: translateY(3px);
+    box-shadow: none;
+}
+
+.primo-figure.is-waving .primo-arm-r {
+    animation: primo-wave 0.85s ease-in-out;
+}
+
+.primo-tuck {
+    position: absolute;
+    top: 50%;
+    left: -10px;
+    right: auto;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 36px;
+    border: 1px solid var(--ep-border, #e4e8ea);
+    border-radius: 10px 0 0 10px;
+    background: #fff;
+    color: var(--primo-green-dark);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    box-shadow: -2px 4px 10px rgba(0, 0, 0, 0.08);
+    pointer-events: auto;
+    padding: 0;
+    z-index: 3;
+}
+
+.primo-tuck:hover {
+    background: var(--primo-green-light);
+}
+
+.primo-root.is-collapsed .primo-tuck {
+    display: none;
+}
+
+/* ---- Chat backdrop + panel (above/right of mascot, below header) ---- */
+.primo-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(23, 23, 23, 0.22);
+    z-index: 1200;
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.primo-root.is-chat-open .primo-backdrop {
+    opacity: 1;
+}
+
+.primo-panel {
+    --primo-header-gap: 12px;
+    position: fixed;
+    left: auto;
+    right: calc(var(--primo-size) + 20px);
+    /* Vertical position is set in JS from real header height (top below navbar). */
+    top: auto;
+    bottom: calc(96px + var(--primo-size) + 18px);
+    width: min(360px, calc(100vw - var(--primo-size) - 48px));
+    height: min(460px, 58vh);
+    transform: translateY(10px) scale(0.96);
+    opacity: 0;
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid var(--ep-border, #e4e8ea);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+    z-index: 1201;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    pointer-events: auto;
+    transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.primo-root.is-chat-open .primo-panel {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.primo-panel[hidden],
+.primo-backdrop[hidden] {
+    display: none !important;
+}
+
+.primo-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    background: linear-gradient(120deg, var(--primo-green) 0%, var(--primo-green-dark) 100%);
+    color: #fff;
+}
+
+.primo-panel-identity {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.primo-panel-identity h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.primo-panel-identity p {
+    margin: 2px 0 0;
+    font-size: 11.5px;
+    font-weight: 500;
+    opacity: 0.92;
+}
+
+.primo-panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.primo-panel-close,
+.primo-panel-history,
+.primo-panel-reset {
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    flex-shrink: 0;
+    transition: background 0.18s ease;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0 10px;
+}
+
+.primo-panel-close,
+.primo-panel-history {
+    width: 34px;
+    padding: 0;
+}
+
+.primo-panel-close:hover,
+.primo-panel-history:hover,
+.primo-panel-reset:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.primo-panel-reset span {
+    line-height: 1;
+}
+
+.primo-history {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    background: #f7f8f9;
+    border-radius: inherit;
+    overflow: hidden;
+}
+
+.primo-history[hidden] {
+    display: none !important;
+}
+
+.primo-history-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px;
+    background: linear-gradient(120deg, var(--primo-green) 0%, var(--primo-green-dark) 100%);
+    color: #fff;
+}
+
+.primo-history-head strong {
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.primo-history-back {
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.primo-history-back:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.primo-history-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px 8px;
+}
+
+.primo-history-note {
+    margin: 0;
+    padding: 8px 14px 12px;
+    font-size: 11px;
+    color: #6b7280;
+    border-top: 1px solid #e8ecf0;
+    background: #fff;
+}
+
+.primo-history-empty {
+    margin: 24px 8px;
+    text-align: center;
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.primo-history-group {
+    margin-bottom: 14px;
+}
+
+.primo-history-group-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: #5b7c99;
+    margin: 0 0 8px;
+}
+
+.primo-history-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #e4e8ea;
+    border-radius: 10px;
+    padding: 8px 8px 8px 12px;
+    margin-bottom: 8px;
+}
+
+.primo-history-open {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0;
+}
+
+.primo-history-open strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2328;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.primo-history-open span {
+    display: block;
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 2px;
+}
+
+.primo-history-del {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #b91c1c;
+    border-radius: 8px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+}
+
+.primo-history-del:hover {
+    background: #fee2e2;
+}
+
+.primo-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 16px;
+    background: #f7f8f9;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.primo-msg {
+    display: flex;
+    gap: 10px;
+    max-width: 92%;
+    align-items: flex-end;
+}
+
+.primo-msg-user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+.primo-msg-bubble {
+    background: #fff;
+    border: 1px solid var(--ep-border, #e4e8ea);
+    border-radius: 14px;
+    padding: 11px 13px;
+    font-size: 13.5px;
+    line-height: 1.45;
+    color: #222;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.primo-msg-user .primo-msg-bubble {
+    background: var(--primo-green-light);
+    border-color: rgba(98, 178, 54, 0.35);
+    color: var(--primo-green-dark);
+    font-weight: 500;
+}
+
+.primo-msg-bubble-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 100%;
+}
+.primo-promo-lead {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.45;
+}
+.primo-tm-card {
+    background: linear-gradient(180deg, #f7fbf3 0%, #ffffff 55%);
+    border: 1px solid rgba(98, 178, 54, 0.28);
+    border-radius: 12px;
+    padding: 14px 14px 12px;
+    box-shadow: 0 6px 16px rgba(75, 139, 42, 0.08);
+}
+.primo-tm-card-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    color: var(--primo-green-dark, #4b8b2a);
+    margin-bottom: 6px;
+}
+.primo-tm-bolt { font-size: 13px; line-height: 1; }
+.primo-tm-tagline {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2328;
+}
+.primo-tm-copy {
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: #5c6570;
+    font-weight: 500;
+}
+.primo-tm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: none;
+    background: var(--primo-green, #62b236);
+    color: #fff !important;
+    text-decoration: none !important;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(75, 139, 42, 0.28);
+    transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.primo-tm-btn:hover {
+    background: var(--primo-green-dark, #4b8b2a);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(75, 139, 42, 0.32);
+}
+
+.primo-sample-note {
+    margin: 4px 0 0;
+    text-align: center;
+    font-size: 11px;
+    color: #8a9098;
+    font-weight: 500;
+}
+
+.primo-panel-input {
+    display: flex;
+    gap: 8px;
+    padding: 12px 14px;
+    border-top: 1px solid var(--ep-border, #e4e8ea);
+    background: #fff;
+}
+
+.primo-panel-input input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--ep-border, #e4e8ea);
+    border-radius: 12px;
+    padding: 11px 13px;
+    font-family: inherit;
+    font-size: 13.5px;
+    background: #fafbfc;
+    color: var(--primo-black);
+}
+
+.primo-panel-input input:focus {
+    outline: none;
+    border-color: var(--primo-green);
+    box-shadow: 0 0 0 3px rgba(98, 178, 54, 0.18);
+    background: #fff;
+}
+
+.primo-send-btn {
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--primo-green);
+    color: #fff;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    transition: background 0.18s ease, transform 0.15s ease;
+}
+
+.primo-send-btn:hover {
+    background: var(--primo-green-dark);
+    transform: translateY(-1px);
+}
+
+.primo-soon {
+    padding: 8px 14px 12px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primo-green-dark);
+    background: var(--primo-green-light);
+    border-top: 1px solid rgba(98, 178, 54, 0.2);
+}
+
+/* Mini robot for panel header / bubbles */
+.primo-mini {
+    width: 36px;
+    height: 40px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.primo-mini-sm {
+    width: 28px;
+    height: 32px;
+}
+
+.primo-mini-head {
+    width: 22px;
+    height: 16px;
+    background: #eef0f3;
+    border: 1.5px solid #cfd3da;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    box-sizing: border-box;
+}
+
+.primo-mini-sm .primo-mini-head {
+    width: 18px;
+    height: 13px;
+}
+
+.primo-mini-eye {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--primo-green);
+    box-shadow: 0 0 4px rgba(98, 178, 54, 0.8);
+}
+
+.primo-mini-body {
+    width: 18px;
+    height: 14px;
+    margin-top: 2px;
+    background: var(--primo-green);
+    border-radius: 7px;
+    border: 1.5px solid var(--primo-green-dark);
+    box-sizing: border-box;
+}
+
+.primo-mini-sm .primo-mini-body {
+    width: 14px;
+    height: 11px;
+}
+
+/* ---- Keyframes ---- */
+@keyframes primo-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+@keyframes primo-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(0.88); }
+}
+
+@keyframes primo-wave {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(-28deg); }
+    50% { transform: rotate(8deg); }
+    75% { transform: rotate(-22deg); }
+    100% { transform: rotate(0deg); }
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 960px) {
+    .primo-root {
+        --primo-size: 92px;
+        bottom: 90px;
+    }
+    .primo-figure {
+        width: 74px;
+        height: 102px;
+    }
+    .primo-head { width: 50px; height: 36px; margin-left: -25px; }
+    .primo-torso { width: 46px; height: 36px; margin-left: -23px; top: 50px; }
+    .primo-base { top: 84px; }
+    .primo-panel {
+        right: calc(var(--primo-size) + 14px);
+        width: min(340px, calc(100vw - var(--primo-size) - 36px));
+        height: min(440px, 56vh);
+        bottom: calc(90px + var(--primo-size) + 16px);
+    }
+}
+
+@media (max-width: 640px) {
+    .primo-root {
+        --primo-size: 78px;
+        bottom: 120px;
+    }
+    .primo-figure {
+        width: 64px;
+        height: 90px;
+    }
+    .primo-label {
+        font-size: 9px;
+        padding: 2px 8px;
+    }
+    .primo-panel {
+        left: 12px;
+        right: 12px;
+        width: auto;
+        bottom: calc(120px + var(--primo-size) + 14px);
+        height: min(420px, 58vh);
+        border-radius: 14px;
+    }
+    .primo-root.is-expanded .primo-stage {
+        transform: translateX(-8px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .primo-figure,
+    .primo-antenna-tip,
+    .primo-stage,
+    .primo-panel,
+    .primo-backdrop {
+        animation: none !important;
+        transition: none !important;
+    }
+}
