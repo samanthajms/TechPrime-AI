@@ -10,6 +10,7 @@ if (!function_exists('ias_inventory_allowed_categories')) {
     require_once __DIR__ . '/../includes/product_categories.php';
 }
 $currentCategory = $currentCategory ?? '';
+$epWishCount = 0;
 
 $searchQuery = $searchQuery ?? '';
 $isHomePage  = ($activePage ?? '') === 'home' || !empty($isHomePage);
@@ -17,11 +18,35 @@ $bodyClass   = $bodyClass ?? '';
 
 if (!isset($epCartPreview)) {
     require_once __DIR__ . '/../includes/client_helpers.php';
+    if (!empty($_SESSION['user_id']) && isset($db)) {
+        ep_ensure_session_cart($db);
+    } elseif (!empty($_SESSION['user_id'])) {
+        ep_ensure_session_cart(getDbConnection());
+    }
     $epCartPreview = ep_get_cart_preview($db ?? getDbConnection());
+}
+if (function_exists('ep_ensure_session_wishlist')) {
+    $wishDb = $db ?? (function_exists('getDbConnection') ? getDbConnection() : null);
+    if ($wishDb) {
+        ep_ensure_session_wishlist($wishDb);
+    }
+    $epWishCount = count(ep_wishlist_ids());
 }
 $epCartItems  = $epCartPreview['items'];
 $epCartTotal  = $epCartPreview['total'];
 $epCartCount  = $epCartPreview['count'];
+
+$epNotifItems = [];
+$epNotifUnread = 0;
+$epNotifCsrf = '';
+if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
+    require_once __DIR__ . '/../includes/inventory_alerts.php';
+    $notifDb = $db ?? getDbConnection();
+    $pack = inv_user_notifications($notifDb, (int)$_SESSION['user_id'], 30);
+    $epNotifItems = $pack['items'] ?? [];
+    $epNotifUnread = (int)($pack['unread'] ?? 0);
+    $epNotifCsrf = generateCsrfToken();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -43,6 +68,7 @@ $epCartCount  = $epCartPreview['count'];
 <body class="ep-body <?php echo h($bodyClass); ?>">
 
 <header class="top-header ep-header full-width">
+<div class="ep-header-main">
     <div class="logo ep-logo" onclick="location.href='index.php'">
         <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img">
     </div>
@@ -71,6 +97,18 @@ $epCartCount  = $epCartPreview['count'];
            <?php echo ($activePage ?? '') === 'shop' ? 'aria-current="page"' : ''; ?>>
             <span class="ep-nav-item-icon"><i class="fas fa-store" aria-hidden="true"></i></span>
             <span class="ep-nav-item-label">Shop Now</span>
+        </a>
+
+        <a href="wishlist.php"
+           class="ep-nav-item<?php echo ($activePage ?? '') === 'wishlist' ? ' active' : ''; ?>"
+           <?php echo ($activePage ?? '') === 'wishlist' ? 'aria-current="page"' : ''; ?>>
+            <span class="ep-nav-item-icon">
+                <i class="far fa-heart" aria-hidden="true"></i>
+                <?php if ($epWishCount > 0): ?>
+                    <span class="badge"><?php echo (int)$epWishCount; ?></span>
+                <?php endif; ?>
+            </span>
+            <span class="ep-nav-item-label">Wishlist</span>
         </a>
 
         <div class="ep-cart-wrap" id="epCartWrap">
@@ -108,8 +146,14 @@ $epCartCount  = $epCartPreview['count'];
         </div>
 
         <button id="notifBtn" type="button" class="ep-nav-item"
-                onclick="document.getElementById('epNotifPanel').classList.toggle('hidden')">
-            <span class="ep-nav-item-icon"><i class="far fa-bell" aria-hidden="true"></i></span>
+                onclick="document.getElementById('epNotifPanel').classList.toggle('hidden')"
+                aria-haspopup="true" aria-controls="epNotifPanel">
+            <span class="ep-nav-item-icon">
+                <i class="far fa-bell" aria-hidden="true"></i>
+                <?php if ($epNotifUnread > 0): ?>
+                    <span class="badge ep-notif-badge"><?php echo $epNotifUnread > 99 ? '99+' : (int)$epNotifUnread; ?></span>
+                <?php endif; ?>
+            </span>
             <span class="ep-nav-item-label">Notifications</span>
         </button>
 
@@ -126,13 +170,40 @@ $epCartCount  = $epCartPreview['count'];
             <span class="ep-nav-item-label">My Profile</span>
         </button>
     </nav>
+</div>
 
     <div id="epNotifPanel" class="notifications-panel hidden">
-        <strong>Notifications</strong>
-        <ul>
-            <li>Welcome to EasyPC!</li>
-            <li>Track your orders from your dashboard.</li>
-        </ul>
+        <div class="ep-notif-head">
+            <strong>Notifications</strong>
+        </div>
+        <?php if (empty($isLoggedIn)): ?>
+            <p class="ep-notif-empty">Log in to see your notifications.</p>
+        <?php elseif (empty($epNotifItems)): ?>
+            <p class="ep-notif-empty">No notifications yet.</p>
+        <?php else: ?>
+            <ul class="ep-notif-list" id="epNotifList">
+                <?php foreach ($epNotifItems as $n):
+                    $nRead = (int)($n['is_read'] ?? 0) === 1;
+                    $when = function_exists('inv_relative_time')
+                        ? inv_relative_time((string)$n['created_at'])
+                        : (string)($n['created_at'] ?? '');
+                    ?>
+                <li class="ep-notif-item<?php echo $nRead ? ' is-read' : ' is-unread'; ?>"
+                    data-id="<?php echo (int)$n['id']; ?>">
+                    <div class="ep-notif-body">
+                        <span class="ep-notif-msg"><?php echo h((string)$n['message']); ?></span>
+                        <span class="ep-notif-time"><?php echo h($when); ?></span>
+                    </div>
+                    <div class="ep-notif-actions">
+                        <?php if (!$nRead): ?>
+                        <button type="button" class="ep-notif-read" title="Mark as read" data-action="read">Read</button>
+                        <?php endif; ?>
+                        <button type="button" class="ep-notif-remove" title="Remove" data-action="delete">&times;</button>
+                    </div>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
     </div>
 </header>
 
@@ -350,6 +421,62 @@ $epCartCount  = $epCartPreview['count'];
 
         document.addEventListener('click', function (e) {
             if (!searchWrap.contains(e.target)) hideSuggest();
+        });
+    }
+
+    /* ---- Persistent notifications (DB-backed) ---- */
+    var notifList = document.getElementById('epNotifList');
+    var notifCsrf = <?php echo json_encode($epNotifCsrf ?? ''); ?>;
+    if (notifList && notifCsrf) {
+        function postClientNotif(action, id) {
+            var body = new URLSearchParams();
+            body.set('action', action);
+            body.set('csrf_token', notifCsrf);
+            body.set('id', String(id));
+            return fetch('client_notif_api.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString()
+            }).then(function (r) { return r.json(); }).catch(function () { return null; });
+        }
+        function refreshNotifBadge() {
+            var badge = document.querySelector('#notifBtn .ep-notif-badge');
+            var unread = notifList.querySelectorAll('.ep-notif-item.is-unread').length;
+            var icon = document.querySelector('#notifBtn .ep-nav-item-icon');
+            if (unread <= 0) {
+                if (badge) badge.remove();
+                return;
+            }
+            if (!badge && icon) {
+                badge = document.createElement('span');
+                badge.className = 'badge ep-notif-badge';
+                icon.appendChild(badge);
+            }
+            if (badge) badge.textContent = unread > 99 ? '99+' : String(unread);
+        }
+        notifList.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            e.stopPropagation();
+            var item = btn.closest('.ep-notif-item');
+            if (!item) return;
+            var id = item.getAttribute('data-id');
+            var action = btn.getAttribute('data-action');
+            postClientNotif(action, id).then(function (data) {
+                if (!data || !data.ok) return;
+                if (action === 'delete') {
+                    item.remove();
+                    if (!notifList.querySelector('.ep-notif-item')) {
+                        notifList.outerHTML = '<p class="ep-notif-empty">No notifications yet.</p>';
+                    }
+                } else if (action === 'read') {
+                    item.classList.remove('is-unread');
+                    item.classList.add('is-read');
+                    btn.remove();
+                }
+                refreshNotifBadge();
+            });
         });
     }
 })();

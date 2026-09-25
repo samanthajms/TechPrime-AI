@@ -13,36 +13,30 @@ $isHomePage = true;
 $epCsrf = $isLoggedIn ? generateCsrfToken() : '';
 $extraHead = '<link rel="stylesheet" href="primo.css">';
 
-$categories = ['Accessories', 'Audio', 'Cables and Adapters', 'Camera', 'Combo', 'Cooling', 'Customization', 'Display', 'Gaming Surface', 'GPU', 'Graphic Card', 'Hard Disk', 'Home & Office Furniture',
-'Keyboard', 'Laptop GA2', 'Laptop GA3', 'Laptop PR2', 'Laptop PR3', 'Memory', 'Mini PC', 'Motherboard', 'Mouse', 'Network Device', 'Others', 'PC Case', 'Power Station', 'Power Supply', 'Printer and Scanner', 'Printers and Scanners',
-'Processor', 'Promotional', 'RAM', 'Recorder', 'Services', 'Software', 'Solid State Drive', 'Speaker', 'UPS & AVR', 'Value Plus'];
+$categories = []; // unused on homepage render; avoid large unused array work
 
-$productQuery = "SELECT p.*, u.name AS seller_name
+$vis = ias_client_product_list_sql_condition('p');
+$listCols = 'p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, u.name AS seller_name';
+
+$productQuery = "SELECT {$listCols}
                  FROM products p
                  INNER JOIN users u ON p.seller_id = u.id
-                 WHERE " . ias_client_product_list_sql_condition('p') . "
+                 WHERE {$vis}
                  ORDER BY p.id DESC
-                 LIMIT 40";
+                 LIMIT 8";
 $productResult = $db->query($productQuery);
-$allDisplayProducts = ias_client_filter_products_for_display(
-    $productResult ? $productResult->fetchAll(PDO::FETCH_ASSOC) : [],
-    12
-);
-$topSellers = array_slice($allDisplayProducts, 0, 8);
+$topSellers = $productResult ? $productResult->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // New Arrivals: products added within the last 7 days (uses existing created_at)
-$newArrivalsQuery = "SELECT p.*, u.name AS seller_name
+$newArrivalsQuery = "SELECT {$listCols}
                      FROM products p
                      INNER JOIN users u ON p.seller_id = u.id
-                     WHERE " . ias_client_product_list_sql_condition('p') . "
+                     WHERE {$vis}
                        AND p.created_at >= (NOW() - INTERVAL '7 day')
                      ORDER BY p.created_at DESC
-                     LIMIT 12";
+                     LIMIT 6";
 $newArrivalsResult = $db->query($newArrivalsQuery);
-$newArrivals = ias_client_filter_products_for_display(
-    $newArrivalsResult ? $newArrivalsResult->fetchAll(PDO::FETCH_ASSOC) : [],
-    6
-);
+$newArrivals = $newArrivalsResult ? $newArrivalsResult->fetchAll(PDO::FETCH_ASSOC) : [];
 
 $returnTo = 'index.php';
 ?>
@@ -65,7 +59,7 @@ $returnTo = 'index.php';
                     <?php foreach ($topSellers as $p): ?>
                         <div class="ep-product-card ep-featured-card">
                             <div class="ep-featured-card-media">
-                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>" class="ep-product-img" alt="<?php echo h($p['name']); ?>">
+                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>" class="ep-product-img" alt="<?php echo h($p['name']); ?>" loading="lazy" decoding="async">
                             </div>
                             <div class="ep-featured-card-body">
                                 <div class="ep-product-name"><?php echo h($p['name']); ?></div>
@@ -115,7 +109,7 @@ $returnTo = 'index.php';
                 <?php foreach ($newArrivals as $p): ?>
                     <article class="ep-new-arrival-card">
                         <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                             alt="<?php echo h($p['name']); ?>">
+                             alt="<?php echo h($p['name']); ?>" loading="lazy" decoding="async">
                         <div class="ep-new-arrival-card-body">
                             <div class="ep-new-arrival-name"><?php echo h($p['name']); ?></div>
                             <div class="ep-new-arrival-price">₱<?php echo number_format((float) $p['price'], 2); ?></div>

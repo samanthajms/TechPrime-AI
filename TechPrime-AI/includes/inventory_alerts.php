@@ -264,6 +264,23 @@ if (!function_exists('inv_mark_all_notifications_read')) {
     }
 }
 
+if (!function_exists('inv_delete_notification')) {
+    /** Remove a single notification owned by the user. */
+    function inv_delete_notification(PDO $db, int $userId, int $notifId): bool
+    {
+        inv_notifications_ensure_schema($db);
+        if ($userId <= 0 || $notifId <= 0) {
+            return false;
+        }
+        $stmt = $db->prepare('DELETE FROM notifications WHERE id = ? AND user_id = ?');
+        if (!$stmt) {
+            return false;
+        }
+        $ok = $stmt->execute([$notifId, $userId]);
+        return (bool)$ok && $stmt->rowCount() > 0;
+    }
+}
+
 if (!function_exists('inv_relative_time')) {
     function inv_relative_time(string $datetime): string
     {

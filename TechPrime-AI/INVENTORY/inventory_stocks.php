@@ -1066,11 +1066,22 @@ function cardHtml(p) {
 
 function renderPagination(totalPages) {
     var el = document.getElementById('pgControls');
-    var html = '<button ' + (state.page <= 1 ? 'disabled' : '') + ' onclick="goToPage(' + (state.page - 1) + ')">Prev</button>';
-    for (var i = 1; i <= totalPages; i++) {
-        html += '<button class="' + (i === state.page ? 'active' : '') + '" onclick="goToPage(' + i + ')">' + i + '</button>';
+    var WINDOW = 20;
+    var windowIndex = Math.floor((state.page - 1) / WINDOW);
+    var start = windowIndex * WINDOW + 1;
+    var end = Math.min(start + WINDOW - 1, totalPages);
+    var html = '';
+    if (start > 1) {
+        html += '<button type="button" title="Previous page set" onclick="goToPage(' + (start - 1) + ')">&lt;</button>';
     }
-    html += '<button ' + (state.page >= totalPages ? 'disabled' : '') + ' onclick="goToPage(' + (state.page + 1) + ')">Next</button>';
+    html += '<button type="button" ' + (state.page <= 1 ? 'disabled' : '') + ' onclick="goToPage(' + (state.page - 1) + ')">Prev</button>';
+    for (var i = start; i <= end; i++) {
+        html += '<button type="button" class="' + (i === state.page ? 'active' : '') + '" onclick="goToPage(' + i + ')">' + i + '</button>';
+    }
+    html += '<button type="button" ' + (state.page >= totalPages ? 'disabled' : '') + ' onclick="goToPage(' + (state.page + 1) + ')">Next</button>';
+    if (end < totalPages) {
+        html += '<button type="button" title="Next page set" onclick="goToPage(' + (end + 1) + ')">&gt;</button>';
+    }
     el.innerHTML = html;
 }
 

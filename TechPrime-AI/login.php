@@ -60,6 +60,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $_SESSION['surname']       = $user['surname'];
     $_SESSION['last_activity'] = time();
 
+    // Persist cart across logout/login for clients (DB-backed cart → session).
+    $role = (string)($user['role'] ?? '');
+    if ($role === 'client' || $role === '' || $role === 'customer') {
+        require_once __DIR__ . '/includes/client_helpers.php';
+        ep_sync_cart_on_login($connection, (int)$user['id']);
+    }
+
     logActivity($connection, $user['id'], 'login_success', 'User logged in');
     redirectByRole($user['role']);
 }

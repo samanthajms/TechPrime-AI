@@ -363,6 +363,9 @@ if (!function_exists('staff_page_start')) {
                                 </span>
                                 <?php if (!$nRead): ?><span class="staff-notif-dot" aria-hidden="true"></span><?php endif; ?>
                             </button>
+                            <button type="button" class="staff-notif-remove" title="Remove notification" aria-label="Remove notification" data-notif-remove="<?php echo (int)$n['id']; ?>">
+                                <i class="fas fa-times" aria-hidden="true"></i>
+                            </button>
                         </li>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -430,8 +433,25 @@ if (!function_exists('staff_page_start')) {
 
                 if (list) {
                     list.addEventListener('click', function (e) {
+                        var removeBtn = e.target.closest('[data-notif-remove]');
+                        if (removeBtn) {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            var rid = removeBtn.getAttribute('data-notif-remove');
+                            var item = removeBtn.closest('.staff-notif-item');
+                            postNotif('delete', rid).then(function (data) {
+                                if (!data || !data.ok) return;
+                                if (item) item.remove();
+                                setBadge(unreadCount());
+                                if (list && !list.querySelector('.staff-notif-item')) {
+                                    list.innerHTML = '<li class="staff-notif-empty"><i class="fas fa-bell-slash" aria-hidden="true"></i><span>No inventory notifications yet.</span></li>';
+                                }
+                            });
+                            return;
+                        }
                         var item = e.target.closest('.staff-notif-item');
                         if (!item) return;
+                        if (e.target.closest('.staff-notif-remove')) return;
                         var id = item.getAttribute('data-id');
                         var href = item.getAttribute('data-href') || 'inventory_stocks.php';
                         var go = function () { window.location.href = href; };

@@ -67,35 +67,4 @@ while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
         break;
     }
 }
-/* If still short, add remaining product names from the result set even if only description matched. */
-if (count($suggestions) < 8) {
-    $stmt2 = $db->prepare(
-        "SELECT DISTINCT p.name
-         FROM products p
-         WHERE (p.name LIKE ? OR p.description LIKE ? OR COALESCE(p.category, '') LIKE ?)
-           AND {$vis}
-         ORDER BY p.name ASC
-         LIMIT 8"
-    );
-    if ($stmt2) {
-        $stmt2->execute([$like, $like, $like]);
-        $r2 = $stmt2;
-        while ($row = $r2->fetch(PDO::FETCH_ASSOC)) {
-            $name = trim((string)($row['name'] ?? ''));
-            if ($name === '') {
-                continue;
-            }
-            $key = 'p:' . mb_strtolower($name);
-            if (isset($seen[$key])) {
-                continue;
-            }
-            $seen[$key] = true;
-            $suggestions[] = ['label' => $name, 'type' => 'product'];
-            if (count($suggestions) >= 8) {
-                break;
-            }
-        }
-    }
-}
-
 echo json_encode(['suggestions' => array_slice($suggestions, 0, 8)]);

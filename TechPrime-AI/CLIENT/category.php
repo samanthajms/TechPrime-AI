@@ -23,7 +23,7 @@ $categoryHeroTitle = $type;
  * decides to hide.
  * ------------------------------------------------------------------ */
 $stmt = $db->prepare(
-    "SELECT p.*, u.name as seller_name
+    "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, u.name as seller_name
      FROM products p
      JOIN users u ON p.seller_id = u.id
      WHERE p.category = ? AND " . ias_client_product_list_sql_condition('p')
@@ -31,7 +31,7 @@ $stmt = $db->prepare(
 $stmt->execute([$type]);
 $baseResult = $stmt;
 $baseRows = $baseResult ? $baseResult->fetchAll(PDO::FETCH_ASSOC) : [];
-$baseProducts = ias_client_filter_products_for_display($baseRows);
+$baseProducts = $baseRows;
 
 // ---- Facet data (brands + price bounds) from the whole category ----
 $availableBrands = [];
@@ -231,7 +231,8 @@ function ep_pagination_range(int $current, int $total): array
                         <?php foreach ($displayProducts as $p): ?>
                             <div class="ep-product-card ep-grid-card">
                                 <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                     class="ep-product-img" alt="<?php echo h($p['name']); ?>">
+                                     class="ep-product-img" alt="<?php echo h($p['name']); ?>"
+                                     loading="lazy" decoding="async">
                                 <div class="ep-product-name"><?php echo h($p['name']); ?></div>
                                 <div class="ep-product-cat">Store: <?php echo h($p['seller_name']); ?></div>
                                 <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>

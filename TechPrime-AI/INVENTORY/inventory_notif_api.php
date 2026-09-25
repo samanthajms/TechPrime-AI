@@ -45,5 +45,12 @@ if ($action === 'read_all') {
     exit;
 }
 
+if ($action === 'delete') {
+    $id = (int)($_POST['id'] ?? 0);
+    $ok = $id > 0 && inv_delete_notification($db, $uid, $id);
+    echo json_encode(['ok' => $ok]);
+    exit;
+}
+
 http_response_code(400);
 echo json_encode(['ok' => false, 'error' => 'Unknown action']);

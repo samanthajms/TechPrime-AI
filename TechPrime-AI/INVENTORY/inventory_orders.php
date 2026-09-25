@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
+require_once __DIR__ . '/../includes/inventory_alerts.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -15,6 +16,7 @@ $orderStatusOptions = [
     'to_receive' => 'With Courier',
     'to_review' => 'Completed',
 ];
+$orderStatusFilters = $orderStatusOptions + ['cancelled' => 'Cancelled'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_status') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
@@ -26,6 +28,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     $returnStatus = trim((string)($_POST['return_status'] ?? ''));
     $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
     if ($oid > 0 && in_array($status, $allowed, true)) {
+        $prev = $db->prepare('SELECT user_id, status FROM orders WHERE id = ? LIMIT 1');
+        $prev->execute([$oid]);
+        $prevRow = $prev->fetch(PDO::FETCH_ASSOC) ?: [];
+        $prevStatus = (string)($prevRow['status'] ?? '');
+        $orderUserId = (int)($prevRow['user_id'] ?? 0);
+
         $up = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
         $up->execute([$status, $oid]);
         // Ensure a shipment row exists for fulfillment tracking (no courier assignment)
@@ -49,9 +57,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
             $su->execute([$shipStatus, $sid]);
         }
 
+        if ($orderUserId > 0 && $prevStatus !== $status) {
+            $label = $orderStatusOptions[$status] ?? $status;
+            inv_notify_user(
+                $db,
+                $orderUserId,
+                "Your order #ORD-{$oid} status is now: {$label}.",
+                'order_status',
+                'user_dashboard.php'
+            );
+        }
+
         logActivity($db, $uid, 'update_order_status', "Order #$oid -> $status");
         $redirectParams = ['alert' => 'updated', 'page' => $returnPage];
-        if ($returnStatus !== '' && isset($orderStatusOptions[$returnStatus])) {
+        if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
             $redirectParams['status'] = $returnStatus;
         }
         header('Location: inventory_orders.php?' . http_build_query($redirectParams));
@@ -73,7 +92,7 @@ $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.cust
 $allRows = $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
 $selectedStatus = trim((string)($_GET['status'] ?? ''));
-if ($selectedStatus !== '' && !isset($orderStatusOptions[$selectedStatus])) {
+if ($selectedStatus !== '' && !isset($orderStatusFilters[$selectedStatus])) {
     $selectedStatus = '';
 }
 
@@ -309,7 +328,7 @@ EXTRA
                         <h3><span class="card-icon"><i class="fas fa-shopping-cart"></i></span> Customer Orders</h3>
                         <div class="card-subtitle">
                             <?php if ($selectedStatus !== ''): ?>
-                                Filtered by <?php echo h($orderStatusOptions[$selectedStatus]); ?>
+                                Filtered by <?php echo h($orderStatusFilters[$selectedStatus]); ?>
                             <?php else: ?>
                                 All customer orders
                             <?php endif; ?>
@@ -321,7 +340,7 @@ EXTRA
                             <label for="statusFilter" class="sr-only" style="position:absolute;left:-9999px;">Status</label>
                             <select name="status" id="statusFilter" class="form-control orders-status-select" aria-label="Filter by status" onchange="this.form.submit()">
                                 <option value="">All Statuses</option>
-                                <?php foreach ($orderStatusOptions as $val => $lbl): ?>
+                                <?php foreach ($orderStatusFilters as $val => $lbl): ?>
                                 <option value="<?php echo h($val); ?>"<?php echo $selectedStatus === $val ? ' selected' : ''; ?>><?php echo h($lbl); ?></option>
                                 <?php endforeach; ?>
                             </select>

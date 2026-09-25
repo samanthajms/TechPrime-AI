@@ -166,14 +166,13 @@ function ias_client_product_image_url(array $p): string
         return '';
     }
 
-    // Git-synced catalog images under assets/products/{Category}/...
+    // Git-synced catalog images: trust managed paths (avoid per-row filesystem stats on listings)
     if (str_starts_with($raw, 'assets/products/')) {
-        $path = dirname(__DIR__) . '/' . $raw;
-        if (!is_file($path) || !is_readable($path)) {
+        $ext = strtolower(pathinfo($raw, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
             return '';
         }
-        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+        if (str_contains($raw, '..')) {
             return '';
         }
         return '../' . $raw;
@@ -235,6 +234,10 @@ function ias_handle_product_upload(int $sellerId): ?string
 /** Human-readable order/shipment status for all roles */
 function ias_order_display_status(?string $orderStatus, ?string $shipmentStatus = null): string
 {
+    $s = $orderStatus ?? '';
+    if (strcasecmp($s, 'cancelled') === 0 || strcasecmp($s, 'canceled') === 0) {
+        return 'Cancelled';
+    }
     if ($shipmentStatus !== null && $shipmentStatus !== '') {
         $ship = [
             'pending' => 'Pending',
@@ -250,8 +253,10 @@ function ias_order_display_status(?string $orderStatus, ?string $shipmentStatus 
         'to_ship' => 'To Ship',
         'to_receive' => 'With Courier',
         'to_review' => 'Completed',
+        'cancelled' => 'Cancelled',
+        'Canceled' => 'Cancelled',
+        'Cancelled' => 'Cancelled',
     ];
-    $s = $orderStatus ?? '';
     return $order[$s] ?? ($s !== '' ? ucfirst($s) : 'New Order');
 }
 

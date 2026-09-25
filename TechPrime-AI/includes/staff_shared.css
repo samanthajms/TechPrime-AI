@@ -1027,6 +1027,32 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   color: var(--text-muted);
   margin-top: 2px;
 }
+.staff-notif-item {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  position: relative;
+}
+.staff-notif-item .staff-notif-item-btn {
+  flex: 1;
+}
+.staff-notif-remove {
+  flex-shrink: 0;
+  width: 32px;
+  border: 0;
+  background: transparent;
+  color: #9aa3ad;
+  cursor: pointer;
+  border-radius: 8px;
+  margin: 6px 6px 6px 0;
+  font-size: 12px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.staff-notif-remove:hover {
+  background: #fde8e8;
+  color: #b42318;
+}
+
 .staff-notif-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
