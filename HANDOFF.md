@@ -1,6 +1,6 @@
 # HANDOFF — Cashier role + barcode POS
 
-_Last updated: 2026-09-26 · branch `Paul-UI` (same commit as `khenzou`) · pushed_
+_Last updated: 2026-09-26 · branch `Paul-UI` (tracks `origin/Paul-UI`; `khenzou` has the same code, only these docs differ)_
 
 ## Goal
 
@@ -41,12 +41,13 @@ All paths relative to `TechPrime-AI/`.
 | `includes/security.php` | Flash messages `barcode`, `barcode_taken`, `barcode_generated` |
 | `INVENTORY/inventory_stocks.php` | New UPC/EAN field on Add/Edit (old "Barcode" field actually saved `sku` → relabelled "SKU / Item Code"); UPC/EAN in details; Barcode column + Has/Missing filter; search matches barcodes; Print Barcode label modal (copies, price toggle, print sheet); Generate / bulk Generate Barcodes; Print Labels for selected |
 
-**Verification done** (evidence in the session; scripts lived in a temp scratchpad and are likely gone):
+**Verification done** (evidence in the sessions; the scripts lived in temp scratchpads and are gone — the recipes are in `CLAUDE.md` → Verifying changes):
 - `php -l` clean on every changed PHP file.
 - 40/40 DB integration checks inside a rolled-back transaction (lookup, sale, idempotent resubmit, over-stock block, forced mid-transaction failure → full rollback, payment validation, stock-in, CHECK constraints, read models); DB identical to baseline afterwards. Row-lock contention test passed.
 - HTTP access control: cashier → 200 on own pages, 302 on all ADMIN/INVENTORY/RETAIL pages, 403 on custodian API; other roles → blocked from all cashier pages (302) and APIs (403); unauthenticated APIs → 403.
 - Headless browser E2E (simulated scanner keystrokes): 30 checks incl. real sale + stock-in; 0 console errors, 0 failed requests on all cashier pages; visual comparison with custodian Stocks page.
 - Rendered barcodes decoded by an independent decoder (ZXing) for all formats, including a label taken from the live page.
+- Knowledge graph refreshed (`/graphify --update`, commit `348c7f9`): 574 → 733 nodes, 1,162 edges, 97 communities; covers the Cashier/POS code and `CLAUDE.md`/`HANDOFF.md`. Health check: no dangling/missing edges, 3 self-loop edges (harmless).
 - Custodian notifications from cashier actions (28/28, rolled back): one sale taking one item ok→low (15 left) and another →0 sends `low_stock` + `out_of_stock` to every active custodian (and only custodians) with link `inventory_stocks.php`; low→low sale, rejected over-stock sale → nothing; stock-in out→ok and low→ok → `stock_updated`; ok→low again within 12 h → deduped; alerts show in `inv_user_notifications()`. Counts, product checksum, `pos_invoice_seq` and the `invoice_no` default identical afterwards. To avoid burning real invoice numbers, the test swaps the `pos_sales.invoice_no` default with `ALTER TABLE` inside the rolled-back transaction (holds a table lock for a few seconds; only run while nobody is selling).
 - Session expiry: APIs return 401 `session_expired` after > 900 s idle (GET lookup, POST stock_out/stock_in, checked before CSRF), then the session is destroyed (next call 403); 890 s idle → 200. In the browser a scan after expiry on POS and Stock-In shows "Your session expired…" and redirects to `login.php`; no page errors (the 401 shows up as a console resource error, expected). Tested with a crafted session file in `C:\xampp\tmp` (removed afterwards).
 
@@ -65,7 +66,8 @@ All paths relative to `TechPrime-AI/`.
 5. **Create real cashier accounts** via Admin → Manage Users; block/delete the test account before go-live.
 6. **Rotate the Supabase DB password** — it is hardcoded in `includes/db.php`, which is committed and on GitHub. Deleting that (apparently unused) file needs the user's OK.
 7. Close the remaining verification gaps (all write to the live DB or need a password, so they need the user): submit Admin's Create Staff form through the UI (no admin password available to the agent); render the Admin/Inventory/Retail dashboards (they write a `logs` row on every GET, so they were skipped); save a barcode through the custodian Edit form. _Done 2026-09-26: API session-expiry (401) path and custodian notifications from cashier sales — see Verification._
-8. Not started / out of scope so far: voiding a sale with Store Manager approval (no Store Manager role exists; `pos_sales.status` already allows `voided`); POS sales in RETAIL sales reports (they only read online `orders`); cashier actions on the custodian Activity page (user declined); per-product reorder levels.
+8. Optional: add a `.graphifyignore` (vendor dirs, `assets/`, `.serena/`, `claude/`) so `/graphify --update` stops re-reporting out-of-scope files — ask the user first (new file). Also fix or unset the invalid Gemini API key.
+9. Not started / out of scope so far: voiding a sale with Store Manager approval (no Store Manager role exists; `pos_sales.status` already allows `voided`); POS sales in RETAIL sales reports (they only read online `orders`); cashier actions on the custodian Activity page (user declined); per-product reorder levels.
 
 ## Key decisions (and why)
 

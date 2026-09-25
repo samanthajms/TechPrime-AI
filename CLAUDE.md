@@ -69,10 +69,14 @@ python test_intents.py
 
 No automated tests exist; the working approach has been:
 1. `php -l` on every changed PHP file.
-2. DB logic: a CLI script that opens a transaction, calls the helpers (they use SAVEPOINTs when nested), asserts, then **rolls back** and confirms the DB matches the baseline. For a forced mid-transaction failure, create a trigger inside that same transaction.
-3. Access control: `curl` with a cookie jar after logging in through `login.php`; other roles can be simulated in CLI by starting a session, setting `$_SESSION` and `require`-ing the page (avoid pages that write on GET — the dashboards call `logActivity` on every view).
+2. DB logic: a CLI script that opens a transaction, calls the helpers (they use SAVEPOINTs when nested), asserts, then **rolls back** and confirms the DB matches the baseline. For a forced mid-transaction failure, create a trigger inside that same transaction. Sequences are not transactional: rolled-back sales still consume `pos_invoice_seq` numbers, so tests that complete sales first run `ALTER TABLE pos_sales ALTER COLUMN invoice_no SET DEFAULT ('TEST-' || substr(md5(random()::text), 1, 12))` inside the same transaction (rolled back with it; locks `pos_sales` briefly — only while nobody is selling). Include `SELECT last_value FROM pos_invoice_seq` in the baseline.
+3. Access control: `curl` with a cookie jar after logging in through `login.php`; other roles can be simulated in CLI by starting a session, setting `$_SESSION` and `require`-ing the page (avoid pages that write on GET — the dashboards call `logActivity` on every view). Without a password, craft a session over HTTP: a CLI script calls `session_id('<id>')`, `session_start()`, fills `$_SESSION` (`user_id`, `role`, `name`, `surname`, `last_activity`, `csrf_token`) and `session_write_close()` — XAMPP's `session.save_path` is `C:\xampp\tmp`, shared with Apache — then send `-b PHPSESSID=<id>`. Set `last_activity` to `time() - 1000` to test the 15-min expiry. Delete the `sess_<id>` files afterwards.
 4. UI: the `browser-automation` skill (headless; simulate the scanner with `page.keyboard.type(code, {delay: 8})` + Enter). Its `page.evaluate` runs in an isolated world — use `addScriptTag` to reach page globals. Check for console errors on every page.
 
 Test account on the live DB: cashier `cashier.test@easypc.local` (password is not stored in the repo; ask the user). Test barcodes: `400000000015` (UPC-A), `20000011` (EAN-8), `2000000000015` (EAN-13).
 
 See `HANDOFF.md` for the status of the Cashier/POS work, open items and known gotchas.
+
+## Knowledge graph (graphify)
+
+`graphify-out/` (repo root, outside the web root) holds a graphify knowledge graph of the app code plus `CLAUDE.md`/`HANDOFF.md` (`graph.html`, `GRAPH_REPORT.md`, `graph.json`); it is committed. Refresh it after code changes with `/graphify --update`. Its scope is the app code only: `--update` also reports vendor code (PHPMailer, Composer), the product/brand images under `assets/` and tool config (`.serena/`, `claude/settings.json`) as new — leave those out, as the original build did (there is no `.graphifyignore` yet). The `GEMINI_API_KEY`/`GOOGLE_API_KEY` in the environment was rejected as invalid on 2026-09-26, so doc extraction falls back to a Claude subagent.
