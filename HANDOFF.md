@@ -47,6 +47,8 @@ All paths relative to `TechPrime-AI/`.
 - HTTP access control: cashier → 200 on own pages, 302 on all ADMIN/INVENTORY/RETAIL pages, 403 on custodian API; other roles → blocked from all cashier pages (302) and APIs (403); unauthenticated APIs → 403.
 - Headless browser E2E (simulated scanner keystrokes): 30 checks incl. real sale + stock-in; 0 console errors, 0 failed requests on all cashier pages; visual comparison with custodian Stocks page.
 - Rendered barcodes decoded by an independent decoder (ZXing) for all formats, including a label taken from the live page.
+- Custodian notifications from cashier actions (28/28, rolled back): one sale taking one item ok→low (15 left) and another →0 sends `low_stock` + `out_of_stock` to every active custodian (and only custodians) with link `inventory_stocks.php`; low→low sale, rejected over-stock sale → nothing; stock-in out→ok and low→ok → `stock_updated`; ok→low again within 12 h → deduped; alerts show in `inv_user_notifications()`. Counts, product checksum, `pos_invoice_seq` and the `invoice_no` default identical afterwards. To avoid burning real invoice numbers, the test swaps the `pos_sales.invoice_no` default with `ALTER TABLE` inside the rolled-back transaction (holds a table lock for a few seconds; only run while nobody is selling).
+- Session expiry: APIs return 401 `session_expired` after > 900 s idle (GET lookup, POST stock_out/stock_in, checked before CSRF), then the session is destroyed (next call 403); 890 s idle → 200. In the browser a scan after expiry on POS and Stock-In shows "Your session expired…" and redirects to `login.php`; no page errors (the 401 shows up as a console resource error, expected). Tested with a crafted session file in `C:\xampp\tmp` (removed afterwards).
 
 **Live test data left in the DB (intentional, approved):**
 - Test cashier `cashier.test@easypc.local` (user #62). Password was given to the user in chat; it is **not** stored in the repo.
@@ -62,7 +64,7 @@ All paths relative to `TechPrime-AI/`.
 4. **Decide on test data cleanup** (test cashier #62, test barcodes on #102/#162/#218, sale INV-…-000004 and its rows). Deleting needs the user's explicit OK.
 5. **Create real cashier accounts** via Admin → Manage Users; block/delete the test account before go-live.
 6. **Rotate the Supabase DB password** — it is hardcoded in `includes/db.php`, which is committed and on GitHub. Deleting that (apparently unused) file needs the user's OK.
-7. Close the verification gaps: submit Admin's Create Staff form through the UI (no admin password available to the agent); render the Admin/Inventory/Retail dashboards (they write a `logs` row on every GET, so they were skipped); save a barcode through the custodian Edit form; API session-expiry (401) path; custodian notifications triggered by cashier sales.
+7. Close the remaining verification gaps (all write to the live DB or need a password, so they need the user): submit Admin's Create Staff form through the UI (no admin password available to the agent); render the Admin/Inventory/Retail dashboards (they write a `logs` row on every GET, so they were skipped); save a barcode through the custodian Edit form. _Done 2026-09-26: API session-expiry (401) path and custodian notifications from cashier sales — see Verification._
 8. Not started / out of scope so far: voiding a sale with Store Manager approval (no Store Manager role exists; `pos_sales.status` already allows `voided`); POS sales in RETAIL sales reports (they only read online `orders`); cashier actions on the custodian Activity page (user declined); per-product reorder levels.
 
 ## Key decisions (and why)
@@ -83,6 +85,7 @@ All paths relative to `TechPrime-AI/`.
 - Pre-existing: `INVENTORY/barcode.js` is a broken, unused stub (mixes a React `import` into a plain script). Not used by anything.
 - Pre-existing: `includes/db.php` hardcoded credentials (see Left to do #6).
 - Stock thresholds are hardcoded (critical ≤ 5, low ≤ 15): 188 of 261 products show as critical, so alert lists are long.
+- Pre-existing: in `inv_notify_stock_change()` the "critically low" branch can never run (the ok→low/critical branch above it matches first), so ok→critical says "is low in stock (N left)". The 12 h dedupe matches the product name with `LIKE`, so a name that contains another product's name can suppress its alert. Left as-is.
 - One product has a blank name (first row in Stocks); labels/confirmations fall back to "Product #id".
 - Invoice numbers 1–3 were consumed by rolled-back tests (sequences are not transactional); real numbering started at 4.
 - `staff_shared.css` gives `.alert` `display:flex`, which overrides the `hidden` attribute — `CASHIER/cashier.css` adds `[hidden]{display:none!important}`.

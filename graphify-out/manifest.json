@@ -30,10 +30,10 @@
     "semantic_hash": "11710b435bc968b2608103e6ef060530"
   },
   "TechPrime-AI/ADMIN/manage_users.php": {
-    "mtime": 1789742395.7148414,
-    "seen": 1790353543.739952,
-    "ast_hash": "d2db50df8cd4f8fc8dd08a78ca347560",
-    "semantic_hash": "d2db50df8cd4f8fc8dd08a78ca347560"
+    "mtime": 1790359217.3384476,
+    "seen": 1790370276.0767984,
+    "ast_hash": "52deb4f9b8fe006b4b8883b74e7fe3e0",
+    "semantic_hash": "52deb4f9b8fe006b4b8883b74e7fe3e0"
   },
   "TechPrime-AI/ADMIN/view_logs.php": {
     "mtime": 1789742231.5209432,
@@ -240,10 +240,10 @@
     "semantic_hash": "088f4063bc14bf3edb6dff87db8d0151"
   },
   "TechPrime-AI/INVENTORY/inventory_stocks.php": {
-    "mtime": 1790350411.9131732,
-    "seen": 1790353543.74095,
-    "ast_hash": "6e408b8c080363ca6b0f89229caa34ca",
-    "semantic_hash": "6e408b8c080363ca6b0f89229caa34ca"
+    "mtime": 1790367506.7941937,
+    "seen": 1790370276.0767984,
+    "ast_hash": "2ee2bf6bce2a2c0eda4e2f232517fc6a",
+    "semantic_hash": "2ee2bf6bce2a2c0eda4e2f232517fc6a"
   },
   "TechPrime-AI/RETAIL/retail_dashboard.php": {
     "mtime": 1786377237.191982,
@@ -504,16 +504,16 @@
     "semantic_hash": "1b437a505b79fd9d9fef004e78a7f8eb"
   },
   "TechPrime-AI/includes/security.php": {
-    "mtime": 1790350412.1976433,
-    "seen": 1790353543.74095,
-    "ast_hash": "900af3da7116f4e3ccac40799ce11eae",
-    "semantic_hash": "900af3da7116f4e3ccac40799ce11eae"
+    "mtime": 1790366984.1446328,
+    "seen": 1790370276.0767984,
+    "ast_hash": "6fed8cabdfd7028768fc5ad7ca8b3134",
+    "semantic_hash": "6fed8cabdfd7028768fc5ad7ca8b3134"
   },
   "TechPrime-AI/includes/staff_layout.php": {
-    "mtime": 1790350412.1996686,
-    "seen": 1790353543.74095,
-    "ast_hash": "6d0fc215bae79560ccf7bf999adb7534",
-    "semantic_hash": "6d0fc215bae79560ccf7bf999adb7534"
+    "mtime": 1790359203.4580445,
+    "seen": 1790370276.0767984,
+    "ast_hash": "f4716eb79e4cba158a3fe0c816cd4c66",
+    "semantic_hash": "f4716eb79e4cba158a3fe0c816cd4c66"
   },
   "TechPrime-AI/includes/ui_alerts.js": {
     "mtime": 1784283905.774318,
@@ -522,10 +522,10 @@
     "semantic_hash": "15a1c6de6bc178a3c414b71e63169d89"
   },
   "TechPrime-AI/login.php": {
-    "mtime": 1790350412.2036216,
-    "seen": 1790353543.74095,
-    "ast_hash": "55f87c3352c3014dce815212a0f4e7c0",
-    "semantic_hash": "55f87c3352c3014dce815212a0f4e7c0"
+    "mtime": 1790359216.5614066,
+    "seen": 1790370276.0767984,
+    "ast_hash": "11f72d892997e3e09fe8fde469a97b6c",
+    "semantic_hash": "11f72d892997e3e09fe8fde469a97b6c"
   },
   "TechPrime-AI/logout.php": {
     "mtime": 1783583967.350386,
@@ -634,5 +634,533 @@
     "seen": 1790353543.74095,
     "ast_hash": "1c43a69b1998a01b7588d88084d85ea3",
     "semantic_hash": "1c43a69b1998a01b7588d88084d85ea3"
+  },
+  "TechPrime-AI/CASHIER/cashier_dashboard.php": {
+    "mtime": 1790360334.5899267,
+    "seen": 1790370276.0767984,
+    "ast_hash": "3e59b826320effc0d5127af165f86037",
+    "semantic_hash": "3e59b826320effc0d5127af165f86037"
+  },
+  "TechPrime-AI/CASHIER/cashier_pos.php": {
+    "mtime": 1790360334.6481764,
+    "seen": 1790370276.0767984,
+    "ast_hash": "5bbc24409ee9aa2fc77d8cbfdfa4c0eb",
+    "semantic_hash": "5bbc24409ee9aa2fc77d8cbfdfa4c0eb"
+  },
+  "TechPrime-AI/CASHIER/cashier_receipt.php": {
+    "mtime": 1790360334.695802,
+    "seen": 1790370276.0767984,
+    "ast_hash": "8efd5c159629501f038abdbd82588bf3",
+    "semantic_hash": "8efd5c159629501f038abdbd82588bf3"
+  },
+  "TechPrime-AI/CASHIER/cashier_stock_in.php": {
+    "mtime": 1790360334.8028886,
+    "seen": 1790370276.0767984,
+    "ast_hash": "2ab5a38af99ca76f548da6bfa4dad27f",
+    "semantic_hash": "2ab5a38af99ca76f548da6bfa4dad27f"
+  },
+  "TechPrime-AI/backend/api/barcode_lookup.php": {
+    "mtime": 1790360189.0427828,
+    "seen": 1790370276.0767984,
+    "ast_hash": "de98b2ed4de2569c3c13b9aa7869e781",
+    "semantic_hash": "de98b2ed4de2569c3c13b9aa7869e781"
+  },
+  "TechPrime-AI/backend/api/stock_in.php": {
+    "mtime": 1790360189.0135043,
+    "seen": 1790370276.0767984,
+    "ast_hash": "1a265e53d0d9ef5af8caad330c2b4eab",
+    "semantic_hash": "1a265e53d0d9ef5af8caad330c2b4eab"
+  },
+  "TechPrime-AI/backend/api/stock_out.php": {
+    "mtime": 1790360189.010945,
+    "seen": 1790370276.0767984,
+    "ast_hash": "bc5b7680fd23655f19749cfea233d397",
+    "semantic_hash": "bc5b7680fd23655f19749cfea233d397"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/composer.json": {
+    "mtime": 1783583967.3039052,
+    "seen": 1790370276.0767984,
+    "ast_hash": "4426075a18339a8cbc38e308e84fe31d",
+    "semantic_hash": "4426075a18339a8cbc38e308e84fe31d"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/get_oauth_token.php": {
+    "mtime": 1783583967.3039052,
+    "seen": 1790370276.0767984,
+    "ast_hash": "84e8788ff9bb0c4eed6cf632eb2aa3db",
+    "semantic_hash": "84e8788ff9bb0c4eed6cf632eb2aa3db"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-af.php": {
+    "mtime": 1783583967.3049288,
+    "seen": 1790370276.0767984,
+    "ast_hash": "9c43d0ea44f038ff620c86337c9e8ca5",
+    "semantic_hash": "9c43d0ea44f038ff620c86337c9e8ca5"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ar.php": {
+    "mtime": 1783583967.3059742,
+    "seen": 1790370276.0767984,
+    "ast_hash": "08ac2a146e10785d2469ca583b048f53",
+    "semantic_hash": "08ac2a146e10785d2469ca583b048f53"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-as.php": {
+    "mtime": 1783583967.307004,
+    "seen": 1790370276.0767984,
+    "ast_hash": "80600ade13a3547b48fa4d6c67ad1406",
+    "semantic_hash": "80600ade13a3547b48fa4d6c67ad1406"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-az.php": {
+    "mtime": 1783583967.307004,
+    "seen": 1790370276.0767984,
+    "ast_hash": "a37acb2040747f96742e4172cfa22b08",
+    "semantic_hash": "a37acb2040747f96742e4172cfa22b08"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ba.php": {
+    "mtime": 1783583967.307004,
+    "seen": 1790370276.0767984,
+    "ast_hash": "b8532008bfd00f05c6ff7aa34c5fe8c7",
+    "semantic_hash": "b8532008bfd00f05c6ff7aa34c5fe8c7"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-be.php": {
+    "mtime": 1783583967.308014,
+    "seen": 1790370276.0767984,
+    "ast_hash": "e048e1ae8ec133dded33ec46d0de1411",
+    "semantic_hash": "e048e1ae8ec133dded33ec46d0de1411"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-bg.php": {
+    "mtime": 1783583967.308014,
+    "seen": 1790370276.0767984,
+    "ast_hash": "ecca6bc479cb5e3ac8a5e4c134b775f1",
+    "semantic_hash": "ecca6bc479cb5e3ac8a5e4c134b775f1"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-bn.php": {
+    "mtime": 1783583967.3090138,
+    "seen": 1790370276.0767984,
+    "ast_hash": "716a9c592e59ce5c4186641e8cab6812",
+    "semantic_hash": "716a9c592e59ce5c4186641e8cab6812"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ca.php": {
+    "mtime": 1783583967.3090138,
+    "seen": 1790370276.0767984,
+    "ast_hash": "a6b8fe9f8d93fcecfff4c1182c79f2b0",
+    "semantic_hash": "a6b8fe9f8d93fcecfff4c1182c79f2b0"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-cs.php": {
+    "mtime": 1783583967.3090138,
+    "seen": 1790370276.0767984,
+    "ast_hash": "19b3055fba61651c1618be62ce235ce1",
+    "semantic_hash": "19b3055fba61651c1618be62ce235ce1"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-da.php": {
+    "mtime": 1783583967.3100145,
+    "seen": 1790370276.0767984,
+    "ast_hash": "60802731b6705d8e2640e9791d902766",
+    "semantic_hash": "60802731b6705d8e2640e9791d902766"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-de.php": {
+    "mtime": 1783583967.3110144,
+    "seen": 1790370276.0767984,
+    "ast_hash": "fa934b897f62ff0637a9286d32c7770d",
+    "semantic_hash": "fa934b897f62ff0637a9286d32c7770d"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-el.php": {
+    "mtime": 1783583967.3110144,
+    "seen": 1790370276.0767984,
+    "ast_hash": "1ec02a40238fb83594a7f3428c669f20",
+    "semantic_hash": "1ec02a40238fb83594a7f3428c669f20"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-eo.php": {
+    "mtime": 1783583967.3110144,
+    "seen": 1790370276.0767984,
+    "ast_hash": "ad9bf63a7d5bbcfc2a22c63d6a3bbff3",
+    "semantic_hash": "ad9bf63a7d5bbcfc2a22c63d6a3bbff3"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-es.php": {
+    "mtime": 1783583967.3125181,
+    "seen": 1790370276.0767984,
+    "ast_hash": "d0cb1963e102de929bd28f1570169182",
+    "semantic_hash": "d0cb1963e102de929bd28f1570169182"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-et.php": {
+    "mtime": 1783583967.3125181,
+    "seen": 1790370276.0767984,
+    "ast_hash": "90500c23725e76ae6d7210a47912f749",
+    "semantic_hash": "90500c23725e76ae6d7210a47912f749"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-fa.php": {
+    "mtime": 1783583967.313529,
+    "seen": 1790370276.0767984,
+    "ast_hash": "687d94cbbac430237bde5e388632b426",
+    "semantic_hash": "687d94cbbac430237bde5e388632b426"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-fi.php": {
+    "mtime": 1783583967.3145401,
+    "seen": 1790370276.0767984,
+    "ast_hash": "4688fe703377c6f3a8c979fb07c91caf",
+    "semantic_hash": "4688fe703377c6f3a8c979fb07c91caf"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-fo.php": {
+    "mtime": 1783583967.3145401,
+    "seen": 1790370276.0767984,
+    "ast_hash": "4d21a4b640e13feb472423870896ed70",
+    "semantic_hash": "4d21a4b640e13feb472423870896ed70"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-fr.php": {
+    "mtime": 1783583967.31554,
+    "seen": 1790370276.0767984,
+    "ast_hash": "290a7d689c497be43c628cb911615aae",
+    "semantic_hash": "290a7d689c497be43c628cb911615aae"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-gl.php": {
+    "mtime": 1783583967.31554,
+    "seen": 1790370276.0767984,
+    "ast_hash": "6ffff8c171caac982e7b14637463031e",
+    "semantic_hash": "6ffff8c171caac982e7b14637463031e"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-he.php": {
+    "mtime": 1783583967.3165402,
+    "seen": 1790370276.0767984,
+    "ast_hash": "e816606874ca5e4418e19baf6bff93c1",
+    "semantic_hash": "e816606874ca5e4418e19baf6bff93c1"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-hi.php": {
+    "mtime": 1783583967.3165402,
+    "seen": 1790370276.0767984,
+    "ast_hash": "46b880e0a1001b797133b95dc3918ee7",
+    "semantic_hash": "46b880e0a1001b797133b95dc3918ee7"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-hr.php": {
+    "mtime": 1783583967.31754,
+    "seen": 1790370276.0767984,
+    "ast_hash": "e5529f3bde60e42d7c88cef468dc35ae",
+    "semantic_hash": "e5529f3bde60e42d7c88cef468dc35ae"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-hu.php": {
+    "mtime": 1783583967.31754,
+    "seen": 1790370276.0767984,
+    "ast_hash": "1b582e34adc980651208cdc035351c9a",
+    "semantic_hash": "1b582e34adc980651208cdc035351c9a"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-hy.php": {
+    "mtime": 1783583967.31754,
+    "seen": 1790370276.0767984,
+    "ast_hash": "41085e50fcd4d731a5d7bbb1da31dc8e",
+    "semantic_hash": "41085e50fcd4d731a5d7bbb1da31dc8e"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-id.php": {
+    "mtime": 1783583967.31854,
+    "seen": 1790370276.0767984,
+    "ast_hash": "0f0f46340dbff045dad793fc7d403641",
+    "semantic_hash": "0f0f46340dbff045dad793fc7d403641"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-it.php": {
+    "mtime": 1783583967.31854,
+    "seen": 1790370276.0767984,
+    "ast_hash": "bde562b2b72aece721d834b5cfe3b9ea",
+    "semantic_hash": "bde562b2b72aece721d834b5cfe3b9ea"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ja.php": {
+    "mtime": 1783583967.3195405,
+    "seen": 1790370276.0767984,
+    "ast_hash": "3a52e2e4a0312800456222eb4836dc87",
+    "semantic_hash": "3a52e2e4a0312800456222eb4836dc87"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ka.php": {
+    "mtime": 1783583967.3195405,
+    "seen": 1790370276.0767984,
+    "ast_hash": "018e4d632edaa5a6ecf98f190e9659a4",
+    "semantic_hash": "018e4d632edaa5a6ecf98f190e9659a4"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ko.php": {
+    "mtime": 1783583967.3205402,
+    "seen": 1790370276.0767984,
+    "ast_hash": "cbadfd4611d7617d0d213aeecb3cb57a",
+    "semantic_hash": "cbadfd4611d7617d0d213aeecb3cb57a"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ku.php": {
+    "mtime": 1783583967.3205402,
+    "seen": 1790370276.0767984,
+    "ast_hash": "594596cd504bf9b9d45d087535ddff35",
+    "semantic_hash": "594596cd504bf9b9d45d087535ddff35"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-lt.php": {
+    "mtime": 1783583967.32154,
+    "seen": 1790370276.0767984,
+    "ast_hash": "431a81a7671f31081f393026477a4a5d",
+    "semantic_hash": "431a81a7671f31081f393026477a4a5d"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-lv.php": {
+    "mtime": 1783583967.3226323,
+    "seen": 1790370276.0767984,
+    "ast_hash": "95ddc2c514a52d2ffc39b424324060d7",
+    "semantic_hash": "95ddc2c514a52d2ffc39b424324060d7"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-mg.php": {
+    "mtime": 1783583967.3226323,
+    "seen": 1790370276.0767984,
+    "ast_hash": "861fd6a40ce42171977ce9323d101c43",
+    "semantic_hash": "861fd6a40ce42171977ce9323d101c43"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-mn.php": {
+    "mtime": 1783583967.3236434,
+    "seen": 1790370276.0767984,
+    "ast_hash": "9dd5c1af0bb6f2a9a9e42f30051870a5",
+    "semantic_hash": "9dd5c1af0bb6f2a9a9e42f30051870a5"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ms.php": {
+    "mtime": 1783583967.3236434,
+    "seen": 1790370276.0767984,
+    "ast_hash": "d369274d8e9c22996fd25ab6d5791460",
+    "semantic_hash": "d369274d8e9c22996fd25ab6d5791460"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-nb.php": {
+    "mtime": 1783583967.3246431,
+    "seen": 1790370276.0767984,
+    "ast_hash": "824af72f2ee3d6b340b8a89412c80413",
+    "semantic_hash": "824af72f2ee3d6b340b8a89412c80413"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-nl.php": {
+    "mtime": 1783583967.3246431,
+    "seen": 1790370276.0767984,
+    "ast_hash": "e45af96a85c623c5825996bae71d092f",
+    "semantic_hash": "e45af96a85c623c5825996bae71d092f"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-pl.php": {
+    "mtime": 1783583967.3246431,
+    "seen": 1790370276.0767984,
+    "ast_hash": "814f5c100a606bea6011a7f1fb700832",
+    "semantic_hash": "814f5c100a606bea6011a7f1fb700832"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-pt.php": {
+    "mtime": 1783583967.3258493,
+    "seen": 1790370276.0767984,
+    "ast_hash": "bc6afeb045f3df31e3dcf2781d44ab2e",
+    "semantic_hash": "bc6afeb045f3df31e3dcf2781d44ab2e"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-pt_br.php": {
+    "mtime": 1783583967.3258493,
+    "seen": 1790370276.0767984,
+    "ast_hash": "40c8061c52937dbdcaeda69bb9a5204f",
+    "semantic_hash": "40c8061c52937dbdcaeda69bb9a5204f"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ro.php": {
+    "mtime": 1783583967.3271875,
+    "seen": 1790370276.0767984,
+    "ast_hash": "fd89ab211dd047a421d772511adc476b",
+    "semantic_hash": "fd89ab211dd047a421d772511adc476b"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ru.php": {
+    "mtime": 1783583967.3271875,
+    "seen": 1790370276.0767984,
+    "ast_hash": "6d9282bcf9db01bda91638669c4da4b8",
+    "semantic_hash": "6d9282bcf9db01bda91638669c4da4b8"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-si.php": {
+    "mtime": 1783583967.3271875,
+    "seen": 1790370276.0767984,
+    "ast_hash": "4c4ee828f0c9e861662cce71010f9fbc",
+    "semantic_hash": "4c4ee828f0c9e861662cce71010f9fbc"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-sk.php": {
+    "mtime": 1783583967.32821,
+    "seen": 1790370276.0767984,
+    "ast_hash": "5656ae3ba50a3f42214df58f6cd341c1",
+    "semantic_hash": "5656ae3ba50a3f42214df58f6cd341c1"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-sl.php": {
+    "mtime": 1783583967.32821,
+    "seen": 1790370276.0767984,
+    "ast_hash": "88ca3c3ec21e9629c66867cee94b555e",
+    "semantic_hash": "88ca3c3ec21e9629c66867cee94b555e"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-sr.php": {
+    "mtime": 1783583967.3292098,
+    "seen": 1790370276.0767984,
+    "ast_hash": "08a1f7aee5cb563db2e918bd01e2c29a",
+    "semantic_hash": "08a1f7aee5cb563db2e918bd01e2c29a"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-sr_latn.php": {
+    "mtime": 1783583967.3292098,
+    "seen": 1790370276.0767984,
+    "ast_hash": "beddff376a1703630ad447ba362ef005",
+    "semantic_hash": "beddff376a1703630ad447ba362ef005"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-sv.php": {
+    "mtime": 1783583967.3302102,
+    "seen": 1790370276.0767984,
+    "ast_hash": "f0d3c38b8a3ac16e904100384c9c9f5f",
+    "semantic_hash": "f0d3c38b8a3ac16e904100384c9c9f5f"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-tl.php": {
+    "mtime": 1783583967.3302102,
+    "seen": 1790370276.0767984,
+    "ast_hash": "6f34efeaaf8beed861650e1e0629e1ca",
+    "semantic_hash": "6f34efeaaf8beed861650e1e0629e1ca"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-tr.php": {
+    "mtime": 1783583967.331324,
+    "seen": 1790370276.0767984,
+    "ast_hash": "9367558327841a0cb1f8175f49d78532",
+    "semantic_hash": "9367558327841a0cb1f8175f49d78532"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-uk.php": {
+    "mtime": 1783583967.331324,
+    "seen": 1790370276.0767984,
+    "ast_hash": "8019fff3998cff93849dbfda99e9f821",
+    "semantic_hash": "8019fff3998cff93849dbfda99e9f821"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-ur.php": {
+    "mtime": 1783583967.331324,
+    "seen": 1790370276.0767984,
+    "ast_hash": "31d5be1aeab2a7ef20a0bb4efee15197",
+    "semantic_hash": "31d5be1aeab2a7ef20a0bb4efee15197"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-vi.php": {
+    "mtime": 1783583967.332472,
+    "seen": 1790370276.0767984,
+    "ast_hash": "1d7da10328d9cdff6a7ec081d204b437",
+    "semantic_hash": "1d7da10328d9cdff6a7ec081d204b437"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-zh.php": {
+    "mtime": 1783583967.332472,
+    "seen": 1790370276.0767984,
+    "ast_hash": "ff1d81e608ea35f9b2497b0401e6419c",
+    "semantic_hash": "ff1d81e608ea35f9b2497b0401e6419c"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/language/phpmailer.lang-zh_cn.php": {
+    "mtime": 1783583967.3334801,
+    "seen": 1790370276.0767984,
+    "ast_hash": "3be2426e37dfff65af3e64e03e3e2864",
+    "semantic_hash": "3be2426e37dfff65af3e64e03e3e2864"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/src/DSNConfigurator.php": {
+    "mtime": 1783583967.3334801,
+    "seen": 1790370276.0767984,
+    "ast_hash": "ebad276fa4ce48e47d4afcb2436cf7d8",
+    "semantic_hash": "ebad276fa4ce48e47d4afcb2436cf7d8"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/src/Exception.php": {
+    "mtime": 1783583967.3346863,
+    "seen": 1790370276.0767984,
+    "ast_hash": "4eb895f1ff297d3e0716fccd5713e5bb",
+    "semantic_hash": "4eb895f1ff297d3e0716fccd5713e5bb"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/src/OAuth.php": {
+    "mtime": 1783583967.3346863,
+    "seen": 1790370276.0767984,
+    "ast_hash": "7df462ed6a878a53e5c9ace10a276f1c",
+    "semantic_hash": "7df462ed6a878a53e5c9ace10a276f1c"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/src/OAuthTokenProvider.php": {
+    "mtime": 1783583967.3346863,
+    "seen": 1790370276.0767984,
+    "ast_hash": "2d21efd46ee0b3cb68c8669afb6b75a6",
+    "semantic_hash": "2d21efd46ee0b3cb68c8669afb6b75a6"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/src/PHPMailer.php": {
+    "mtime": 1783583967.3380737,
+    "seen": 1790370276.0767984,
+    "ast_hash": "6254d59fa240e91f8701281e4d4dc9b5",
+    "semantic_hash": "6254d59fa240e91f8701281e4d4dc9b5"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/src/POP3.php": {
+    "mtime": 1783583967.3380737,
+    "seen": 1790370276.0767984,
+    "ast_hash": "32552dd756cd5bb0a5e33e262a938465",
+    "semantic_hash": "32552dd756cd5bb0a5e33e262a938465"
+  },
+  "TechPrime-AI/backend/vendor/PHPMailer-master/src/SMTP.php": {
+    "mtime": 1783583967.339147,
+    "seen": 1790370276.0767984,
+    "ast_hash": "05ab9088de48dd199123a3d5e04c339f",
+    "semantic_hash": "05ab9088de48dd199123a3d5e04c339f"
+  },
+  "TechPrime-AI/backend/vendor/totp/TOTP.php": {
+    "mtime": 1783583967.340258,
+    "seen": 1790370276.0767984,
+    "ast_hash": "09b5725b0381b6f10de3204b7709d6a5",
+    "semantic_hash": "09b5725b0381b6f10de3204b7709d6a5"
+  },
+  "TechPrime-AI/database/migration_cashier_pos.sql": {
+    "mtime": 1790359035.226442,
+    "seen": 1790370276.0767984,
+    "ast_hash": "6f298269846ec394befcae22577dbc0f",
+    "semantic_hash": "6f298269846ec394befcae22577dbc0f"
+  },
+  "TechPrime-AI/includes/barcode_label.js": {
+    "mtime": 1790366912.0952797,
+    "seen": 1790370276.0767984,
+    "ast_hash": "f7ce20187f007f07f1807d63e1111e5e",
+    "semantic_hash": "f7ce20187f007f07f1807d63e1111e5e"
+  },
+  "TechPrime-AI/includes/barcode_scanner.js": {
+    "mtime": 1790359185.562563,
+    "seen": 1790370276.0767984,
+    "ast_hash": "8340ba7caaac23e2c822a7d73430e83d",
+    "semantic_hash": "8340ba7caaac23e2c822a7d73430e83d"
+  },
+  "TechPrime-AI/includes/pos_helpers.php": {
+    "mtime": 1790359114.7357192,
+    "seen": 1790370276.0767984,
+    "ast_hash": "e5c2a24f09ca735c04613c2654d0edc0",
+    "semantic_hash": "e5c2a24f09ca735c04613c2654d0edc0"
+  },
+  "TechPrime-AI/vendor/composer/installed.json": {
+    "mtime": 1790181666.3642695,
+    "seen": 1790370276.0767984,
+    "ast_hash": "f319e5dc839de7bda712404fd1d91a99",
+    "semantic_hash": "f319e5dc839de7bda712404fd1d91a99"
+  },
+  "TechPrime-AI/vendor/graham-campbell/result-type/composer.json": {
+    "mtime": 1787508412.0,
+    "seen": 1790370276.0767984,
+    "ast_hash": "f9c26223eefaf9ba9800cfd8794012d9",
+    "semantic_hash": "f9c26223eefaf9ba9800cfd8794012d9"
+  },
+  "TechPrime-AI/vendor/phpoption/phpoption/composer.json": {
+    "mtime": 1787478880.0,
+    "seen": 1790370276.0767984,
+    "ast_hash": "957ccfab3b13647ce7b16b573fedb9fd",
+    "semantic_hash": "957ccfab3b13647ce7b16b573fedb9fd"
+  },
+  "TechPrime-AI/vendor/symfony/polyfill-ctype/composer.json": {
+    "mtime": 1775783962.0,
+    "seen": 1790370276.0767984,
+    "ast_hash": "4c10684e27f952e5ffde2dc5d2ae3578",
+    "semantic_hash": "4c10684e27f952e5ffde2dc5d2ae3578"
+  },
+  "TechPrime-AI/vendor/symfony/polyfill-mbstring/composer.json": {
+    "mtime": 1779811170.0,
+    "seen": 1790370276.0767984,
+    "ast_hash": "cd85b68a021e1d93330ec159da724adb",
+    "semantic_hash": "cd85b68a021e1d93330ec159da724adb"
+  },
+  "TechPrime-AI/vendor/symfony/polyfill-php80/composer.json": {
+    "mtime": 1775783962.0,
+    "seen": 1790370276.0767984,
+    "ast_hash": "511a4e1964472053cf8540a48641af74",
+    "semantic_hash": "511a4e1964472053cf8540a48641af74"
+  },
+  "TechPrime-AI/vendor/vlucas/phpdotenv/composer.json": {
+    "mtime": 1787540868.0,
+    "seen": 1790370276.0767984,
+    "ast_hash": "7c024efcff8517d809635343830e513e",
+    "semantic_hash": "7c024efcff8517d809635343830e513e"
+  },
+  "claude/settings.json": {
+    "mtime": 1790352962.4515562,
+    "seen": 1790370276.0767984,
+    "ast_hash": "68486f5ae88d4fa65f9a0aea450e6da2",
+    "semantic_hash": "68486f5ae88d4fa65f9a0aea450e6da2"
+  },
+  "CLAUDE.md": {
+    "mtime": 1790368176.4315152,
+    "seen": 1790370276.0767984,
+    "ast_hash": "4ce7456892450ba8fb7770e850843b35",
+    "semantic_hash": "4ce7456892450ba8fb7770e850843b35"
+  },
+  "HANDOFF.md": {
+    "mtime": 1790368687.5421295,
+    "seen": 1790370276.0767984,
+    "ast_hash": "17c60a9e09492889f4084197c4ff628a",
+    "semantic_hash": "17c60a9e09492889f4084197c4ff628a"
   }
 }
