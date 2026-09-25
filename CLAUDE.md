@@ -63,7 +63,7 @@ python test_intents.py
 - Only make changes the task requires — no unrelated refactors. Reuse existing helpers (`getDbConnection`, `logActivity`, `staff_page_start`, `inv_notify_stock_change`, `pos_*`) and the repo's response format instead of writing parallel ones.
 - Match existing staff UI (layout shell, tokens, `.card`, `.btn-*`, `.alert-*`, tables, modals) rather than adding new design systems. Note `.alert` is `display:flex` and overrides `[hidden]` unless a page adds `[hidden]{display:none!important}`.
 - Keep scratch/debug output out of the web root — everything under `TechPrime-AI/` is publicly served by Apache.
-- `.gitattributes` uses `text=auto` (repo stores LF); CRLF/LF differences in the working copy are harmless. Work happens on branch `khenzou`.
+- `.gitattributes` uses `text=auto` (repo stores LF); CRLF/LF differences in the working copy are harmless. Work happens on branch `Paul-UI`.
 
 ## Verifying changes
 

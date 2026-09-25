@@ -1,6 +1,6 @@
 # HANDOFF — Cashier role + barcode POS
 
-_Last updated: 2026-09-26 · branch `khenzou` · committed locally (not pushed)_
+_Last updated: 2026-09-26 · branch `Paul-UI` (same commit as `khenzou`) · pushed_
 
 ## Goal
 
@@ -59,7 +59,7 @@ All paths relative to `TechPrime-AI/`.
 ## Left to do (in order)
 
 1. **Physical test with the real scanner and a printer** (never done — scanner was simulated). Print labels at 100% scale ("Fit to page" off); confirm the scanner sends Enter as suffix (Tab or no suffix will not work without reconfiguring it).
-2. **Push** branch `khenzou` when the user asks (reviewed and committed locally; `reference/scanner.jpg` was left untracked on purpose).
+2. ~~**Push**~~ — done: `348c7f9` is on `origin/Paul-UI` and `origin/khenzou`; work continues on `Paul-UI`. (`reference/scanner.jpg` was left untracked on purpose.)
 3. **Assign real barcodes**: custodian Stocks → filter "Missing barcode" → Edit → scan the box barcode. Use Generate only for items with no manufacturer barcode (freebies/bundles).
 4. **Decide on test data cleanup** (test cashier #62, test barcodes on #102/#162/#218, sale INV-…-000004 and its rows). Deleting needs the user's explicit OK.
 5. **Create real cashier accounts** via Admin → Manage Users; block/delete the test account before go-live.
