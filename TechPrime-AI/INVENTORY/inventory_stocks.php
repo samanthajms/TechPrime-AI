@@ -4,6 +4,7 @@ require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 require_once __DIR__ . '/../includes/product_categories.php';
 require_once __DIR__ . '/../includes/inventory_alerts.php';
+require_once __DIR__ . '/../includes/pos_helpers.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -48,6 +49,31 @@ function inventory_stock_status(int $stock): string
 }
 
 $hasSku = inventory_products_has_column($db, 'sku');
+$hasBarcode = inventory_products_has_column($db, 'barcode');
+
+/**
+ * Validate the optional UPC/EAN field. Returns the normalized code, null for "none",
+ * or redirects with an error when it is invalid or already used by another product.
+ */
+function inventory_barcode_from_post(PDO $db, bool $hasBarcode, int $productId): ?string
+{
+    $raw = trim((string)($_POST['barcode'] ?? ''));
+    if (!$hasBarcode || $raw === '') {
+        return null;
+    }
+    $code = pos_normalize_barcode($raw);
+    if ($code === null) {
+        header('Location: inventory_stocks.php?error=barcode');
+        exit;
+    }
+    $dup = $db->prepare('SELECT id FROM products WHERE barcode = ? AND id <> ? LIMIT 1');
+    $dup->execute([$code, $productId]);
+    if ($dup->fetchColumn()) {
+        header('Location: inventory_stocks.php?error=barcode_taken');
+        exit;
+    }
+    return $code;
+}
 
 /* ---------------------------------------------------------------------
  * Add product
@@ -59,6 +85,7 @@ if (isset($_POST['add_product'])) {
     $desc = trim($_POST['description'] ?? '');
     $category = inventory_product_category($allowed_categories);
     $sku = trim($_POST['sku'] ?? '');
+    $barcode = inventory_barcode_from_post($db, $hasBarcode, 0);
     $imageFile = ias_handle_product_upload($uid);
 
     if ($name !== '' && $price > 0 && $stock >= 0 && $imageFile !== null) {
@@ -78,6 +105,9 @@ if (isset($_POST['add_product'])) {
             $stmt->execute([$uid, $name, $price, $stock, $desc, $imageFile, $emptyUrl, $category]);
         }
         $newId = (int)$db->lastInsertId();
+        if ($hasBarcode && $barcode !== null && $newId > 0) {
+            $db->prepare('UPDATE products SET barcode = ? WHERE id = ?')->execute([$barcode, $newId]);
+        }
         logActivity($db, $uid, 'add_product', 'Added product: ' . $name . ' (stock: ' . $stock . ')');
         if ($newId > 0 && $stock <= 15) {
             inv_notify_stock_change($db, $name, $newId, 999, $stock);
@@ -103,6 +133,7 @@ if (isset($_POST['edit_product'])) {
     $sku = trim($_POST['sku'] ?? '');
 
     if ($id > 0 && $name !== '' && $price > 0 && $stock >= 0) {
+        $barcode = inventory_barcode_from_post($db, $hasBarcode, $id);
         $newImage = ias_handle_product_upload($uid);
         $triedImageUpload = !empty($_FILES['product_image']['name']);
 
@@ -158,6 +189,10 @@ if (isset($_POST['edit_product'])) {
                 );
                 $stmt->execute([$name, $price, $stock, $desc, $category, $id]);
             }
+        }
+
+        if ($hasBarcode) {
+            $db->prepare('UPDATE products SET barcode = ? WHERE id = ?')->execute([$barcode, $id]);
         }
 
         $logName = $name !== '' ? $name : $oldName;
@@ -232,18 +267,58 @@ if (isset($_POST['action']) && $_POST['action'] === 'bulk_delete') {
 }
 
 /* ---------------------------------------------------------------------
+ * Generate in-store barcodes for products that have none.
+ * EAN-13 "21" + 10-digit product id + check digit: unique per product and
+ * inside the GS1 in-store range, so it never clashes with retail barcodes.
+ * ------------------------------------------------------------------- */
+if (isset($_POST['action']) && $_POST['action'] === 'generate_barcode') {
+    if (!$hasBarcode || !verifyCsrfToken((string)($_POST['csrf_token'] ?? ''))) {
+        header('Location: inventory_stocks.php?alert=error');
+        exit;
+    }
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['ids'] ?? [])), fn($v) => $v > 0)));
+    $made = [];
+    $taken = $db->prepare('SELECT id FROM products WHERE barcode = ?');
+    $up = $db->prepare('UPDATE products SET barcode = ? WHERE id = ? AND barcode IS NULL RETURNING name');
+    foreach ($ids as $pid) {
+        $body = '21' . str_pad((string)$pid, 10, '0', STR_PAD_LEFT);
+        $code = $body . pos_gtin_check_digit($body);
+        $taken->execute([$code]);
+        if ($taken->fetchColumn()) {
+            continue;
+        }
+        $up->execute([$code, $pid]);
+        $name = $up->fetchColumn();
+        if ($name !== false) {
+            $made[] = 'product #' . $pid . ' "' . $name . '" = ' . $code;
+        }
+    }
+    if ($made) {
+        logActivity($db, $uid, 'generate_barcode', 'Generated in-store barcode for ' . count($made) . ' product(s): ' . implode('; ', $made));
+    }
+    $query = ['alert' => $made ? 'barcode_generated' : 'error'];
+    if (count($ids) === 1 && $made) {
+        $query['label'] = $ids[0];
+    }
+    header('Location: inventory_stocks.php?' . http_build_query($query));
+    exit;
+}
+
+/* ---------------------------------------------------------------------
  * Data for the page: full product set (filtering/sorting/paging is done
  * client-side in JS so the dashboard updates instantly with no reloads),
  * plus the counts and category list the sidebar needs.
  * ------------------------------------------------------------------- */
 $skuSelect = $hasSku ? 'sku' : 'NULL AS sku';
-$products = $db->query("SELECT id, name, description, price, stock, image, image_url, category, created_at, $skuSelect FROM products ORDER BY name ASC");
+$barcodeSelect = $hasBarcode ? 'barcode' : 'NULL AS barcode';
+$products = $db->query("SELECT id, name, description, price, stock, image, image_url, category, created_at, $skuSelect, $barcodeSelect FROM products ORDER BY name ASC");
 
 $totalCount = 0;
 $inStockCount = 0;
 $outOfStockCount = 0;
 $lowStockCount = 0;
 $criticalStockCount = 0;
+$withBarcodeCount = 0;
 $categoriesInUse = [];
 $rows = [];
 
@@ -262,6 +337,9 @@ if ($products) {
         }
         if ($status === 'critical') {
             $criticalStockCount++;
+        }
+        if (trim((string)($p['barcode'] ?? '')) !== '') {
+            $withBarcodeCount++;
         }
         $cat = $p['category'] ?? 'Accessories';
         if ($cat !== '' && !in_array($cat, $categoriesInUse, true)) {
@@ -451,6 +529,46 @@ staff_page_start([
 .stocks-table th.col-stock { width: 100px; }
 .stocks-table th.col-status { width: 150px; }
 .stocks-table th.col-price { width: 120px; }
+.stocks-table th.col-barcode { width: 150px; }
+.barcode-code {
+    font-family: var(--font-mono, monospace); font-size: 12.5px; font-weight: 700;
+    color: var(--ep-text); letter-spacing: 0.3px; white-space: nowrap;
+}
+.barcode-btn {
+    border: 1px solid var(--ep-border); background: #fff; color: var(--ep-green-dark); cursor: pointer;
+    border-radius: 8px; height: 28px; padding: 0 9px; margin-left: 6px; font-size: 11.5px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; font-family: inherit;
+}
+.barcode-btn:hover { border-color: var(--ep-green); background: var(--ep-green-light); }
+.label-preview {
+    display: flex; justify-content: center; padding: 18px; margin-bottom: 16px;
+    background: var(--ep-gray-bg); border: 1px dashed var(--ep-border); border-radius: 12px;
+}
+.label-preview .ep-label { transform: scale(1.35); transform-origin: top center; margin-bottom: 12mm; }
+.label-options { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 10px; }
+.label-options .form-group { margin: 0; }
+.label-options input[type=number] { width: 100px; }
+.ep-label {
+    width: 62mm; box-sizing: border-box; padding: 2.5mm 2mm 2mm; background: #fff; color: #000;
+    border: 0.2mm dashed #b5b5b5; text-align: center; font-family: Arial, Helvetica, sans-serif;
+    break-inside: avoid; page-break-inside: avoid;
+}
+.ep-label-name { font-size: 7.5pt; font-weight: 700; line-height: 1.2; max-height: 2.45em; overflow: hidden; }
+.ep-label svg { display: block; margin: 1.2mm auto 0; }
+.ep-label-price { font-size: 9pt; font-weight: 800; margin-top: 0.8mm; }
+#labelPrintArea { display: none; }
+@media print {
+    body.printing-labels > *:not(#labelPrintArea) { display: none !important; }
+    body.printing-labels { background: #fff !important; }
+    body.printing-labels #labelPrintArea {
+        display: grid !important; grid-template-columns: repeat(3, 62mm); gap: 3mm; justify-content: center;
+    }
+    @page { margin: 8mm; }
+}
+.barcode-missing {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600;
+    color: var(--ep-muted); white-space: nowrap;
+}
 .stocks-table th.col-actions { width: 72px; text-align: center; }
 .stocks-table td {
     padding: 14px 16px;
@@ -670,6 +788,16 @@ EXTRA
                                 <option value="critical">Critical Stock (&le; <?php echo CRITICAL_STOCK_MAX; ?>)</option>
                             </select>
                         </div>
+                        <?php if ($hasBarcode): ?>
+                        <div>
+                            <span class="filter-title">Barcode</span>
+                            <select id="barcodeFilter" class="form-control">
+                                <option value="all" selected>All Products</option>
+                                <option value="has">Has UPC/EAN barcode (<?php echo (int)$withBarcodeCount; ?>)</option>
+                                <option value="missing">Missing barcode (<?php echo (int)($totalCount - $withBarcodeCount); ?>)</option>
+                            </select>
+                        </div>
+                        <?php endif; ?>
                         <div>
                             <span class="filter-title">Price Range</span>
                             <div class="price-range">
@@ -687,7 +815,7 @@ EXTRA
                 <div class="stocks-toolbar">
                     <div class="search-wrap">
                         <i class="fas fa-search"></i>
-                        <input type="text" id="searchInput" class="form-control" placeholder="Search by name, category or SKU...">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search by name, category, SKU or barcode...">
                         <button type="button" id="scanBtn" class="btn btn-outline btn-scan" title="Focus this field, then use a barcode scanner (acts as keyboard input ending in Enter)">
                             <i class="fas fa-barcode"></i> Scan
                         </button>
@@ -713,6 +841,10 @@ EXTRA
                         Select All (<span id="pageCount">0</span>)
                     </label>
                     <div class="selection-bar" id="selectionBar">
+                        <?php if ($hasBarcode): ?>
+                        <button type="button" class="btn btn-outline btn-sm" id="bulkLabelBtn"><i class="fas fa-print"></i> Print Labels</button>
+                        <button type="button" class="btn btn-outline btn-sm" id="bulkGenerateBtn"><i class="fas fa-barcode"></i> Generate Barcodes</button>
+                        <?php endif; ?>
                         <button type="button" class="btn btn-danger btn-sm" id="bulkDeleteBtn"><i class="fas fa-trash"></i> Delete</button>
                     </div>
                 </div>
@@ -735,15 +867,22 @@ EXTRA
                 <h3><i class="fas fa-plus"></i> Add New Product</h3>
                 <form method="post" enctype="multipart/form-data">
                     <div class="form-group">
-                        <label class="form-label">Barcode (optional)</label>
-                        <div class="barcode-input-row" style="display:flex;gap:8px;align-items:center;">
-                            <input type="text" name="sku" id="add_barcode" class="form-control" placeholder="Scan or type barcode">
-                            <button type="button" class="btn btn-outline btn-scan" onclick="focusBarcodeField('add_barcode')"><i class="fas fa-barcode"></i> Scan</button>
-                        </div>
+                        <label class="form-label">SKU / Item Code (optional)</label>
+                        <input type="text" name="sku" id="add_sku" class="form-control" placeholder="e.g. 11510">
                         <?php if (!$hasSku): ?>
-                        <p class="text-small text-muted" style="margin:6px 0 0;">Barcode is optional; apply SKU migration to persist scanned codes.</p>
+                        <p class="text-small text-muted" style="margin:6px 0 0;">SKU is optional; apply SKU migration to persist item codes.</p>
                         <?php endif; ?>
                     </div>
+                    <?php if ($hasBarcode): ?>
+                    <div class="form-group">
+                        <label class="form-label">UPC / EAN Barcode (optional)</label>
+                        <div class="barcode-input-row" style="display:flex;gap:8px;align-items:center;">
+                            <input type="text" name="barcode" id="add_barcode" class="form-control" maxlength="14" inputmode="numeric" placeholder="Scan or type barcode" onkeydown="if (event.key === 'Enter') event.preventDefault();">
+                            <button type="button" class="btn btn-outline btn-scan" onclick="focusBarcodeField('add_barcode')"><i class="fas fa-barcode"></i> Scan</button>
+                        </div>
+                        <p class="text-small text-muted" style="margin:6px 0 0;">UPC-A, UPC-E, EAN-13 or EAN-8 printed on the box. Used by the Cashier scanner.</p>
+                    </div>
+                    <?php endif; ?>
                     <div class="form-group">
                         <label class="form-label">Product Name</label>
                         <input type="text" name="name" class="form-control" placeholder="e.g. Wireless Keyboard" required>
@@ -787,8 +926,17 @@ EXTRA
                     <input type="hidden" name="product_id" id="edit_id">
                     <?php if ($hasSku): ?>
                     <div class="form-group">
-                        <label class="form-label">Barcode / SKU (optional)</label>
+                        <label class="form-label">SKU / Item Code (optional)</label>
                         <input type="text" name="sku" id="edit_sku" class="form-control">
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($hasBarcode): ?>
+                    <div class="form-group">
+                        <label class="form-label">UPC / EAN Barcode (optional)</label>
+                        <div class="barcode-input-row" style="display:flex;gap:8px;align-items:center;">
+                            <input type="text" name="barcode" id="edit_barcode" class="form-control" maxlength="14" inputmode="numeric" placeholder="Scan or type barcode" onkeydown="if (event.key === 'Enter') event.preventDefault();">
+                            <button type="button" class="btn btn-outline btn-scan" onclick="focusBarcodeField('edit_barcode')"><i class="fas fa-barcode"></i> Scan</button>
+                        </div>
                     </div>
                     <?php endif; ?>
                     <div class="form-group">
@@ -836,12 +984,47 @@ EXTRA
                     <dt>Stock</dt><dd id="d_stock"></dd>
                     <dt>Status</dt><dd id="d_status"></dd>
                     <dt>Price</dt><dd id="d_price"></dd>
-                    <?php if ($hasSku): ?><dt>SKU / Barcode</dt><dd id="d_sku"></dd><?php endif; ?>
+                    <?php if ($hasSku): ?><dt>SKU / Item Code</dt><dd id="d_sku"></dd><?php endif; ?>
+                    <?php if ($hasBarcode): ?><dt>UPC / EAN</dt><dd id="d_barcode"></dd><?php endif; ?>
                     <dt>Date Added</dt><dd id="d_created"></dd>
                     <dt>Description</dt><dd id="d_desc"></dd>
                 </dl>
             </div>
         </div>
+
+        <?php if ($hasBarcode): ?>
+        <!-- ============================== BARCODE LABEL MODAL ============================== -->
+        <div id="labelModal" class="modal">
+            <div class="modal-content wide">
+                <button type="button" class="close" onclick="closeLabelModal()">&times;</button>
+                <h3><i class="fas fa-barcode"></i> Barcode Label</h3>
+                <div class="label-preview" id="labelPreview"></div>
+                <div class="label-options">
+                    <div class="form-group">
+                        <label class="form-label" for="labelCopies">Copies</label>
+                        <input type="number" id="labelCopies" class="form-control" min="1" max="60" value="1">
+                    </div>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;padding-bottom:10px;">
+                        <input type="checkbox" id="labelShowPrice" checked> Show price
+                    </label>
+                </div>
+                <p class="text-small text-muted" style="margin:0 0 14px;">
+                    Print at <strong>100% scale</strong> (turn off "Fit to page") so the bars keep their true size.
+                    3 labels per row on A4/Letter; cut along the dashed lines.
+                </p>
+                <button type="button" class="btn btn-primary" id="labelPrintBtn" style="width:100%;justify-content:center;">
+                    <i class="fas fa-print"></i> Print Labels
+                </button>
+            </div>
+        </div>
+
+        <!-- Hidden form used for barcode generation -->
+        <form method="post" id="generateBarcodeForm" style="display:none;">
+            <input type="hidden" name="action" value="generate_barcode">
+            <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+            <div id="generateBarcodeIds"></div>
+        </form>
+        <?php endif; ?>
 
         <!-- Hidden form used for bulk delete submissions -->
         <form method="post" id="bulkDeleteForm" style="display:none;">
@@ -870,6 +1053,7 @@ $jsProducts = array_map(function ($p) {
         'status' => inventory_stock_status($stock),
         'description' => $p['description'] ?? '',
         'sku' => $p['sku'] ?? '',
+        'barcode' => $p['barcode'] ?? '',
         'created_at' => $p['created_at'] ?? '',
         'img' => ias_product_image_url($p),
     ];
@@ -878,12 +1062,93 @@ $jsProducts = array_map(function ($p) {
 $productsJson = json_encode($jsProducts, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 $lowMax = LOW_STOCK_MAX;
 $criticalMax = CRITICAL_STOCK_MAX;
+$hasBarcodeJs = $hasBarcode ? 'true' : 'false';
+$openLabelId = (int)($_GET['label'] ?? 0);
 
 $mainScript = <<<SCRIPTS
 <script>
 var ALL_PRODUCTS = {$productsJson};
 var LOW_STOCK_MAX = {$lowMax};
 var CRITICAL_STOCK_MAX = {$criticalMax};
+var HAS_BARCODE = {$hasBarcodeJs};
+
+/* UPC-A is stored as a 13-digit GTIN with a leading 0; show the 12 digits printed on the box. */
+function barcodeLabel(code) {
+    code = String(code || '');
+    return (code.length === 13 && code.charAt(0) === '0') ? code.slice(1) : code;
+}
+var OPEN_LABEL_ID = {$openLabelId};
+function barcodeCellHtml(p) {
+    return p.barcode
+        ? '<span class="barcode-code">' + escapeHtml(barcodeLabel(p.barcode)) + '</span>' +
+          '<button type="button" class="barcode-btn" data-label-id="' + p.id + '" title="Print barcode label"><i class="fas fa-print"></i></button>'
+        : '<span class="barcode-missing"><i class="fas fa-minus-circle"></i> None</span>' +
+          '<button type="button" class="barcode-btn" data-generate-id="' + p.id + '" title="Generate an in-store barcode"><i class="fas fa-plus"></i> Generate</button>';
+}
+function barcodeMenuItem(p) {
+    if (!HAS_BARCODE) return '';
+    return p.barcode
+        ? '<button type="button" onclick="openLabelModal([' + p.id + '])"><i class="fas fa-print"></i> Print Barcode</button>'
+        : '<button type="button" onclick="generateBarcodes([' + p.id + '])"><i class="fas fa-barcode"></i> Generate Barcode</button>';
+}
+
+/* ---- Barcode labels ---- */
+var labelIds = [];
+function labelHtml(p, showPrice) {
+    return '<div class="ep-label">' +
+        '<div class="ep-label-name">' + escapeHtml(p.name || ('Product #' + p.id)) + '</div>' +
+        EP_BarcodeSVG.svg(p.barcode) +
+        (showPrice ? '<div class="ep-label-price">' + peso(p.price) + '</div>' : '') +
+    '</div>';
+}
+function openLabelModal(ids) {
+    labelIds = ids.map(Number).filter(function (id) { var p = findProduct(id); return p && p.barcode; });
+    if (!labelIds.length) return;
+    document.getElementById('labelCopies').value = 1;
+    renderLabelPreview();
+    document.getElementById('labelModal').classList.add('open');
+}
+function closeLabelModal() { document.getElementById('labelModal').classList.remove('open'); }
+function renderLabelPreview() {
+    var showPrice = document.getElementById('labelShowPrice').checked;
+    var first = findProduct(labelIds[0]);
+    var more = labelIds.length > 1 ? '<p class="text-small text-muted" style="margin:8px 0 0;text-align:center;">+ ' + (labelIds.length - 1) + ' more product(s)</p>' : '';
+    document.getElementById('labelPreview').innerHTML = '<div>' + labelHtml(first, showPrice) + more + '</div>';
+}
+function printLabels() {
+    var copies = Math.max(1, Math.min(60, parseInt(document.getElementById('labelCopies').value, 10) || 1));
+    var showPrice = document.getElementById('labelShowPrice').checked;
+    var area = document.getElementById('labelPrintArea');
+    if (!area) {
+        area = document.createElement('div');
+        area.id = 'labelPrintArea';
+        document.body.appendChild(area);
+    }
+    var html = '';
+    labelIds.forEach(function (id) {
+        var p = findProduct(id);
+        for (var i = 0; i < copies; i++) html += labelHtml(p, showPrice);
+    });
+    area.innerHTML = html;
+    document.body.classList.add('printing-labels');
+    window.print();
+}
+window.addEventListener('afterprint', function () { document.body.classList.remove('printing-labels'); });
+function generateBarcodes(ids) {
+    ids = ids.map(Number).filter(function (id) { var p = findProduct(id); return p && !p.barcode; });
+    if (!ids.length) {
+        if (typeof IAS_UI !== 'undefined') IAS_UI.alert('The selected products already have barcodes.', 'info', 0);
+        return;
+    }
+    var msg = ids.length === 1
+        ? 'Generate an in-store barcode for "' + (findProduct(ids[0]).name || ('Product #' + ids[0])) + '"?'
+        : 'Generate in-store barcodes for ' + ids.length + ' product(s) without one?';
+    if (!confirm(msg + '\\n\\nOnly do this for items with no manufacturer barcode on the box.')) return;
+    document.getElementById('generateBarcodeIds').innerHTML = ids.map(function (id) {
+        return '<input type="hidden" name="ids[]" value="' + id + '">';
+    }).join('');
+    document.getElementById('generateBarcodeForm').submit();
+}
 
 function focusBarcodeField(id) {
     var input = document.getElementById(id);
@@ -898,6 +1163,7 @@ var state = {
     category: '',
     sort: 'name_asc',
     alert: 'all',
+    barcode: 'all',
     priceMin: null,
     priceMax: null,
     search: '',
@@ -930,10 +1196,12 @@ function getFiltered() {
         if (state.category && p.category !== state.category) return false;
         if (state.alert === 'low' && !(p.status === 'low' || p.status === 'critical')) return false;
         if (state.alert === 'critical' && p.status !== 'critical') return false;
+        if (state.barcode === 'has' && !p.barcode) return false;
+        if (state.barcode === 'missing' && p.barcode) return false;
         if (state.priceMin !== null && p.price < state.priceMin) return false;
         if (state.priceMax !== null && p.price > state.priceMax) return false;
         if (q) {
-            var hay = (p.name + ' ' + p.category + ' ' + (p.sku || '')).toLowerCase();
+            var hay = (p.name + ' ' + p.category + ' ' + (p.sku || '') + ' ' + (p.barcode || '') + ' ' + barcodeLabel(p.barcode)).toLowerCase();
             if (hay.indexOf(q) === -1) return false;
         }
         return true;
@@ -979,6 +1247,7 @@ function render() {
                     '<thead><tr>' +
                         '<th class="col-chk"></th>' +
                         '<th>Product Name</th>' +
+                        (HAS_BARCODE ? '<th class="col-barcode">Barcode</th>' : '') +
                         '<th class="col-stock">Stock</th>' +
                         '<th class="col-status">Status</th>' +
                         '<th class="col-price">Price</th>' +
@@ -1017,6 +1286,7 @@ function rowHtml(p) {
             '<div class="stocks-pname" title="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</div>' +
             '<span class="stocks-pcat">' + escapeHtml(p.category) + '</span>' +
         '</td>' +
+        (HAS_BARCODE ? '<td>' + barcodeCellHtml(p) + '</td>' : '') +
         '<td><span class="stocks-qty' + qtyClass + '">' + p.stock + '</span></td>' +
         '<td>' + statusPillHtml(p.status) + '</td>' +
         '<td class="price-tag">' + peso(p.price) + '</td>' +
@@ -1026,6 +1296,7 @@ function rowHtml(p) {
                 '<div class="ellipsis-menu" id="menu-' + p.id + '">' +
                     '<button type="button" onclick="viewDetails(' + p.id + ')"><i class="fas fa-eye"></i> View Details</button>' +
                     '<button type="button" onclick="openEditModal(' + p.id + ')"><i class="fas fa-edit"></i> Edit</button>' +
+                    barcodeMenuItem(p) +
                     '<button type="button" class="danger" onclick="deleteOne(' + p.id + ')"><i class="fas fa-trash"></i> Delete</button>' +
                 '</div>' +
             '</div>' +
@@ -1046,6 +1317,7 @@ function cardHtml(p) {
                 '<span class="category-pill">' + escapeHtml(p.category) + '</span>' +
                 statusPillHtml(p.status) +
             '</div>' +
+            (HAS_BARCODE ? '<div class="product-meta">' + barcodeCellHtml(p) + '</div>' : '') +
         '</div>' +
         '<div class="product-price">' +
             '<div class="price-label">Stock</div>' +
@@ -1058,6 +1330,7 @@ function cardHtml(p) {
             '<div class="ellipsis-menu" id="menu-' + p.id + '">' +
                 '<button type="button" onclick="viewDetails(' + p.id + ')"><i class="fas fa-eye"></i> View Details</button>' +
                 '<button type="button" onclick="openEditModal(' + p.id + ')"><i class="fas fa-edit"></i> Edit</button>' +
+                barcodeMenuItem(p) +
                 '<button type="button" class="danger" onclick="deleteOne(' + p.id + ')"><i class="fas fa-trash"></i> Delete</button>' +
             '</div>' +
         '</div>' +
@@ -1115,6 +1388,8 @@ function viewDetails(id) {
     document.getElementById('d_price').textContent = peso(p.price);
     var skuEl = document.getElementById('d_sku');
     if (skuEl) skuEl.textContent = p.sku || '—';
+    var barcodeEl = document.getElementById('d_barcode');
+    if (barcodeEl) barcodeEl.textContent = p.barcode ? barcodeLabel(p.barcode) : '—';
     document.getElementById('d_created').textContent = p.created_at || '—';
     document.getElementById('d_desc').textContent = p.description || '—';
     document.getElementById('detailsModal').classList.add('open');
@@ -1131,6 +1406,8 @@ function openEditModal(id) {
     document.getElementById('edit_desc').value = p.description || '';
     var skuField = document.getElementById('edit_sku');
     if (skuField) skuField.value = p.sku || '';
+    var barcodeField = document.getElementById('edit_barcode');
+    if (barcodeField) barcodeField.value = p.barcode || '';
     document.getElementById('editModal').classList.add('open');
 }
 function closeEditModal() { document.getElementById('editModal').classList.remove('open'); }
@@ -1187,9 +1464,37 @@ document.getElementById('bulkDeleteBtn').addEventListener('click', function () {
     document.getElementById('bulkDeleteForm').submit();
 });
 
+if (HAS_BARCODE) {
+    var selectedIds = function () {
+        return Object.keys(state.selected).filter(function (id) { return state.selected[id]; }).map(Number);
+    };
+    document.getElementById('bulkLabelBtn').addEventListener('click', function () {
+        var ids = selectedIds();
+        var withCode = ids.filter(function (id) { var p = findProduct(id); return p && p.barcode; });
+        if (!withCode.length) {
+            if (typeof IAS_UI !== 'undefined') IAS_UI.alert('None of the selected products has a barcode yet. Use Generate Barcodes first.', 'info', 0);
+            return;
+        }
+        openLabelModal(withCode);
+    });
+    document.getElementById('bulkGenerateBtn').addEventListener('click', function () { generateBarcodes(selectedIds()); });
+    document.getElementById('productList').addEventListener('click', function (e) {
+        var lbl = e.target.closest('[data-label-id]');
+        if (lbl) { e.stopPropagation(); openLabelModal([Number(lbl.getAttribute('data-label-id'))]); return; }
+        var gen = e.target.closest('[data-generate-id]');
+        if (gen) { e.stopPropagation(); generateBarcodes([Number(gen.getAttribute('data-generate-id'))]); }
+    });
+    document.getElementById('labelShowPrice').addEventListener('change', renderLabelPreview);
+    document.getElementById('labelPrintBtn').addEventListener('click', printLabels);
+    document.getElementById('labelModal').addEventListener('click', function (e) { if (e.target === this) closeLabelModal(); });
+    if (OPEN_LABEL_ID) {
+        document.addEventListener('DOMContentLoaded', function () { openLabelModal([OPEN_LABEL_ID]); });
+    }
+}
+
 function updateFilterBtnState() {
     var btn = document.getElementById('filterToggleBtn');
-    var active = state.status !== 'all' || state.category !== '' || state.alert !== 'all' || state.sort !== 'name_asc'
+    var active = state.status !== 'all' || state.category !== '' || state.alert !== 'all' || state.barcode !== 'all' || state.sort !== 'name_asc'
         || state.priceMin !== null || state.priceMax !== null;
     btn.classList.toggle('has-active', active);
 }
@@ -1234,6 +1539,16 @@ document.getElementById('sortBy').addEventListener('change', function () {
     render();
 });
 
+var barcodeFilterEl = document.getElementById('barcodeFilter');
+if (barcodeFilterEl) {
+    barcodeFilterEl.addEventListener('change', function () {
+        state.barcode = this.value;
+        state.page = 1;
+        updateFilterBtnState();
+        render();
+    });
+}
+
 document.getElementById('stockAlert').addEventListener('change', function () {
     state.alert = this.value;
     state.page = 1;
@@ -1269,7 +1584,8 @@ document.getElementById('scanBtn').addEventListener('click', function () {
 });
 
 document.getElementById('resetFilters').addEventListener('click', function () {
-    state.status = 'all'; state.category = ''; state.sort = 'name_asc'; state.alert = 'all';
+    state.status = 'all'; state.category = ''; state.sort = 'name_asc'; state.alert = 'all'; state.barcode = 'all';
+    if (barcodeFilterEl) barcodeFilterEl.value = 'all';
     state.priceMin = null; state.priceMax = null; state.page = 1;
     document.querySelectorAll('.status-btn').forEach(function (b) { b.classList.remove('active'); });
     document.querySelector('.status-btn[data-status="all"]').classList.add('active');
@@ -1300,5 +1616,5 @@ render();
 </script>
 SCRIPTS;
 
-staff_page_end($mainScript . $flashScript);
+staff_page_end('<script src="../includes/barcode_label.js?v=1"></script>' . $mainScript . $flashScript);
 ?>

@@ -30,6 +30,12 @@ if (!function_exists('staff_nav_for_role')) {
                     ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list'],
                     ['key' => 'profile', 'href' => 'inventory_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
+            case 'cashier':
+                return [
+                    ['key' => 'dashboard', 'href' => 'cashier_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
+                    ['key' => 'pos', 'href' => 'cashier_pos.php', 'label' => 'POS Checkout', 'icon' => 'fa-cash-register'],
+                    ['key' => 'stockin', 'href' => 'cashier_stock_in.php', 'label' => 'Stock In', 'icon' => 'fa-dolly'],
+                ];
             case 'courier':
                 return [
                     ['key' => 'dashboard', 'href' => 'courier_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
@@ -50,6 +56,7 @@ if (!function_exists('staff_role_label')) {
             'admin' => 'Admin',
             'retail_officer' => 'Retail Officer',
             'inventory_custodian' => 'Inventory Custodian',
+            'cashier' => 'Cashier',
         ];
         return $map[$role] ?? 'Staff';
     }
@@ -59,7 +66,7 @@ if (!function_exists('staff_css_href')) {
     function staff_css_href(): string
     {
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
-        if (preg_match('#/(ADMIN|RETAIL|INVENTORY|courier)$#', $scriptDir)) {
+        if (preg_match('#/(ADMIN|RETAIL|INVENTORY|CASHIER|courier)$#', $scriptDir)) {
             return '../includes/staff_shared.css';
         }
         return 'includes/staff_shared.css';
@@ -70,7 +77,7 @@ if (!function_exists('staff_logo_href')) {
     function staff_logo_href(): string
     {
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
-        if (preg_match('#/(ADMIN|RETAIL|INVENTORY|courier)$#', $scriptDir)) {
+        if (preg_match('#/(ADMIN|RETAIL|INVENTORY|CASHIER|courier)$#', $scriptDir)) {
             return '../assets/logo.png';
         }
         return 'assets/easypc-logo-transparent.png';
@@ -81,7 +88,7 @@ if (!function_exists('staff_logout_href')) {
     function staff_logout_href(): string
     {
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
-        if (preg_match('#/(ADMIN|RETAIL|INVENTORY|courier)$#', $scriptDir)) {
+        if (preg_match('#/(ADMIN|RETAIL|INVENTORY|CASHIER|courier)$#', $scriptDir)) {
             return '../logout.php';
         }
         return 'logout.php';
@@ -132,8 +139,22 @@ if (!function_exists('staff_page_start')) {
             'activity' => 'fa-clipboard-list',
             'profile' => 'fa-user',
         ];
+        if ($role === 'cashier') {
+            /* Cashier pages reuse the Inventory page title banner */
+            $invTitleIcons = [
+                'cashier_dashboard.php' => 'fa-tachometer-alt',
+                'cashier_pos.php' => 'fa-cash-register',
+                'cashier_stock_in.php' => 'fa-dolly',
+                'cashier_receipt.php' => 'fa-receipt',
+            ];
+            $invActiveIcons = [
+                'dashboard' => 'fa-tachometer-alt',
+                'pos' => 'fa-cash-register',
+                'stockin' => 'fa-dolly',
+            ];
+        }
         $currentScript = strtolower(basename($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? ''));
-        $useInvPageTitle = ($role === 'inventory_custodian' && (
+        $useInvPageTitle = (in_array($role, ['inventory_custodian', 'cashier'], true) && (
             isset($invTitleIcons[$currentScript]) || isset($invActiveIcons[$active])
         ));
         $invTitleIcon = $invTitleIcons[$currentScript]
@@ -525,7 +546,7 @@ if (!function_exists('staff_page_end')) {
 </div><!-- /.main -->
 <script src="<?php
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
-        echo preg_match('#/(ADMIN|RETAIL|INVENTORY|courier)$#', $scriptDir)
+        echo preg_match('#/(ADMIN|RETAIL|INVENTORY|CASHIER|courier)$#', $scriptDir)
             ? '../includes/ui_alerts.js'
             : 'includes/ui_alerts.js';
     ?>"></script>

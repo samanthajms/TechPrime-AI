@@ -88,6 +88,9 @@ function redirectByRole($role) {
         case 'inventory_custodian':
             header("Location: INVENTORY/inventory_dashboard.php");
             break;
+        case 'cashier':
+            header("Location: CASHIER/cashier_dashboard.php");
+            break;
         case 'technician':
             header("Location: login.php?error=" . urlencode("The Technician role has been removed. Contact an administrator."));
             break;

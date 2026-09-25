@@ -289,6 +289,9 @@ function ias_alert_message_from_request(): ?string
         'login'       => 'Login successful.',
         'error'       => 'Could not complete the action. Please check your input and try again.',
         'stock'       => 'Some items are out of stock. Your cart was updated.',
+        'barcode'     => 'Invalid UPC/EAN barcode. Check the digits (UPC-A 12, UPC-E 8, EAN-13 13, EAN-8 8) and the check digit.',
+        'barcode_taken' => 'That UPC/EAN barcode is already assigned to another product.',
+        'barcode_generated' => 'Barcode generated. Print the label and stick it on the item.',
     ];
     if (isset($_GET['logged_out'])) {
         return $map['logout'];

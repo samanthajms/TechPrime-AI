@@ -11,6 +11,7 @@ $admin_id = (int)$_SESSION['user_id'];
 $staffRoles = [
     'retail_officer' => 'Retail Officer',
     'inventory_custodian' => 'Inventory Custodian',
+    'cashier' => 'Cashier',
 ];
  
 // ── Handle POST Actions ──────────────────────────────────────────────────────
@@ -102,6 +103,7 @@ $clients       = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at 
 $admins        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='admin' ORDER BY u.name ASC");
 $retail_officers        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='retail_officer' ORDER BY u.name ASC");
 $inventory_custodians        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='inventory_custodian' ORDER BY u.name ASC");
+$cashiers      = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='cashier' ORDER BY u.name ASC");
 
  
 // Counts
@@ -110,12 +112,13 @@ $count_client  = $db->query("SELECT COUNT(*) as c FROM users WHERE role='client'
 $count_admin   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='admin'")->fetch(PDO::FETCH_ASSOC)['c'];
 $count_officer   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='retail_officer'")->fetch(PDO::FETCH_ASSOC)['c'];
 $count_custodian   = $db->query("SELECT COUNT(*) as c FROM users WHERE role='inventory_custodian'")->fetch(PDO::FETCH_ASSOC)['c'];
+$count_cashier = $db->query("SELECT COUNT(*) as c FROM users WHERE role='cashier'")->fetch(PDO::FETCH_ASSOC)['c'];
 
  
 $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
 $csrf = generateCsrfToken();
 $active_tab = $_GET['tab'] ?? 'all';
-$valid_tabs = ['all', 'client', 'admin', 'retail_officer', 'inventory_custodian'];
+$valid_tabs = ['all', 'client', 'admin', 'retail_officer', 'inventory_custodian', 'cashier'];
 if (!in_array($active_tab, $valid_tabs, true)) {
     $active_tab = 'all';
 }
@@ -132,6 +135,7 @@ $user_rows = [
     'admin'   => fetchToArray($admins),
     'retail_officer' => fetchToArray($retail_officers),
     'inventory_custodian' => fetchToArray($inventory_custodians),
+    'cashier' => fetchToArray($cashiers),
     
 ];
 $users = $user_rows[$active_tab];
@@ -569,6 +573,7 @@ $users = $user_rows[$active_tab];
                 <a class="tab-btn <?php echo $active_tab === 'client' ? 'active' : ''; ?>" href="manage_users.php?tab=client">Clients <span class="tab-count"><?php echo (int)$count_client; ?></span></a>
                 <a class="tab-btn <?php echo $active_tab === 'retail_officer' ? 'active' : ''; ?>" href="manage_users.php?tab=retail_officer">Retail Officers <span class="tab-count"><?php echo (int)$count_officer; ?></span></a>
                 <a class="tab-btn <?php echo $active_tab === 'inventory_custodian' ? 'active' : ''; ?>" href="manage_users.php?tab=inventory_custodian">Inventory Custodian <span class="tab-count"><?php echo (int)$count_custodian; ?></span></a>
+                <a class="tab-btn <?php echo $active_tab === 'cashier' ? 'active' : ''; ?>" href="manage_users.php?tab=cashier">Cashiers <span class="tab-count"><?php echo (int)$count_cashier; ?></span></a>
             </div>
         </div>
 
