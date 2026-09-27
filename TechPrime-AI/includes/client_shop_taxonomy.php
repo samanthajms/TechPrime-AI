@@ -263,6 +263,8 @@ function ep_shop_classify_product(array $p): array
         $result = $pick('component', 'chassis-fan');
     } elseif (strcasecmp($dbCat, 'Cooling') === 0) {
         $result = $pick('component', 'cpu-cooling');
+    } elseif (($stored = ep_shop_taxonomy_from_label($dbCat)) !== null) {
+        $result = $stored;
     } else {
         $result = $pick('others');
     }
@@ -359,6 +361,78 @@ function ep_shop_url(array $overrides = [], ?array $base = null): string
 function ep_shop_parent_valid(?string $slug): bool
 {
     return $slug !== null && $slug !== '' && isset(ep_shop_taxonomy()[$slug]);
+}
+
+/**
+ * Map a stored products.category label onto the Client taxonomy.
+ * Matches subcategory labels, plus parent labels that are not the old
+ * generic defaults (Accessories / Others) used by legacy inventory rows.
+ *
+ * @return array{0:string,1:string,2:string,3:string}|null
+ */
+function ep_shop_taxonomy_from_label(string $label): ?array
+{
+    $label = trim($label);
+    if ($label === '') {
+        return null;
+    }
+    $skipParents = ['accessories', 'others'];
+    foreach (ep_shop_taxonomy() as $parent => $info) {
+        foreach ($info['subs'] as $sub => $subLabel) {
+            if (strcasecmp((string)$subLabel, $label) === 0) {
+                return [$parent, $sub, (string)$info['label'], (string)$subLabel];
+            }
+        }
+        if (!in_array($parent, $skipParents, true) && strcasecmp((string)$info['label'], $label) === 0) {
+            return [$parent, '', (string)$info['label'], ''];
+        }
+    }
+    return null;
+}
+
+/** @return array<string, list<string>> parent label => selectable values */
+function ep_shop_inventory_category_groups(): array
+{
+    $groups = [];
+    foreach (ep_shop_taxonomy() as $info) {
+        $subs = $info['subs'];
+        $groups[(string)$info['label']] = $subs === []
+            ? [(string)$info['label']]
+            : array_values($subs);
+    }
+    return $groups;
+}
+
+/** @return list<string> */
+function ep_shop_inventory_allowed_category_values(): array
+{
+    $out = [];
+    foreach (ep_shop_inventory_category_groups() as $values) {
+        foreach ($values as $value) {
+            $out[] = $value;
+        }
+    }
+    return $out;
+}
+
+function ep_shop_category_display(array $info): string
+{
+    $parent = trim((string)($info['parent_label'] ?? ''));
+    $sub = trim((string)($info['sub_label'] ?? ''));
+    if ($parent !== '' && $sub !== '') {
+        return $parent . ' · ' . $sub;
+    }
+    return $parent !== '' ? $parent : 'Others';
+}
+
+function ep_shop_category_store_value(array $info): string
+{
+    $sub = trim((string)($info['sub_label'] ?? ''));
+    if ($sub !== '') {
+        return $sub;
+    }
+    $parent = trim((string)($info['parent_label'] ?? ''));
+    return $parent !== '' ? $parent : 'Others';
 }
 
 function ep_shop_sub_valid(string $parent, ?string $sub): bool

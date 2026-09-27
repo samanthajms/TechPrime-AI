@@ -329,6 +329,8 @@ if (!function_exists('inv_parse_log_change')) {
             $product = trim($m[1]);
         } elseif (preg_match('/Deleted product:\s*(.+)$/i', $details, $m)) {
             $product = trim($m[1]);
+        } elseif (preg_match('/Generated in-store barcode for .+?: (.+)$/i', $details, $m)) {
+            $product = trim($m[1]);
         }
 
         if (preg_match('/stock\s+(\d+)\s*→\s*(\d+)/u', $details, $m)
@@ -364,6 +366,10 @@ if (!function_exists('inv_parse_log_change')) {
             $change = 'Updated';
             $changeClass = 'chg-updated';
             $status = 'Adjusted';
+        } elseif ($action === 'generate_barcode') {
+            $change = 'Barcode';
+            $changeClass = 'chg-updated';
+            $status = 'Completed';
         }
 
         return [
@@ -382,6 +388,7 @@ if (!function_exists('inv_action_label')) {
             'add_product' => 'Stock Added',
             'edit_product' => 'Stock Updated',
             'delete_product' => 'Product Removed',
+            'generate_barcode' => 'Barcode Generated',
             'update_order_status' => 'Order Updated',
             'view_dashboard' => 'Viewed Dashboard',
             'profile_update' => 'Profile Updated',

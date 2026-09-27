@@ -23,9 +23,20 @@ if (!function_exists('staff_nav_for_role')) {
                     ['key' => 'profile', 'href' => 'retail_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
             case 'inventory_custodian':
+                $stockChildren = [
+                    ['label' => 'All', 'href' => 'inventory_stocks.php', 'slug' => ''],
+                ];
+                require_once __DIR__ . '/client_shop_taxonomy.php';
+                foreach (ep_shop_taxonomy() as $slug => $info) {
+                    $stockChildren[] = [
+                        'label' => (string)$info['label'],
+                        'href' => 'inventory_stocks.php?cat=' . rawurlencode((string)$slug),
+                        'slug' => (string)$slug,
+                    ];
+                }
                 return [
                     ['key' => 'dashboard', 'href' => 'inventory_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes'],
+                    ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes', 'children' => $stockChildren],
                     ['key' => 'orders', 'href' => 'inventory_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart'],
                     ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list'],
                     ['key' => 'profile', 'href' => 'inventory_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
@@ -301,12 +312,38 @@ if (!function_exists('staff_page_start')) {
         </div>
     </div>
     <nav>
-        <?php foreach ($nav as $item): ?>
+        <?php
+        $navScript = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+        $onStocksPage = (bool)preg_match('#/inventory_stocks\.php$#', $navScript);
+        $stocksCat = $onStocksPage ? trim((string)($_GET['cat'] ?? '')) : '';
+        foreach ($nav as $item):
+            $children = $item['children'] ?? [];
+            if ($children !== []):
+                $dropOpen = ($item['key'] === $active);
+        ?>
+            <details class="sidebar-drop<?php echo $dropOpen ? ' is-active' : ''; ?>" <?php echo $dropOpen ? 'open' : ''; ?>>
+                <summary class="nav-link<?php echo $dropOpen ? ' active' : ''; ?>">
+                    <i class="fas <?php echo h($item['icon']); ?>"></i>
+                    <span><?php echo h($item['label']); ?></span>
+                    <i class="fas fa-chevron-down sidebar-drop-caret" aria-hidden="true"></i>
+                </summary>
+                <div class="sidebar-drop-menu">
+                    <?php foreach ($children as $child):
+                        $childSlug = (string)($child['slug'] ?? '');
+                        $childActive = $onStocksPage && $stocksCat === $childSlug;
+                    ?>
+                    <a href="<?php echo h($child['href']); ?>" class="<?php echo $childActive ? 'active' : ''; ?>">
+                        <span><?php echo h($child['label']); ?></span>
+                    </a>
+                    <?php endforeach; ?>
+                </div>
+            </details>
+        <?php else: ?>
             <a href="<?php echo h($item['href']); ?>" class="<?php echo ($item['key'] === $active) ? 'active' : ''; ?>">
                 <i class="fas <?php echo h($item['icon']); ?>"></i>
                 <span><?php echo h($item['label']); ?></span>
             </a>
-        <?php endforeach; ?>
+        <?php endif; endforeach; ?>
     </nav>
     <div class="sidebar-footer">
         <a href="<?php echo h($logout); ?>"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>

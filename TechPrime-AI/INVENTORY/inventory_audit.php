@@ -21,6 +21,7 @@ $allowedActions = [
     'add_product' => 'Stock Added',
     'edit_product' => 'Stock Updated',
     'delete_product' => 'Product Removed',
+    'generate_barcode' => 'Barcode Generated',
     'update_order_status' => 'Order Updated',
 ];
 if (!array_key_exists($actionFilter, $allowedActions)) {
@@ -38,16 +39,19 @@ if (!array_key_exists($range, $allowedRanges)) {
     $range = 'all';
 }
 
-$inventoryActions = ['add_product', 'edit_product', 'delete_product', 'update_order_status'];
+$inventoryActions = ['add_product', 'edit_product', 'delete_product', 'generate_barcode', 'update_order_status'];
 
-$where = ['l.action IN (' . implode(',', array_fill(0, count($inventoryActions), '?')) . ')'];
-$types = str_repeat('s', count($inventoryActions));
-$params = $inventoryActions;
+$where = [
+    'l.action IN (' . implode(',', array_fill(0, count($inventoryActions), '?')) . ')',
+    'u.role = ?',
+];
+$types = str_repeat('s', count($inventoryActions) + 1);
+$params = array_merge($inventoryActions, ['inventory_custodian']);
 
 if ($actionFilter !== '') {
-    $where = ['l.action = ?'];
-    $types = 's';
-    $params = [$actionFilter];
+    $where = ['l.action = ?', 'u.role = ?'];
+    $types = 'ss';
+    $params = [$actionFilter, 'inventory_custodian'];
 }
 
 if ($q !== '') {
@@ -316,7 +320,7 @@ EXTRA
                             $timeLabel = $ts ? date('g:i A', $ts) : '';
                             $actClass = 'act-other';
                             if ($action === 'add_product') $actClass = 'act-add';
-                            elseif ($action === 'edit_product') $actClass = 'act-edit';
+                            elseif ($action === 'edit_product' || $action === 'generate_barcode') $actClass = 'act-edit';
                             elseif ($action === 'delete_product') $actClass = 'act-del';
                             elseif ($action === 'update_order_status') $actClass = 'act-order';
                             $statusClass = ($parsed['status'] === 'Adjusted') ? 'adj' : '';

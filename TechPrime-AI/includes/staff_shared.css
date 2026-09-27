@@ -170,6 +170,38 @@ body {
   box-shadow: inset 3px 0 0 var(--ep-yellow);
 }
 
+.sidebar-drop {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar-drop > summary {
+  list-style: none;
+}
+.sidebar-drop > summary::-webkit-details-marker {
+  display: none;
+}
+.sidebar-drop-caret {
+  margin-left: auto;
+  width: auto !important;
+  font-size: 11px;
+  opacity: 0.8;
+  transition: transform 0.18s ease;
+}
+.sidebar-drop[open] > summary .sidebar-drop-caret {
+  transform: rotate(180deg);
+}
+.sidebar-drop-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 6px 10px;
+}
+.sidebar-drop-menu a {
+  padding: 8px 12px 8px 22px;
+  font-size: 12.5px;
+}
+
 .sidebar-footer {
   padding: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.18);

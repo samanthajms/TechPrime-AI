@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 require_once __DIR__ . '/../includes/product_categories.php';
+require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -21,8 +22,7 @@ $productCount = count($productRows);
 $totalStock = 0;
 $lowStockCount = 0;
 $outOfStockCount = 0;
-$categoriesInUse = [];
-foreach ($productRows as $row) {
+foreach ($productRows as &$row) {
     $stock = (int)($row['stock'] ?? 0);
     $totalStock += $stock;
     if ($stock <= 0) {
@@ -30,15 +30,14 @@ foreach ($productRows as $row) {
     } elseif ($stock <= 5) {
         $lowStockCount++;
     }
-    $cat = trim((string)($row['category'] ?? ''));
-    if ($cat !== '' && !in_array($cat, $categoriesInUse, true)) {
-        $categoriesInUse[] = $cat;
-    }
+    $tax = ep_shop_classify_product($row);
+    $row['tax_parent_label'] = $tax['parent_label'];
 }
-sort($categoriesInUse);
-$allowedCategories = ias_inventory_allowed_categories();
-$categoryTabs = array_values(array_unique(array_merge($categoriesInUse, $allowedCategories)));
-sort($categoryTabs);
+unset($row);
+$categoryTabs = [];
+foreach (ep_shop_taxonomy() as $info) {
+    $categoryTabs[] = (string)$info['label'];
+}
 $completionRate = $total > 0 ? (int)round(($done / $total) * 100) : 0;
 
 $stockYear = (int)date('Y');
@@ -48,7 +47,7 @@ inv_sync_stock_alerts($db);
 
 $jsStockProducts = array_map(static function ($p) {
     return [
-        'category' => trim((string)($p['category'] ?? 'Accessories')) ?: 'Accessories',
+        'category' => trim((string)($p['tax_parent_label'] ?? 'Others')) ?: 'Others',
         'created_at' => (string)($p['created_at'] ?? ''),
     ];
 }, $productRows);

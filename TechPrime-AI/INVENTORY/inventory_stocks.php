@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 require_once __DIR__ . '/../includes/product_categories.php';
+require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
 require_once __DIR__ . '/../includes/inventory_alerts.php';
 require_once __DIR__ . '/../includes/pos_helpers.php';
 
@@ -11,7 +12,12 @@ checkSessionTimeout();
 checkRole('inventory_custodian');
 
 $uid = (int)$_SESSION['user_id'];
-$allowed_categories = ias_inventory_allowed_categories();
+$allowed_categories = ep_shop_inventory_allowed_category_values();
+$categoryGroups = ep_shop_inventory_category_groups();
+$stockCat = trim((string)($_GET['cat'] ?? ''));
+if ($stockCat !== '' && !ep_shop_parent_valid($stockCat)) {
+    $stockCat = '';
+}
 
 /* Stock alert thresholds (qty-based; no per-product config in the schema). */
 const CRITICAL_STOCK_MAX = 5;   // 0 < stock <= 5
@@ -108,7 +114,7 @@ if (isset($_POST['add_product'])) {
         if ($hasBarcode && $barcode !== null && $newId > 0) {
             $db->prepare('UPDATE products SET barcode = ? WHERE id = ?')->execute([$barcode, $newId]);
         }
-        logActivity($db, $uid, 'add_product', 'Added product: ' . $name . ' (stock: ' . $stock . ')');
+        logActivity($db, $uid, 'add_product', 'Added product: ' . $name . ' [' . $category . '] (stock: ' . $stock . ')');
         if ($newId > 0 && $stock <= 15) {
             inv_notify_stock_change($db, $name, $newId, 999, $stock);
         }
@@ -142,11 +148,18 @@ if (isset($_POST['edit_product'])) {
             exit;
         }
 
-        $oldSt = $db->prepare('SELECT name, stock, image FROM products WHERE id = ?');
+        $oldSt = $db->prepare('SELECT name, stock, image, category FROM products WHERE id = ?');
         $oldSt->execute([$id]);
         $oldRow = $oldSt->fetch(PDO::FETCH_ASSOC) ?: [];
         $oldStock = (int)($oldRow['stock'] ?? 0);
         $oldName = trim((string)($oldRow['name'] ?? $name));
+        $shownCat = ep_shop_category_store_value(ep_shop_classify_product([
+            'name' => $oldName,
+            'category' => (string)($oldRow['category'] ?? ''),
+        ]));
+        if ($category === $shownCat) {
+            $category = (string)($oldRow['category'] ?? $category);
+        }
 
         if ($newImage !== null) {
             $emptyUrl = '';
@@ -196,12 +209,12 @@ if (isset($_POST['edit_product'])) {
         }
 
         $logName = $name !== '' ? $name : $oldName;
-        logActivity(
-            $db,
-            $uid,
-            'edit_product',
-            'Updated product #' . $id . ' "' . $logName . '": stock ' . $oldStock . ' → ' . $stock
-        );
+        $logDetails = 'Updated product #' . $id . ' "' . $logName . '": stock ' . $oldStock . ' → ' . $stock;
+        $oldCat = (string)($oldRow['category'] ?? '');
+        if ($category !== $oldCat) {
+            $logDetails .= '; category ' . $oldCat . ' → ' . $category;
+        }
+        logActivity($db, $uid, 'edit_product', $logDetails);
         inv_notify_stock_change($db, $logName, $id, $oldStock, $stock);
         header('Location: inventory_stocks.php?alert=updated');
         exit;
@@ -319,7 +332,6 @@ $outOfStockCount = 0;
 $lowStockCount = 0;
 $criticalStockCount = 0;
 $withBarcodeCount = 0;
-$categoriesInUse = [];
 $rows = [];
 
 if ($products) {
@@ -341,16 +353,15 @@ if ($products) {
         if (trim((string)($p['barcode'] ?? '')) !== '') {
             $withBarcodeCount++;
         }
-        $cat = $p['category'] ?? 'Accessories';
-        if ($cat !== '' && !in_array($cat, $categoriesInUse, true)) {
-            $categoriesInUse[] = $cat;
-        }
+        $tax = ep_shop_classify_product($p);
+        $p['tax_parent'] = $tax['parent'];
+        $p['tax_parent_label'] = $tax['parent_label'];
+        $p['tax_sub_label'] = $tax['sub_label'];
+        $p['tax_display'] = ep_shop_category_display($tax);
+        $p['tax_store'] = ep_shop_category_store_value($tax);
         $rows[] = $p;
     }
 }
-sort($categoriesInUse);
-$categoryOptions = array_values(array_unique(array_merge($categoriesInUse, $allowed_categories)));
-sort($categoryOptions);
 
 staff_page_start([
     'role' => 'inventory_custodian',
@@ -369,55 +380,12 @@ staff_page_start([
     box-shadow: var(--card-shadow);
     overflow: visible;
 }
-.stocks-section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    background: linear-gradient(to bottom, #fff 0%, #f4f9f0 100%);
-    border-bottom: 1px solid var(--ep-border);
-    padding: 16px 20px;
-    border-radius: 16px 16px 0 0;
-}
-.stocks-section-title-box {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-    flex: 1 1 auto;
-    background: linear-gradient(180deg, #ffffff 0%, var(--ep-green-light) 100%);
-    border: 1.5px solid var(--teal-light, #c6e6b3);
-    border-left: 4px solid var(--ep-green);
-    border-radius: 12px;
-    padding: 12px 16px;
-    box-shadow: 0 2px 8px rgba(75, 139, 42, 0.08);
-}
-.stocks-section-title-box h3 {
-    margin: 0;
-    font-size: 17px;
-    font-weight: 800;
-    color: var(--ep-green-dark);
-    letter-spacing: 0.02em;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.stocks-section-title-box .card-icon {
-    width: 32px; height: 32px; border-radius: 9px;
-}
-.stocks-section-title-box .card-subtitle {
-    margin: 0;
-    font-size: 12px;
-    color: var(--ep-muted);
-    font-weight: 500;
-}
 .stocks-shell > .card-body {
     padding: 18px 24px 24px;
     background: transparent;
 }
 
-.stocks-filter-wrap { position: relative; flex-shrink: 0; margin-left: auto; }
+.stocks-filter-wrap { position: relative; flex-shrink: 0; }
 .stocks-filter-btn {
     display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px;
     border-radius: 10px; border: 1px solid var(--ep-border); background: #fff;
@@ -730,7 +698,6 @@ staff_page_start([
 
 @media (max-width: 640px) {
     .stocks-shell > .card-body { padding: 14px 14px 18px; }
-    .stocks-section-header { padding: 12px 14px; }
     .stocks-filter-panel { right: 0; left: auto; }
     .stocks-toolbar { padding: 10px; }
 }
@@ -741,75 +708,6 @@ EXTRA
 
         <div class="stocks-page">
         <div class="card stocks-shell">
-            <div class="card-header stocks-section-header">
-                <div class="stocks-section-title-box">
-                    <h3><span class="card-icon"><i class="fas fa-boxes"></i></span> Stock Products</h3>
-                    <div class="card-subtitle"><span id="totalCountLabel"><?php echo (int)$totalCount; ?></span> products in inventory</div>
-                </div>
-                <div class="stocks-filter-wrap">
-                    <button type="button" id="filterToggleBtn" class="stocks-filter-btn" aria-expanded="false" aria-controls="stocksFilterPanel">
-                        <i class="fas fa-filter"></i> Filter <i class="fas fa-chevron-down"></i> <span class="filter-dot" aria-hidden="true"></span>
-                    </button>
-                    <div id="stocksFilterPanel" class="stocks-filter-panel" role="dialog" aria-label="Stock filters">
-                        <h4 class="stocks-filter-panel-title">Filter Stock</h4>
-                        <div>
-                            <span class="filter-title">Category</span>
-                            <select id="categorySelect" class="form-control stocks-category-select" aria-label="Product category">
-                                <option value="">All Categories</option>
-                                <?php foreach ($categoryOptions as $cat): ?>
-                                    <option value="<?php echo h($cat); ?>"><?php echo h($cat); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div>
-                            <span class="filter-title">Product Status</span>
-                            <div class="status-toggle" id="statusToggle">
-                                <button type="button" class="status-btn active" data-status="all">All <span class="cnt"><?php echo (int)$totalCount; ?></span></button>
-                                <button type="button" class="status-btn" data-status="instock">In stock <span class="cnt"><?php echo (int)$inStockCount; ?></span></button>
-                                <button type="button" class="status-btn" data-status="outofstock">Out of Stock <span class="cnt"><?php echo (int)$outOfStockCount; ?></span></button>
-                            </div>
-                        </div>
-                        <div>
-                            <span class="filter-title">Sort By</span>
-                            <select id="sortBy" class="form-control">
-                                <option value="name_asc" selected>Alphabetical (A-Z)</option>
-                                <option value="name_desc">Alphabetical (Z-A)</option>
-                                <option value="price_asc">Price (Low to High)</option>
-                                <option value="price_desc">Price (High to Low)</option>
-                                <option value="stock_asc">Stock Quantity (Low to High)</option>
-                                <option value="stock_desc">Stock Quantity (High to Low)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <span class="filter-title">Stock Alert</span>
-                            <select id="stockAlert" class="form-control">
-                                <option value="all" selected>All Stock</option>
-                                <option value="low">Low Stock (&le; <?php echo LOW_STOCK_MAX; ?>)</option>
-                                <option value="critical">Critical Stock (&le; <?php echo CRITICAL_STOCK_MAX; ?>)</option>
-                            </select>
-                        </div>
-                        <?php if ($hasBarcode): ?>
-                        <div>
-                            <span class="filter-title">Barcode</span>
-                            <select id="barcodeFilter" class="form-control">
-                                <option value="all" selected>All Products</option>
-                                <option value="has">Has UPC/EAN barcode (<?php echo (int)$withBarcodeCount; ?>)</option>
-                                <option value="missing">Missing barcode (<?php echo (int)($totalCount - $withBarcodeCount); ?>)</option>
-                            </select>
-                        </div>
-                        <?php endif; ?>
-                        <div>
-                            <span class="filter-title">Price Range</span>
-                            <div class="price-range">
-                                <input type="number" min="0" step="0.01" id="priceMin" class="form-control" placeholder="Min">
-                                <span>&ndash;</span>
-                                <input type="number" min="0" step="0.01" id="priceMax" class="form-control" placeholder="Max">
-                            </div>
-                        </div>
-                        <button type="button" id="resetFilters" class="btn btn-outline btn-reset">Reset Filters</button>
-                    </div>
-                </div>
-            </div>
             <div class="card-body">
 
                 <div class="stocks-toolbar">
@@ -823,7 +721,61 @@ EXTRA
                     <div class="toolbar-actions">
                         <div class="view-toggle">
                             <button type="button" id="listViewBtn" class="active" title="List view"><i class="fas fa-list"></i></button>
-                            <button type="button" id="gridViewBtn" title="Grid view"><i class="fas fa-th-large"></i></button>
+                            <button type="button" id="gridViewBtn" title="Larger picture view"><i class="fas fa-th-large"></i></button>
+                        </div>
+                        <div class="stocks-filter-wrap">
+                            <button type="button" id="filterToggleBtn" class="stocks-filter-btn" aria-expanded="false" aria-controls="stocksFilterPanel">
+                                <i class="fas fa-filter"></i> Filter <i class="fas fa-chevron-down"></i> <span class="filter-dot" aria-hidden="true"></span>
+                            </button>
+                            <div id="stocksFilterPanel" class="stocks-filter-panel" role="dialog" aria-label="Stock filters">
+                                <h4 class="stocks-filter-panel-title">Filter Stock</h4>
+                                <div>
+                                    <span class="filter-title">Product Status</span>
+                                    <div class="status-toggle" id="statusToggle">
+                                        <button type="button" class="status-btn active" data-status="all">All <span class="cnt"><?php echo (int)$totalCount; ?></span></button>
+                                        <button type="button" class="status-btn" data-status="instock">In stock <span class="cnt"><?php echo (int)$inStockCount; ?></span></button>
+                                        <button type="button" class="status-btn" data-status="outofstock">Out of Stock <span class="cnt"><?php echo (int)$outOfStockCount; ?></span></button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span class="filter-title">Sort By</span>
+                                    <select id="sortBy" class="form-control">
+                                        <option value="name_asc" selected>Alphabetical (A-Z)</option>
+                                        <option value="name_desc">Alphabetical (Z-A)</option>
+                                        <option value="price_asc">Price (Low to High)</option>
+                                        <option value="price_desc">Price (High to Low)</option>
+                                        <option value="stock_asc">Stock Quantity (Low to High)</option>
+                                        <option value="stock_desc">Stock Quantity (High to Low)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <span class="filter-title">Stock Alert</span>
+                                    <select id="stockAlert" class="form-control">
+                                        <option value="all" selected>All Stock</option>
+                                        <option value="low">Low Stock (&le; <?php echo LOW_STOCK_MAX; ?>)</option>
+                                        <option value="critical">Critical Stock (&le; <?php echo CRITICAL_STOCK_MAX; ?>)</option>
+                                    </select>
+                                </div>
+                                <?php if ($hasBarcode): ?>
+                                <div>
+                                    <span class="filter-title">Barcode</span>
+                                    <select id="barcodeFilter" class="form-control">
+                                        <option value="all" selected>All Products</option>
+                                        <option value="has">Has UPC/EAN barcode (<?php echo (int)$withBarcodeCount; ?>)</option>
+                                        <option value="missing">Missing barcode (<?php echo (int)($totalCount - $withBarcodeCount); ?>)</option>
+                                    </select>
+                                </div>
+                                <?php endif; ?>
+                                <div>
+                                    <span class="filter-title">Price Range</span>
+                                    <div class="price-range">
+                                        <input type="number" min="0" step="0.01" id="priceMin" class="form-control" placeholder="Min">
+                                        <span>&ndash;</span>
+                                        <input type="number" min="0" step="0.01" id="priceMax" class="form-control" placeholder="Max">
+                                    </div>
+                                </div>
+                                <button type="button" id="resetFilters" class="btn btn-outline btn-reset">Reset Filters</button>
+                            </div>
                         </div>
                         <button type="button" id="addProductBtn" class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">
                             <i class="fas fa-plus"></i> Add Product
@@ -891,8 +843,12 @@ EXTRA
                         <label class="form-label">Category</label>
                         <select name="category" class="form-control" required>
                             <option value="" disabled selected>Select a category...</option>
-                            <?php foreach ($allowed_categories as $category): ?>
+                            <?php foreach ($categoryGroups as $groupLabel => $groupValues): ?>
+                            <optgroup label="<?php echo h($groupLabel); ?>">
+                                <?php foreach ($groupValues as $category): ?>
                                 <option value="<?php echo h($category); ?>"><?php echo h($category); ?></option>
+                                <?php endforeach; ?>
+                            </optgroup>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -946,8 +902,12 @@ EXTRA
                     <div class="form-group">
                         <label class="form-label">Category</label>
                         <select name="category" id="edit_category" class="form-control" required>
-                            <?php foreach ($allowed_categories as $category): ?>
+                            <?php foreach ($categoryGroups as $groupLabel => $groupValues): ?>
+                            <optgroup label="<?php echo h($groupLabel); ?>">
+                                <?php foreach ($groupValues as $category): ?>
                                 <option value="<?php echo h($category); ?>"><?php echo h($category); ?></option>
+                                <?php endforeach; ?>
+                            </optgroup>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -1047,7 +1007,9 @@ $jsProducts = array_map(function ($p) {
     return [
         'id' => (int)$p['id'],
         'name' => $p['name'] ?? '',
-        'category' => $p['category'] ?? 'Accessories',
+        'category' => $p['tax_display'] ?? ($p['category'] ?? 'Others'),
+        'category_value' => $p['tax_store'] ?? ($p['category'] ?? 'Others'),
+        'tax_parent' => $p['tax_parent'] ?? 'others',
         'price' => (float)$p['price'],
         'stock' => $stock,
         'status' => inventory_stock_status($stock),
@@ -1064,6 +1026,7 @@ $lowMax = LOW_STOCK_MAX;
 $criticalMax = CRITICAL_STOCK_MAX;
 $hasBarcodeJs = $hasBarcode ? 'true' : 'false';
 $openLabelId = (int)($_GET['label'] ?? 0);
+$stockCatJs = json_encode($stockCat, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
 $mainScript = <<<SCRIPTS
 <script>
@@ -1071,6 +1034,7 @@ var ALL_PRODUCTS = {$productsJson};
 var LOW_STOCK_MAX = {$lowMax};
 var CRITICAL_STOCK_MAX = {$criticalMax};
 var HAS_BARCODE = {$hasBarcodeJs};
+var STOCK_CAT = {$stockCatJs};
 
 /* UPC-A is stored as a 13-digit GTIN with a leading 0; show the 12 digits printed on the box. */
 function barcodeLabel(code) {
@@ -1160,7 +1124,7 @@ function focusBarcodeField(id) {
 
 var state = {
     status: 'all',
-    category: '',
+    category: STOCK_CAT || '',
     sort: 'name_asc',
     alert: 'all',
     barcode: 'all',
@@ -1193,7 +1157,7 @@ function getFiltered() {
     var list = ALL_PRODUCTS.filter(function (p) {
         if (state.status === 'instock' && p.status === 'out') return false;
         if (state.status === 'outofstock' && p.status !== 'out') return false;
-        if (state.category && p.category !== state.category) return false;
+        if (state.category && p.tax_parent !== state.category) return false;
         if (state.alert === 'low' && !(p.status === 'low' || p.status === 'critical')) return false;
         if (state.alert === 'critical' && p.status !== 'critical') return false;
         if (state.barcode === 'has' && !p.barcode) return false;
@@ -1201,7 +1165,7 @@ function getFiltered() {
         if (state.priceMin !== null && p.price < state.priceMin) return false;
         if (state.priceMax !== null && p.price > state.priceMax) return false;
         if (q) {
-            var hay = (p.name + ' ' + p.category + ' ' + (p.sku || '') + ' ' + (p.barcode || '') + ' ' + barcodeLabel(p.barcode)).toLowerCase();
+            var hay = (p.name + ' ' + p.category + ' ' + (p.tax_parent || '') + ' ' + (p.sku || '') + ' ' + (p.barcode || '') + ' ' + barcodeLabel(p.barcode)).toLowerCase();
             if (hay.indexOf(q) === -1) return false;
         }
         return true;
@@ -1400,7 +1364,7 @@ function openEditModal(id) {
     if (!p) return;
     document.getElementById('edit_id').value = p.id;
     document.getElementById('edit_name').value = p.name || '';
-    document.getElementById('edit_category').value = p.category || 'Accessories';
+    document.getElementById('edit_category').value = p.category_value || p.category || 'Others';
     document.getElementById('edit_price').value = p.price;
     document.getElementById('edit_stock').value = p.stock;
     document.getElementById('edit_desc').value = p.description || '';
@@ -1494,7 +1458,7 @@ if (HAS_BARCODE) {
 
 function updateFilterBtnState() {
     var btn = document.getElementById('filterToggleBtn');
-    var active = state.status !== 'all' || state.category !== '' || state.alert !== 'all' || state.barcode !== 'all' || state.sort !== 'name_asc'
+    var active = state.status !== 'all' || state.alert !== 'all' || state.barcode !== 'all' || state.sort !== 'name_asc'
         || state.priceMin !== null || state.priceMax !== null;
     btn.classList.toggle('has-active', active);
 }
@@ -1521,13 +1485,6 @@ document.getElementById('statusToggle').addEventListener('click', function (e) {
     document.querySelectorAll('.status-btn').forEach(function (b) { b.classList.remove('active'); });
     btn.classList.add('active');
     state.status = btn.dataset.status;
-    state.page = 1;
-    updateFilterBtnState();
-    render();
-});
-
-document.getElementById('categorySelect').addEventListener('change', function () {
-    state.category = this.value.trim();
     state.page = 1;
     updateFilterBtnState();
     render();
@@ -1584,12 +1541,11 @@ document.getElementById('scanBtn').addEventListener('click', function () {
 });
 
 document.getElementById('resetFilters').addEventListener('click', function () {
-    state.status = 'all'; state.category = ''; state.sort = 'name_asc'; state.alert = 'all'; state.barcode = 'all';
+    state.status = 'all'; state.sort = 'name_asc'; state.alert = 'all'; state.barcode = 'all';
     if (barcodeFilterEl) barcodeFilterEl.value = 'all';
     state.priceMin = null; state.priceMax = null; state.page = 1;
     document.querySelectorAll('.status-btn').forEach(function (b) { b.classList.remove('active'); });
     document.querySelector('.status-btn[data-status="all"]').classList.add('active');
-    document.getElementById('categorySelect').value = '';
     document.getElementById('sortBy').value = 'name_asc';
     document.getElementById('stockAlert').value = 'all';
     document.getElementById('priceMin').value = '';
