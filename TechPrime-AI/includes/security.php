@@ -42,15 +42,8 @@ function checkRole($roles) {
     }
 }
 
-// Session Timeout (15 minutes)
+// Session activity stamp only — no automatic logout on inactivity.
 function checkSessionTimeout() {
-    $timeout = 900; // 15 minutes
-    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > $timeout)) {
-        session_unset();
-        session_destroy();
-        header("Location: /../login.php");
-        exit;
-    }
     $_SESSION['last_activity'] = time();
 }
 

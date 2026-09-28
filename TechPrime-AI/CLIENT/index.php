@@ -59,10 +59,12 @@ $returnTo = 'index.php';
                     <?php foreach ($topSellers as $p): ?>
                         <div class="ep-product-card ep-featured-card">
                             <div class="ep-featured-card-media">
+                                <a href="products.php?id=<?php echo (int)$p['id']; ?>">
                                 <img src="<?php echo h(ias_client_product_image_url($p)); ?>" class="ep-product-img" alt="<?php echo h($p['name']); ?>" loading="lazy" decoding="async">
+                                </a>
                             </div>
                             <div class="ep-featured-card-body">
-                                <div class="ep-product-name"><?php echo h($p['name']); ?></div>
+                                <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
                                 <div class="ep-product-cat"><?php echo h($p['category'] ?: 'Uncategorized'); ?></div>
                                 <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
                                 <div class="ep-card-actions">
@@ -108,12 +110,14 @@ $returnTo = 'index.php';
             <?php if (!empty($newArrivals)): ?>
                 <?php foreach ($newArrivals as $p): ?>
                     <article class="ep-new-arrival-card">
+                        <a href="products.php?id=<?php echo (int)$p['id']; ?>">
                         <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
                              alt="<?php echo h($p['name']); ?>" loading="lazy" decoding="async">
                         <div class="ep-new-arrival-card-body">
                             <div class="ep-new-arrival-name"><?php echo h($p['name']); ?></div>
                             <div class="ep-new-arrival-price">₱<?php echo number_format((float) $p['price'], 2); ?></div>
                         </div>
+                        </a>
                     </article>
                 <?php endforeach; ?>
             <?php else: ?>

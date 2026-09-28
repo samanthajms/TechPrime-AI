@@ -73,6 +73,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'uploa
     }
 }
 
+/* ---- Profile settings ---- */
+$hasPhone = ep_users_has_phone($db);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_profile') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $name = trim((string)($_POST['name'] ?? ''));
+    $surname = trim((string)($_POST['surname'] ?? ''));
+    $age = (int)($_POST['age'] ?? 0);
+    $address = trim((string)($_POST['address'] ?? ''));
+    $email = strtolower(trim((string)($_POST['email'] ?? '')));
+    $phone = trim((string)($_POST['phone'] ?? ''));
+
+    if ($name === '' || $surname === '') {
+        $profileFlashErr = 'First name and surname are required.';
+    } elseif (mb_strlen($name) > 80 || mb_strlen($surname) > 80) {
+        $profileFlashErr = 'Name fields must be 80 characters or fewer.';
+    } elseif ($age < 13 || $age > 120) {
+        $profileFlashErr = 'Age must be between 13 and 120.';
+    } elseif ($address === '') {
+        $profileFlashErr = 'Address is required.';
+    } elseif (mb_strlen($address) > 255) {
+        $profileFlashErr = 'Address must be 255 characters or fewer.';
+    } elseif ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $profileFlashErr = 'Please enter a valid email address.';
+    } elseif (mb_strlen($email) > 190) {
+        $profileFlashErr = 'Email is too long.';
+    } else {
+        if ($hasPhone) {
+            if ($phone === '') {
+                $profileFlashErr = 'Phone number is required.';
+            } else {
+                $phoneDigits = preg_replace('/\D+/', '', $phone);
+                if (strlen($phoneDigits) < 7 || strlen($phoneDigits) > 15) {
+                    $profileFlashErr = 'Please enter a valid phone number.';
+                } elseif (strlen($phone) > 30) {
+                    $profileFlashErr = 'Phone number is too long.';
+                }
+            }
+        }
+        if ($profileFlashErr === '') {
+            $dup = $db->prepare('SELECT id FROM users WHERE LOWER(email) = ? AND id <> ? LIMIT 1');
+            $dup->execute([$email, $user_id]);
+            if ($dup->fetch(PDO::FETCH_ASSOC)) {
+                $profileFlashErr = 'That email is already in use.';
+            }
+        }
+        if ($profileFlashErr === '') {
+            if ($hasPhone) {
+                $up = $db->prepare(
+                    'UPDATE users SET name = ?, surname = ?, age = ?, address = ?, phone = ?, email = ? WHERE id = ?'
+                );
+                $up->execute([$name, $surname, $age, $address, $phone, $email, $user_id]);
+            } else {
+                $up = $db->prepare(
+                    'UPDATE users SET name = ?, surname = ?, age = ?, address = ?, email = ? WHERE id = ?'
+                );
+                $up->execute([$name, $surname, $age, $address, $email, $user_id]);
+            }
+            $_SESSION['name'] = $name;
+            $_SESSION['surname'] = $surname;
+            $_SESSION['email'] = $email;
+            logActivity($db, $user_id, 'update_profile', 'Client updated profile settings');
+            header('Location: user_dashboard.php?settings=1&alert=profile_saved');
+            exit;
+        }
+    }
+}
+
 /* ---- Cancel order ---- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'cancel_order') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
@@ -94,10 +163,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'cance
     exit;
 }
 
-$uStmt = $db->prepare('SELECT profile_image FROM users WHERE id = ? LIMIT 1');
+$profileCols = 'name, surname, age, address, email, profile_image';
+if (!isset($hasPhone)) {
+    $hasPhone = ep_users_has_phone($db);
+}
+if ($hasPhone) {
+    $profileCols .= ', phone';
+}
+$uStmt = $db->prepare('SELECT ' . $profileCols . ' FROM users WHERE id = ? LIMIT 1');
 $uStmt->execute([$user_id]);
 $uRow = $uStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 $profileImageUrl = ep_user_profile_image_url($uRow['profile_image'] ?? null);
+
+$profileForm = [
+    'name' => (string)($uRow['name'] ?? ''),
+    'surname' => (string)($uRow['surname'] ?? ''),
+    'age' => (string)($uRow['age'] ?? ''),
+    'address' => (string)($uRow['address'] ?? ''),
+    'email' => (string)($uRow['email'] ?? ''),
+    'phone' => (string)($uRow['phone'] ?? ''),
+];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_profile' && $profileFlashErr !== '') {
+    $profileForm['name'] = trim((string)($_POST['name'] ?? $profileForm['name']));
+    $profileForm['surname'] = trim((string)($_POST['surname'] ?? $profileForm['surname']));
+    $profileForm['age'] = (string)($_POST['age'] ?? $profileForm['age']);
+    $profileForm['address'] = trim((string)($_POST['address'] ?? $profileForm['address']));
+    $profileForm['email'] = trim((string)($_POST['email'] ?? $profileForm['email']));
+    $profileForm['phone'] = trim((string)($_POST['phone'] ?? $profileForm['phone']));
+}
+
+$rawName = trim((string)($_SESSION['name'] ?? ($profileForm['name'] !== '' ? $profileForm['name'] : 'Customer')));
+$safeName = h($rawName !== '' ? $rawName : 'Customer');
+$initial = strtoupper(substr($rawName !== '' ? $rawName : 'C', 0, 1));
 
 $search_query = trim($_GET['q'] ?? '');
 $current_filter = ias_normalize_order_status_filter($_GET['status'] ?? 'All');
@@ -176,8 +273,16 @@ if (!empty($_GET['alert'])) {
         'already_cancelled' => 'This order was already cancelled.',
         'not_cancellable' => 'This order can no longer be cancelled.',
         'error' => 'Could not complete the action. Please try again.',
+        'profile_saved' => 'Profile settings saved.',
     ];
     $alertMsg = $alertMap[$_GET['alert']] ?? '';
+}
+
+$showSettings = isset($_GET['settings'])
+    || (isset($_POST['keep_settings']) && (string)$_POST['keep_settings'] === '1')
+    || ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_profile');
+if ($showSettings) {
+    $pageTitle = 'Profile Settings';
 }
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
@@ -205,6 +310,9 @@ if (!empty($_GET['alert'])) {
                     <form method="post" enctype="multipart/form-data" class="avatar-upload-form">
                         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                         <input type="hidden" name="action" value="upload_avatar">
+                        <?php if (!empty($showSettings)): ?>
+                            <input type="hidden" name="keep_settings" value="1">
+                        <?php endif; ?>
                         <label class="avatar-upload-btn" for="avatarInput">
                             <i class="fas fa-camera" aria-hidden="true"></i>
                             <span>Change photo</span>
@@ -218,8 +326,77 @@ if (!empty($_GET['alert'])) {
                     <p class="user-status">Verified Member</p>
                 </div>
             </div>
-            <a href="../logout.php" class="logout-btn">Log Out Account</a>
+            <div class="profile-banner-actions">
+                <a href="../logout.php" class="logout-btn">Log Out</a>
+                <span class="profile-banner-sep" aria-hidden="true">|</span>
+                <a href="user_dashboard.php?settings=1"
+                   class="profile-settings-btn<?php echo $showSettings ? ' is-active' : ''; ?>"
+                   <?php echo $showSettings ? 'aria-current="page"' : ''; ?>>Profile Settings</a>
+            </div>
         </section>
+
+        <?php if (!$showSettings): ?>
+        <div class="profile-shortcuts">
+            <a class="profile-shortcut" href="wishlist.php">
+                <i class="fas fa-heart" aria-hidden="true"></i>
+                <span>View my Wishlists</span>
+            </a>
+            <a class="profile-shortcut" href="saved_builds.php">
+                <i class="fas fa-desktop" aria-hidden="true"></i>
+                <span>View my Saved Build</span>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($showSettings): ?>
+        <section class="panel profile-settings-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-user-cog"></i> Profile Settings</h3>
+            </div>
+            <form method="post" class="profile-settings-form">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                <input type="hidden" name="action" value="update_profile">
+                <div class="profile-settings-grid">
+                    <div>
+                        <label class="ep-form-label" for="profileName">First name</label>
+                        <input class="ep-form-control" id="profileName" type="text" name="name" maxlength="80" required
+                               value="<?php echo h($profileForm['name']); ?>">
+                    </div>
+                    <div>
+                        <label class="ep-form-label" for="profileSurname">Surname</label>
+                        <input class="ep-form-control" id="profileSurname" type="text" name="surname" maxlength="80" required
+                               value="<?php echo h($profileForm['surname']); ?>">
+                    </div>
+                    <div>
+                        <label class="ep-form-label" for="profileAge">Age</label>
+                        <input class="ep-form-control" id="profileAge" type="number" name="age" min="13" max="120" required
+                               value="<?php echo h($profileForm['age']); ?>">
+                    </div>
+                    <div>
+                        <label class="ep-form-label" for="profileEmail">Email</label>
+                        <input class="ep-form-control" id="profileEmail" type="email" name="email" maxlength="190" required
+                               value="<?php echo h($profileForm['email']); ?>">
+                    </div>
+                    <?php if ($hasPhone): ?>
+                    <div>
+                        <label class="ep-form-label" for="profilePhone">Phone number</label>
+                        <input class="ep-form-control" id="profilePhone" type="tel" name="phone" maxlength="30" required
+                               value="<?php echo h($profileForm['phone']); ?>">
+                    </div>
+                    <?php endif; ?>
+                    <div class="profile-settings-full">
+                        <label class="ep-form-label" for="profileAddress">Address</label>
+                        <input class="ep-form-control" id="profileAddress" type="text" name="address" maxlength="255" required
+                               value="<?php echo h($profileForm['address']); ?>">
+                    </div>
+                </div>
+                <div class="profile-settings-actions">
+                    <a href="user_dashboard.php" class="ep-btn profile-settings-back">Back</a>
+                    <button type="submit" class="ep-btn ep-btn-primary">Save changes</button>
+                </div>
+            </form>
+        </section>
+        <?php else: ?>
 
         <div class="dash-grid">
             <div class="panel">
@@ -303,6 +480,7 @@ if (!empty($_GET['alert'])) {
             <a href="user_dashboard.php?status=to_receive" class="tab-item <?php echo $current_filter === 'to_receive' ? 'active' : ''; ?>"><i class="fas fa-inbox"></i> To Receive</a>
             <a href="user_dashboard.php?status=to_review" class="tab-item <?php echo $current_filter === 'to_review' ? 'active' : ''; ?>"><i class="fas fa-star"></i> To Review</a>
         </div>
+        <?php endif; ?>
     </div>
 </main>
 

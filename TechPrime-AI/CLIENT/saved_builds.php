@@ -72,9 +72,15 @@ $extraHead = '<style>
   padding: 22px 24px;
   margin-bottom: 22px;
   box-shadow: 0 8px 22px rgba(75,139,42,0.07);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 .sb-hero h1 { margin: 0 0 6px; font-size: 22px; font-weight: 800; color: var(--ep-green-dark, #4b8b2a); }
 .sb-hero p { margin: 0; color: #6b7280; font-size: 14px; font-weight: 500; }
+.sb-hero .ep-profile-back-arrow { margin: 2px 0 0; flex-shrink: 0; }
 
 .sb-stage {
   width: 100%;
@@ -220,8 +226,11 @@ include __DIR__ . '/ep_header.php';
 
 <main class="sb-page">
     <section class="sb-hero">
-        <h1><i class="fas fa-desktop" aria-hidden="true"></i> Saved Build</h1>
-        <p>Your saved Tech &amp; Match PC configurations. Only you can see these builds.</p>
+        <a class="ep-profile-back-arrow" href="user_dashboard.php" aria-label="Back to Profile">&lt;</a>
+        <div>
+            <h1><i class="fas fa-desktop" aria-hidden="true"></i> Saved Build</h1>
+            <p>Your saved Tech &amp; Match PC configurations. Only you can see these builds.</p>
+        </div>
     </section>
 
     <?php if (empty($builds)): ?>
@@ -371,9 +380,14 @@ document.addEventListener('DOMContentLoaded', function () {
         Object.keys(slotLabels).forEach(function (key) {
             var c = build.components && build.components[key];
             if (!c) return;
+            var pid = parseInt(c.id, 10) || 0;
+            var nameHtml = escapeHtml(c.name || '');
+            if (pid > 0) {
+                nameHtml = '<a href="products.php?id=' + pid + '">' + nameHtml + '</a>';
+            }
             rows += '<div class="sb-view-row">' +
                 '<strong>' + escapeHtml(slotLabels[key]) + '</strong>' +
-                '<span>' + escapeHtml(c.name || '') + '</span>' +
+                '<span>' + nameHtml + '</span>' +
                 '<em>' + peso(c.price) + '</em></div>';
         });
 

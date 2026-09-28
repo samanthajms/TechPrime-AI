@@ -362,6 +362,74 @@ function ep_add_product_to_cart(PDO $db, int $productId, int $qty = 1): bool
     return true;
 }
 
+/** Set an exact cart quantity (session + DB). Qty < 1 removes the item. */
+function ep_set_cart_quantity(PDO $db, int $productId, int $qty): array
+{
+    if ($productId <= 0) {
+        return ['ok' => false, 'qty' => 0, 'error' => 'invalid'];
+    }
+
+    if (!isset($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
+        $_SESSION['cart'] = [];
+    }
+
+    if ($qty < 1) {
+        unset($_SESSION['cart'][$productId]);
+        if (!empty($_SESSION['user_id'])) {
+            $del = $db->prepare('DELETE FROM cart WHERE user_id = ? AND product_id = ?');
+            $del->execute([(int)$_SESSION['user_id'], $productId]);
+        }
+        return ['ok' => true, 'qty' => 0];
+    }
+
+    $chk = $db->prepare(
+        'SELECT p.id, p.stock FROM products p WHERE p.id = ? AND ' . ias_client_product_list_sql_condition('p') . ' LIMIT 1'
+    );
+    $chk->execute([$productId]);
+    $row = $chk->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return ['ok' => false, 'qty' => 0, 'error' => 'not_found'];
+    }
+    $stock = (int)($row['stock'] ?? 0);
+    if ($stock < 1) {
+        return ['ok' => false, 'qty' => 0, 'error' => 'stock'];
+    }
+    if ($qty > $stock) {
+        $qty = $stock;
+    }
+
+    $_SESSION['cart'][$productId] = $qty;
+    if (!empty($_SESSION['user_id'])) {
+        $uid = (int)$_SESSION['user_id'];
+        $exists = $db->prepare('SELECT id FROM cart WHERE user_id = ? AND product_id = ?');
+        $exists->execute([$uid, $productId]);
+        if ($exists->fetch(PDO::FETCH_ASSOC)) {
+            $up = $db->prepare('UPDATE cart SET quantity = ? WHERE user_id = ? AND product_id = ?');
+            $up->execute([$qty, $uid, $productId]);
+        } else {
+            $ins = $db->prepare('INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)');
+            $ins->execute([$uid, $productId, $qty]);
+        }
+    }
+
+    return ['ok' => true, 'qty' => $qty];
+}
+
+function ep_users_has_phone(PDO $db): bool
+{
+    static $has = null;
+    if ($has !== null) {
+        return $has;
+    }
+    $stmt = $db->prepare(
+        "SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'phone'"
+    );
+    $stmt->execute();
+    $has = (bool)$stmt->fetchColumn();
+    return $has;
+}
+
 /**
  * Derive a brand label from real product name text (first token).
  * No hardcoded brand list — values come from existing product names.

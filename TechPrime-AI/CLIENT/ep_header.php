@@ -99,18 +99,6 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
             <span class="ep-nav-item-label">Shop Now</span>
         </a>
 
-        <a href="wishlist.php"
-           class="ep-nav-item<?php echo ($activePage ?? '') === 'wishlist' ? ' active' : ''; ?>"
-           <?php echo ($activePage ?? '') === 'wishlist' ? 'aria-current="page"' : ''; ?>>
-            <span class="ep-nav-item-icon">
-                <i class="far fa-heart" aria-hidden="true"></i>
-                <?php if ($epWishCount > 0): ?>
-                    <span class="badge"><?php echo (int)$epWishCount; ?></span>
-                <?php endif; ?>
-            </span>
-            <span class="ep-nav-item-label">Wishlist</span>
-        </a>
-
         <div class="ep-cart-wrap" id="epCartWrap">
             <button id="cartBtn" type="button" class="ep-nav-item ep-cart-trigger"
                     aria-haspopup="true" aria-expanded="false" aria-controls="epCartDropdown">
@@ -309,6 +297,9 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         var suggestAbort = null;
         var activeIdx = -1;
 
+        var RECENT_KEY = 'ep_recent_searches';
+        var RECENT_MAX = 6;
+
         function hideSuggest() {
             searchSuggest.hidden = true;
             searchSuggest.innerHTML = '';
@@ -320,6 +311,33 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
             return String(str).replace(/[&<>"']/g, function (c) {
                 return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
             });
+        }
+
+        function isSafeSearchTerm(t) {
+            t = String(t || '').trim();
+            if (!t || t.length > 80) return false;
+            if (t.indexOf('@') !== -1) return false;
+            if (/^\+?[\d\s\-().]{7,}$/.test(t)) return false;
+            return true;
+        }
+
+        function loadRecents() {
+            try {
+                var raw = localStorage.getItem(RECENT_KEY);
+                var arr = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(arr)) return [];
+                return arr.map(function (x) { return String(x || '').trim(); }).filter(isSafeSearchTerm).slice(0, RECENT_MAX);
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveRecent(term) {
+            if (!isSafeSearchTerm(term)) return;
+            var t = String(term).trim();
+            var arr = loadRecents().filter(function (x) { return x.toLowerCase() !== t.toLowerCase(); });
+            arr.unshift(t);
+            try { localStorage.setItem(RECENT_KEY, JSON.stringify(arr.slice(0, RECENT_MAX))); } catch (e) {}
         }
 
         function highlightMatch(label, q) {
@@ -334,15 +352,25 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
             }
         }
 
-        function renderSuggest(items, q) {
+        function suggestIcon(type) {
+            if (type === 'recent') return 'fa-history';
+            if (type === 'category') return 'fa-tag';
+            if (type === 'brand') return 'fa-industry';
+            if (type === 'product') return 'fa-box';
+            return 'fa-search';
+        }
+
+        function renderSuggest(items, q, heading) {
             if (!items || !items.length) {
                 hideSuggest();
                 return;
             }
             activeIdx = -1;
-            searchSuggest.innerHTML = items.map(function (item, i) {
+            var head = heading ? '<div class="ep-search-suggest-head">' + escapeHtml(heading) + '</div>' : '';
+            searchSuggest.innerHTML = head + items.map(function (item, i) {
+                var type = item.type || 'product';
                 return '<button type="button" class="ep-search-suggest-item" role="option" data-idx="' + i + '" data-label="' + escapeHtml(item.label) + '">' +
-                    '<i class="fas fa-search" aria-hidden="true"></i>' +
+                    '<i class="fas ' + suggestIcon(type) + '" aria-hidden="true"></i>' +
                     '<span>' + highlightMatch(item.label, q) + '</span>' +
                     '</button>';
             }).join('');
@@ -350,9 +378,21 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
             searchInput.setAttribute('aria-expanded', 'true');
         }
 
+        function showRecents() {
+            var recents = loadRecents();
+            if (!recents.length) {
+                hideSuggest();
+                return;
+            }
+            renderSuggest(recents.map(function (label) {
+                return { label: label, type: 'recent' };
+            }), '', 'Recent searches');
+        }
+
         function runSearch(term) {
             var t = String(term || '').trim();
             if (!t) return;
+            saveRecent(t);
             hideSuggest();
             window.location.href = 'search.php?q=' + encodeURIComponent(t);
         }
@@ -377,10 +417,14 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
             var q = searchInput.value.trim();
             if (suggestTimer) clearTimeout(suggestTimer);
             if (!q) {
-                hideSuggest();
+                showRecents();
                 return;
             }
             suggestTimer = setTimeout(function () { fetchSuggest(q); }, 180);
+        });
+
+        searchInput.addEventListener('focus', function () {
+            if (!searchInput.value.trim()) showRecents();
         });
 
         searchInput.addEventListener('keydown', function (e) {
@@ -416,6 +460,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         });
 
         searchForm.addEventListener('submit', function () {
+            saveRecent(searchInput.value);
             hideSuggest();
         });
 

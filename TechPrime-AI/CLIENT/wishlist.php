@@ -11,10 +11,20 @@ ep_ensure_session_wishlist($db);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_wishlist'])) {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        if (isset($_POST['ajax']) && (string)$_POST['ajax'] === '1') {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'csrf']);
+            exit;
+        }
         die('Invalid CSRF token.');
     }
     $pid = (int)($_POST['product_id'] ?? 0);
-    ep_toggle_wishlist($db, $pid);
+    $nowOn = ep_toggle_wishlist($db, $pid);
+    if (isset($_POST['ajax']) && (string)$_POST['ajax'] === '1') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => true, 'in_wishlist' => $nowOn]);
+        exit;
+    }
     $returnTo = $_POST['return_to'] ?? 'wishlist.php';
     if (!preg_match('#^[a-zA-Z0-9_\-./?=&%]+$#', $returnTo)) {
         $returnTo = 'wishlist.php';
@@ -39,36 +49,57 @@ if (!empty($ids)) {
 
 $isLoggedIn = isset($_SESSION['user_id']);
 $activePage = 'wishlist';
-$pageTitle = 'Wishlist';
+$pageTitle = 'My Wishlists';
 $searchQuery = '';
 $bodyClass = 'ep-shop-page-body';
+$itemCount = count($items);
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
 <main class="ep-main">
-    <div class="ep-page-inner ep-shop-page">
-        <div class="ep-shop-header">
-            <div>
-                <p class="ep-shop-kicker">Saved items</p>
-                <h2 class="ep-page-title">Wishlist</h2>
-                <p class="ep-shop-subtitle">Products you saved stay here so you can return to them later.</p>
+    <div class="ep-page-inner ep-wishlist-page">
+        <a href="user_dashboard.php" class="ep-profile-back-arrow" aria-label="Back to Profile">&lt;</a>
+
+        <header class="ep-wish-hero">
+            <div class="ep-wish-hero-icon" aria-hidden="true">
+                <i class="fas fa-heart"></i>
             </div>
-            <p class="ep-shop-count"><?php echo count($items); ?> item<?php echo count($items) === 1 ? '' : 's'; ?></p>
-        </div>
+            <div class="ep-wish-hero-copy">
+                <p class="ep-wish-kicker">Saved for later</p>
+                <h1 class="ep-wish-title">My Wishlists</h1>
+                <p class="ep-wish-subtitle">Products you saved stay here so you can come back to them anytime.</p>
+            </div>
+            <span class="ep-wish-count"><?php echo $itemCount; ?> item<?php echo $itemCount === 1 ? '' : 's'; ?></span>
+        </header>
 
         <?php if (!empty($items)): ?>
-            <div class="ep-products-grid ep-shop-grid">
-                <?php foreach ($items as $p): ?>
-                    <div class="ep-product-card ep-grid-card">
-                        <div class="ep-shop-card-media">
-                            <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                 class="ep-product-img" alt="<?php echo h($p['name']); ?>"
-                                 loading="lazy" decoding="async">
+            <div class="ep-wish-grid">
+                <?php foreach ($items as $p):
+                    $stk = (int)($p['stock'] ?? 0);
+                    ?>
+                    <article class="ep-wish-card">
+                        <div class="ep-wish-card-media">
+                            <a href="products.php?id=<?php echo (int)$p['id']; ?>">
+                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
+                                     alt="<?php echo h($p['name']); ?>"
+                                     loading="lazy" decoding="async">
+                            </a>
+                            <form method="POST" action="wishlist.php" class="ep-wish-form ep-wish-card-heart">
+                                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
+                                <input type="hidden" name="return_to" value="wishlist.php">
+                                <button type="submit" name="toggle_wishlist" value="1" class="ep-wish-btn is-on" title="Remove from wishlist">
+                                    <i class="fas fa-heart" aria-hidden="true"></i>
+                                </button>
+                            </form>
                         </div>
-                        <div class="ep-shop-card-body">
-                            <div class="ep-product-name"><?php echo h($p['name']); ?></div>
-                            <div class="ep-product-cat"><?php echo h($p['tax_sub_label'] ?: $p['tax_parent_label']); ?></div>
-                            <div class="ep-product-price">₱<?php echo number_format((float)$p['price'], 2); ?></div>
+                        <div class="ep-wish-card-body">
+                            <a class="ep-wish-card-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
+                            <div class="ep-wish-card-cat"><?php echo h($p['tax_sub_label'] ?: $p['tax_parent_label']); ?></div>
+                            <div class="ep-wish-card-price">₱<?php echo number_format((float)$p['price'], 2); ?></div>
+                            <div class="ep-wish-card-stock<?php echo $stk > 0 ? '' : ' is-out'; ?>">
+                                <?php echo $stk > 0 ? ('In stock · ' . $stk . ' available') : 'Out of stock'; ?>
+                            </div>
                             <div class="ep-card-actions">
                                 <form method="POST" action="products.php" class="ep-buy-form">
                                     <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
@@ -77,22 +108,16 @@ $bodyClass = 'ep-shop-page-body';
                                     <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
                                     <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
                                 </form>
-                                <form method="POST" action="wishlist.php" class="ep-wish-form">
-                                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                    <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                    <input type="hidden" name="return_to" value="wishlist.php">
-                                    <button type="submit" name="toggle_wishlist" value="1" class="ep-wish-btn is-on" title="Remove from wishlist">
-                                        <i class="fas fa-heart" aria-hidden="true"></i>
-                                    </button>
-                                </form>
                             </div>
                         </div>
-                    </div>
+                    </article>
                 <?php endforeach; ?>
             </div>
         <?php else: ?>
-            <div class="ep-empty-state ep-shop-empty">
-                <i class="far fa-heart" aria-hidden="true"></i>
+            <div class="ep-wish-empty">
+                <div class="ep-wish-empty-icon" aria-hidden="true">
+                    <i class="far fa-heart"></i>
+                </div>
                 <h3>Your wishlist is empty</h3>
                 <p>Browse Shop Now and tap the heart on a product to save it here.</p>
                 <a href="shop.php" class="ep-btn ep-btn-primary">Browse products</a>

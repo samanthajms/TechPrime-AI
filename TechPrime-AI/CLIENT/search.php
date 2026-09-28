@@ -2,8 +2,12 @@
 session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/client_helpers.php';
 
 $db = getDbConnection();
+if (is_file(__DIR__ . '/../includes/client_shop_taxonomy.php')) {
+    require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
+}
 
 $query       = isset($_GET['q']) ? trim($_GET['q']) : '';
 $searchQuery = $query;
@@ -15,17 +19,62 @@ $peripheralCategories = ['Mobile', 'Cameras', 'Accessories'];
 $displayProducts = [];
 if (!empty($query)) {
     $searchTerm = '%' . $query . '%';
+    $vis = ias_client_product_list_sql_condition('p');
     $stmt = $db->prepare(
-        "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, u.name as seller_name
+        "SELECT p.*, u.name as seller_name
          FROM products p
          JOIN users u ON p.seller_id = u.id
-         WHERE (p.name LIKE ? OR p.description LIKE ?) AND " . ias_client_product_list_sql_condition('p') . "
+         WHERE (p.name LIKE ? OR p.description LIKE ?) AND {$vis}
          ORDER BY p.id DESC
          LIMIT 48"
     );
     $stmt->execute([$searchTerm, $searchTerm]);
-    $resultSet = $stmt;
-    $displayProducts = $resultSet ? $resultSet->fetchAll(PDO::FETCH_ASSOC) : [];
+    $displayProducts = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+
+    if (function_exists('ep_shop_classify_product') && count($displayProducts) < 48) {
+        $qLower = mb_strtolower($query);
+        $seen = [];
+        foreach ($displayProducts as $row) {
+            $seen[(int)$row['id']] = true;
+        }
+        $more = $db->query(
+            "SELECT p.*, u.name as seller_name
+             FROM products p
+             JOIN users u ON p.seller_id = u.id
+             WHERE {$vis}
+             ORDER BY p.id DESC
+             LIMIT 400"
+        );
+        if ($more) {
+            while ($p = $more->fetch(PDO::FETCH_ASSOC)) {
+                $pid = (int)$p['id'];
+                if (isset($seen[$pid])) {
+                    continue;
+                }
+                $tax = ep_shop_classify_product($p);
+                $labels = [
+                    (string)($tax['parent_label'] ?? ''),
+                    (string)($tax['sub_label'] ?? ''),
+                ];
+                $hit = false;
+                foreach ($labels as $label) {
+                    $ll = mb_strtolower(trim($label));
+                    if ($ll !== '' && ($ll === $qLower || (mb_strlen($qLower) >= 4 && str_starts_with($ll, $qLower)))) {
+                        $hit = true;
+                        break;
+                    }
+                }
+                if (!$hit) {
+                    continue;
+                }
+                $seen[$pid] = true;
+                $displayProducts[] = $p;
+                if (count($displayProducts) >= 48) {
+                    break;
+                }
+            }
+        }
+    }
 }
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
@@ -54,10 +103,12 @@ if (!empty($query)) {
                 <div class="ep-products-grid">
                     <?php foreach ($displayProducts as $p): ?>
                         <div class="ep-product-card ep-grid-card">
+                            <a href="products.php?id=<?php echo (int)$p['id']; ?>">
                             <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
                                  class="ep-product-img" alt="<?php echo h($p['name']); ?>"
                                  loading="lazy" decoding="async">
-                            <div class="ep-product-name"><?php echo h($p['name']); ?></div>
+                            </a>
+                            <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
                             <div class="ep-product-cat">Store: <?php echo h($p['seller_name']); ?></div>
                             <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
                             <div class="ep-card-actions">

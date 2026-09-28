@@ -24,6 +24,13 @@ $total = 0;
 $items = [];
 
 $ids = array_map('intval', array_keys($_SESSION['cart']));
+$selectedIds = array_values(array_filter(array_map('intval', (array)($_SESSION['cart_selected'] ?? []))));
+if ($selectedIds) {
+    $only = array_values(array_intersect($ids, $selectedIds));
+    if ($only) {
+        $ids = $only;
+    }
+}
 $ids_str = implode(',', $ids);
 
 $res = $db->query("SELECT * FROM products WHERE id IN ($ids_str) AND COALESCE(stock, 0) > 0");

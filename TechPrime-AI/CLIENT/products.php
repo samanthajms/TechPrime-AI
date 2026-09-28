@@ -11,6 +11,11 @@ require_once __DIR__ . '/../includes/client_helpers.php';
 // ── Handle Add to Cart / Buy Now ───────────────────────────────────────────
 if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        if (isset($_POST['ajax']) && (string)$_POST['ajax'] === '1') {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'csrf']);
+            exit;
+        }
         die('Invalid CSRF token.');
     }
 
@@ -20,7 +25,17 @@ if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
         $returnTo = 'index.php';
     }
 
-    if (!ep_add_product_to_cart($db, $product_id, 1)) {
+    $added = ep_add_product_to_cart($db, $product_id, 1);
+    if (isset($_POST['ajax']) && (string)$_POST['ajax'] === '1') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => $added,
+            'cart' => $added ? ep_get_cart_preview($db) : null,
+        ]);
+        exit;
+    }
+
+    if (!$added) {
         header('Location: products.php?alert=error');
         exit;
     }
@@ -34,7 +49,10 @@ if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
     exit;
 }
 
-// ── Fetch all products ────────────────────────────────────────────────────
+$viewId = (int)($_GET['id'] ?? 0);
+$openProductModalId = $viewId > 0 ? $viewId : 0;
+
+$displayProducts = [];
 $productResult = $db->query(
     "SELECT p.*, u.name AS seller_name FROM products p
      INNER JOIN users u ON p.seller_id = u.id
@@ -66,9 +84,11 @@ $peripheralCategories = ['Mobile', 'Cameras', 'Accessories'];
                 <div class="ep-products-grid">
                     <?php foreach ($displayProducts as $p): ?>
                         <div class="ep-product-card ep-grid-card">
-                            <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                 class="ep-product-img" alt="<?php echo h($p['name']); ?>">
-                            <div class="ep-product-name"><?php echo h($p['name']); ?></div>
+                            <a href="products.php?id=<?php echo (int)$p['id']; ?>">
+                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
+                                     class="ep-product-img" alt="<?php echo h($p['name']); ?>">
+                            </a>
+                            <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
                             <div class="ep-product-cat">By: <?php echo h($p['seller_name']); ?></div>
                             <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
                             <div class="ep-card-actions">

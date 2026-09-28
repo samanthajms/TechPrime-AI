@@ -230,10 +230,12 @@ function ep_pagination_range(int $current, int $total): array
                     <div class="ep-products-grid">
                         <?php foreach ($displayProducts as $p): ?>
                             <div class="ep-product-card ep-grid-card">
+                                <a href="products.php?id=<?php echo (int)$p['id']; ?>">
                                 <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
                                      class="ep-product-img" alt="<?php echo h($p['name']); ?>"
                                      loading="lazy" decoding="async">
-                                <div class="ep-product-name"><?php echo h($p['name']); ?></div>
+                                </a>
+                                <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
                                 <div class="ep-product-cat">Store: <?php echo h($p['seller_name']); ?></div>
                                 <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
                             <div class="ep-card-actions">

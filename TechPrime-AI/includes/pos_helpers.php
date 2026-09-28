@@ -663,11 +663,6 @@ function pos_api_require_cashier(string $method): array
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
 
-    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 900)) {
-        session_unset();
-        session_destroy();
-        pos_json(401, ['ok' => false, 'error' => 'session_expired', 'message' => 'Your session expired. Please log in again.']);
-    }
     checkSessionTimeout();
 
     if (!isset($_SESSION['user_id'], $_SESSION['role']) || $_SESSION['role'] !== 'cashier') {

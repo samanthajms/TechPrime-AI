@@ -485,9 +485,11 @@ foreach ($allProducts as $p) {
                         <?php foreach ($displayProducts as $p): ?>
                             <div class="ep-product-card ep-grid-card">
                                 <div class="ep-shop-card-media">
+                                    <a href="products.php?id=<?php echo (int)$p['id']; ?>">
                                     <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
                                          class="ep-product-img" alt="<?php echo h($p['name']); ?>"
                                          loading="lazy" decoding="async">
+                                    </a>
                                     <form method="POST" action="wishlist.php" class="ep-wish-form ep-wish-overlay">
                                         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                                         <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
@@ -500,7 +502,7 @@ foreach ($allProducts as $p) {
                                     </form>
                                 </div>
                                 <div class="ep-shop-card-body">
-                                    <div class="ep-product-name"><?php echo h($p['name']); ?></div>
+                                    <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
                                     <div class="ep-product-cat">
                                         <?php echo h($p['tax_parent_label']); ?>
                                         <?php if ($p['tax_sub_label'] !== ''): ?>
