@@ -85,6 +85,8 @@ body {
   flex-direction: column;
   z-index: 100;
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.12);
+  overflow-x: hidden;
+  transition: width 0.25s ease;
 }
 
 .sidebar-brand {
@@ -93,6 +95,7 @@ body {
   gap: 12px;
   padding: 22px 18px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
 }
 
 .sidebar-brand .ep-logo-img,
@@ -101,6 +104,12 @@ body {
   width: auto;
   display: block;
   filter: brightness(0) invert(1);
+  flex-shrink: 0;
+}
+
+.brand-copy {
+  min-width: 0;
+  flex: 1;
 }
 
 .brand-text {
@@ -120,12 +129,36 @@ body {
   margin-top: 2px;
 }
 
+.sidebar-collapse-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.sidebar-collapse-btn:hover,
+.sidebar-collapse-btn:focus-visible {
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--ep-yellow);
+  outline: none;
+}
+
 .sidebar nav {
-  padding: 14px 10px;
+  padding: 16px 12px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   overflow-y: auto;
 }
 
@@ -133,11 +166,11 @@ body {
 .sidebar .nav-link {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 14px;
+  gap: 14px;
+  padding: 13px 16px;
   color: rgba(255, 255, 255, 0.92);
   text-decoration: none;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   border-radius: 10px;
   border: 0;
@@ -149,12 +182,17 @@ body {
   transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 
-.sidebar nav a i,
-.sidebar .nav-link i {
-  width: 20px;
+.sidebar nav a i:not(.sidebar-drop-caret),
+.sidebar .nav-link i:not(.sidebar-drop-caret) {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  font-size: 15px;
+  font-size: 19px;
   opacity: 0.95;
+  flex-shrink: 0;
 }
 
 .sidebar nav a:hover,
@@ -184,7 +222,8 @@ body {
 .sidebar-drop-caret {
   margin-left: auto;
   width: auto !important;
-  font-size: 11px;
+  height: auto !important;
+  font-size: 12px;
   opacity: 0.8;
   transition: transform 0.18s ease;
 }
@@ -198,23 +237,24 @@ body {
   padding: 2px 0 6px 10px;
 }
 .sidebar-drop-menu a {
-  padding: 8px 12px 8px 22px;
-  font-size: 12.5px;
+  padding: 10px 14px 10px 28px;
+  font-size: 14px;
 }
 
 .sidebar-footer {
-  padding: 10px;
+  padding: 10px 12px 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
 }
 
 .sidebar-footer a {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 14px;
+  gap: 14px;
+  padding: 13px 16px;
   color: rgba(255, 255, 255, 0.92);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   border-radius: 10px;
   transition: background 0.15s, color 0.15s;
@@ -225,7 +265,15 @@ body {
   color: #ffe08a;
 }
 
-.sidebar-footer a i { width: 20px; text-align: center; }
+.sidebar-footer a i {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  flex-shrink: 0;
+}
 
 /* ================================================================
    LAYOUT + TOPBAR
@@ -233,6 +281,7 @@ body {
 .main {
   margin-left: var(--sidebar-width);
   min-height: 100vh;
+  transition: margin-left 0.25s ease;
 }
 
 .topbar {
@@ -728,6 +777,34 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
 .toggle input:checked + .toggle-slider:before { transform: translateX(20px); }
 
 /* ================================================================
+   FILTER / FORM MODALS
+   ================================================================ */
+.filter-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 3000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.filter-modal.open { display: flex; }
+.filter-modal-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 22px;
+  width: min(460px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 2px solid var(--ep-green);
+}
+.filter-modal-card h4 {
+  margin: 0 0 14px;
+  color: var(--ep-green-dark);
+}
+
+/* ================================================================
    ALERTS / EMPTY / SEARCH
    ================================================================ */
 .alert {
@@ -844,6 +921,54 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
 .text-green { color: var(--ep-green-dark); }
 .text-yellow { color: var(--ep-yellow-dark); }
 
+/* Collapsed icon rail — desktop only. ≤900px keeps the existing off-canvas drawer. */
+@media (min-width: 901px) {
+  body.sidebar-collapsed {
+    --sidebar-width: 92px;
+  }
+  body.sidebar-collapsed .sidebar-brand {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 12px 14px;
+  }
+  body.sidebar-collapsed .brand-copy {
+    display: none;
+  }
+  body.sidebar-collapsed .sidebar-brand .ep-logo-img,
+  body.sidebar-collapsed .brand-logo {
+    width: 66px;
+    max-width: 66px;
+    height: auto;
+  }
+  body.sidebar-collapsed .sidebar-collapse-btn {
+    margin-left: 0;
+  }
+  body.sidebar-collapsed .sidebar nav a,
+  body.sidebar-collapsed .sidebar .nav-link,
+  body.sidebar-collapsed .sidebar-footer a {
+    justify-content: center;
+    gap: 0;
+    padding: 11px 0;
+    min-height: 48px;
+  }
+  body.sidebar-collapsed .sidebar nav a span,
+  body.sidebar-collapsed .sidebar .nav-link span,
+  body.sidebar-collapsed .sidebar-footer a span,
+  body.sidebar-collapsed .sidebar-drop-caret,
+  body.sidebar-collapsed .sidebar-drop-menu {
+    display: none;
+  }
+  body.sidebar-collapsed .sidebar nav a i:not(.sidebar-drop-caret),
+  body.sidebar-collapsed .sidebar .nav-link i:not(.sidebar-drop-caret),
+  body.sidebar-collapsed .sidebar-footer a i {
+    width: 26px;
+    height: 26px;
+    font-size: 22px;
+  }
+}
+
 @media (max-width: 900px) {
   .sidebar {
     transform: translateX(-100%);
@@ -853,6 +978,7 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   .main { margin-left: 0; }
   .page-content { padding: 18px 16px 32px; }
   .topbar { padding: 0 16px; }
+  .sidebar-collapse-btn { display: none; }
 }
 
 /* ================================================================

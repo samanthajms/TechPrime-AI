@@ -301,4 +301,4 @@ new Chart(catCtx, {
 });
 </script>
 SCRIPTS);
-?>
+

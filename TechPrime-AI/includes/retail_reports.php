@@ -302,6 +302,39 @@ function ias_summarize_deliveries(PDO $db, int $sellerId, DateTime $from, DateTi
     ];
 }
 
+/**
+ * Store-wide delivery totals (admin scope — no seller filter).
+ * Delivered count uses shipment_status = 'delivered' and updated_at in range.
+ *
+ * @return array{delivered:int,total_shipments_in_range:int,success_rate:float}
+ */
+function ias_summarize_deliveries_all(PDO $db, DateTime $from, DateTime $to): array
+{
+    $fromStr = $from->format('Y-m-d 00:00:00');
+    $toStr = (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00');
+
+    $deliveredStmt = $db->prepare(
+        "SELECT COUNT(*) FROM shipments
+         WHERE shipment_status = 'delivered'
+           AND updated_at >= ? AND updated_at < ?"
+    );
+    $deliveredStmt->execute([$fromStr, $toStr]);
+    $delivered = (int)($deliveredStmt->fetchColumn() ?? 0);
+
+    $totalStmt = $db->prepare(
+        "SELECT COUNT(*) FROM shipments
+         WHERE created_at >= ? AND created_at < ?"
+    );
+    $totalStmt->execute([$fromStr, $toStr]);
+    $totalInRange = (int)($totalStmt->fetchColumn() ?? 0);
+
+    return [
+        'delivered' => $delivered,
+        'total_shipments_in_range' => $totalInRange,
+        'success_rate' => $totalInRange > 0 ? ($delivered / $totalInRange) * 100 : ($delivered > 0 ? 100.0 : 0.0),
+    ];
+}
+
 /** Breakdown of deliveries by product category (categories column is a comma-joined list per order) */
 function ias_deliveries_by_category(array $rows): array
 {

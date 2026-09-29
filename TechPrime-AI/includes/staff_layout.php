@@ -11,6 +11,8 @@ if (!function_exists('staff_nav_for_role')) {
             case 'admin':
                 return [
                     ['key' => 'dashboard', 'href' => 'admin_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
+                    ['key' => 'forecast', 'href' => 'admin_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line'],
+                    ['key' => 'messages', 'href' => 'admin_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
                     ['key' => 'users', 'href' => 'manage_users.php', 'label' => 'Manage Users', 'icon' => 'fa-users'],
                     ['key' => 'logs', 'href' => 'view_logs.php', 'label' => 'Activity Logs', 'icon' => 'fa-clipboard-list'],
                     ['key' => 'profile', 'href' => 'admin_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user'],
@@ -20,25 +22,16 @@ if (!function_exists('staff_nav_for_role')) {
                 return [
                     ['key' => 'dashboard', 'href' => 'retail_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
                     ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'History', 'icon' => 'fa-history'],
+                    ['key' => 'messages', 'href' => 'retail_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
                     ['key' => 'profile', 'href' => 'retail_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
             case 'inventory_custodian':
-                $stockChildren = [
-                    ['label' => 'All', 'href' => 'inventory_stocks.php', 'slug' => ''],
-                ];
-                require_once __DIR__ . '/client_shop_taxonomy.php';
-                foreach (ep_shop_taxonomy() as $slug => $info) {
-                    $stockChildren[] = [
-                        'label' => (string)$info['label'],
-                        'href' => 'inventory_stocks.php?cat=' . rawurlencode((string)$slug),
-                        'slug' => (string)$slug,
-                    ];
-                }
                 return [
                     ['key' => 'dashboard', 'href' => 'inventory_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes', 'children' => $stockChildren],
+                    ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes'],
                     ['key' => 'orders', 'href' => 'inventory_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart'],
                     ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list'],
+                    ['key' => 'messages', 'href' => 'inventory_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
                     ['key' => 'profile', 'href' => 'inventory_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
             case 'cashier':
@@ -112,6 +105,7 @@ if (!function_exists('staff_logout_href')) {
  * @param array{
  *   title:string,
  *   active:string,
+ *   active_child?:string,
  *   heading:string,
  *   subtitle?:string,
  *   role?:string,
@@ -125,6 +119,7 @@ if (!function_exists('staff_page_start')) {
         $role = $opts['role'] ?? ($_SESSION['role'] ?? 'admin');
         $title = $opts['title'] ?? 'EasyPC';
         $active = $opts['active'] ?? '';
+        $activeChild = (string)($opts['active_child'] ?? '');
         $heading = $opts['heading'] ?? $title;
         $subtitle = $opts['subtitle'] ?? '';
         $extraHead = $opts['extra_head'] ?? '';
@@ -201,7 +196,7 @@ if (!function_exists('staff_page_start')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo h($title); ?> — EasyPC</title>
-    <link rel="stylesheet" href="<?php echo h($css); ?>?v=inv-notif-1">
+    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-sidebar-collapse-1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if ($useInvPageTitle): ?>
     <style>
@@ -303,26 +298,37 @@ if (!function_exists('staff_page_start')) {
     <?php echo $extraHead; ?>
 </head>
 <body class="<?php echo trim(($role === 'inventory_custodian' ? 'topnav-mode' : '') . ($useInvPageTitle ? ' inv-title-mode' : '')); ?>">
-<div class="sidebar">
+<script>
+(function () {
+    try {
+        if (localStorage.getItem('ep_sidebar_collapsed') === '1'
+            && window.matchMedia('(min-width: 901px)').matches) {
+            document.body.classList.add('sidebar-collapsed');
+        }
+    } catch (e) {}
+})();
+</script>
+<div class="sidebar" id="staffSidebar">
     <div class="sidebar-brand">
         <img src="<?php echo h($logo); ?>" alt="EasyPC" class="ep-logo-img brand-logo">
-        <div>
+        <div class="brand-copy">
             <div class="brand-text">EasyPC</div>
             <div class="brand-sub"><?php echo h($roleLabel); ?></div>
         </div>
+        <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseToggle"
+                aria-label="Collapse navigation" aria-expanded="true" title="Collapse navigation">
+            <i class="fas fa-chevron-left" aria-hidden="true"></i>
+        </button>
     </div>
     <nav>
         <?php
-        $navScript = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
-        $onStocksPage = (bool)preg_match('#/inventory_stocks\.php$#', $navScript);
-        $stocksCat = $onStocksPage ? trim((string)($_GET['cat'] ?? '')) : '';
         foreach ($nav as $item):
             $children = $item['children'] ?? [];
             if ($children !== []):
                 $dropOpen = ($item['key'] === $active);
         ?>
             <details class="sidebar-drop<?php echo $dropOpen ? ' is-active' : ''; ?>" <?php echo $dropOpen ? 'open' : ''; ?>>
-                <summary class="nav-link<?php echo $dropOpen ? ' active' : ''; ?>">
+                <summary class="nav-link<?php echo $dropOpen ? ' active' : ''; ?>" title="<?php echo h($item['label']); ?>">
                     <i class="fas <?php echo h($item['icon']); ?>"></i>
                     <span><?php echo h($item['label']); ?></span>
                     <i class="fas fa-chevron-down sidebar-drop-caret" aria-hidden="true"></i>
@@ -330,23 +336,23 @@ if (!function_exists('staff_page_start')) {
                 <div class="sidebar-drop-menu">
                     <?php foreach ($children as $child):
                         $childSlug = (string)($child['slug'] ?? '');
-                        $childActive = $onStocksPage && $stocksCat === $childSlug;
+                        $childActive = ($childSlug === $activeChild);
                     ?>
-                    <a href="<?php echo h($child['href']); ?>" class="<?php echo $childActive ? 'active' : ''; ?>">
+                    <a href="<?php echo h((string)($child['href'] ?? '')); ?>" class="<?php echo $childActive ? 'active' : ''; ?>" title="<?php echo h($child['label']); ?>">
                         <span><?php echo h($child['label']); ?></span>
                     </a>
                     <?php endforeach; ?>
                 </div>
             </details>
         <?php else: ?>
-            <a href="<?php echo h($item['href']); ?>" class="<?php echo ($item['key'] === $active) ? 'active' : ''; ?>">
+            <a href="<?php echo h((string)($item['href'] ?? '')); ?>" class="<?php echo ($item['key'] === $active) ? 'active' : ''; ?>" title="<?php echo h($item['label']); ?>">
                 <i class="fas <?php echo h($item['icon']); ?>"></i>
                 <span><?php echo h($item['label']); ?></span>
             </a>
         <?php endif; endforeach; ?>
     </nav>
     <div class="sidebar-footer">
-        <a href="<?php echo h($logout); ?>"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+        <a href="<?php echo h($logout); ?>" title="Logout"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
     </div>
 </div>
 
@@ -588,6 +594,78 @@ if (!function_exists('staff_page_end')) {
             : 'includes/ui_alerts.js';
     ?>"></script>
 <?php echo $extraScripts; ?>
+<?php
+        $endRole = (string)($_SESSION['role'] ?? '');
+        $endScript = strtolower(basename((string)($_SERVER['SCRIPT_NAME'] ?? '')));
+        $skipChat = (defined('STAFF_CHAT_SKIP_WIDGET') && STAFF_CHAT_SKIP_WIDGET)
+            || in_array($endScript, ['admin_messages.php', 'retail_messages.php', 'inventory_messages.php'], true);
+        if (!$skipChat && in_array($endRole, ['admin', 'retail_officer', 'inventory_custodian'], true)) {
+            require __DIR__ . '/staff_chat_widget.php';
+        }
+?>
+<script>
+(function () {
+    var KEY = 'ep_sidebar_collapsed';
+    var mq = window.matchMedia('(min-width: 901px)');
+    var btn = document.getElementById('sidebarCollapseToggle');
+    var sidebar = document.getElementById('staffSidebar');
+    var main = document.querySelector('.main');
+
+    function isDesktop() { return mq.matches; }
+    function readCollapsed() {
+        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+    }
+    function writeCollapsed(on) {
+        try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
+    }
+    function apply() {
+        var collapsed = readCollapsed() && isDesktop();
+        document.body.classList.toggle('sidebar-collapsed', collapsed);
+        if (!btn) return;
+        btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        var label = collapsed ? 'Expand navigation' : 'Collapse navigation';
+        btn.setAttribute('aria-label', label);
+        btn.title = label;
+        var icon = btn.querySelector('i');
+        if (icon) {
+            icon.className = 'fas ' + (collapsed ? 'fa-chevron-right' : 'fa-chevron-left');
+        }
+    }
+    apply();
+
+    if (btn) {
+        btn.addEventListener('click', function () {
+            if (!isDesktop()) return;
+            writeCollapsed(!readCollapsed());
+            apply();
+        });
+    }
+
+    document.querySelectorAll('.sidebar-drop > summary').forEach(function (sum) {
+        sum.addEventListener('click', function (e) {
+            if (!document.body.classList.contains('sidebar-collapsed') || !isDesktop()) return;
+            e.preventDefault();
+            writeCollapsed(false);
+            apply();
+            sum.parentElement.open = true;
+        });
+    });
+
+    function onWidthTransition(e) {
+        if (e.propertyName === 'width' || e.propertyName === 'margin-left') {
+            window.dispatchEvent(new Event('resize'));
+        }
+    }
+    if (sidebar) sidebar.addEventListener('transitionend', onWidthTransition);
+    if (main) main.addEventListener('transitionend', onWidthTransition);
+
+    if (typeof mq.addEventListener === 'function') {
+        mq.addEventListener('change', apply);
+    } else if (typeof mq.addListener === 'function') {
+        mq.addListener(apply);
+    }
+})();
+</script>
 </body>
 </html>
         <?php

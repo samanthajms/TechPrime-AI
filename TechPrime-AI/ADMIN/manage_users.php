@@ -139,16 +139,8 @@ $user_rows = [
     
 ];
 $users = $user_rows[$active_tab];
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Users — EasyPC Admin</title>
-    <link rel="stylesheet" href="admin_shared.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <style>
+
+$usersCss = <<<'CSS'
         /* ── Tab Navigation ── */
         .tab-nav {
             display: flex;
@@ -188,7 +180,8 @@ $users = $user_rows[$active_tab];
         .staff-create-grid label { display: block; margin-bottom: 5px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
         .staff-create-grid input, .staff-create-grid select { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1.5px solid var(--border); border-radius: 8px; font: inherit; }
         .staff-create-grid input:focus, .staff-create-grid select:focus { outline: none; border-color: var(--teal); }
-        .staff-create-actions { display: flex; align-items: end; }
+        .staff-create-actions { display: flex; align-items: center; gap: 8px; }
+        .filter-modal-card.staff-create-card { width: min(560px, 100%); }
         @media (max-width: 650px) { .staff-create-grid { grid-template-columns: 1fr; } .staff-create-grid .full-width { grid-column: auto; } }
 
         /* ── Toolbar ── */
@@ -456,46 +449,18 @@ $users = $user_rows[$active_tab];
         .actions-cell form { margin: 0; }
         .status-text { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
         .tabs-card { padding: 18px 22px 0; }
-    </style>
-</head>
-<body>
+CSS;
 
-<div class="sidebar">
-    <div class="sidebar-brand">
-        <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img brand-logo">
-        <div>
-            <div class="brand-text">EasyPC</div>
-            <div class="brand-sub">Admin</div>
-        </div>
-    </div>
-    <nav>
-        <a href="admin_dashboard.php"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
-        <a href="manage_users.php" class="active"><i class="fas fa-users"></i><span>Manage Users</span></a>
-        <a href="view_logs.php"><i class="fas fa-clipboard-list"></i><span>Activity Logs</span></a>
-        <a href="admin_profile.php"><i class="fas fa-user"></i><span>My Profile</span></a>
-        <a href="admin_settings.php"><i class="fas fa-cog"></i><span>Settings</span></a>
-    </nav>
-    <div class="sidebar-footer">
-        <a href="../logout.php"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
-    </div>
-</div>
+staff_page_start([
+    'role' => 'admin',
+    'title' => 'Manage Users',
+    'active' => 'users',
+    'heading' => 'Manage Users',
+    'subtitle' => 'View, suspend, block or unlock user accounts by role',
+    'extra_head' => '<style>' . $usersCss . '</style>',
+]);
+?>
 
-<!-- ══ MAIN ══════════════════════════════════════════════════════════════════ -->
-<div class="main">
-    <div class="topbar">
-        <div class="topbar-left">
-            <h2>Manage Users</h2>
-            <div class="breadcrumb">View, suspend, block or unlock user accounts by role</div>
-        </div>
-        <div class="topbar-right">
-            <div class="admin-badge">
-                <div class="avatar"><?php echo $adminInitials; ?></div>
-                <?php echo h($_SESSION['name']); ?>
-            </div>
-        </div>
-    </div>
-
-    <div class="page-content">
         <div class="stats-grid users-summary">
             <div class="stat-card">
                 <div class="stat-label">All Users</div>
@@ -519,54 +484,6 @@ $users = $user_rows[$active_tab];
             </div>
         </div>
 
-        <div class="card" style="margin-bottom: 20px;">
-            <div class="card-header">
-                <div>
-                    <h3><span class="card-icon">+</span> Create Staff Account</h3>
-                    <div class="card-subtitle">Create accounts for retail officers and inventory custodians. New staff accounts are verified and ready to sign in.</div>
-                </div>
-            </div>
-            <form method="post" class="staff-create-grid">
-                <input type="hidden" name="action" value="create_staff">
-                <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>">
-                <div>
-                    <label for="staff-name">First Name</label>
-                    <input id="staff-name" type="text" name="name" required>
-                </div>
-                <div>
-                    <label for="staff-surname">Surname</label>
-                    <input id="staff-surname" type="text" name="surname" required>
-                </div>
-                <div>
-                    <label for="staff-role">Role</label>
-                    <select id="staff-role" name="role" required>
-                        <?php foreach ($staffRoles as $roleValue => $roleLabel): ?>
-                            <option value="<?php echo h($roleValue); ?>"><?php echo h($roleLabel); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label for="staff-age">Age</label>
-                    <input id="staff-age" type="number" name="age" min="13" required>
-                </div>
-                <div>
-                    <label for="staff-email">Email Address</label>
-                    <input id="staff-email" type="email" name="email" required>
-                </div>
-                <div>
-                    <label for="staff-password">Temporary Password</label>
-                    <input id="staff-password" type="password" name="password" required>
-                </div>
-                <div class="full-width">
-                    <label for="staff-address">Location</label>
-                    <input id="staff-address" type="text" name="address" placeholder="City, Country" required>
-                </div>
-                <div class="full-width staff-create-actions">
-                    <button type="submit" class="btn btn-primary">Create Staff Account</button>
-                </div>
-            </form>
-        </div>
-
         <div class="card tabs-card">
             <div class="tab-nav">
                 <a class="tab-btn <?php echo $active_tab === 'all' ? 'active' : ''; ?>" href="manage_users.php?tab=all">All <span class="tab-count"><?php echo (int)$count_all; ?></span></a>
@@ -583,6 +500,7 @@ $users = $user_rows[$active_tab];
                     <h3><span class="card-icon">U</span> User Accounts</h3>
                     <div class="card-subtitle">Showing <?php echo count($users); ?> account<?php echo count($users) === 1 ? '' : 's'; ?> for the selected role</div>
                 </div>
+                <button type="button" class="btn btn-primary no-print" onclick="openFilterModal('createStaffModal')"><i class="fas fa-user-plus"></i> Create Staff Account</button>
             </div>
             <div class="table-wrap">
                 <table class="ias-table">
@@ -665,13 +583,59 @@ $users = $user_rows[$active_tab];
             </table>
         </div>
     </div>
+
+<div id="createStaffModal" class="filter-modal no-print" onclick="if(event.target===this)closeFilterModal('createStaffModal')">
+    <div class="filter-modal-card staff-create-card">
+        <h4><i class="fas fa-user-plus"></i> Create Staff Account</h4>
+        <p class="text-muted text-small" style="margin:-6px 0 14px;">Create accounts for retail officers and inventory custodians. New staff accounts are verified and ready to sign in.</p>
+        <form method="post" class="staff-create-grid">
+            <input type="hidden" name="action" value="create_staff">
+            <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>">
+            <div>
+                <label for="staff-name">First Name</label>
+                <input id="staff-name" type="text" name="name" required>
+            </div>
+            <div>
+                <label for="staff-surname">Surname</label>
+                <input id="staff-surname" type="text" name="surname" required>
+            </div>
+            <div>
+                <label for="staff-role">Role</label>
+                <select id="staff-role" name="role" required>
+                    <?php foreach ($staffRoles as $roleValue => $roleLabel): ?>
+                        <option value="<?php echo h($roleValue); ?>"><?php echo h($roleLabel); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="staff-age">Age</label>
+                <input id="staff-age" type="number" name="age" min="13" required>
+            </div>
+            <div>
+                <label for="staff-email">Email Address</label>
+                <input id="staff-email" type="email" name="email" required>
+            </div>
+            <div>
+                <label for="staff-password">Temporary Password</label>
+                <input id="staff-password" type="password" name="password" required>
+            </div>
+            <div class="full-width">
+                <label for="staff-address">Location</label>
+                <input id="staff-address" type="text" name="address" placeholder="City, Country" required>
+            </div>
+            <div class="full-width staff-create-actions">
+                <button type="submit" class="btn btn-primary">Create Staff Account</button>
+                <button type="button" class="btn btn-outline" onclick="closeFilterModal('createStaffModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
 </div>
 
-<!-- ══ SCRIPTS ══════════════════════════════════════════════════════════════ -->
-</div>
-
-<script src="../includes/ui_alerts.js"></script>
+<?php
+staff_page_end(<<<'SCRIPTS'
 <script>
+function openFilterModal(id){ document.getElementById(id).classList.add('open'); }
+function closeFilterModal(id){ document.getElementById(id).classList.remove('open'); }
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('success') === 'staff_created') {
@@ -687,6 +651,5 @@ $users = $user_rows[$active_tab];
         }
     });
 </script>
-<?php include __DIR__ . '/chat_widget.php'; ?>
-</body>
-</html>
+SCRIPTS);
+

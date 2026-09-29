@@ -14,10 +14,6 @@ checkRole('inventory_custodian');
 $uid = (int)$_SESSION['user_id'];
 $allowed_categories = ep_shop_inventory_allowed_category_values();
 $categoryGroups = ep_shop_inventory_category_groups();
-$stockCat = trim((string)($_GET['cat'] ?? ''));
-if ($stockCat !== '' && !ep_shop_parent_valid($stockCat)) {
-    $stockCat = '';
-}
 
 /* Stock alert thresholds (qty-based; no per-product config in the schema). */
 const CRITICAL_STOCK_MAX = 5;   // 0 < stock <= 5
@@ -415,10 +411,6 @@ staff_page_start([
 .filter-title {
     font-size: 12px; font-weight: 700; color: var(--ep-text); margin-bottom: 8px; display: block;
     text-transform: uppercase; letter-spacing: .04em;
-}
-.stocks-category-select {
-    width: 100%; height: 40px; border-radius: 10px !important; border: 1px solid var(--ep-border);
-    font-weight: 600; font-size: 13px; background: #fff;
 }
 .status-toggle { display: flex; flex-direction: column; gap: 6px; }
 .status-btn {
@@ -1026,7 +1018,6 @@ $lowMax = LOW_STOCK_MAX;
 $criticalMax = CRITICAL_STOCK_MAX;
 $hasBarcodeJs = $hasBarcode ? 'true' : 'false';
 $openLabelId = (int)($_GET['label'] ?? 0);
-$stockCatJs = json_encode($stockCat, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
 $mainScript = <<<SCRIPTS
 <script>
@@ -1034,7 +1025,6 @@ var ALL_PRODUCTS = {$productsJson};
 var LOW_STOCK_MAX = {$lowMax};
 var CRITICAL_STOCK_MAX = {$criticalMax};
 var HAS_BARCODE = {$hasBarcodeJs};
-var STOCK_CAT = {$stockCatJs};
 
 /* UPC-A is stored as a 13-digit GTIN with a leading 0; show the 12 digits printed on the box. */
 function barcodeLabel(code) {
@@ -1124,7 +1114,6 @@ function focusBarcodeField(id) {
 
 var state = {
     status: 'all',
-    category: STOCK_CAT || '',
     sort: 'name_asc',
     alert: 'all',
     barcode: 'all',
@@ -1157,7 +1146,6 @@ function getFiltered() {
     var list = ALL_PRODUCTS.filter(function (p) {
         if (state.status === 'instock' && p.status === 'out') return false;
         if (state.status === 'outofstock' && p.status !== 'out') return false;
-        if (state.category && p.tax_parent !== state.category) return false;
         if (state.alert === 'low' && !(p.status === 'low' || p.status === 'critical')) return false;
         if (state.alert === 'critical' && p.status !== 'critical') return false;
         if (state.barcode === 'has' && !p.barcode) return false;

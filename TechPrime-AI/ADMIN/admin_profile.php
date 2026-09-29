@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/staff_layout.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -70,16 +71,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $adminInitials = strtoupper(substr($admin['name'] ?? 'A', 0, 1));
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile — EasyPC Admin</title>
-    <link rel="stylesheet" href="admin_shared.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <style>
+
+staff_page_start([
+    'role' => 'admin',
+    'title' => 'My Profile',
+    'active' => 'profile',
+    'heading' => 'My Profile',
+    'subtitle' => 'Manage your admin account details',
+    'extra_head' => '<style>
         .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media(max-width:768px){ .profile-grid { grid-template-columns: 1fr; } }
         .profile-avatar {
@@ -90,45 +89,9 @@ $adminInitials = strtoupper(substr($admin['name'] ?? 'A', 0, 1));
             font-size: 28px; font-weight: 800; color: #fff;
             margin-bottom: 16px;
         }
-    </style>
-</head>
-<body>
-
-<div class="sidebar">
-    <div class="sidebar-brand">
-        <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img brand-logo">
-        <div>
-            <div class="brand-text">EasyPC</div>
-            <div class="brand-sub">Admin</div>
-        </div>
-    </div>
-    <nav>
-        <a href="admin_dashboard.php"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
-        <a href="manage_users.php"><i class="fas fa-users"></i><span>Manage Users</span></a>
-        <a href="view_logs.php"><i class="fas fa-clipboard-list"></i><span>Activity Logs</span></a>
-        <a href="admin_profile.php" class="active"><i class="fas fa-user"></i><span>My Profile</span></a>
-        <a href="admin_settings.php"><i class="fas fa-cog"></i><span>Settings</span></a>
-    </nav>
-    <div class="sidebar-footer">
-        <a href="../logout.php"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
-    </div>
-</div>
-
-<div class="main">
-    <div class="topbar">
-        <div class="topbar-left">
-            <h2>My Profile</h2>
-            <div class="breadcrumb">Manage your admin account details</div>
-        </div>
-        <div class="topbar-right">
-            <div class="admin-badge">
-                <div class="avatar"><?php echo $adminInitials; ?></div>
-                <?php echo h($admin['name']); ?>
-            </div>
-        </div>
-    </div>
-
-    <div class="page-content">
+    </style>',
+]);
+?>
 
         <?php if ($success): ?>
             <div class="alert alert-success">✔ <?php echo h($success); ?></div>
@@ -210,9 +173,5 @@ $adminInitials = strtoupper(substr($admin['name'] ?? 'A', 0, 1));
             </div>
 
         </div>
-    </div>
-</div>
 
-<script src="../includes/ui_alerts.js"></script>
-</body>
-</html>
+<?php staff_page_end(); ?>

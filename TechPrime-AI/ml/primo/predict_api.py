@@ -16,7 +16,6 @@ from pathlib import Path
 import joblib
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-
 from preprocess import preprocess_text
 
 BASE_DIR = Path(__file__).resolve().parent
