@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/client_helpers.php';
 require_once __DIR__ . '/../includes/inventory_alerts.php';
+require_once __DIR__ . '/../includes/address_helpers.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -82,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     $name = trim((string)($_POST['name'] ?? ''));
     $surname = trim((string)($_POST['surname'] ?? ''));
     $age = (int)($_POST['age'] ?? 0);
-    $address = trim((string)($_POST['address'] ?? ''));
+    $addressInput = ep_address_from_input($_POST);
     $email = strtolower(trim((string)($_POST['email'] ?? '')));
     $phone = trim((string)($_POST['phone'] ?? ''));
 
@@ -92,10 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
         $profileFlashErr = 'Name fields must be 80 characters or fewer.';
     } elseif ($age < 13 || $age > 120) {
         $profileFlashErr = 'Age must be between 13 and 120.';
-    } elseif ($address === '') {
-        $profileFlashErr = 'Address is required.';
-    } elseif (mb_strlen($address) > 255) {
-        $profileFlashErr = 'Address must be 255 characters or fewer.';
+    } elseif ($addressInput['error'] !== '') {
+        $profileFlashErr = $addressInput['error'];
     } elseif ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $profileFlashErr = 'Please enter a valid email address.';
     } elseif (mb_strlen($email) > 190) {
@@ -121,17 +120,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
             }
         }
         if ($profileFlashErr === '') {
+            // users.address gets the formatted one-line address; address_* columns and
+            // phone are included when migration_users_address_phone.sql has been applied.
+            $set = ['name' => $name, 'surname' => $surname, 'age' => $age]
+                + ep_address_columns($db, $addressInput['fields']);
             if ($hasPhone) {
-                $up = $db->prepare(
-                    'UPDATE users SET name = ?, surname = ?, age = ?, address = ?, phone = ?, email = ? WHERE id = ?'
-                );
-                $up->execute([$name, $surname, $age, $address, $phone, $email, $user_id]);
-            } else {
-                $up = $db->prepare(
-                    'UPDATE users SET name = ?, surname = ?, age = ?, address = ?, email = ? WHERE id = ?'
-                );
-                $up->execute([$name, $surname, $age, $address, $email, $user_id]);
+                $set['phone'] = $phone;
             }
+            $set['email'] = $email;
+            $up = $db->prepare(
+                'UPDATE users SET ' . implode(', ', array_map(fn($c) => "$c = ?", array_keys($set))) . ' WHERE id = ?'
+            );
+            $up->execute([...array_values($set), $user_id]);
             $_SESSION['name'] = $name;
             $_SESSION['surname'] = $surname;
             $_SESSION['email'] = $email;
@@ -179,7 +179,6 @@ $profileForm = [
     'name' => (string)($uRow['name'] ?? ''),
     'surname' => (string)($uRow['surname'] ?? ''),
     'age' => (string)($uRow['age'] ?? ''),
-    'address' => (string)($uRow['address'] ?? ''),
     'email' => (string)($uRow['email'] ?? ''),
     'phone' => (string)($uRow['phone'] ?? ''),
 ];
@@ -187,9 +186,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     $profileForm['name'] = trim((string)($_POST['name'] ?? $profileForm['name']));
     $profileForm['surname'] = trim((string)($_POST['surname'] ?? $profileForm['surname']));
     $profileForm['age'] = (string)($_POST['age'] ?? $profileForm['age']);
-    $profileForm['address'] = trim((string)($_POST['address'] ?? $profileForm['address']));
     $profileForm['email'] = trim((string)($_POST['email'] ?? $profileForm['email']));
     $profileForm['phone'] = trim((string)($_POST['phone'] ?? $profileForm['phone']));
+}
+
+// Saved delivery address (structured). Legacy accounts may only have free-text users.address.
+$savedAddress = ep_user_address($db, $user_id);
+$addressComplete = ep_address_is_complete($savedAddress);
+$savedAddressLine = $addressComplete ? ep_address_format($savedAddress) : $savedAddress['full'];
+$profileAddr = $savedAddress;
+if (isset($addressInput) && $profileFlashErr !== '') {
+    $profileAddr = $addressInput['fields'] + $profileAddr;
 }
 
 $rawName = trim((string)($_SESSION['name'] ?? ($profileForm['name'] !== '' ? $profileForm['name'] : 'Customer')));
@@ -336,6 +343,30 @@ if ($showSettings) {
         </section>
 
         <?php if (!$showSettings): ?>
+        <section class="ep-address-card<?php echo $addressComplete ? '' : ' is-incomplete'; ?>">
+            <div class="ep-address-card-icon"><i class="fas <?php echo $addressComplete ? 'fa-map-marker-alt' : 'fa-exclamation'; ?>" aria-hidden="true"></i></div>
+            <div class="ep-address-card-body">
+                <span class="ep-address-card-label">Default delivery address</span>
+                <?php if ($addressComplete): ?>
+                    <p class="ep-address-card-line"><?php echo h($savedAddressLine); ?></p>
+                    <p class="ep-address-card-meta">
+                        <?php if ($profileForm['phone'] !== ''): ?>
+                            <span><i class="fas fa-phone-alt" aria-hidden="true"></i> <?php echo h($profileForm['phone']); ?></span>
+                        <?php endif; ?>
+                        <span><i class="fas fa-check-circle" aria-hidden="true"></i> Used automatically at checkout</span>
+                    </p>
+                <?php else: ?>
+                    <p class="ep-address-card-line">
+                        <?php echo $savedAddressLine !== '' ? h($savedAddressLine) : 'No delivery address yet.'; ?>
+                    </p>
+                    <p class="ep-address-card-meta is-warning">Please complete your address (street, barangay, city, province and ZIP) so we can deliver your orders.</p>
+                <?php endif; ?>
+            </div>
+            <a class="ep-address-card-edit" href="user_dashboard.php?settings=1#delivery">
+                <?php echo $addressComplete ? '<i class="fas fa-pen"></i> Edit' : '<i class="fas fa-pen"></i> Complete address'; ?>
+            </a>
+        </section>
+
         <div class="profile-shortcuts">
             <a class="profile-shortcut" href="wishlist.php">
                 <i class="fas fa-heart" aria-hidden="true"></i>
@@ -384,10 +415,16 @@ if ($showSettings) {
                                value="<?php echo h($profileForm['phone']); ?>">
                     </div>
                     <?php endif; ?>
-                    <div class="profile-settings-full">
-                        <label class="ep-form-label" for="profileAddress">Address</label>
-                        <input class="ep-form-control" id="profileAddress" type="text" name="address" maxlength="255" required
-                               value="<?php echo h($profileForm['address']); ?>">
+                    <div class="profile-settings-full" id="delivery">
+                        <h4 class="ep-address-heading"><i class="fas fa-map-marker-alt"></i> Default delivery address</h4>
+                        <p class="ep-address-hint">Used automatically at checkout. You can still send a single order somewhere else.</p>
+                        <?php if (!$addressComplete && $savedAddress['full'] !== ''): ?>
+                            <div class="ep-address-legacy">
+                                <i class="fas fa-exclamation-circle"></i>
+                                <span>Your current address <strong>"<?php echo h($savedAddress['full']); ?>"</strong> is missing details. Please fill in the fields below.</span>
+                            </div>
+                        <?php endif; ?>
+                        <?php ep_render_address_fields($profileAddr, '../assets/data/psgc', 'profileAddr_'); ?>
                     </div>
                 </div>
                 <div class="profile-settings-actions">
@@ -484,4 +521,9 @@ if ($showSettings) {
     </div>
 </main>
 
-<?php include __DIR__ . '/ep_footer.php'; ?>
+<?php
+if ($showSettings) {
+    $extraScripts = '<script src="../assets/js/ph-address.js"></script>';
+}
+include __DIR__ . '/ep_footer.php';
+?>

@@ -133,11 +133,13 @@ function redirectByRole($role) {
             display: flex;
         }
 
-        /* Left panel: product image */
+        /* Left panel: hero photo + animated effects (assets/js/login-hero.js) */
         .auth-visual {
             position: relative;
+            isolation: isolate;
+            overflow: hidden;
             flex: 1 1 50%;
-            background: #0e1a08 url('assets/easypc.png') center / cover no-repeat;
+            background: #0a0f08 url('assets/EasyPC.jpg') center 45% / cover no-repeat;
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
@@ -148,12 +150,26 @@ function redirectByRole($role) {
             content: "";
             position: absolute;
             inset: 0;
+            z-index: 1;
+            /* darken top (logo) and bottom (tagline) so the text stays readable */
+            background:
+                linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 22%),
+                linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.35) 30%, rgba(0,0,0,0) 55%);
         }
         .auth-visual::after {
             content: "";
             position: absolute;
             top: 0; left: 0; right: 0; height: 6px;
         }
+        #heroCanvas {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            display: block;
+            opacity: 0;
+            transition: opacity .6s ease;
+        }
+        .visual-brand, .visual-copy { z-index: 2; }
         .visual-brand {
             position: relative;
             display: flex;
@@ -268,6 +284,7 @@ function redirectByRole($role) {
 <body>
 <div class="auth-shell">
     <div class="auth-visual">
+        <canvas id="heroCanvas" data-src="assets/EasyPC.jpg" data-scene="pc" aria-hidden="true"></canvas>
         <div class="visual-brand">
             <img src="assets/logo.png" alt="EasyPC Logo" style="width: auto; height: 45px;">
             <span>One Oasis</span>
@@ -310,5 +327,6 @@ function redirectByRole($role) {
     </div>
 </div>
 <?php ias_alert_footer(); ?>
+<script src="assets/js/login-hero.js"></script>
 </body>
 </html>

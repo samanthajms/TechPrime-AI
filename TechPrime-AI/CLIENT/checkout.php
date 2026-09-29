@@ -3,6 +3,7 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/client_helpers.php';
+require_once __DIR__ . '/../includes/address_helpers.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -56,6 +57,14 @@ if (empty($items)) {
 }
 
 $checkoutError = '';
+// Address/phone problems from the Pay Online handler (backend/api/create_payment.php).
+if (!empty($_SESSION['checkout_flash_error'])) {
+    $checkoutError = (string)$_SESSION['checkout_flash_error'];
+    unset($_SESSION['checkout_flash_error']);
+}
+
+$savedAddress = ep_user_address($db, $user_id);
+$addressComplete = ep_address_is_complete($savedAddress);
 
 if (isset($_POST['place_order'])) {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
@@ -71,33 +80,50 @@ if (isset($_POST['place_order'])) {
     }
     unset($_SESSION['checkout_token']);
 
-    $address = trim((string)($_POST['address'] ?? ''));
     $phone = trim((string)($_POST['phone'] ?? ''));
+    $resolved = ep_checkout_resolve_address($db, $user_id, $_POST);
+    $phoneError = ep_phone_error($phone);
 
-    $orderItems = [];
-    foreach ($items as $item) {
-        $orderItems[] = [
-            'id' => (int)$item['id'],
-            'qty' => (int)$item['qty'],
-            'price' => (float)$item['price'],
-            'name' => (string)$item['name'],
-        ];
-    }
+    if ($phoneError !== '') {
+        $checkoutError = $phoneError;
+    } elseif (!$resolved['ok']) {
+        $checkoutError = $resolved['error'];
+    } else {
+        $orderItems = [];
+        foreach ($items as $item) {
+            $orderItems[] = [
+                'id' => (int)$item['id'],
+                'qty' => (int)$item['qty'],
+                'price' => (float)$item['price'],
+                'name' => (string)$item['name'],
+            ];
+        }
 
-    $result = ep_place_cod_order($db, $user_id, $orderItems, (float)$total, $address, $phone);
-    if (!empty($result['ok'])) {
-        $order_id = (int)$result['order_id'];
-        header("Location: order_success.php?order_id=$order_id&total=$total");
-        exit;
-    }
+        $result = ep_place_cod_order($db, $user_id, $orderItems, (float)$total, $resolved['address'], $phone);
+        if (!empty($result['ok'])) {
+            $order_id = (int)$result['order_id'];
+            header("Location: order_success.php?order_id=$order_id&total=$total");
+            exit;
+        }
 
-    if (($result['error'] ?? '') === 'stock') {
-        header('Location: cart.php?alert=stock');
-        exit;
+        if (($result['error'] ?? '') === 'stock') {
+            header('Location: cart.php?alert=stock');
+            exit;
+        }
+        $checkoutError = 'Could not place your order. Please try again.';
     }
-    $checkoutError = 'Could not place your order. Please try again.';
     $_SESSION['checkout_token'] = bin2hex(random_bytes(16));
 }
+
+// Form state: after a failed submit keep what the customer entered.
+$posted = isset($_POST['place_order']);
+$addressMode = $addressComplete
+    ? (($posted && ($_POST['address_mode'] ?? '') === 'custom') ? 'custom' : 'saved')
+    : 'custom';
+$customAddress = $posted && $addressMode === 'custom'
+    ? ep_address_from_input($_POST)['fields'] + $savedAddress
+    : $savedAddress;
+$phoneValue = $posted ? (string)($_POST['phone'] ?? '') : $savedAddress['phone'];
 
 if (empty($_SESSION['checkout_token'])) {
     $_SESSION['checkout_token'] = bin2hex(random_bytes(16));
@@ -144,11 +170,45 @@ $bodyClass  = 'ep-checkout-layout';
             <?php endif; ?>
 
             <label class="ep-form-label" for="checkoutPhone">Phone Number</label>
-            <input class="ep-form-control" id="checkoutPhone" type="text" name="phone" placeholder="09123456789" required
-                   value="<?php echo h($_POST['phone'] ?? ''); ?>">
+            <input class="ep-form-control" id="checkoutPhone" type="tel" name="phone" placeholder="09123456789" required
+                   autocomplete="tel" maxlength="30" value="<?php echo h($phoneValue); ?>">
 
-            <label class="ep-form-label" for="checkoutAddress">Delivery Address</label>
-            <textarea class="ep-form-control" id="checkoutAddress" name="address" rows="4" placeholder="House No., Street, City..." required><?php echo h($_POST['address'] ?? ''); ?></textarea>
+            <span class="ep-form-label">Deliver To</span>
+            <?php if ($addressComplete): ?>
+                <div class="ep-deliver-options" role="radiogroup" aria-label="Delivery address">
+                    <label class="ep-deliver-option">
+                        <input type="radio" name="address_mode" value="saved" <?php echo $addressMode === 'saved' ? 'checked' : ''; ?>>
+                        <span class="ep-deliver-radio" aria-hidden="true"></span>
+                        <span class="ep-deliver-body">
+                            <strong><i class="fas fa-home"></i> My saved address</strong>
+                            <span><?php echo h(ep_address_format($savedAddress)); ?></span>
+                            <a href="user_dashboard.php?settings=1#delivery" class="ep-deliver-edit">Edit in profile</a>
+                        </span>
+                    </label>
+                    <label class="ep-deliver-option">
+                        <input type="radio" name="address_mode" value="custom" <?php echo $addressMode === 'custom' ? 'checked' : ''; ?>>
+                        <span class="ep-deliver-radio" aria-hidden="true"></span>
+                        <span class="ep-deliver-body">
+                            <strong><i class="fas fa-map-signs"></i> Deliver to a different address</strong>
+                            <span>For this order only. Your saved address won't change.</span>
+                        </span>
+                    </label>
+                </div>
+            <?php else: ?>
+                <input type="hidden" name="address_mode" value="custom">
+                <div class="ep-address-legacy">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>
+                        Please enter your complete delivery address.
+                        <a href="user_dashboard.php?settings=1#delivery">Save it to your profile</a> so it's filled in automatically next time.
+                    </span>
+                </div>
+            <?php endif; ?>
+
+            <fieldset class="ep-deliver-custom" id="epCustomAddress" <?php echo $addressMode === 'custom' ? '' : 'hidden disabled'; ?>>
+                <legend class="sr-only">Delivery address for this order</legend>
+                <?php ep_render_address_fields($customAddress, '../assets/data/psgc', 'checkoutAddr_'); ?>
+            </fieldset>
 
             <div class="ep-info-note">Choose your payment method on the right.</div>
         </div>
@@ -174,7 +234,26 @@ $bodyClass  = 'ep-checkout-layout';
         </div>
     </form>
 </main>
+<script src="../assets/js/ph-address.js"></script>
 <script>
+(function () {
+    // Saved vs. one-off address. The one-off fields sit in a <fieldset>; disabling it
+    // means they are neither validated nor submitted while the saved address is used.
+    var custom = document.getElementById('epCustomAddress');
+    var radios = document.querySelectorAll('input[name=address_mode][type=radio]');
+    radios.forEach(function (r) {
+        r.addEventListener('change', function () {
+            var useCustom = r.value === 'custom' && r.checked;
+            custom.hidden = !useCustom;
+            custom.disabled = !useCustom;
+            if (useCustom) {
+                var first = custom.querySelector('input');
+                if (first) first.focus();
+            }
+        });
+    });
+})();
+
 (function () {
     var form = document.getElementById('epCheckoutForm');
     var btn = document.getElementById('epPlaceOrderBtn');

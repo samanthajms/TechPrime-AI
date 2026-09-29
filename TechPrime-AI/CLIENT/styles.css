@@ -4907,3 +4907,151 @@ body.ep-pvm-open { overflow: hidden; }
     font-size: 13px;
     font-weight: 600;
 }
+
+/* ── Structured delivery address (includes/address_helpers.php, assets/js/ph-address.js) ── */
+.ep-address-fields { display: grid; gap: 0; }
+.ep-address-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+}
+.ep-address-optional { font-weight: 500; color: #999; }
+select.ep-form-control {
+    appearance: none;
+    -webkit-appearance: none;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+    padding-right: 36px;
+    cursor: pointer;
+    text-overflow: ellipsis;
+}
+select.ep-form-control:disabled { background-color: #f5f6f7; color: #999; cursor: not-allowed; }
+select.ep-form-control:invalid { color: #999; }
+select.ep-form-control option { color: #171717; }
+.ep-address-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 4px;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--ep-black);
+}
+.ep-address-heading i { color: var(--ep-green); }
+.ep-address-hint { margin: 0 0 14px; font-size: 13px; color: #777; }
+.ep-address-legacy {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    border-radius: 10px;
+    background: #fff8e6;
+    border: 1px solid #f3dca0;
+    color: #8a6200;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.ep-address-legacy i { margin-top: 2px; }
+.ep-address-legacy a { color: var(--ep-green-dark); font-weight: 700; }
+
+/* Profile: default delivery address card */
+.ep-address-card {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 20px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.03);
+}
+.ep-address-card-icon {
+    flex: 0 0 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: var(--ep-green-light);
+    color: var(--ep-green);
+    font-size: 20px;
+}
+.ep-address-card-body { flex: 1; min-width: 0; }
+.ep-address-card-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #999;
+    margin-bottom: 4px;
+}
+.ep-address-card-line { margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--ep-black); line-height: 1.5; }
+.ep-address-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin: 0;
+    font-size: 13px;
+    color: #777;
+}
+.ep-address-card-meta i { color: var(--ep-green); margin-right: 4px; }
+.ep-address-card-meta.is-warning { color: #8a6200; }
+.ep-address-card-edit {
+    flex: 0 0 auto;
+    padding: 9px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--ep-green);
+    color: var(--ep-green-dark);
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+.ep-address-card-edit:hover { background: var(--ep-green); color: #fff; }
+.ep-address-card.is-incomplete { border-color: #f3dca0; background: #fffdf6; }
+.ep-address-card.is-incomplete .ep-address-card-icon { background: #fff1c9; color: #b07d00; }
+.ep-address-card.is-incomplete .ep-address-card-edit { border-color: #b07d00; color: #8a6200; }
+.ep-address-card.is-incomplete .ep-address-card-edit:hover { background: #b07d00; color: #fff; }
+
+/* Checkout: saved vs. one-off address */
+.ep-deliver-options { display: grid; gap: 10px; margin-bottom: 14px; }
+.ep-deliver-option {
+    position: relative;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    border: 1.5px solid var(--ep-border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+.ep-deliver-option:hover { border-color: #cfd8cb; }
+.ep-deliver-option input { position: absolute; opacity: 0; pointer-events: none; }
+.ep-deliver-radio {
+    flex: 0 0 18px;
+    height: 18px;
+    margin-top: 2px;
+    border-radius: 50%;
+    border: 2px solid #c5cbc2;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.ep-deliver-option input:checked ~ .ep-deliver-radio {
+    border-color: var(--ep-green);
+    box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 10px var(--ep-green);
+}
+.ep-deliver-option:has(input:checked) { border-color: var(--ep-green); background: var(--ep-green-light); }
+.ep-deliver-option input:focus-visible ~ .ep-deliver-radio { box-shadow: 0 0 0 3px rgba(98, 178, 54, 0.3); }
+.ep-deliver-body { display: grid; gap: 3px; font-size: 13px; color: #555; line-height: 1.5; }
+.ep-deliver-body strong { font-size: 14px; color: var(--ep-black); }
+.ep-deliver-body strong i { color: var(--ep-green); margin-right: 4px; }
+.ep-deliver-edit { justify-self: start; font-size: 12px; font-weight: 700; color: var(--ep-green-dark); }
+.ep-deliver-custom { border: 0; margin: 0; padding: 0; min-width: 0; }
+.ep-deliver-custom[hidden] { display: none; }
+
+@media (max-width: 640px) {
+    .ep-address-grid { grid-template-columns: 1fr; }
+    .ep-address-card { flex-wrap: wrap; padding: 18px; }
+    .ep-address-card-edit { width: 100%; text-align: center; }
+}
