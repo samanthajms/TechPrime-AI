@@ -71,7 +71,14 @@ echo json_encode([
  */
 function primo_call_svm(string $message): ?array
 {
-    $url = 'http://127.0.0.1:5055/predict';
+    // PRIMO_API_URL = base URL of the hosted service (e.g. https://primo-xxxx.onrender.com); local default otherwise.
+    $base = $_ENV['PRIMO_API_URL'] ?? getenv('PRIMO_API_URL');
+    $base = is_string($base) && trim($base) !== '' ? rtrim(trim($base), '/') : 'http://127.0.0.1:5055';
+    $url = $base . '/predict';
+    $isLocal = str_starts_with($base, 'http://127.0.0.1') || str_starts_with($base, 'http://localhost');
+    // A sleeping Render free instance takes up to ~1 min to wake up.
+    $connectTimeout = $isLocal ? 2 : 15;
+    $timeout = $isLocal ? 6 : 60;
     $body = json_encode(['message' => $message]);
 
     if (function_exists('curl_init')) {
@@ -81,8 +88,8 @@ function primo_call_svm(string $message): ?array
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_POSTFIELDS => $body,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CONNECTTIMEOUT => 2,
-            CURLOPT_TIMEOUT => 6,
+            CURLOPT_CONNECTTIMEOUT => $connectTimeout,
+            CURLOPT_TIMEOUT => $timeout,
         ]);
         $resp = curl_exec($ch);
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -99,7 +106,7 @@ function primo_call_svm(string $message): ?array
             'method' => 'POST',
             'header' => "Content-Type: application/json\r\n",
             'content' => $body,
-            'timeout' => 6,
+            'timeout' => $timeout,
             'ignore_errors' => true,
         ],
     ]);
