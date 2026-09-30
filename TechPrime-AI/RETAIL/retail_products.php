@@ -127,8 +127,8 @@ staff_page_start([
     'subtitle' => 'Manage products in your shop',
     'extra_head' => <<<'EXTRA'
 <style>
-.products-grid { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; }
-@media (max-width: 1100px) { .products-grid { grid-template-columns: 1fr; } }
+.products-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
+@media (max-width: 1100px) { .products-grid { grid-template-columns: minmax(0, 1fr); } }
 .thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; background: var(--ep-green-light); }
 .category-pill {
     background: var(--ep-green-light); color: var(--ep-green-dark);

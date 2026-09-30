@@ -292,7 +292,7 @@ function ep_get_cart_preview(PDO $db): array
     }
 
     $idsStr = implode(',', $ids);
-    $res = $db->query("SELECT id, name, price FROM products WHERE id IN ($idsStr)");
+    $res = $db->query("SELECT id, name, price, image FROM products WHERE id IN ($idsStr)");
     $items = [];
     $total = 0.0;
     $count = 0;
@@ -311,6 +311,8 @@ function ep_get_cart_preview(PDO $db): array
                 'price' => (float)$row['price'],
                 'qty' => $qty,
                 'subtotal' => $subtotal,
+                // Thumbnail for the header cart preview ('' = show a placeholder icon)
+                'image' => function_exists('ias_client_product_image_url') ? ias_client_product_image_url($row) : '',
             ];
             $total += $subtotal;
             $count += $qty;

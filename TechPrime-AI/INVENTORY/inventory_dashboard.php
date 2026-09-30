@@ -298,13 +298,13 @@ staff_page_start([
 
 @media (max-width: 1100px) {
     .inv-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .inv-overview { grid-template-columns: 1fr; }
-    .inv-chart-body { grid-template-columns: 1fr; }
+    .inv-overview { grid-template-columns: minmax(0, 1fr); }
+    .inv-chart-body { grid-template-columns: minmax(0, 1fr); }
     .inv-chart-summary { flex-direction: row; flex-wrap: wrap; }
     .inv-chart-metric { flex: 1 1 140px; }
 }
 @media (max-width: 640px) {
-    .inv-stats-grid { grid-template-columns: 1fr; }
+    .inv-stats-grid { grid-template-columns: minmax(0, 1fr); }
     .inv-hero { padding: 18px; }
     .inv-hero h1 { font-size: 18px; }
     .inv-stockin-canvas-wrap { height: 260px; }

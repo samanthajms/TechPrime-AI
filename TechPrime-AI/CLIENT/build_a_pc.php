@@ -17,7 +17,7 @@ $isHomePage = false;
 $pageTitle = 'Build a PC';
 $csrf = generateCsrfToken();
 
-$extraHead = '<link rel="stylesheet" href="tech_match.css"><style>
+$extraHead = '<link rel="stylesheet" href="tech_match.css?v=responsive-1"><style>
 .bap-page { max-width: 1280px; margin: 0 auto; padding: 22px 18px 96px; }
 .bap-hero {
   background: linear-gradient(135deg, #eef8e6 0%, #fff 70%);

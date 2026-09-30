@@ -125,6 +125,19 @@ $_cw_openStaff = (int)($_GET['staff_id'] ?? $_GET['chat_seller'] ?? 0);
     cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 #cwSendBtn:hover { background: var(--cw-teal-dk); }
+body.sidebar-open #cwFab, body.sidebar-open #cwPanel { display: none; }
+/* Phones: icon-only button, panel spans the screen width */
+@media (max-width: 600px) {
+    #cwFab { right: 14px; bottom: 16px; padding: 14px; }
+    #cwFab .cw-fab-label, #cwFabAvatars { display: none; }
+    #cwFab .cw-fab-icon { font-size: 20px; }
+    #cwPanel {
+        left: 8px; right: 8px; bottom: 80px; width: auto;
+        height: min(var(--cw-h), calc(100vh - 100px));
+        height: min(var(--cw-h), calc(100dvh - 100px));
+    }
+    #cwMsgInput { font-size: 16px; } /* stops iOS zooming into the field */
+}
 </style>
 
 <button id="cwFab" onclick="CW.toggle()" aria-label="Open Messages">

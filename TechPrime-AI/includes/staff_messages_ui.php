@@ -71,6 +71,15 @@ if (!function_exists('staff_messages_extra_head')) {
 @media (max-width: 900px) {
     .chat-container { flex-direction: column; height: auto; }
     .contacts-column { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid #eee; }
+    /* Conversation keeps its own scroll area instead of growing with every message */
+    .chat-column { height: 65vh; min-height: 360px; }
+}
+@media (max-width: 600px) {
+    .chat-messages { padding: 14px; }
+    .chat-footer { padding: 10px 12px; }
+    .bubble { max-width: 85%; }
+    .input-box input { font-size: 16px; } /* stops iOS zooming into the field */
+    .send-btn { padding: 8px 16px; }
 }
 </style>
 CSS;

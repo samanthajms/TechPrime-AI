@@ -58,7 +58,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <?php else: ?>
         <title>EasyPC</title>
     <?php endif; ?>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=cart-1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -69,6 +69,11 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
 
 <header class="top-header ep-header full-width">
 <div class="ep-header-main">
+    <button type="button" class="ep-menu-btn" id="epMenuBtn"
+            aria-label="Open menu" aria-controls="epDrawer" aria-expanded="false">
+        <i class="fas fa-bars" aria-hidden="true"></i>
+    </button>
+
     <div class="logo ep-logo" onclick="location.href='index.php'">
         <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img">
     </div>
@@ -99,9 +104,11 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
             <span class="ep-nav-item-label">Shop Now</span>
         </a>
 
+        <?php /* Click → cart page. Hover (mouse) or keyboard focus → preview, rendered by epUpdateCartPreview(). */ ?>
         <div class="ep-cart-wrap" id="epCartWrap">
-            <button id="cartBtn" type="button" class="ep-nav-item ep-cart-trigger"
-                    aria-haspopup="true" aria-expanded="false" aria-controls="epCartDropdown">
+            <a href="cart.php" id="cartBtn"
+               class="ep-nav-item ep-cart-trigger<?php echo ($activePage ?? '') === 'cart' ? ' active' : ''; ?>"
+               <?php echo ($activePage ?? '') === 'cart' ? 'aria-current="page"' : ''; ?>>
                 <span class="ep-nav-item-icon">
                     <i class="fas fa-shopping-bag" aria-hidden="true"></i>
                     <?php if ($epCartCount > 0): ?>
@@ -109,28 +116,8 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
                     <?php endif; ?>
                 </span>
                 <span class="ep-nav-item-label">Cart</span>
-            </button>
-            <div id="epCartDropdown" class="ep-cart-dropdown" role="menu" aria-label="Cart preview">
-                <?php if (!empty($epCartItems)): ?>
-                    <ul class="ep-cart-dropdown-list">
-                        <?php foreach ($epCartItems as $ci): ?>
-                            <li>
-                                <span class="ep-cart-item-name"><?php echo h($ci['name']); ?></span>
-                                <span class="ep-cart-item-meta">×<?php echo (int)$ci['qty']; ?> · ₱<?php echo number_format($ci['subtotal'], 2); ?></span>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                    <div class="ep-cart-dropdown-total">
-                        <span>Total</span>
-                        <strong>₱<?php echo number_format($epCartTotal, 2); ?></strong>
-                    </div>
-                    <a href="checkout.php" class="ep-btn ep-btn-primary ep-cart-checkout-btn">Checkout</a>
-                    <a href="cart.php" class="ep-cart-view-link">View full cart</a>
-                <?php else: ?>
-                    <p class="ep-cart-empty">Your cart is empty.</p>
-                    <a href="shop.php" class="ep-cart-view-link">Browse products</a>
-                <?php endif; ?>
-            </div>
+            </a>
+            <div id="epCartDropdown" class="ep-cart-dropdown" role="region" aria-label="Cart preview"></div>
         </div>
 
         <button id="notifBtn" type="button" class="ep-nav-item"
@@ -195,37 +182,194 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     </div>
 </header>
 
+<?php
+/* ---- Mobile navigation drawer (≤ 900px; opened by #epMenuBtn) ---- */
+$epActive = (string)($activePage ?? '');
+$epOnSettings = $epActive === 'account' && isset($_GET['settings']);
+$epUserName = !empty($isLoggedIn) ? trim((string)($_SESSION['name'] ?? '')) : '';
+$epDrawerLinks = [
+    ['href' => 'index.php', 'icon' => 'fa-home', 'label' => 'Home', 'active' => $epActive === 'home'],
+    ['href' => 'shop.php', 'icon' => 'fa-store', 'label' => 'Shop Now', 'active' => $epActive === 'shop'],
+    ['categories' => true],
+    ['href' => !empty($isLoggedIn) ? 'build_a_pc.php' : '../login.php', 'icon' => 'fa-desktop', 'label' => 'Build a PC', 'active' => $epActive === 'build_a_pc'],
+];
+if (!empty($isLoggedIn)) {
+    $epDrawerLinks[] = ['href' => 'saved_builds.php', 'icon' => 'fa-folder-open', 'label' => 'Saved Builds', 'active' => $epActive === 'saved_builds'];
+}
+$epDrawerLinks[] = ['href' => 'wishlist.php', 'icon' => 'fa-heart', 'label' => 'Wishlist', 'active' => $epActive === 'wishlist', 'count' => $epWishCount];
+$epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' => 'Cart', 'active' => $epActive === 'cart', 'count' => $epCartCount, 'id' => 'epDrawerCartCount'];
+?>
+<div class="ep-drawer-backdrop" id="epDrawerBackdrop" hidden></div>
+<aside class="ep-drawer" id="epDrawer" role="dialog" aria-modal="true" aria-label="Main menu" aria-hidden="true">
+    <div class="ep-drawer-head">
+        <img src="../assets/logo.png" alt="EasyPC" class="ep-drawer-logo">
+        <button type="button" class="ep-drawer-close" id="epDrawerClose" aria-label="Close menu">
+            <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <div class="ep-drawer-account">
+        <?php if (!empty($isLoggedIn)): ?>
+            <span class="ep-drawer-avatar" aria-hidden="true"><?php echo h(strtoupper(mb_substr($epUserName !== '' ? $epUserName : 'C', 0, 1))); ?></span>
+            <div class="ep-drawer-account-text">
+                <strong>Hi, <?php echo h($epUserName !== '' ? $epUserName : 'Customer'); ?>!</strong>
+                <a href="user_dashboard.php">View my profile</a>
+            </div>
+        <?php else: ?>
+            <div class="ep-drawer-account-text">
+                <strong>Welcome to EasyPC</strong>
+                <span>Log in to track orders and save builds.</span>
+            </div>
+            <div class="ep-drawer-auth">
+                <a href="../login.php" class="ep-drawer-auth-btn is-primary">Log in</a>
+                <a href="../register.php" class="ep-drawer-auth-btn">Register</a>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <nav class="ep-drawer-nav" aria-label="Main menu">
+        <?php foreach ($epDrawerLinks as $link): ?>
+            <?php if (!empty($link['categories'])): ?>
+                <details class="ep-drawer-group"<?php echo $currentCategory !== '' ? ' open' : ''; ?>>
+                    <summary class="ep-drawer-link">
+                        <i class="fas fa-th-large" aria-hidden="true"></i>
+                        <span>Categories</span>
+                        <i class="fas fa-chevron-down ep-drawer-caret" aria-hidden="true"></i>
+                    </summary>
+                    <div class="ep-drawer-sub">
+                        <?php foreach (ias_inventory_allowed_categories() as $cat): ?>
+                            <a href="category.php?type=<?php echo urlencode($cat); ?>"
+                               class="<?php echo strcasecmp($currentCategory, $cat) === 0 ? 'is-active' : ''; ?>"
+                               <?php echo strcasecmp($currentCategory, $cat) === 0 ? 'aria-current="page"' : ''; ?>><?php echo h($cat); ?></a>
+                        <?php endforeach; ?>
+                    </div>
+                </details>
+            <?php else: ?>
+                <a href="<?php echo h($link['href']); ?>"
+                   class="ep-drawer-link<?php echo $link['active'] ? ' is-active' : ''; ?>"
+                   <?php echo $link['active'] ? 'aria-current="page"' : ''; ?>>
+                    <i class="fas <?php echo h($link['icon']); ?>" aria-hidden="true"></i>
+                    <span><?php echo h($link['label']); ?></span>
+                    <?php if (array_key_exists('count', $link)): ?>
+                        <span class="ep-drawer-count"<?php echo isset($link['id']) ? ' id="' . h($link['id']) . '"' : ''; ?><?php echo (int)$link['count'] > 0 ? '' : ' hidden'; ?>><?php echo (int)$link['count']; ?></span>
+                    <?php endif; ?>
+                </a>
+            <?php endif; ?>
+        <?php endforeach; ?>
+
+        <?php if (!empty($isLoggedIn)): ?>
+            <div class="ep-drawer-label">My account</div>
+            <a href="user_dashboard.php"
+               class="ep-drawer-link<?php echo $epActive === 'account' && !$epOnSettings ? ' is-active' : ''; ?>">
+                <i class="fas fa-box" aria-hidden="true"></i><span>My Orders &amp; Profile</span>
+            </a>
+            <a href="user_dashboard.php?settings=1"
+               class="ep-drawer-link<?php echo $epOnSettings ? ' is-active' : ''; ?>">
+                <i class="fas fa-user-cog" aria-hidden="true"></i><span>Profile Settings</span>
+            </a>
+        <?php endif; ?>
+    </nav>
+
+    <?php if (!empty($isLoggedIn)): ?>
+        <div class="ep-drawer-foot">
+            <a href="../logout.php" class="ep-drawer-link ep-drawer-logout">
+                <i class="fas fa-sign-out-alt" aria-hidden="true"></i><span>Log out</span>
+            </a>
+        </div>
+    <?php endif; ?>
+</aside>
+
 <script>
 (function () {
     function epSetHeaderOffset() {
         var header = document.querySelector('.ep-header');
         var h = header ? header.offsetHeight : 0;
         document.body.style.paddingTop = h + 'px';
+        // Used by the phone layout to place the cart dropdown under the header.
+        document.documentElement.style.setProperty('--ep-header-h', h + 'px');
     }
     epSetHeaderOffset();
     window.addEventListener('resize', epSetHeaderOffset);
 
+    /* ---- Mobile navigation drawer ---- */
+    var menuBtn = document.getElementById('epMenuBtn');
+    var drawer = document.getElementById('epDrawer');
+    var drawerBackdrop = document.getElementById('epDrawerBackdrop');
+    var drawerClose = document.getElementById('epDrawerClose');
+    var drawerMq = window.matchMedia('(max-width: 900px)');
+    if (menuBtn && drawer) {
+        var drawerFocusable = function () {
+            return Array.prototype.filter.call(
+                drawer.querySelectorAll('a[href], button:not([disabled]), summary'),
+                function (el) { return el.offsetParent !== null; }
+            );
+        };
+        var openDrawer = function () {
+            if (!drawerMq.matches) return;
+            // Close header popups so they don't sit on top of the drawer.
+            var cw = document.getElementById('epCartWrap');
+            if (cw) cw.classList.remove('open');
+            var np = document.getElementById('epNotifPanel');
+            if (np) np.classList.add('hidden');
+
+            drawer.classList.add('open');
+            drawer.setAttribute('aria-hidden', 'false');
+            if (drawerBackdrop) drawerBackdrop.hidden = false;
+            document.documentElement.classList.add('ep-drawer-open');
+            menuBtn.setAttribute('aria-expanded', 'true');
+            if (drawerClose) drawerClose.focus({ preventScroll: true });
+        };
+        var closeDrawer = function (returnFocus) {
+            if (!drawer.classList.contains('open')) return;
+            drawer.classList.remove('open');
+            drawer.setAttribute('aria-hidden', 'true');
+            if (drawerBackdrop) drawerBackdrop.hidden = true;
+            document.documentElement.classList.remove('ep-drawer-open');
+            menuBtn.setAttribute('aria-expanded', 'false');
+            if (returnFocus) menuBtn.focus({ preventScroll: true });
+        };
+
+        menuBtn.addEventListener('click', openDrawer);
+        if (drawerClose) drawerClose.addEventListener('click', function () { closeDrawer(true); });
+        if (drawerBackdrop) drawerBackdrop.addEventListener('click', function () { closeDrawer(true); });
+        drawer.addEventListener('click', function (e) {
+            if (e.target.closest('a[href]')) closeDrawer(false);
+        });
+        document.addEventListener('keydown', function (e) {
+            if (!drawer.classList.contains('open')) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeDrawer(true);
+            } else if (e.key === 'Tab') {
+                // Keep keyboard focus inside the open drawer.
+                var items = drawerFocusable();
+                if (!items.length) return;
+                var first = items[0], last = items[items.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        });
+        var onDrawerBreakpoint = function () { if (!drawerMq.matches) closeDrawer(false); };
+        if (typeof drawerMq.addEventListener === 'function') drawerMq.addEventListener('change', onDrawerBreakpoint);
+        else if (typeof drawerMq.addListener === 'function') drawerMq.addListener(onDrawerBreakpoint);
+    }
+
+    /* Cart: the icon is a plain link to cart.php. The preview opens on mouse hover or
+       keyboard focus (CSS). Escape hides it until the pointer/focus leaves the cart. */
     var wrap = document.getElementById('epCartWrap');
     var trigger = document.getElementById('cartBtn');
     if (wrap && trigger) {
-        trigger.addEventListener('click', function (e) {
-            e.stopPropagation();
-            var open = wrap.classList.toggle('open');
-            trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            var focusedInside = wrap.contains(document.activeElement);
+            if (!focusedInside && !wrap.matches(':hover')) return;
+            wrap.classList.add('is-dismissed');
+            if (focusedInside) trigger.focus();
         });
-        wrap.addEventListener('mouseenter', function () {
-            wrap.classList.add('open');
-            trigger.setAttribute('aria-expanded', 'true');
-        });
-        wrap.addEventListener('mouseleave', function () {
-            wrap.classList.remove('open');
-            trigger.setAttribute('aria-expanded', 'false');
-        });
-        document.addEventListener('click', function (e) {
-            if (!e.target.closest('#epCartWrap')) {
-                wrap.classList.remove('open');
-                trigger.setAttribute('aria-expanded', 'false');
-            }
+        wrap.addEventListener('mouseenter', function () { wrap.classList.remove('is-dismissed'); });
+        wrap.addEventListener('mouseleave', function () { wrap.classList.remove('is-dismissed'); });
+        wrap.addEventListener('focusout', function (e) {
+            if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('is-dismissed');
         });
     }
 
@@ -263,29 +407,51 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
                 badge.remove();
             }
         }
+        var drawerCount = document.getElementById('epDrawerCartCount');
+        if (drawerCount) {
+            var dc = parseInt(preview.count, 10) || 0;
+            drawerCount.textContent = String(dc);
+            drawerCount.hidden = dc <= 0;
+        }
 
         var items = Array.isArray(preview.items) ? preview.items : [];
-        var html = '';
+        var count = parseInt(preview.count, 10) || 0;
+        var html;
         if (items.length) {
-            html += '<ul class="ep-cart-dropdown-list">';
+            html = '<div class="ep-cart-dd-head"><strong>My Cart</strong><span>' +
+                count + (count === 1 ? ' item' : ' items') + '</span></div>';
+            html += '<ul class="ep-cart-dd-list">';
             items.forEach(function (ci) {
-                html += '<li>' +
-                    '<span class="ep-cart-item-name">' + escapeHtml(ci.name || '') + '</span>' +
-                    '<span class="ep-cart-item-meta">×' + (parseInt(ci.qty, 10) || 0) +
-                    ' · ₱' + money(ci.subtotal) + '</span>' +
+                var qty = parseInt(ci.qty, 10) || 0;
+                var thumb = ci.image
+                    ? '<img src="' + escapeHtml(ci.image) + '" alt="" loading="lazy">'
+                    : '<i class="fas fa-box" aria-hidden="true"></i>';
+                html += '<li class="ep-cart-dd-item">' +
+                    '<span class="ep-cart-dd-thumb">' + thumb + '</span>' +
+                    '<span class="ep-cart-dd-info">' +
+                        '<span class="ep-cart-dd-name">' + escapeHtml(ci.name || '') + '</span>' +
+                        '<span class="ep-cart-dd-meta">₱' + money(ci.price) + ' × ' + qty + '</span>' +
+                    '</span>' +
+                    '<strong class="ep-cart-dd-sub">₱' + money(ci.subtotal) + '</strong>' +
                     '</li>';
             });
             html += '</ul>';
-            html += '<div class="ep-cart-dropdown-total"><span>Total</span><strong>₱' +
-                money(preview.total) + '</strong></div>';
-            html += '<a href="checkout.php" class="ep-btn ep-btn-primary ep-cart-checkout-btn">Checkout</a>';
-            html += '<a href="cart.php" class="ep-cart-view-link">View full cart</a>';
+            html += '<div class="ep-cart-dd-total"><span>Subtotal</span><strong>₱' + money(preview.total) + '</strong></div>';
+            html += '<div class="ep-cart-dd-actions">' +
+                '<a href="cart.php" class="ep-cart-dd-btn">View Cart</a>' +
+                '<a href="checkout.php" class="ep-cart-dd-btn is-primary">Checkout</a>' +
+                '</div>';
         } else {
-            html = '<p class="ep-cart-empty">Your cart is empty.</p>' +
-                '<a href="shop.php" class="ep-cart-view-link">Browse products</a>';
+            html = '<div class="ep-cart-dd-empty">' +
+                '<span class="ep-cart-dd-empty-icon"><i class="fas fa-shopping-bag" aria-hidden="true"></i></span>' +
+                '<strong>Your cart is empty</strong>' +
+                '<span>Browse our products and add something you like.</span>' +
+                '<a href="shop.php" class="ep-cart-dd-btn is-primary">Start Shopping</a>' +
+                '</div>';
         }
         dropdown.innerHTML = html;
     };
+    window.epUpdateCartPreview(<?php echo json_encode($epCartPreview, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
 
     /* ---- Search recommendations (existing search bar) ---- */
     var searchInput = document.getElementById('epSearchInput');

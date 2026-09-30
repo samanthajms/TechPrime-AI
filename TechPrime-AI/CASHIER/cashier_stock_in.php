@@ -17,7 +17,7 @@ staff_page_start([
     'active' => 'stockin',
     'heading' => 'Stock In',
     'subtitle' => 'Receive deliveries by scanning each item',
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=3">',
+    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=4">',
 ]);
 ?>
         <div class="cash-page">

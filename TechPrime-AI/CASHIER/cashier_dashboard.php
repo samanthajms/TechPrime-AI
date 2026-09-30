@@ -21,7 +21,7 @@ staff_page_start([
     'active' => 'dashboard',
     'heading' => 'Cashier Dashboard',
     'subtitle' => 'Welcome, ' . ($_SESSION['name'] ?? 'Cashier') . ' · ' . pos_format_datetime(gmdate('Y-m-d H:i:s'), 'l, F j, Y'),
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=3">',
+    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=4">',
 ]);
 ?>
         <div class="cash-page">

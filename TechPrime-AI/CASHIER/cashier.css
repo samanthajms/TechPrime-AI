@@ -241,12 +241,21 @@
 
 @media (max-width: 1100px) {
     .inv-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .pos-layout, .si-layout, .cash-grid-2 { grid-template-columns: 1fr; }
+    /* minmax(0, …): a wide table or the scan bar must not stretch the column past the screen */
+    .pos-layout, .si-layout, .cash-grid-2 { grid-template-columns: minmax(0, 1fr); }
     .pos-summary { position: static; }
 }
 @media (max-width: 640px) {
-    .inv-stats-grid { grid-template-columns: 1fr; }
+    .cash-page { gap: 16px; }
+    .inv-stats-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
     .pay-methods { grid-template-columns: repeat(2, 1fr); }
+    .cash-panel-header { padding: 14px 16px; }
+    .cash-panel-body { padding: 14px 16px 18px; }
+    .pos-scan-bar { padding: 4px 6px 4px 14px; }
+    .pos-scan-bar input { font-size: 16px; }   /* 16px+ keeps iOS from zooming on focus */
+    .pos-scan-bar .scan-state { display: none; }
+    .modal-content { padding: 22px 18px; }
+    .pay-total-box strong { font-size: 20px; }
 }
 
 /* ---- Receipt ---- */

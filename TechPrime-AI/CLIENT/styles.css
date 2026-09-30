@@ -3124,77 +3124,209 @@ a.ep-product-name:hover { color: var(--ep-green-dark); }
 }
 
 /* =========================================================================
-   Cart dropdown (header)
+   Cart (header): the icon links to cart.php; hovering it (mouse) or focusing it
+   (keyboard) shows a preview. Touch devices skip the preview so a tap always
+   goes straight to the cart page. Content is rendered by epUpdateCartPreview().
    ========================================================================= */
 .ep-cart-wrap { position: relative; display: flex; align-items: stretch; }
 .ep-cart-wrap > .ep-nav-item { width: 86px; }
+
 .ep-cart-dropdown {
     position: absolute;
-    top: calc(100% + 10px);
+    top: calc(100% + 12px);
     right: 0;
-    width: min(320px, 92vw);
+    width: min(360px, 92vw);
     background: #fff;
     color: var(--ep-black);
     border: 1px solid var(--ep-border);
-    border-radius: 12px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
-    padding: 14px;
+    border-radius: 16px;
+    box-shadow: 0 18px 44px rgba(15, 23, 42, 0.2);
+    padding: 0;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(8px);
-    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+    transform: translateY(10px) scale(0.98);
+    transform-origin: top right;
+    /* Closing waits ~150ms so moving the mouse from the icon to the panel doesn't flicker it shut */
+    transition: opacity 0.18s ease 0.15s, transform 0.18s ease 0.15s, visibility 0s linear 0.33s;
     z-index: 1200;
 }
-.ep-cart-wrap.open .ep-cart-dropdown,
-.ep-cart-wrap:hover .ep-cart-dropdown {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
+/* Invisible bridge over the gap so the pointer can travel from icon to panel */
+.ep-cart-dropdown::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -14px;
+    height: 14px;
 }
-.ep-cart-dropdown-list {
-    list-style: none;
-    margin: 0 0 10px;
-    padding: 0;
-    max-height: 220px;
-    overflow-y: auto;
+/* Arrow pointing at the cart icon */
+.ep-cart-dropdown::after {
+    content: "";
+    position: absolute;
+    top: -7px;
+    right: 36px;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-left: 1px solid var(--ep-border);
+    border-top: 1px solid var(--ep-border);
+    transform: rotate(45deg);
 }
-.ep-cart-dropdown-list li {
+
+@media (hover: hover) and (pointer: fine) {
+    .ep-cart-wrap:hover .ep-cart-dropdown,
+    .ep-cart-wrap:focus-within .ep-cart-dropdown {
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+        transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s;
+    }
+    /* Cart icon while its preview is open */
+    .ep-cart-wrap:hover > .ep-nav-item:not(.active),
+    .ep-cart-wrap:focus-within > .ep-nav-item:not(.active) {
+        background: #fff;
+        border-color: #fff;
+        color: var(--ep-green-dark);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+        transform: translateY(-1px);
+    }
+    .ep-cart-wrap:hover .ep-nav-item-icon .fa-shopping-bag {
+        animation: epCartWiggle 0.5s ease;
+    }
+}
+.ep-cart-wrap.is-dismissed .ep-cart-dropdown {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+@keyframes epCartWiggle {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-12deg); }
+    50% { transform: rotate(9deg); }
+    75% { transform: rotate(-5deg); }
+}
+
+.ep-cart-dd-head {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 8px 0;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px 12px;
     border-bottom: 1px solid var(--ep-border);
-    font-size: 13px;
 }
-.ep-cart-item-name { font-weight: 700; color: var(--ep-black); }
-.ep-cart-item-meta { color: var(--ep-gray-text); font-size: 12px; }
-.ep-cart-dropdown-total {
+.ep-cart-dd-head strong { font-size: 15px; font-weight: 800; }
+.ep-cart-dd-head span { font-size: 12px; font-weight: 700; color: var(--ep-green-dark); }
+
+.ep-cart-dd-list {
+    list-style: none;
+    margin: 0;
+    padding: 6px 8px;
+    max-height: 272px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+.ep-cart-dd-item {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    border-radius: 12px;
+    transition: background 0.15s ease;
+}
+.ep-cart-dd-item:hover { background: #f6f8f5; }
+.ep-cart-dd-thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 10px;
+    border: 1px solid var(--ep-border);
+    background: #fff;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    color: #b3b9b0;
+    font-size: 18px;
+}
+.ep-cart-dd-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.ep-cart-dd-info { display: grid; gap: 3px; min-width: 0; }
+.ep-cart-dd-name {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--ep-black);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.ep-cart-dd-meta { font-size: 12px; font-weight: 600; color: #7c8577; }
+.ep-cart-dd-sub { font-size: 13px; font-weight: 800; color: var(--ep-black); white-space: nowrap; }
+
+.ep-cart-dd-total {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 0;
+    padding: 14px 18px 4px;
+    border-top: 1px solid var(--ep-border);
     font-size: 14px;
     font-weight: 700;
 }
-.ep-cart-checkout-btn {
-    display: block;
-    width: 100%;
-    text-align: center;
-    margin-bottom: 8px;
+.ep-cart-dd-total strong { font-size: 18px; color: var(--ep-green-dark); }
+
+.ep-cart-dd-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px 18px 18px;
 }
-.ep-cart-view-link {
-    display: block;
-    text-align: center;
-    font-size: 12px;
-    font-weight: 700;
+.ep-cart-dd-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 11px 14px;
+    border: 1.5px solid var(--ep-green);
+    border-radius: 12px;
+    background: #fff;
     color: var(--ep-green-dark);
-    text-decoration: underline;
+    font-size: 13.5px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
-.ep-cart-empty {
-    margin: 0 0 10px;
-    font-size: 13px;
-    color: var(--ep-gray-text);
+.ep-cart-dd-btn:hover { background: var(--ep-green-light); transform: translateY(-1px); }
+.ep-cart-dd-btn.is-primary { background: var(--ep-green); color: #fff; }
+.ep-cart-dd-btn.is-primary:hover {
+    background: var(--ep-green-dark);
+    border-color: var(--ep-green-dark);
+    box-shadow: 0 6px 16px rgba(75, 139, 42, 0.3);
+}
+.ep-cart-dd-btn:focus-visible { outline: 3px solid rgba(98, 178, 54, 0.4); outline-offset: 2px; }
+
+.ep-cart-dd-empty {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 26px 24px 22px;
     text-align: center;
+}
+.ep-cart-dd-empty-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    margin-bottom: 6px;
+    background: var(--ep-green-light);
+    color: var(--ep-green);
+    font-size: 22px;
+}
+.ep-cart-dd-empty strong { font-size: 15px; }
+.ep-cart-dd-empty span { font-size: 13px; color: #7c8577; margin-bottom: 10px; }
+.ep-cart-dd-empty .ep-cart-dd-btn { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+    .ep-cart-dropdown { transition: none; }
+    .ep-cart-wrap:hover .ep-nav-item-icon .fa-shopping-bag { animation: none; }
 }
 
 /* =========================================================================
@@ -5054,4 +5186,324 @@ select.ep-form-control option { color: #171717; }
     .ep-address-grid { grid-template-columns: 1fr; }
     .ep-address-card { flex-wrap: wrap; padding: 18px; }
     .ep-address-card-edit { width: 100%; text-align: center; }
+}
+
+/* =========================================================================
+   Responsive hardening (phones & tablets).
+   Kept at the end of the file so these rules win over earlier ones.
+   ========================================================================= */
+
+/* Page containers always fill the screen width. Without this, a <main> with
+   margin:auto inside the flex-column body shrink-wraps to its widest child
+   (a table, a builder) and pushes the whole page sideways. */
+.ep-body > main { width: 100%; min-width: 0; box-sizing: border-box; }
+
+/* Media is never wider than its box (product images can be 1000px+ wide). */
+.ep-body img, .ep-body video, .ep-body iframe { max-width: 100%; }
+
+/* Collapsed grids use minmax(0, 1fr): a bare 1fr lets a wide child stretch the column. */
+@media (max-width: 1100px) {
+    .ep-category-body,
+    .tm-workspace { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+    .dash-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+    .ep-checkout-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- Mobile header + navigation drawer (ep_header.php) --------------------
+   ≤ 900px: [☰] [logo] ........ [bell] [cart]   /   full-width search below.
+   Home, Shop Now, Build a PC and My Profile move into the slide-in drawer.
+   -------------------------------------------------------------------------- */
+.ep-menu-btn,
+.ep-drawer,
+.ep-drawer-backdrop { display: none; }
+
+@media (max-width: 900px) {
+    .ep-header-main {
+        grid-template-columns: auto auto minmax(0, 1fr) auto;
+        grid-template-areas:
+            "menu logo . actions"
+            "search search search search";
+        justify-items: stretch;
+        align-items: center;
+        gap: 8px 10px;
+        padding: 10px 12px;
+    }
+    .ep-menu-btn {
+        grid-area: menu;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border: 0;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+        font-size: 20px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+    }
+    .ep-menu-btn:hover,
+    .ep-menu-btn[aria-expanded="true"] { background: rgba(0, 0, 0, 0.16); }
+    .ep-menu-btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+    .ep-header .ep-logo { grid-area: logo; justify-self: start; }
+    .ep-header .ep-logo-img { height: 30px; }
+
+    .ep-header .search-wrap { grid-area: search; max-width: none; width: 100%; }
+    .ep-header .search-wrap input {
+        padding: 11px 44px 11px 14px;
+        font-size: 16px;            /* 16px+ keeps iOS from zooming into the field */
+    }
+
+    /* Only the Notifications and Cart icons stay in the header row */
+    .ep-nav-actions {
+        grid-area: actions;
+        width: auto;
+        justify-content: flex-end;
+        gap: 4px;
+    }
+    .ep-nav-actions > a.ep-nav-item,
+    .ep-nav-actions > #profileBtn { display: none; }
+    .ep-nav-item,
+    .ep-cart-wrap > .ep-nav-item {
+        flex: 0 0 auto;
+        width: 44px;
+        height: 44px;
+        min-height: 44px;
+        padding: 0;
+        border-radius: 12px;
+    }
+    .ep-cart-wrap { flex: 0 0 auto; }
+    .ep-nav-item-icon { font-size: 19px; }
+    /* Labels stay available to screen readers */
+    .ep-nav-item-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    /* Header popups span the screen under the header */
+    .ep-cart-dropdown {
+        position: fixed;
+        top: calc(var(--ep-header-h, 120px) + 6px);
+        left: 8px;
+        right: 8px;
+        width: auto;
+    }
+    .ep-cart-dropdown::after { display: none; }   /* arrow only lines up in the desktop layout */
+    .ep-header .notifications-panel { left: 8px; right: 8px; width: auto; }
+
+    /* ---- Drawer ---- */
+    html.ep-drawer-open,
+    html.ep-drawer-open body { overflow: hidden; }
+    html.ep-drawer-open .primo-root { visibility: hidden; }   /* floating Primo chat sits above the backdrop */
+
+    .ep-drawer-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 1090;
+        background: rgba(15, 23, 42, 0.5);
+        animation: epDrawerFade 0.2s ease;
+    }
+    .ep-drawer-backdrop[hidden] { display: none; }
+
+    .ep-drawer {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 1100;
+        width: min(320px, 86vw);
+        background: #fff;
+        box-shadow: 12px 0 40px rgba(0, 0, 0, 0.25);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        transform: translateX(-100%);
+        visibility: hidden;
+        transition: transform 0.3s ease, visibility 0s linear 0.3s;
+    }
+    .ep-drawer.open {
+        transform: translateX(0);
+        visibility: visible;
+        transition: transform 0.3s ease, visibility 0s;
+    }
+
+    .ep-drawer-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 14px 14px 18px;
+        background: var(--ep-green);
+    }
+    .ep-drawer-logo { height: 28px; width: auto; }
+    .ep-drawer-close {
+        width: 40px;
+        height: 40px;
+        border: 0;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+    }
+    .ep-drawer-close:hover { background: rgba(0, 0, 0, 0.16); }
+    .ep-drawer-close:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+    .ep-drawer-account {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 18px;
+        background: var(--ep-green-light);
+        border-bottom: 1px solid var(--ep-border);
+    }
+    .ep-drawer-avatar {
+        flex: 0 0 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--ep-green);
+        color: #fff;
+        font-size: 18px;
+        font-weight: 800;
+    }
+    .ep-drawer-account-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+    .ep-drawer-account-text strong {
+        font-size: 15px;
+        color: var(--ep-black);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .ep-drawer-account-text span { font-size: 12.5px; color: #666; }
+    .ep-drawer-account-text a { font-size: 13px; font-weight: 700; color: var(--ep-green-dark); text-decoration: none; }
+    .ep-drawer-auth { display: flex; gap: 8px; width: 100%; }
+    .ep-drawer-auth-btn {
+        flex: 1;
+        padding: 10px 12px;
+        border: 1.5px solid var(--ep-green);
+        border-radius: 10px;
+        color: var(--ep-green-dark);
+        font-size: 14px;
+        font-weight: 700;
+        text-align: center;
+        text-decoration: none;
+        background: #fff;
+    }
+    .ep-drawer-auth-btn.is-primary { background: var(--ep-green); color: #fff; }
+
+    .ep-drawer-nav { display: flex; flex-direction: column; padding: 10px 10px 16px; }
+    .ep-drawer-label {
+        margin: 14px 10px 6px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        color: #999;
+    }
+    .ep-drawer-link {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-height: 48px;
+        padding: 0 12px;
+        border-radius: 12px;
+        color: var(--ep-black);
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        list-style: none;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    .ep-drawer-link::-webkit-details-marker { display: none; }
+    .ep-drawer-link > i:first-child { width: 22px; text-align: center; font-size: 17px; color: var(--ep-green); }
+    .ep-drawer-link:hover { background: #f4f6f3; }
+    .ep-drawer-link.is-active { background: var(--ep-green-light); color: var(--ep-green-dark); }
+    .ep-drawer-link.is-active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 10px;
+        bottom: 10px;
+        width: 4px;
+        border-radius: 0 4px 4px 0;
+        background: var(--ep-green);
+    }
+    .ep-drawer-link:focus-visible,
+    .ep-drawer-sub a:focus-visible { outline: 2px solid var(--ep-green); outline-offset: -2px; }
+
+    .ep-drawer-count {
+        margin-left: auto;
+        min-width: 22px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--ep-green);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 800;
+        text-align: center;
+    }
+    .ep-drawer-count[hidden] { display: none; }
+
+    .ep-drawer-caret { margin-left: auto; font-size: 12px; color: #999; transition: transform 0.2s ease; }
+    .ep-drawer-group[open] .ep-drawer-caret { transform: rotate(180deg); }
+    .ep-drawer-sub { display: flex; flex-direction: column; padding: 2px 0 6px 48px; }
+    .ep-drawer-sub a {
+        padding: 10px 12px;
+        border-radius: 10px;
+        color: #555;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .ep-drawer-sub a:hover { background: #f4f6f3; color: var(--ep-green-dark); }
+    .ep-drawer-sub a.is-active { color: var(--ep-green-dark); background: var(--ep-green-light); }
+
+    .ep-drawer-foot { margin-top: auto; padding: 10px; border-top: 1px solid var(--ep-border); }
+    .ep-drawer-logout,
+    .ep-drawer-logout > i:first-child { color: #c0392b; }
+    .ep-drawer-logout:hover { background: #fef2f2; }
+}
+
+@keyframes epDrawerFade { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+    .ep-drawer, .ep-drawer.open, .ep-drawer-backdrop { transition: none; animation: none; }
+}
+
+/* ---- Product grids: two compact columns on phones ---- */
+@media (max-width: 600px) {
+    .ep-products-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .ep-grid-card .ep-product-img { height: 140px; }
+}
+
+/* ---- Cart rows wrap: controls move to their own line ---- */
+@media (max-width: 600px) {
+    .cart-item-row { flex-wrap: wrap; gap: 10px 12px; }
+    .cart-item-meta { flex: 1 1 calc(100% - 150px); min-width: 0; }
+    .cart-item-title { font-size: 14px; overflow-wrap: anywhere; }
+    .cart-row-controls { width: 100%; justify-content: flex-end; gap: 12px; }
+    .cart-item-subtotal { min-width: 0; }
+    .cart-qty-input { font-size: 16px; }
+}
+
+/* Profile banner: the "|" divider only makes sense when the buttons sit side by side */
+@media (max-width: 900px) {
+    .profile-banner-sep { display: none; }
 }

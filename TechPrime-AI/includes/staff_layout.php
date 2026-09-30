@@ -196,7 +196,7 @@ if (!function_exists('staff_page_start')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo h($title); ?> — EasyPC</title>
-    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-sidebar-collapse-1">
+    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-responsive-1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if ($useInvPageTitle): ?>
     <style>
@@ -319,6 +319,9 @@ if (!function_exists('staff_page_start')) {
                 aria-label="Collapse navigation" aria-expanded="true" title="Collapse navigation">
             <i class="fas fa-chevron-left" aria-hidden="true"></i>
         </button>
+        <button type="button" class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close navigation" title="Close navigation">
+            <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
     </div>
     <nav>
         <?php
@@ -355,9 +358,14 @@ if (!function_exists('staff_page_start')) {
         <a href="<?php echo h($logout); ?>" title="Logout"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
     </div>
 </div>
+<div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
 
 <div class="main">
     <div class="topbar<?php echo $useInvPageTitle ? ' topbar-inv-compact' : ''; ?>">
+        <button type="button" class="sidebar-open-btn" id="sidebarOpenBtn"
+                aria-label="Open navigation" aria-controls="staffSidebar" aria-expanded="false" title="Menu">
+            <i class="fas fa-bars" aria-hidden="true"></i>
+        </button>
         <?php if (!$useInvPageTitle): ?>
         <div class="topbar-left">
             <h2><?php echo h($heading); ?></h2>
@@ -659,10 +667,45 @@ if (!function_exists('staff_page_end')) {
     if (sidebar) sidebar.addEventListener('transitionend', onWidthTransition);
     if (main) main.addEventListener('transitionend', onWidthTransition);
 
+    // Phones/tablets (<= 900px): the sidebar is an off-canvas drawer opened from the topbar.
+    var openBtn = document.getElementById('sidebarOpenBtn');
+    var closeBtn = document.getElementById('sidebarCloseBtn');
+    var backdrop = document.getElementById('sidebarBackdrop');
+    function setDrawer(open) {
+        if (!sidebar) return;
+        open = open && !isDesktop();
+        sidebar.classList.toggle('open', open);
+        document.body.classList.toggle('sidebar-open', open);
+        if (backdrop) backdrop.hidden = !open;
+        if (openBtn) openBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) {
+            var first = sidebar.querySelector('nav a, nav summary');
+            if (first) first.focus({ preventScroll: true });
+        }
+    }
+    if (openBtn) openBtn.addEventListener('click', function () { setDrawer(true); });
+    if (closeBtn) closeBtn.addEventListener('click', function () { setDrawer(false); if (openBtn) openBtn.focus(); });
+    if (backdrop) backdrop.addEventListener('click', function () { setDrawer(false); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) {
+            setDrawer(false);
+            if (openBtn) openBtn.focus();
+        }
+    });
+    if (sidebar) {
+        sidebar.addEventListener('click', function (e) {
+            if (e.target.closest('a[href]')) setDrawer(false);
+        });
+    }
+
+    function onBreakpoint() {
+        apply();
+        if (isDesktop()) setDrawer(false);
+    }
     if (typeof mq.addEventListener === 'function') {
-        mq.addEventListener('change', apply);
+        mq.addEventListener('change', onBreakpoint);
     } else if (typeof mq.addListener === 'function') {
-        mq.addListener(apply);
+        mq.addListener(onBreakpoint);
     }
 })();
 </script>

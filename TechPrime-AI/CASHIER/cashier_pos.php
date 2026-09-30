@@ -16,7 +16,7 @@ staff_page_start([
     'active' => 'pos',
     'heading' => 'POS Checkout',
     'subtitle' => 'Scan items to add them to the sale',
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=3">',
+    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=4">',
 ]);
 ?>
         <div class="cash-page">

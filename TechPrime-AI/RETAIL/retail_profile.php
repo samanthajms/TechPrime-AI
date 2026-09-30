@@ -80,8 +80,8 @@ staff_page_start([
     'subtitle' => 'Manage your account details',
     'extra_head' => <<<'EXTRA'
 <style>
-.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-@media (max-width: 768px) { .profile-grid { grid-template-columns: 1fr; } }
+.profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+@media (max-width: 768px) { .profile-grid { grid-template-columns: minmax(0, 1fr); } }
 .profile-avatar {
     width: 72px; height: 72px;
     background: var(--ep-green);
