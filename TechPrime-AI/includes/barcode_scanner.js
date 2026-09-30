@@ -194,9 +194,10 @@
         }, true);
 
         // Keep the scan field focused, except while the cashier edits another field
-        // (quantity, amount tendered) or the page says not to (modal open).
+        // (quantity, amount tendered), the page says not to (modal open), or the
+        // session-timeout dialog (includes/session_timeout.js) is showing.
         function refocus() {
-            if (!canRefocus()) return;
+            if (!canRefocus() || document.body.classList.contains('ias-sess-open')) return;
             var active = document.activeElement;
             if (active === input || isEditable(active)) return;
             input.focus({ preventScroll: true });

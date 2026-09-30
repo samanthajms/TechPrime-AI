@@ -64,6 +64,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if (!empty($extraHead)) echo $extraHead; ?>
+    <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">
 

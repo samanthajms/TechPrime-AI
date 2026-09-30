@@ -9,6 +9,10 @@ $connection = getDbConnection();
 $error   = $_GET['error']   ?? '';
 $success = $_GET['success'] ?? '';
 
+// One-shot details left by checkSessionTimeout(); shown on its ?expired=1 redirect.
+$sessionExpired = $_SESSION['session_expired'] ?? [];
+unset($_SESSION['session_expired']);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email    = strtolower(trim($_POST['email'] ?? ''));
     $password = $_POST['password'] ?? '';
@@ -58,6 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $_SESSION['email']         = $user['email'];
     $_SESSION['name']          = $user['name'];
     $_SESSION['surname']       = $user['surname'];
+    $_SESSION['login_at']      = time();
     $_SESSION['last_activity'] = time();
 
     // Persist cart across logout/login for clients (DB-backed cart → session).
@@ -355,6 +360,7 @@ function redirectByRole($role) {
     </div>
 </div>
 <?php ias_alert_footer(); ?>
+<?php if (isset($_GET['expired'])) echo ias_session_expired_notice(is_array($sessionExpired) ? $sessionExpired : []); ?>
 <script>
 (function () {
     var form = document.getElementById('loginForm');

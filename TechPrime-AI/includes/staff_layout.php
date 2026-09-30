@@ -601,6 +601,7 @@ if (!function_exists('staff_page_end')) {
             ? '../includes/ui_alerts.js'
             : 'includes/ui_alerts.js';
     ?>"></script>
+<?php echo ias_session_timeout_assets(); ?>
 <?php echo $extraScripts; ?>
 <?php
         $endRole = (string)($_SESSION['role'] ?? '');

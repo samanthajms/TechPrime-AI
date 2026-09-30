@@ -214,7 +214,10 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         return r.json().catch(function () {
             return { ok: false, error: 'bad_response', message: 'Unexpected server response (HTTP ' + r.status + ').' };
         }).then(function (d) {
-            if (r.status === 401) setTimeout(function () { window.location.href = '../login.php'; }, 1500);
+            if (r.status === 401) {
+                if (window.IAS_Session) IAS_Session.check();
+                else setTimeout(function () { window.location.href = '../login.php?expired=1'; }, 1500);
+            }
             return d;
         });
     }

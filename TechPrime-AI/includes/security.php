@@ -37,14 +37,157 @@ function logActivity($db, $user_id, $action, $details) {
 // Role Based Access Control
 function checkRole($roles) {
     if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], (array)$roles)) {
-        header("Location: /login.php");
+        header('Location: ' . ias_login_url());
         exit;
     }
 }
 
-// Session activity stamp only — no automatic logout on inactivity.
+/** URL path of the app root (e.g. /TechPrime-AI/TechPrime-AI), so redirects work from any folder. */
+function ias_app_base_url(): string {
+    $root = rtrim(str_replace('\\', '/', dirname(__DIR__)), '/');
+    $file = str_replace('\\', '/', (string)($_SERVER['SCRIPT_FILENAME'] ?? ''));
+    $script = (string)($_SERVER['SCRIPT_NAME'] ?? '');
+    if ($file !== '' && stripos($file, $root . '/') === 0) {
+        $rel = substr($file, strlen($root)); // e.g. /ADMIN/admin_dashboard.php
+        if (strlen($script) >= strlen($rel) && strcasecmp(substr($script, -strlen($rel)), $rel) === 0) {
+            return substr($script, 0, -strlen($rel));
+        }
+    }
+    $docRoot = rtrim(str_replace('\\', '/', (string)($_SERVER['DOCUMENT_ROOT'] ?? '')), '/');
+    if ($docRoot !== '' && stripos($root, $docRoot) === 0) {
+        return substr($root, strlen($docRoot));
+    }
+    return '';
+}
+
+function ias_login_url(array $query = []): string {
+    return ias_app_base_url() . '/login.php' . ($query ? '?' . http_build_query($query) : '');
+}
+
+// Idle session timeout. Keep it below session.gc_maxlifetime (1440 s in XAMPP's php.ini):
+// past that PHP may garbage-collect the session file first and the user loses the notice.
+const IAS_SESSION_IDLE_TIMEOUT = 900; // 15 minutes
+const IAS_SESSION_WARN_BEFORE = 60;   // includes/session_timeout.js warns this many seconds before
+
+/**
+ * Signs the user out after IAS_SESSION_IDLE_TIMEOUT without activity, otherwise stamps activity.
+ * Pages go to login.php?expired=1 (session details shown there); fetch/JSON requests get a
+ * 401 {ok:false,error:'session_expired'}.
+ */
 function checkSessionTimeout() {
+    if (ias_session_idle_expired()) {
+        ias_expire_session();
+        if (ias_request_wants_json()) {
+            http_response_code(401);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => false,
+                'error' => 'session_expired',
+                'message' => 'Your session expired due to inactivity. Please log in again.',
+            ]);
+            exit;
+        }
+        header('Location: ' . ias_login_url(['expired' => 1]));
+        exit;
+    }
     $_SESSION['last_activity'] = time();
+}
+
+function ias_session_idle_expired(): bool {
+    return !empty($_SESSION['user_id']) && isset($_SESSION['last_activity'])
+        && time() - (int)$_SESSION['last_activity'] >= IAS_SESSION_IDLE_TIMEOUT;
+}
+
+/** Seconds left before the idle timeout (0 when signed out or expired). */
+function ias_session_remaining(): int {
+    if (empty($_SESSION['user_id'])) {
+        return 0;
+    }
+    $last = (int)($_SESSION['last_activity'] ?? time());
+    return max(0, IAS_SESSION_IDLE_TIMEOUT - (time() - $last));
+}
+
+/** Who/when of the current session, for the session-expired dialog. */
+function ias_session_snapshot(): array {
+    $role = (string)($_SESSION['role'] ?? '');
+    $labels = [
+        'admin' => 'Admin',
+        'retail_officer' => 'Retail Officer',
+        'inventory_custodian' => 'Inventory Custodian',
+        'cashier' => 'Cashier',
+        'client' => 'Customer',
+        'customer' => 'Customer',
+        '' => 'Customer',
+    ];
+    return [
+        'name' => trim(($_SESSION['name'] ?? '') . ' ' . ($_SESSION['surname'] ?? '')),
+        'email' => (string)($_SESSION['email'] ?? ''),
+        'role' => $role,
+        'role_label' => $labels[$role] ?? ucwords(str_replace('_', ' ', $role)),
+        'login_at' => isset($_SESSION['login_at']) ? (int)$_SESSION['login_at'] : null,
+        'last_activity' => isset($_SESSION['last_activity']) ? (int)$_SESSION['last_activity'] : null,
+    ];
+}
+
+/**
+ * End an idle session: the old session is discarded and the fresh one only carries
+ * $_SESSION['session_expired'] (snapshot) for the notice. Call before any output.
+ */
+function ias_expire_session(): void {
+    $info = ias_session_snapshot();
+    $last = $info['last_activity'] ?? time();
+    $info['expired_at'] = min(time(), $last + IAS_SESSION_IDLE_TIMEOUT);
+    $info['timeout_minutes'] = intdiv(IAS_SESSION_IDLE_TIMEOUT, 60);
+    $_SESSION = [];
+    if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+        session_regenerate_id(true);
+    }
+    $_SESSION['session_expired'] = $info;
+}
+
+/** True for fetch/XHR/JSON requests, which must not be redirected to an HTML page. */
+function ias_request_wants_json(): bool {
+    foreach (headers_list() as $header) {
+        if (stripos($header, 'Content-Type: application/json') === 0) {
+            return true;
+        }
+    }
+    return stripos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false
+        || strcasecmp((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''), 'XMLHttpRequest') === 0
+        || ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '') === 'empty';
+}
+
+/** Idle warning + session-expired dialog for signed-in pages (staff layout, client header). */
+function ias_session_timeout_assets(): string {
+    if (empty($_SESSION['user_id'])) {
+        return '';
+    }
+    $base = ias_app_base_url();
+    return ias_session_dialog_tags([
+        'timeout' => IAS_SESSION_IDLE_TIMEOUT,
+        'warn' => IAS_SESSION_WARN_BEFORE,
+        'remaining' => ias_session_remaining(),
+        'csrf' => generateCsrfToken(),
+        'api' => $base . '/backend/api/session.php',
+        'login' => $base . '/login.php',
+        'logout' => $base . '/logout.php',
+        'session' => ias_session_snapshot(),
+    ]);
+}
+
+/** Login page: show the session-expired dialog for a checkSessionTimeout() redirect. */
+function ias_session_expired_notice(array $info): string {
+    return ias_session_dialog_tags([
+        'timeout' => IAS_SESSION_IDLE_TIMEOUT,
+        'notice' => (object)$info,
+    ]);
+}
+
+function ias_session_dialog_tags(array $cfg): string {
+    $src = ias_app_base_url() . '/includes/session_timeout.js?v=1';
+    return '<script>window.IAS_SESSION_CFG = '
+        . json_encode($cfg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ';</script>'
+        . '<script src="' . h($src) . '" defer></script>';
 }
 
 // Password Complexity Check

@@ -194,6 +194,7 @@ if ($action === 'verify_totp') {
     $_SESSION['email']         = $user['email'];
     $_SESSION['name']          = $user['name'];
     $_SESSION['surname']       = $user['surname'];
+    $_SESSION['login_at']      = time();
     $_SESSION['last_activity'] = time();
 
     logActivity($connection, $user['id'], 'login_success', 'User logged in via Google Authenticator TOTP');
@@ -239,6 +240,7 @@ if ($action === 'confirm_totp_setup') {
     $_SESSION['email']         = $user['email'];
     $_SESSION['name']          = $user['name'];
     $_SESSION['surname']       = $user['surname'];
+    $_SESSION['login_at']      = time();
     $_SESSION['last_activity'] = time();
 
     logActivity($connection, $user['id'], 'totp_setup_complete', 'Google Authenticator configured via API');
