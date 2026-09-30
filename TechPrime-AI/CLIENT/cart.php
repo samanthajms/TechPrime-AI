@@ -138,9 +138,13 @@ if ($cart_items && empty($_SESSION['cart_selected'])) {
 }
 
 $selectedTotal = 0;
+$selectedUnits = 0;
+$totalUnits    = 0;
 foreach ($cart_items as $it) {
+    $totalUnits += (int)$it['qty'];
     if (!empty($it['selected'])) {
         $selectedTotal += $it['subtotal'];
+        $selectedUnits += (int)$it['qty'];
     }
 }
 
@@ -156,65 +160,126 @@ $csrf                 = generateCsrfToken();
 <?php include __DIR__ . '/ep_header.php'; ?>
 
 <main class="ep-main ep-cart-main">
-        <div class="ep-page-header-row">
-            <button class="back-home-btn" onclick="location.href='index.php'">← Back to Home</button>
-            <h2 class="ep-page-title">My Cart</h2>
+        <div class="ep-page-header-row epc-header">
+            <a href="index.php" class="ep-back-link"><i class="fas fa-arrow-left"></i> Continue Shopping</a>
+            <h2 class="ep-page-title">
+                My Cart
+                <?php if ($cart_items): ?>
+                    <span class="epc-title-count" id="cartItemCount"><?php echo $totalUnits; ?> item<?php echo $totalUnits === 1 ? '' : 's'; ?></span>
+                <?php endif; ?>
+            </h2>
         </div>
 
-        <section class="profile-card ep-cart-panel">
-            <?php if (empty($cart_items)): ?>
-                <div class="empty-state-message">
-                    <h3>Your cart is empty</h3>
-                    <button type="button" class="primary-btn" onclick="location.href='index.php'">Start Shopping</button>
+        <?php if (empty($cart_items)): ?>
+            <section class="epc-empty">
+                <div class="epc-empty-icon" aria-hidden="true"><i class="fas fa-shopping-bag"></i></div>
+                <h3>Your cart is empty</h3>
+                <p>Looks like you haven't added anything yet. Browse our PCs, parts and accessories to get started.</p>
+                <div class="epc-empty-actions">
+                    <a href="shop.php" class="epc-btn epc-btn-primary"><i class="fas fa-store"></i> Shop Now</a>
+                    <a href="build_a_pc.php" class="epc-btn epc-btn-ghost"><i class="fas fa-desktop"></i> Build a PC</a>
                 </div>
-            <?php else: ?>
-                <form method="post" id="cartForm">
-                    <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>">
+            </section>
+        <?php else: ?>
+            <form method="post" id="cartForm" class="epc-grid">
+                <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>">
 
-                    <label class="cart-select-all">
-                        <input type="checkbox" id="cartSelectAll">
-                        <span>Select All</span>
-                    </label>
+                <section class="epc-card epc-items" aria-label="Cart items">
+                    <div class="epc-items-head">
+                        <label class="epc-check-label">
+                            <input type="checkbox" id="cartSelectAll" class="epc-check">
+                            <span>Select All (<span id="cartRowCount"><?php echo count($cart_items); ?></span>)</span>
+                        </label>
+                        <span class="epc-col epc-col-price">Unit Price</span>
+                        <span class="epc-col epc-col-qty">Quantity</span>
+                        <span class="epc-col epc-col-total">Total</span>
+                        <span class="epc-col epc-col-action" aria-hidden="true"></span>
+                    </div>
 
                     <div id="cartItems">
-                        <?php foreach ($cart_items as $item): ?>
-                        <div class="cart-item-row" data-id="<?php echo (int)$item['id']; ?>" data-price="<?php echo h((string)$item['price']); ?>" data-stock="<?php echo (int)$item['stock']; ?>">
-                            <label class="cart-select">
-                                <input type="checkbox" class="cart-item-check" name="selected[]" value="<?php echo (int)$item['id']; ?>" <?php echo !empty($item['selected']) ? 'checked' : ''; ?>>
+                        <?php foreach ($cart_items as $item):
+                            $pid      = (int)$item['id'];
+                            $stock    = (int)$item['stock'];
+                            $category = trim((string)($item['category'] ?? ''));
+                            $imgUrl   = ias_client_product_image_url($item);
+                        ?>
+                        <div class="cart-item-row<?php echo !empty($item['selected']) ? ' is-selected' : ''; ?>" data-id="<?php echo $pid; ?>" data-price="<?php echo h((string)$item['price']); ?>" data-stock="<?php echo $stock; ?>">
+                            <label class="epc-row-check">
+                                <input type="checkbox" class="cart-item-check epc-check" name="selected[]" value="<?php echo $pid; ?>" <?php echo !empty($item['selected']) ? 'checked' : ''; ?> aria-label="Select <?php echo h($item['name']); ?>">
                             </label>
-                            <a class="cart-item-thumb" href="products.php?id=<?php echo (int)$item['id']; ?>">
-                                <img src="<?php echo h(ias_client_product_image_url($item)); ?>" alt="<?php echo h($item['name']); ?>">
-                            </a>
-                            <div class="cart-item-meta">
-                                <a class="cart-item-title" href="products.php?id=<?php echo (int)$item['id']; ?>"><?php echo h($item['name']); ?></a>
-                                <div class="cart-item-price">₱<?php echo number_format((float)$item['price'], 2); ?></div>
+                            <div class="epc-product">
+                                <a class="epc-thumb" href="products.php?id=<?php echo $pid; ?>">
+                                    <?php if ($imgUrl !== ''): ?>
+                                        <img src="<?php echo h($imgUrl); ?>" alt="<?php echo h($item['name']); ?>" loading="lazy">
+                                    <?php else: ?>
+                                        <i class="fas fa-image" aria-hidden="true"></i>
+                                    <?php endif; ?>
+                                </a>
+                                <div class="epc-info">
+                                    <?php if ($category !== ''): ?>
+                                        <span class="epc-category"><?php echo h($category); ?></span>
+                                    <?php endif; ?>
+                                    <a class="epc-name" href="products.php?id=<?php echo $pid; ?>"><?php echo h($item['name']); ?></a>
+                                    <?php if ($stock <= 5): ?>
+                                        <span class="epc-stock epc-stock-low"><i class="fas fa-exclamation-circle"></i> Only <?php echo $stock; ?> left</span>
+                                    <?php else: ?>
+                                        <span class="epc-stock"><i class="fas fa-check-circle"></i> In stock</span>
+                                    <?php endif; ?>
+                                </div>
                             </div>
-                            <div class="cart-row-controls">
-                                <input type="number" class="cart-qty-input" name="qty[<?php echo (int)$item['id']; ?>]" value="<?php echo (int)$item['qty']; ?>" min="1" max="<?php echo max(1, (int)$item['stock']); ?>">
-                                <div class="cart-item-subtotal">₱<?php echo number_format((float)$item['subtotal'], 2); ?></div>
-                                <a href="cart.php?remove=<?php echo (int)$item['id']; ?>" class="cart-remove-link" title="Remove">&times;</a>
+                            <div class="epc-price">
+                                <span class="epc-mobile-label">Unit Price</span>
+                                ₱<?php echo number_format((float)$item['price'], 2); ?>
+                            </div>
+                            <div class="epc-qty">
+                                <div class="epc-stepper">
+                                    <button type="button" class="epc-step" data-step="-1" aria-label="Decrease quantity"><i class="fas fa-minus"></i></button>
+                                    <input type="number" class="cart-qty-input" name="qty[<?php echo $pid; ?>]" value="<?php echo (int)$item['qty']; ?>" min="1" max="<?php echo max(1, $stock); ?>" aria-label="Quantity">
+                                    <button type="button" class="epc-step" data-step="1" aria-label="Increase quantity"><i class="fas fa-plus"></i></button>
+                                </div>
+                                <span class="epc-max">Max <?php echo $stock; ?></span>
+                            </div>
+                            <div class="epc-total cart-item-subtotal">₱<?php echo number_format((float)$item['subtotal'], 2); ?></div>
+                            <div class="epc-action">
+                                <a href="cart.php?remove=<?php echo $pid; ?>" class="epc-remove" title="Remove from cart" aria-label="Remove <?php echo h($item['name']); ?>"><i class="far fa-trash-alt"></i><span>Remove</span></a>
                             </div>
                         </div>
                         <?php endforeach; ?>
                     </div>
+                </section>
 
-                    <div class="cart-summary">
-                        <div class="summary-row">
-                            <span class="summary-label">Selected Total</span>
-                            <strong class="summary-total" id="cartSelectedTotal">₱<?php echo number_format($selectedTotal, 2); ?></strong>
-                        </div>
-                        <div class="summary-row">
-                            <span class="summary-label">Cart Total</span>
-                            <strong id="cartGrandTotal">₱<?php echo number_format($total, 2); ?></strong>
-                        </div>
-                        <div class="cart-summary-actions">
-                            <button type="submit" name="update_cart" class="primary-btn" hidden>Update Quantities</button>
-                            <button type="button" class="primary-btn" id="cartCheckoutBtn">Checkout Now</button>
-                        </div>
+                <aside class="epc-card epc-summary" aria-label="Order summary">
+                    <h3 class="epc-summary-title"><i class="fas fa-receipt"></i> Order Summary</h3>
+
+                    <div class="epc-sum-row">
+                        <span>Subtotal (<span id="cartSelectedCount"><?php echo $selectedUnits; ?></span> selected)</span>
+                        <strong id="cartSelectedTotal">₱<?php echo number_format($selectedTotal, 2); ?></strong>
                     </div>
-                </form>
-            <?php endif; ?>
-        </section>
+                    <div class="epc-sum-row epc-sum-cart">
+                        <span>Cart total (all items)</span>
+                        <span id="cartGrandTotal">₱<?php echo number_format($total, 2); ?></span>
+                    </div>
+
+                    <div class="epc-sum-total">
+                        <span>Total</span>
+                        <strong id="cartPayTotal">₱<?php echo number_format($selectedTotal, 2); ?></strong>
+                    </div>
+                    <p class="epc-vat">Prices are VAT-inclusive</p>
+
+                    <button type="submit" name="update_cart" class="primary-btn" hidden>Update Quantities</button>
+                    <button type="button" class="epc-btn epc-btn-primary epc-btn-block" id="cartCheckoutBtn">
+                        <i class="fas fa-lock"></i> <span>Checkout (<span id="cartCheckoutCount"><?php echo $selectedUnits; ?></span>)</span>
+                    </button>
+                    <a href="shop.php" class="epc-btn epc-btn-ghost epc-btn-block">Continue Shopping</a>
+
+                    <ul class="epc-perks">
+                        <li><i class="fas fa-money-bill-wave"></i> Cash on Delivery available</li>
+                        <li><i class="fas fa-credit-card"></i> Secure online payment</li>
+                        <li><i class="fas fa-store-alt"></i> EasyPC One Oasis, Rosario, Pasig</li>
+                    </ul>
+                </aside>
+            </form>
+        <?php endif; ?>
     </main>
 
 <?php ias_alert_footer(); ?>
@@ -233,21 +298,41 @@ $csrf                 = generateCsrfToken();
     function rows() { return Array.prototype.slice.call(document.querySelectorAll('.cart-item-row')); }
     function checkedRows() { return rows().filter(function (r) { return r.querySelector('.cart-item-check').checked; }); }
 
+    function setText(id, text) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+
     function refreshTotals() {
         var grand = 0;
         var selected = 0;
+        var units = 0;
+        var selectedUnits = 0;
         rows().forEach(function (row) {
             var price = parseFloat(row.getAttribute('data-price')) || 0;
-            var qty = parseInt(row.querySelector('.cart-qty-input').value, 10) || 0;
+            var input = row.querySelector('.cart-qty-input');
+            var qty = parseInt(input.value, 10) || 0;
+            var max = parseInt(row.getAttribute('data-stock'), 10) || 1;
             var sub = price * qty;
+            var isChecked = row.querySelector('.cart-item-check').checked;
             grand += sub;
+            units += qty;
             row.querySelector('.cart-item-subtotal').textContent = money(sub);
-            if (row.querySelector('.cart-item-check').checked) selected += sub;
+            row.classList.toggle('is-selected', isChecked);
+            row.querySelector('.epc-step[data-step="-1"]').disabled = qty <= 1;
+            row.querySelector('.epc-step[data-step="1"]').disabled = qty >= max;
+            if (isChecked) {
+                selected += sub;
+                selectedUnits += qty;
+            }
         });
-        var selEl = document.getElementById('cartSelectedTotal');
-        var grandEl = document.getElementById('cartGrandTotal');
-        if (selEl) selEl.textContent = money(selected);
-        if (grandEl) grandEl.textContent = money(grand);
+        setText('cartSelectedTotal', money(selected));
+        setText('cartPayTotal', money(selected));
+        setText('cartGrandTotal', money(grand));
+        setText('cartSelectedCount', String(selectedUnits));
+        setText('cartCheckoutCount', String(selectedUnits));
+        setText('cartItemCount', units + (units === 1 ? ' item' : ' items'));
+        if (checkoutBtn) checkoutBtn.classList.toggle('is-disabled', selectedUnits === 0);
         if (selectAll) {
             var all = rows();
             selectAll.checked = all.length > 0 && all.every(function (r) { return r.querySelector('.cart-item-check').checked; });
@@ -312,6 +397,15 @@ $csrf                 = generateCsrfToken();
             refreshTotals();
         });
         check.addEventListener('change', saveSelection);
+        Array.prototype.forEach.call(row.querySelectorAll('.epc-step'), function (btn) {
+            btn.addEventListener('click', function () {
+                var max = parseInt(row.getAttribute('data-stock'), 10) || 1;
+                var next = (parseInt(input.value, 10) || 1) + parseInt(btn.getAttribute('data-step'), 10);
+                if (next < 1 || next > max) return;
+                input.value = next;
+                input.dispatchEvent(new Event('input'));
+            });
+        });
     });
 
     if (selectAll) {
