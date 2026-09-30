@@ -68,6 +68,21 @@ if (!function_exists('staff_role_label')) {
     }
 }
 
+if (!function_exists('staff_user_initials')) {
+    /** Up to two letters: first name + surname initials (multibyte-safe). */
+    function staff_user_initials(string $name, string $surname = ''): string
+    {
+        $out = '';
+        foreach ([$name, $surname] as $part) {
+            $part = trim($part);
+            if ($part !== '') {
+                $out .= mb_strtoupper(mb_substr($part, 0, 1));
+            }
+        }
+        return $out !== '' ? $out : 'U';
+    }
+}
+
 if (!function_exists('staff_css_href')) {
     function staff_css_href(): string
     {
@@ -127,8 +142,20 @@ if (!function_exists('staff_page_start')) {
         $extraHead = $opts['extra_head'] ?? '';
         $nav = $opts['nav'] ?? staff_nav_for_role($role);
         $userName = $_SESSION['name'] ?? 'User';
-        $initials = strtoupper(substr($userName, 0, 1));
+        $userSurname = trim((string)($_SESSION['surname'] ?? ''));
+        $userFullName = trim($userName . ' ' . $userSurname);
+        $userEmail = (string)($_SESSION['email'] ?? '');
+        $initials = staff_user_initials($userName, $userSurname);
         $roleLabel = staff_role_label($role);
+        $profileHref = '';
+        $settingsHref = '';
+        foreach ($nav as $navItem) {
+            if (($navItem['key'] ?? '') === 'profile') {
+                $profileHref = (string)($navItem['href'] ?? '');
+            } elseif (($navItem['key'] ?? '') === 'settings') {
+                $settingsHref = (string)($navItem['href'] ?? '');
+            }
+        }
         $css = staff_css_href();
         $logo = staff_logo_href();
         $logout = staff_logout_href();
@@ -202,7 +229,7 @@ if (!function_exists('staff_page_start')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo h($title); ?> — EasyPC</title>
-    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-responsive-1">
+    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-responsive-2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if ($useInvPageTitle): ?>
     <style>
@@ -567,10 +594,84 @@ if (!function_exists('staff_page_start')) {
             })();
             </script>
             <?php endif; ?>
-            <div class="admin-badge user-badge">
-                <div class="avatar"><?php echo h($initials); ?></div>
-                <?php echo h($userName); ?>
+            <div class="staff-user-wrap" id="staffUserWrap">
+                <button type="button" class="admin-badge user-badge staff-user-btn" id="staffUserBtn"
+                        aria-haspopup="true" aria-expanded="false" aria-controls="staffUserMenu"
+                        title="Account menu">
+                    <span class="avatar" aria-hidden="true"><?php echo h($initials); ?></span>
+                    <span class="staff-user-text">
+                        <span class="staff-user-name"><?php echo h($userFullName !== '' ? $userFullName : $userName); ?></span>
+                        <span class="staff-user-role"><?php echo h($roleLabel); ?></span>
+                    </span>
+                    <i class="fas fa-chevron-down staff-user-caret" aria-hidden="true"></i>
+                </button>
+                <div class="staff-user-menu" id="staffUserMenu" role="menu" aria-label="Account" hidden>
+                    <div class="staff-user-menu-head">
+                        <span class="staff-user-menu-avatar" aria-hidden="true"><?php echo h($initials); ?></span>
+                        <div class="staff-user-menu-id">
+                            <strong><?php echo h($userFullName !== '' ? $userFullName : $userName); ?></strong>
+                            <?php if ($userEmail !== ''): ?>
+                            <span class="staff-user-menu-email"><?php echo h($userEmail); ?></span>
+                            <?php endif; ?>
+                            <span class="staff-user-menu-role"><i class="fas fa-id-badge" aria-hidden="true"></i> <?php echo h($roleLabel); ?></span>
+                        </div>
+                    </div>
+                    <div class="staff-user-menu-list">
+                        <?php if ($profileHref !== ''): ?>
+                        <a role="menuitem" href="<?php echo h($profileHref); ?>"<?php echo $active === 'profile' ? ' aria-current="page"' : ''; ?>>
+                            <i class="fas fa-user-circle" aria-hidden="true"></i><span>My Profile</span>
+                        </a>
+                        <?php endif; ?>
+                        <?php if ($settingsHref !== ''): ?>
+                        <a role="menuitem" href="<?php echo h($settingsHref); ?>"<?php echo $active === 'settings' ? ' aria-current="page"' : ''; ?>>
+                            <i class="fas fa-cog" aria-hidden="true"></i><span>Settings</span>
+                        </a>
+                        <?php endif; ?>
+                        <a role="menuitem" href="<?php echo h($logout); ?>" class="staff-user-menu-logout">
+                            <i class="fas fa-sign-out-alt" aria-hidden="true"></i><span>Logout</span>
+                        </a>
+                    </div>
+                </div>
             </div>
+            <script>
+            (function () {
+                var wrap = document.getElementById('staffUserWrap');
+                var btn = document.getElementById('staffUserBtn');
+                var menu = document.getElementById('staffUserMenu');
+                if (!wrap || !btn || !menu) return;
+                function setOpen(open) {
+                    menu.hidden = !open;
+                    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    wrap.classList.toggle('open', open);
+                }
+                btn.addEventListener('click', function () {
+                    setOpen(menu.hidden);
+                    if (!menu.hidden) {
+                        var first = menu.querySelector('a');
+                        if (first) first.focus({ preventScroll: true });
+                    }
+                });
+                /* capture phase: the notification button stops propagation of its clicks */
+                document.addEventListener('click', function (e) {
+                    if (!menu.hidden && !wrap.contains(e.target)) setOpen(false);
+                }, true);
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape' && !menu.hidden) {
+                        setOpen(false);
+                        btn.focus();
+                    }
+                });
+                menu.addEventListener('keydown', function (e) {
+                    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+                    var items = Array.prototype.slice.call(menu.querySelectorAll('a'));
+                    var i = items.indexOf(document.activeElement);
+                    if (i < 0) return;
+                    e.preventDefault();
+                    var next = items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length];
+                    next.focus();
+                });
+            })();
+            </script>
         </div>
     </div>
     <?php if ($useInvPageTitle): ?>
