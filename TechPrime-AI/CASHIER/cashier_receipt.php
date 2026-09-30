@@ -19,7 +19,7 @@ staff_page_start([
     'active' => 'dashboard',
     'heading' => 'Receipt',
     'subtitle' => $sale ? 'Invoice ' . $sale['invoice_no'] : 'Receipt not found',
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=4">',
+    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=5">',
 ]);
 ?>
         <div class="receipt-toolbar">

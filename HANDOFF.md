@@ -56,6 +56,14 @@ All paths relative to `TechPrime-AI/`.
 - Generated barcode #243 `2100000002436` (real use of the Generate action).
 - One sale `INV-20260926-000004` (1 × #162, cash) + one stock-in (+1 #162) → net stock unchanged; matching `stock_movements` and `logs` rows.
 
+## Changes 2026-10-01 (cashier follow-ups requested by the user)
+
+- **Stock-in moved to the Inventory Custodian**: `CASHIER/cashier_stock_in.php` → `INVENTORY/inventory_stock_in.php` (nav "Stock In" after Stocks); `backend/api/stock_in.php` is custodian-only; `barcode_lookup.php` allows cashier + custodian. Custodian stock-ins appear on the custodian Activity page ("Stock In"). The cashier no longer has any stock-in UI or API access.
+- **Supplier is a required dropdown** (`pos_supplier_catalog()`): there is no suppliers table, so suppliers = catalog brands (`shop_brands`) that at least one product maps to; the scanned product's brand is preselected. 218 of 261 products map to a brand; for the rest the custodian picks one. Server rejects empty/unknown suppliers. A real `suppliers` table would need a schema change (ask the user).
+- **Cashier stock alerts**: dashboard panel lists every alerting product (was capped at 10) in its own scroll area, and a new full-page **Stock Alerts** tab (`CASHIER/cashier_stock_alerts.php`, search/scan, level filter, sort, paging — read-only). Both refresh every 30 s from `backend/api/stock_alerts.php` (does not count as session activity).
+- **Cashier Profile** tab (`CASHIER/cashier_profile.php`), same page as the other staff profiles.
+- Verified: `php -l`; rolled-back DB test (11/11, DB identical afterwards); HTTP access control per role; headless browser run of all changed pages (0 console errors). A real custodian stock-in through the UI was **not** submitted (would write to the live DB).
+
 ## Left to do (in order)
 
 1. **Physical test with the real scanner and a printer** (never done — scanner was simulated). Print labels at 100% scale ("Fit to page" off); confirm the scanner sends Enter as suffix (Tab or no suffix will not work without reconfiguring it).

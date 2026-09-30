@@ -12,7 +12,7 @@ $uid = (int)$_SESSION['user_id'];
 
 $today = pos_today_stats($db, $uid);
 $recent = pos_recent_sales($db, $uid, 10);
-$alerts = pos_stock_alerts($db, 10);
+$alerts = pos_stock_alerts($db);
 $avgSale = $today['count'] > 0 ? $today['total'] / $today['count'] : 0;
 
 staff_page_start([
@@ -21,13 +21,13 @@ staff_page_start([
     'active' => 'dashboard',
     'heading' => 'Cashier Dashboard',
     'subtitle' => 'Welcome, ' . ($_SESSION['name'] ?? 'Cashier') . ' · ' . pos_format_datetime(gmdate('Y-m-d H:i:s'), 'l, F j, Y'),
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=4">',
+    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=5">',
 ]);
 ?>
         <div class="cash-page">
             <div class="cash-quick">
                 <a href="cashier_pos.php" class="btn btn-primary"><i class="fas fa-cash-register"></i> Start New Sale</a>
-                <a href="cashier_stock_in.php" class="btn btn-outline"><i class="fas fa-dolly"></i> Receive Stock</a>
+                <a href="cashier_stock_alerts.php" class="btn btn-outline"><i class="fas fa-bell"></i> View Stock Alerts</a>
             </div>
 
             <div class="inv-stats-grid">
@@ -55,7 +55,7 @@ staff_page_start([
                     <div class="inv-stat-top">
                         <div>
                             <div class="inv-stat-label">Low Stock</div>
-                            <div class="inv-stat-num"><?php echo (int)$alerts['low']; ?></div>
+                            <div class="inv-stat-num" id="statLow"><?php echo (int)$alerts['low']; ?></div>
                         </div>
                         <div class="inv-stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
                     </div>
@@ -65,7 +65,7 @@ staff_page_start([
                     <div class="inv-stat-top">
                         <div>
                             <div class="inv-stat-label">Critical / Out</div>
-                            <div class="inv-stat-num"><?php echo (int)$alerts['critical']; ?> / <?php echo (int)$alerts['out']; ?></div>
+                            <div class="inv-stat-num" id="statCritOut"><?php echo (int)$alerts['critical']; ?> / <?php echo (int)$alerts['out']; ?></div>
                         </div>
                         <div class="inv-stat-icon"><i class="fas fa-times-circle"></i></div>
                     </div>
@@ -125,41 +125,63 @@ staff_page_start([
                             <h3><span class="card-icon"><i class="fas fa-bell"></i></span> Stock Alerts</h3>
                             <div class="card-subtitle">Read-only · lowest stock first · restocking is handled by the Inventory Custodian</div>
                         </div>
+                        <a href="cashier_stock_alerts.php" class="btn btn-outline btn-xs"><i class="fas fa-expand"></i> View all</a>
                     </div>
                     <div class="cash-panel-body">
                         <div class="alert-counts">
-                            <span class="stock-status-pill out"><i class="fas fa-times-circle"></i> <?php echo (int)$alerts['out']; ?> out</span>
-                            <span class="stock-status-pill critical"><i class="fas fa-exclamation-circle"></i> <?php echo (int)$alerts['critical']; ?> critical</span>
-                            <span class="stock-status-pill low"><i class="fas fa-exclamation-triangle"></i> <?php echo (int)$alerts['low']; ?> low</span>
+                            <span class="stock-status-pill out"><i class="fas fa-times-circle"></i> <span id="cntOut"><?php echo (int)$alerts['out']; ?></span> out</span>
+                            <span class="stock-status-pill critical"><i class="fas fa-exclamation-circle"></i> <span id="cntCritical"><?php echo (int)$alerts['critical']; ?></span> critical</span>
+                            <span class="stock-status-pill low"><i class="fas fa-exclamation-triangle"></i> <span id="cntLow"><?php echo (int)$alerts['low']; ?></span> low</span>
+                            <span class="alerts-live" id="alertsLive" title="Refreshes every 30 seconds">Live stock</span>
                         </div>
-                        <?php if (!$alerts['items']): ?>
-                            <div class="empty-state-row"><i class="fas fa-check-circle"></i> All products are well stocked.</div>
-                        <?php else: ?>
-                        <div class="stocks-table-wrap">
+                        <div class="empty-state-row" id="alertsEmpty" hidden><i class="fas fa-check-circle"></i> All products are well stocked.</div>
+                        <div class="stocks-table-wrap alerts-scroll" id="alertsWrap" tabindex="0" aria-label="Stock alert list">
                             <table class="stocks-table compact">
                                 <thead><tr><th>Product</th><th class="num">Stock</th><th>Status</th></tr></thead>
-                                <tbody>
-                                <?php foreach ($alerts['items'] as $p):
-                                    $stock = (int)$p['stock'];
-                                    $status = inv_stock_status_label($stock);
-                                    $label = ['out' => 'Out of Stock', 'critical' => 'Critical', 'low' => 'Low'][$status] ?? 'In Stock';
-                                    ?>
-                                    <tr>
-                                        <td>
-                                            <div class="stocks-pname"><?php echo h((string)$p['name']); ?></div>
-                                            <span class="stocks-pcat"><?php echo h((string)$p['category']); ?></span>
-                                        </td>
-                                        <td class="num"><span class="stocks-qty <?php echo $status === 'out' ? 'out' : 'warn'; ?>"><?php echo $stock; ?></span></td>
-                                        <td><span class="stock-status-pill <?php echo h($status); ?>"><?php echo h($label); ?></span></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                                </tbody>
+                                <tbody id="alertsRows"></tbody>
                             </table>
                         </div>
-                        <?php endif; ?>
                     </div>
                 </section>
             </div>
         </div>
 <?php
-staff_page_end();
+$alertsJson = json_encode($alerts, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$script = '<script src="stock_alerts.js?v=1"></script>'
+    . '<script>var INITIAL_ALERTS = ' . $alertsJson . ';</script>'
+    . <<<'SCRIPT'
+<script>
+(function () {
+    'use strict';
+    var SA = CashierStockAlerts;
+    var rows = document.getElementById('alertsRows');
+    var wrap = document.getElementById('alertsWrap');
+    var empty = document.getElementById('alertsEmpty');
+    var live = document.getElementById('alertsLive');
+
+    function render(d, at) {
+        document.getElementById('cntOut').textContent = d.out;
+        document.getElementById('cntCritical').textContent = d.critical;
+        document.getElementById('cntLow').textContent = d.low;
+        document.getElementById('statLow').textContent = d.low;
+        document.getElementById('statCritOut').textContent = d.critical + ' / ' + d.out;
+        wrap.hidden = d.items.length === 0;
+        empty.hidden = d.items.length !== 0;
+        rows.innerHTML = d.items.map(function (p) {
+            return '<tr>' +
+                '<td><div class="stocks-pname">' + SA.esc(p.name || ('Product #' + p.id)) + '</div>' +
+                '<span class="stocks-pcat">' + SA.esc(p.category) + '</span></td>' +
+                '<td class="num"><span class="stocks-qty' + SA.qtyClass(p.status) + '">' + p.stock + '</span></td>' +
+                '<td>' + SA.pill(p.status) + '</td>' +
+            '</tr>';
+        }).join('');
+        live.textContent = 'Live · updated ' + SA.timeLabel(at);
+    }
+
+    render(INITIAL_ALERTS, new Date());
+    SA.sync('../backend/api/stock_alerts.php', render);
+})();
+</script>
+SCRIPT;
+
+staff_page_end($script);

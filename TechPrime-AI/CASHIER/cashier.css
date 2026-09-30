@@ -223,26 +223,119 @@
 .sale-done .change-due { font-size: 26px; font-weight: 800; margin: 10px 0 18px; }
 .sale-done .btn { margin: 4px; }
 
-/* ---- Stock-in ---- */
-.si-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
-.si-product {
-    display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 14px;
-    border: 1.5px dashed var(--ep-border); background: #fff; min-height: 120px; justify-content: center;
-}
-.si-product.has-product { border-style: solid; border-color: var(--teal-light); background: var(--ep-green-light); }
-.si-product .si-name { font-size: 16px; font-weight: 800; color: var(--ep-text); }
-.si-product .si-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12.5px; color: var(--ep-muted); }
-.si-product .si-stock { font-size: 28px; font-weight: 800; color: var(--ep-green-dark); }
-
 /* ---- Dashboard ---- */
 .cash-quick { display: flex; gap: 10px; flex-wrap: wrap; }
 .cash-grid-2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 22px; align-items: start; }
-.alert-counts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.alert-counts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+
+/* ---- Stock alerts (dashboard panel + cashier_stock_alerts.php) ---- */
+/* The dashboard list scrolls inside its panel instead of stretching the page. */
+.alerts-scroll { max-height: 440px; overflow-y: auto; overscroll-behavior: contain; }
+.alerts-scroll thead th {
+    position: sticky; top: 0; z-index: 1; background: var(--ep-green-light);
+    box-shadow: inset 0 -2px 0 var(--teal-light, #c6e6b3);
+}
+.alerts-live {
+    display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
+    font-size: 11.5px; font-weight: 600; color: var(--ep-muted); white-space: nowrap;
+}
+.alerts-live::before {
+    content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ep-green);
+    animation: pos-pulse 1.6s ease-in-out infinite;
+}
+
+/* Toolbar / filter / pagination: same values as inventory_stocks.php */
+.stocks-toolbar {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+    margin: 0 0 16px; padding: 12px 14px; background: #fff; border: 1px solid var(--ep-border); border-radius: 14px;
+}
+.search-wrap {
+    flex: 1 1 280px; display: flex; align-items: center; gap: 6px;
+    background: var(--ep-gray-bg); border: 1px solid var(--ep-border); border-radius: 999px; padding: 4px 6px 4px 16px;
+}
+.search-wrap i.fa-search { color: var(--ep-muted); }
+.search-wrap input { flex: 1; border: none; background: transparent; box-shadow: none; padding: 8px 4px; }
+.search-wrap input:focus { outline: none; box-shadow: none; }
+.btn-scan {
+    white-space: nowrap; border-radius: 999px !important; background: var(--ep-green-light);
+    border: 1px solid var(--ep-green) !important; color: var(--ep-green-dark) !important; font-weight: 700;
+}
+.toolbar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.stocks-filter-wrap { position: relative; flex-shrink: 0; }
+.stocks-filter-btn {
+    display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px;
+    border-radius: 10px; border: 1px solid var(--ep-border); background: #fff;
+    color: var(--ep-text); font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease, color .15s ease;
+}
+.stocks-filter-btn:hover,
+.stocks-filter-btn.open {
+    border-color: var(--ep-green); background: var(--ep-green-light); color: var(--ep-green-dark);
+    box-shadow: 0 4px 12px rgba(75, 139, 42, 0.12);
+}
+.stocks-filter-btn .filter-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ep-green); display: none; }
+.stocks-filter-btn.has-active .filter-dot { display: inline-block; }
+.stocks-filter-btn .fa-chevron-down { font-size: 11px; opacity: 0.7; margin-left: 2px; }
+.stocks-filter-panel {
+    display: none; position: absolute; right: 0; left: auto; top: calc(100% + 8px); z-index: 90;
+    width: min(360px, calc(100vw - 48px)); background: #fff; border: 1px solid var(--ep-border);
+    border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,0.12); padding: 16px;
+}
+.stocks-filter-panel.open { display: flex; flex-direction: column; gap: 14px; }
+.stocks-filter-panel-title { margin: 0 0 2px; font-size: 14px; font-weight: 800; color: var(--ep-green-dark); }
+.filter-title {
+    font-size: 12px; font-weight: 700; color: var(--ep-text); margin-bottom: 8px; display: block;
+    text-transform: uppercase; letter-spacing: .04em;
+}
+.status-toggle { display: flex; flex-direction: column; gap: 6px; }
+.status-btn {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; border-radius: 8px; border: 1px solid var(--ep-border);
+    background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ep-text); font-family: inherit;
+    transition: all .15s ease;
+}
+.status-btn:hover { border-color: var(--ep-green); }
+.status-btn.active { background: var(--ep-green); border-color: var(--ep-green); color: #fff; }
+.status-btn .cnt { font-weight: 700; opacity: .85; }
+.btn-reset { width: 100%; }
+.stocks-table.wide { min-width: 720px; }
+.stocks-table.wide td { padding: 14px 16px; }
+.stocks-table th.col-stock { width: 100px; }
+.stocks-table th.col-status { width: 150px; }
+.stocks-table th.col-price { width: 120px; }
+.stocks-table th.col-barcode { width: 150px; }
+.barcode-code {
+    font-family: var(--font-mono, monospace); font-size: 12.5px; font-weight: 700;
+    color: var(--ep-text); letter-spacing: 0.3px; white-space: nowrap;
+}
+.barcode-missing {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600;
+    color: var(--ep-muted); white-space: nowrap;
+}
+.pagination-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px;
+    padding: 14px 4px 0; border-top: 1px solid var(--ep-border); flex-wrap: wrap;
+}
+.pagination-bar .pg-info { font-size: 13px; color: var(--ep-muted); font-weight: 500; }
+.pagination-bar .pg-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pagination-bar button {
+    border: 1px solid var(--ep-border); background: #fff; border-radius: 10px; min-width: 36px; height: 36px;
+    padding: 0 12px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ep-text); font-family: inherit;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.pagination-bar button:hover:not(:disabled):not(.active) {
+    border-color: var(--ep-green); color: var(--ep-green-dark); background: var(--ep-green-light);
+}
+.pagination-bar button.active {
+    background: var(--ep-green); border-color: var(--ep-green); color: #fff;
+    box-shadow: 0 4px 12px rgba(75, 139, 42, 0.22);
+}
+.pagination-bar button:disabled { opacity: .4; cursor: not-allowed; }
 
 @media (max-width: 1100px) {
     .inv-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     /* minmax(0, …): a wide table or the scan bar must not stretch the column past the screen */
-    .pos-layout, .si-layout, .cash-grid-2 { grid-template-columns: minmax(0, 1fr); }
+    .pos-layout, .cash-grid-2 { grid-template-columns: minmax(0, 1fr); }
     .pos-summary { position: static; }
 }
 @media (max-width: 640px) {
@@ -256,6 +349,8 @@
     .pos-scan-bar .scan-state { display: none; }
     .modal-content { padding: 22px 18px; }
     .pay-total-box strong { font-size: 20px; }
+    .stocks-toolbar { padding: 10px; }
+    .alerts-scroll { max-height: 360px; }
 }
 
 /* ---- Receipt ---- */

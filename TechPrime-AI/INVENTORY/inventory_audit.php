@@ -20,6 +20,7 @@ $allowedActions = [
     '' => 'All Activities',
     'add_product' => 'Stock Added',
     'edit_product' => 'Stock Updated',
+    'pos_stock_in' => 'Stock In',
     'delete_product' => 'Product Removed',
     'generate_barcode' => 'Barcode Generated',
     'update_order_status' => 'Order Updated',
@@ -39,7 +40,7 @@ if (!array_key_exists($range, $allowedRanges)) {
     $range = 'all';
 }
 
-$inventoryActions = ['add_product', 'edit_product', 'delete_product', 'generate_barcode', 'update_order_status'];
+$inventoryActions = ['add_product', 'edit_product', 'pos_stock_in', 'delete_product', 'generate_barcode', 'update_order_status'];
 
 $where = [
     'l.action IN (' . implode(',', array_fill(0, count($inventoryActions), '?')) . ')',
@@ -319,7 +320,7 @@ EXTRA
                             $dateLabel = $ts ? date('M j, Y', $ts) : (string)$row['created_at'];
                             $timeLabel = $ts ? date('g:i A', $ts) : '';
                             $actClass = 'act-other';
-                            if ($action === 'add_product') $actClass = 'act-add';
+                            if ($action === 'add_product' || $action === 'pos_stock_in') $actClass = 'act-add';
                             elseif ($action === 'edit_product' || $action === 'generate_barcode') $actClass = 'act-edit';
                             elseif ($action === 'delete_product') $actClass = 'act-del';
                             elseif ($action === 'update_order_status') $actClass = 'act-order';

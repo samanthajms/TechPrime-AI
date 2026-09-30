@@ -1,13 +1,13 @@
 <?php
 /**
- * Cashier: look up a product by scanned UPC/EAN barcode.
+ * Cashier (POS) and Inventory Custodian (stock-in): look up a product by scanned UPC/EAN barcode.
  * GET ?code=0123456789012  →  {ok, product:{id,name,category,price,stock,status,barcode}}
  */
 require_once __DIR__ . '/../../includes/security.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../../includes/pos_helpers.php';
 
-pos_api_require_cashier('GET');
+pos_api_require_role(['cashier', 'inventory_custodian'], 'GET', 'Staff access only.');
 
 $code = (string)($_GET['code'] ?? '');
 if (strlen($code) > 32) {

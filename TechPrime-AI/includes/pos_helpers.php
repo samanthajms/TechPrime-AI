@@ -1,7 +1,8 @@
 <?php
 /**
  * Cashier POS: UPC/EAN validation, product lookup by barcode, checkout (stock-out)
- * and receiving (stock-in). Tables come from database/migration_cashier_pos.sql.
+ * and receiving (stock-in, done by the Inventory Custodian). Tables come from
+ * database/migration_cashier_pos.sql.
  * Money is handled in integer centavos; prices are VAT-inclusive.
  */
 
@@ -476,9 +477,47 @@ function pos_sale_ok_payload(array $sale, bool $duplicate): array
  * ------------------------------------------------------------------- */
 
 /**
+ * Suppliers for the stock-in dropdown. There is no suppliers table, so a supplier is
+ * the product's brand: the first word of the product name (ias_client_product_brand)
+ * matched case-insensitively against shop_brands. Only brands that at least one
+ * product maps to are offered.
+ *
+ * @return array{suppliers: string[], by_product: array<int,string>}
+ */
+function pos_supplier_catalog(PDO $db): array
+{
+    require_once __DIR__ . '/client_helpers.php';
+    require_once __DIR__ . '/client_shop_taxonomy.php';
+    ep_shop_brands_ensure_schema($db);
+
+    $brands = [];
+    foreach ($db->query('SELECT name FROM shop_brands ORDER BY name') as $row) {
+        $name = trim((string)$row['name']);
+        $key = mb_strtolower($name);
+        if ($name !== '' && !isset($brands[$key])) {
+            $brands[$key] = $name;
+        }
+    }
+
+    $byProduct = [];
+    $used = [];
+    foreach ($db->query('SELECT id, name FROM products') as $row) {
+        $key = mb_strtolower(ias_client_product_brand($row));
+        if ($key !== '' && isset($brands[$key])) {
+            $byProduct[(int)$row['id']] = $brands[$key];
+            $used[$brands[$key]] = true;
+        }
+    }
+    $suppliers = array_keys($used);
+    natcasesort($suppliers);
+
+    return ['suppliers' => array_values($suppliers), 'by_product' => $byProduct];
+}
+
+/**
  * @return array{ok:bool, error?:string, message?:string, product?:array, stock_before?:int, stock_after?:int, quantity?:int}
  */
-function pos_stock_in(PDO $db, int $userId, int $productId, int $qty, string $supplier = '', string $reference = ''): array
+function pos_stock_in(PDO $db, int $userId, int $productId, int $qty, string $supplier, string $reference = ''): array
 {
     $supplier = trim($supplier);
     $reference = trim($reference);
@@ -488,9 +527,20 @@ function pos_stock_in(PDO $db, int $userId, int $productId, int $qty, string $su
     if ($qty < 1 || $qty > POS_MAX_STOCK_IN_QTY) {
         return pos_err('invalid_quantity', 'Quantity must be between 1 and ' . POS_MAX_STOCK_IN_QTY . '.');
     }
-    if (mb_strlen($supplier) > 150) {
-        return pos_err('invalid_supplier', 'Supplier name is too long (max 150 characters).');
+    if ($supplier === '') {
+        return pos_err('supplier_required', 'Choose the supplier of this delivery.');
     }
+    $known = null;
+    foreach (pos_supplier_catalog($db)['suppliers'] as $name) {
+        if (strcasecmp($name, $supplier) === 0) {
+            $known = $name;
+            break;
+        }
+    }
+    if ($known === null) {
+        return pos_err('invalid_supplier', 'Choose a supplier from the list.');
+    }
+    $supplier = $known;
     if (mb_strlen($reference) > 64) {
         return pos_err('invalid_reference', 'Reference number is too long (max 64 characters).');
     }
@@ -625,29 +675,27 @@ function pos_recent_stock_ins(PDO $db, int $userId, int $limit = 10): array
     return $st->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/** Read-only low/critical/out-of-stock alerts (same thresholds as the Inventory module). */
-function pos_stock_alerts(PDO $db, int $limit = 10): array
+/**
+ * Read-only low/critical/out-of-stock alerts (same thresholds as the Inventory module),
+ * lowest stock first. Every alerting product is returned so the list always matches
+ * the counts; items and counts come from the same query.
+ */
+function pos_stock_alerts(PDO $db): array
 {
-    $limit = max(1, min(50, $limit));
-    $counts = $db->query(
-        'SELECT COUNT(*) FILTER (WHERE stock <= 0) AS out_cnt,
-                COUNT(*) FILTER (WHERE stock > 0 AND stock <= 5) AS critical_cnt,
-                COUNT(*) FILTER (WHERE stock > 5 AND stock <= 15) AS low_cnt
-         FROM products'
-    )->fetch(PDO::FETCH_ASSOC);
-    $items = $db->query(
-        'SELECT id, name, category, stock FROM products WHERE stock <= 15 ORDER BY stock ASC, name ASC LIMIT ' . $limit
+    $rows = $db->query(
+        'SELECT id, name, category, price, stock, barcode FROM products WHERE stock <= 15 ORDER BY stock ASC, name ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
-    return [
-        'out' => (int)($counts['out_cnt'] ?? 0),
-        'critical' => (int)($counts['critical_cnt'] ?? 0),
-        'low' => (int)($counts['low_cnt'] ?? 0),
-        'items' => $items,
-    ];
+    $out = ['out' => 0, 'critical' => 0, 'low' => 0, 'items' => []];
+    foreach ($rows as $row) {
+        $item = pos_product_payload($row);
+        $out[$item['status']]++;
+        $out['items'][] = $item;
+    }
+    return $out;
 }
 
 /* ---------------------------------------------------------------------
- * JSON API guard shared by backend/api/barcode_lookup|stock_in|stock_out.php
+ * JSON API guard shared by backend/api/barcode_lookup|stock_in|stock_out|stock_alerts.php
  * ------------------------------------------------------------------- */
 
 function pos_json(int $status, array $body): void
@@ -660,13 +708,19 @@ function pos_json(int $status, array $body): void
 /** Cashier-only endpoint guard: JSON headers, session timeout, role, method, CSRF (POST). */
 function pos_api_require_cashier(string $method): array
 {
+    return pos_api_require_role(['cashier'], $method, 'Cashier access only.');
+}
+
+/** Same guard for endpoints shared with (or owned by) other staff roles. */
+function pos_api_require_role(array $roles, string $method, string $forbiddenMessage): array
+{
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
 
     checkSessionTimeout();
 
-    if (!isset($_SESSION['user_id'], $_SESSION['role']) || $_SESSION['role'] !== 'cashier') {
-        pos_json(403, ['ok' => false, 'error' => 'forbidden', 'message' => 'Cashier access only.']);
+    if (!isset($_SESSION['user_id'], $_SESSION['role']) || !in_array($_SESSION['role'], $roles, true)) {
+        pos_json(403, ['ok' => false, 'error' => 'forbidden', 'message' => $forbiddenMessage]);
     }
     if ($_SERVER['REQUEST_METHOD'] !== $method) {
         pos_json(405, ['ok' => false, 'error' => 'method_not_allowed', 'message' => 'Method not allowed.']);

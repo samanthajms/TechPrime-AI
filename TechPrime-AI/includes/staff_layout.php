@@ -29,6 +29,7 @@ if (!function_exists('staff_nav_for_role')) {
                 return [
                     ['key' => 'dashboard', 'href' => 'inventory_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
                     ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes'],
+                    ['key' => 'stockin', 'href' => 'inventory_stock_in.php', 'label' => 'Stock In', 'icon' => 'fa-dolly'],
                     ['key' => 'orders', 'href' => 'inventory_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart'],
                     ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list'],
                     ['key' => 'messages', 'href' => 'inventory_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
@@ -38,7 +39,8 @@ if (!function_exists('staff_nav_for_role')) {
                 return [
                     ['key' => 'dashboard', 'href' => 'cashier_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
                     ['key' => 'pos', 'href' => 'cashier_pos.php', 'label' => 'POS Checkout', 'icon' => 'fa-cash-register'],
-                    ['key' => 'stockin', 'href' => 'cashier_stock_in.php', 'label' => 'Stock In', 'icon' => 'fa-dolly'],
+                    ['key' => 'alerts', 'href' => 'cashier_stock_alerts.php', 'label' => 'Stock Alerts', 'icon' => 'fa-bell'],
+                    ['key' => 'profile', 'href' => 'cashier_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
             case 'courier':
                 return [
@@ -133,6 +135,7 @@ if (!function_exists('staff_page_start')) {
         $invTitleIcons = [
             'inventory_dashboard.php' => 'fa-tachometer-alt',
             'inventory_stocks.php' => 'fa-boxes',
+            'inventory_stock_in.php' => 'fa-dolly',
             'inventory_orders.php' => 'fa-shopping-cart',
             'inventory_audit.php' => 'fa-clipboard-list',
             'inventory_details.php' => 'fa-shopping-cart',
@@ -141,6 +144,7 @@ if (!function_exists('staff_page_start')) {
         $invActiveIcons = [
             'dashboard' => 'fa-tachometer-alt',
             'stocks' => 'fa-boxes',
+            'stockin' => 'fa-dolly',
             'orders' => 'fa-shopping-cart',
             'activity' => 'fa-clipboard-list',
             'profile' => 'fa-user',
@@ -150,13 +154,15 @@ if (!function_exists('staff_page_start')) {
             $invTitleIcons = [
                 'cashier_dashboard.php' => 'fa-tachometer-alt',
                 'cashier_pos.php' => 'fa-cash-register',
-                'cashier_stock_in.php' => 'fa-dolly',
+                'cashier_stock_alerts.php' => 'fa-bell',
                 'cashier_receipt.php' => 'fa-receipt',
+                'cashier_profile.php' => 'fa-user',
             ];
             $invActiveIcons = [
                 'dashboard' => 'fa-tachometer-alt',
                 'pos' => 'fa-cash-register',
-                'stockin' => 'fa-dolly',
+                'alerts' => 'fa-bell',
+                'profile' => 'fa-user',
             ];
         }
         $currentScript = strtolower(basename($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? ''));

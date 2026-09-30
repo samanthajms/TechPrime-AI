@@ -1,14 +1,14 @@
 <?php
 /**
- * Cashier: receive stock for a scanned product (stock-in).
- * POST JSON {csrf_token, product_id, qty, supplier?, reference_no?}
+ * Inventory Custodian: receive stock for a scanned product (stock-in).
+ * POST JSON {csrf_token, product_id, qty, supplier, reference_no?}
  * → {ok, product, stock_before, stock_after, quantity}
  */
 require_once __DIR__ . '/../../includes/security.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../../includes/pos_helpers.php';
 
-$input = pos_api_require_cashier('POST');
+$input = pos_api_require_role(['inventory_custodian'], 'POST', 'Inventory Custodian access only.');
 
 $qtyRaw = (string)($input['qty'] ?? '');
 if (!preg_match('/^\d{1,6}$/', $qtyRaw)) {

@@ -387,6 +387,7 @@ if (!function_exists('inv_action_label')) {
         $map = [
             'add_product' => 'Stock Added',
             'edit_product' => 'Stock Updated',
+            'pos_stock_in' => 'Stock In',
             'delete_product' => 'Product Removed',
             'generate_barcode' => 'Barcode Generated',
             'update_order_status' => 'Order Updated',
