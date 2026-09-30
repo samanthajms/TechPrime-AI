@@ -11,6 +11,7 @@ GET /health → status
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import joblib
@@ -107,5 +108,9 @@ def predict():
 
 if __name__ == "__main__":
     load_model()
-    # Local-only service; PHP proxies from the browser.
-    app.run(host="127.0.0.1", port=5055, debug=False)
+    # Local: 127.0.0.1:5055 (PHP proxies from the browser).
+    # Render sets RENDER and PORT; the service must listen on 0.0.0.0:$PORT there.
+    on_render = bool(os.environ.get("RENDER"))
+    host = os.environ.get("PRIMO_HOST", "0.0.0.0" if on_render else "127.0.0.1")
+    port = int(os.environ.get("PORT", "5055"))
+    app.run(host=host, port=port, debug=False)
