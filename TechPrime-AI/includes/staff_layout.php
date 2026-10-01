@@ -222,6 +222,19 @@ if (!function_exists('staff_page_start')) {
             }
         }
         $staffNotifCsrf = function_exists('generateCsrfToken') ? generateCsrfToken() : '';
+
+        /* Header avatar: profile picture when set, otherwise initials */
+        $userAvatarUrl = '';
+        if (function_exists('getDbConnection') && isset($_SESSION['user_id'])) {
+            try {
+                require_once __DIR__ . '/staff_chat_lib.php';
+                $aStmt = getDbConnection()->prepare('SELECT profile_image FROM users WHERE id = ? LIMIT 1');
+                $aStmt->execute([(int)$_SESSION['user_id']]);
+                $userAvatarUrl = staff_chat_avatar_url($aStmt->fetchColumn() ?: null);
+            } catch (Throwable $e) {
+                $userAvatarUrl = '';
+            }
+        }
         ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -229,7 +242,7 @@ if (!function_exists('staff_page_start')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo h($title); ?> — EasyPC</title>
-    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-responsive-2">
+    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-responsive-3">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if ($useInvPageTitle): ?>
     <style>
@@ -598,7 +611,7 @@ if (!function_exists('staff_page_start')) {
                 <button type="button" class="admin-badge user-badge staff-user-btn" id="staffUserBtn"
                         aria-haspopup="true" aria-expanded="false" aria-controls="staffUserMenu"
                         title="Account menu">
-                    <span class="avatar" aria-hidden="true"><?php echo h($initials); ?></span>
+                    <span class="avatar<?php echo $userAvatarUrl !== '' ? ' has-img' : ''; ?>" aria-hidden="true"><?php if ($userAvatarUrl !== ''): ?><img src="<?php echo h($userAvatarUrl); ?>" alt=""><?php else: ?><?php echo h($initials); ?><?php endif; ?></span>
                     <span class="staff-user-text">
                         <span class="staff-user-name"><?php echo h($userFullName !== '' ? $userFullName : $userName); ?></span>
                         <span class="staff-user-role"><?php echo h($roleLabel); ?></span>
@@ -607,7 +620,7 @@ if (!function_exists('staff_page_start')) {
                 </button>
                 <div class="staff-user-menu" id="staffUserMenu" role="menu" aria-label="Account" hidden>
                     <div class="staff-user-menu-head">
-                        <span class="staff-user-menu-avatar" aria-hidden="true"><?php echo h($initials); ?></span>
+                        <span class="staff-user-menu-avatar<?php echo $userAvatarUrl !== '' ? ' has-img' : ''; ?>" aria-hidden="true"><?php if ($userAvatarUrl !== ''): ?><img src="<?php echo h($userAvatarUrl); ?>" alt=""><?php else: ?><?php echo h($initials); ?><?php endif; ?></span>
                         <div class="staff-user-menu-id">
                             <strong><?php echo h($userFullName !== '' ? $userFullName : $userName); ?></strong>
                             <?php if ($userEmail !== ''): ?>
