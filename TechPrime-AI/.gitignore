@@ -9,3 +9,8 @@
 Thumbs.db
 .vscode/
 .idea/
+
+# Staff chat attachments (user files; the folder's .htaccess guard is committed)
+/uploads/chat/*
+!/uploads/chat/.htaccess
+!/uploads/chat/index.html

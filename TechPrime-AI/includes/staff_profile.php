@@ -23,6 +23,51 @@ if (!function_exists('staff_profile_format_ts')) {
     }
 }
 
+if (!function_exists('staff_profile_save_avatar')) {
+    /**
+     * Save an uploaded profile picture as assets/profiles/u{id}.{ext} (same rules as the client avatar,
+     * plus the chat attachment content checks). Returns an error message, or '' on success.
+     */
+    function staff_profile_save_avatar(PDO $db, int $userId, array $file): string
+    {
+        require_once __DIR__ . '/staff_chat_lib.php';
+        $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+        $err = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        $tmp = (string)($file['tmp_name'] ?? '');
+        if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE || ($err === UPLOAD_ERR_OK && filesize($tmp) > 2 * 1024 * 1024)) {
+            return 'Image must be 2 MB or smaller.';
+        }
+        if ($err !== UPLOAD_ERR_OK || !is_uploaded_file($tmp)) {
+            return 'Upload failed. Please try again.';
+        }
+        $mime = (string)((new finfo(FILEINFO_MIME_TYPE))->file($tmp) ?: '');
+        if (!isset($allowed[$mime])) {
+            return 'Only JPG, PNG, WEBP, or GIF images are allowed.';
+        }
+        $ext = $allowed[$mime];
+        $problem = staff_chat_inspect_file($tmp, $ext);
+        if ($problem !== '') {
+            return $problem;
+        }
+        $dir = dirname(__DIR__) . '/assets/profiles';
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+            return 'Could not save the image.';
+        }
+        $rel = 'profiles/u' . $userId . '.' . $ext;
+        foreach ($allowed as $oldExt) {
+            $old = $dir . '/u' . $userId . '.' . $oldExt;
+            if ($oldExt !== $ext && is_file($old)) {
+                @unlink($old);
+            }
+        }
+        if (!move_uploaded_file($tmp, dirname(__DIR__) . '/assets/' . $rel)) {
+            return 'Could not save the image.';
+        }
+        $db->prepare('UPDATE users SET profile_image = ? WHERE id = ?')->execute([$rel, $userId]);
+        return '';
+    }
+}
+
 if (!function_exists('staff_profile_page')) {
     function staff_profile_page(PDO $db, string $role): void
     {
@@ -32,7 +77,7 @@ if (!function_exists('staff_profile_page')) {
         $error     = '';
         $errorForm = '';
 
-        $q = $db->prepare('SELECT name, surname, age, address, email, password, created_at FROM users WHERE id = ? LIMIT 1');
+        $q = $db->prepare('SELECT name, surname, age, address, email, password, created_at, profile_image FROM users WHERE id = ? LIMIT 1');
         $q->execute([$userId]);
         $user = $q->fetch(PDO::FETCH_ASSOC);
         $formValues = $user;
@@ -72,6 +117,31 @@ if (!function_exists('staff_profile_page')) {
                         $errorForm = 'profile';
                     }
                 }
+            }
+
+            if ($form === 'avatar') {
+                $avatarError = staff_profile_save_avatar($db, $userId, $_FILES['avatar'] ?? []);
+                if ($avatarError === '') {
+                    $q->execute([$userId]);
+                    $user = $q->fetch(PDO::FETCH_ASSOC);
+                    logActivity($db, $userId, 'profile_update', $roleLabel . ' updated their profile picture');
+                    $success = 'Profile picture updated.';
+                } else {
+                    $error = $avatarError;
+                }
+            }
+
+            if ($form === 'avatar_remove') {
+                foreach (['jpg', 'png', 'webp', 'gif'] as $oldExt) {
+                    $old = dirname(__DIR__) . '/assets/profiles/u' . $userId . '.' . $oldExt;
+                    if (is_file($old)) {
+                        @unlink($old);
+                    }
+                }
+                $db->prepare('UPDATE users SET profile_image = NULL WHERE id = ?')->execute([$userId]);
+                $user['profile_image'] = null;
+                logActivity($db, $userId, 'profile_update', $roleLabel . ' removed their profile picture');
+                $success = 'Profile picture removed.';
             }
 
             if ($form === 'password') {
@@ -127,6 +197,8 @@ if (!function_exists('staff_profile_page')) {
         $memberSince  = staff_profile_format_ts($user['created_at'] ?? null, 'M j, Y');
         $prevLoginFmt = staff_profile_format_ts($prevLogin, 'M j, Y · g:i A');
         $csrf         = generateCsrfToken();
+        require_once __DIR__ . '/staff_chat_lib.php';
+        $avatarUrl    = staff_chat_avatar_url($user['profile_image'] ?? null);
 
         staff_page_start([
             'role' => $role,
@@ -164,6 +236,21 @@ if (!function_exists('staff_profile_page')) {
     flex-shrink: 0;
     box-shadow: 0 0 0 4px var(--ep-green-light), 0 8px 20px rgba(75, 139, 42, .28);
 }
+.sp-hero-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.sp-avatar-wrap { position: relative; flex-shrink: 0; }
+.sp-avatar-edit {
+    position: absolute; right: -2px; bottom: -2px;
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid #fff; background: var(--ep-black); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; cursor: pointer; transition: background .15s;
+}
+.sp-avatar-edit:hover, .sp-avatar-edit:focus-visible { background: var(--ep-green-dark); outline: none; }
+.sp-avatar-remove {
+    border: 0; background: none; padding: 0; margin-top: 8px; cursor: pointer;
+    font-family: inherit; font-size: 12px; font-weight: 600; color: var(--text-muted); text-decoration: underline;
+}
+.sp-avatar-remove:hover { color: #b42318; }
 .sp-hero-id { min-width: 0; }
 .sp-hero-name {
     margin: 0;
@@ -298,13 +385,28 @@ EXTRA
 
         <section class="card sp-hero" aria-label="Account summary">
             <div class="sp-hero-main">
-                <div class="sp-hero-avatar" aria-hidden="true"><?php echo h($initials); ?></div>
+                <div class="sp-avatar-wrap">
+                    <div class="sp-hero-avatar" aria-hidden="true"><?php if ($avatarUrl !== ''): ?><img src="<?php echo h($avatarUrl); ?>" alt=""><?php else: ?><?php echo h($initials); ?><?php endif; ?></div>
+                    <form method="post" enctype="multipart/form-data" id="spAvatarForm">
+                        <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>">
+                        <input type="hidden" name="form" value="avatar">
+                        <input type="file" name="avatar" id="spAvatarInput" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+                        <label for="spAvatarInput" class="sp-avatar-edit" tabindex="0" role="button" title="Change profile picture" aria-label="Change profile picture"><i class="fas fa-camera"></i></label>
+                    </form>
+                </div>
                 <div class="sp-hero-id">
                     <h2 class="sp-hero-name"><?php echo h($fullName !== '' ? $fullName : 'User'); ?></h2>
                     <div class="sp-hero-tags">
                         <span class="sp-role-pill"><i class="fas fa-id-badge" aria-hidden="true"></i> <?php echo h($roleLabel); ?></span>
                         <span class="sp-hero-email"><i class="fas fa-envelope" aria-hidden="true"></i> <?php echo h((string)($user['email'] ?? '')); ?></span>
                     </div>
+                    <?php if ($avatarUrl !== ''): ?>
+                    <form method="post" id="spAvatarRemoveForm">
+                        <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>">
+                        <input type="hidden" name="form" value="avatar_remove">
+                        <button type="submit" class="sp-avatar-remove">Remove photo</button>
+                    </form>
+                    <?php endif; ?>
                 </div>
             </div>
             <dl class="sp-hero-meta">
@@ -420,6 +522,34 @@ EXTRA
         $script = <<<'JS'
 <script>
 (function () {
+    /* Profile picture: upload as soon as a file is picked (JPG/PNG/WEBP/GIF, max 2 MB) */
+    var avInput = document.getElementById('spAvatarInput');
+    var avForm = document.getElementById('spAvatarForm');
+    if (avInput && avForm) {
+        var avLabel = avForm.querySelector('.sp-avatar-edit');
+        if (avLabel) {
+            avLabel.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); avInput.click(); }
+            });
+        }
+        avInput.addEventListener('change', function () {
+            var f = avInput.files && avInput.files[0];
+            if (!f) return;
+            if (f.size > 2 * 1024 * 1024) {
+                avInput.value = '';
+                if (typeof IAS_UI !== 'undefined') IAS_UI.alert('Image must be 2 MB or smaller.', 'error');
+                return;
+            }
+            avForm.submit();
+        });
+    }
+    var avRemove = document.getElementById('spAvatarRemoveForm');
+    if (avRemove) {
+        avRemove.addEventListener('submit', function (e) {
+            if (!window.confirm('Remove your profile picture?')) e.preventDefault();
+        });
+    }
+
     document.querySelectorAll('[data-sp-toggle]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var input = document.getElementById(btn.getAttribute('data-sp-toggle'));
