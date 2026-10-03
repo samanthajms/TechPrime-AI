@@ -64,38 +64,93 @@ function ias_product_categories(?PDO $db = null): array
  * (supabase_category_alignment/03_apply_align_categories.sql).
  * ---------------------------------------------------------------------------------------- */
 
-/** lower-case requested name => extra stored values that mean the same thing (besides the name itself) */
+/**
+ * Requested name (as stored, matched case-insensitively) => extra stored values that mean the same thing
+ * (besides the name itself). Keys keep their stored spelling because group filters add them to SQL IN lists.
+ */
 function ias_category_legacy_aliases(): array
 {
     return [
-        'display'               => ['Monitor'],
-        'monitor'               => ['Display'],
-        'audio'                 => ['Headset', 'Earphones'],            // speakers have their own label / page
-        'headset'               => ['Audio'],
-        'cooling'               => ['CPU Cooling', 'Chassis Fan'],
-        'gpu'                   => ['Graphics Card', 'Graphic Card'],
-        'graphic card'          => ['Graphics Card', 'GPU'],
-        'ram'                   => ['Memory'],
-        'memory'                => ['RAM'],
-        'storage'               => ['Solid State Drive', 'Hard Disk'],
-        'psu'                   => ['Power Supply'],
-        'case'                  => ['PC Case'],
-        'processor'             => ['Processor AMD', 'Processor INTEL', 'Processor Tray'],
-        'printers and scanners' => ['Printer & Scanner', 'Printer and Scanner'],
-        'printer and scanner'   => ['Printer & Scanner', 'Printers and Scanners'],
-        'cables and adapters'   => ['Cables'],
-        'cameras'               => ['Web & Digital Camera', 'CCTV', 'Recorder'],
-        'mobile'                => ['Mobile Phone', 'Tablet'],
-        'keyboard'              => ['Keyboard and Mouse', 'Accessories'],
-        'mouse'                 => ['Keyboard and Mouse', 'Accessories'],
-        'keyboard and mouse'    => ['Keyboard', 'Mouse', 'Accessories'],
+        'Display'               => ['Monitor'],
+        'Monitor'               => ['Display'],
+        'Audio'                 => ['Headset', 'Earphones'],            // speakers have their own label / page
+        'Headset'               => ['Audio'],
+        'Cooling'               => ['CPU Cooling', 'Chassis Fan'],
+        'GPU'                   => ['Graphics Card', 'Graphic Card'],
+        'Graphic Card'          => ['Graphics Card', 'GPU'],
+        'RAM'                   => ['Memory'],
+        'Memory'                => ['RAM'],
+        'Storage'               => ['Solid State Drive', 'Hard Disk'],
+        'PSU'                   => ['Power Supply'],
+        'Case'                  => ['PC Case'],
+        'Processor'             => ['Processor AMD', 'Processor INTEL', 'Processor Tray'],
+        'Printers and Scanners' => ['Printer & Scanner', 'Printer and Scanner'],
+        'Printer and Scanner'   => ['Printer & Scanner', 'Printers and Scanners'],
+        'Cables and Adapters'   => ['Cables'],
+        'Cameras'               => ['Web & Digital Camera', 'CCTV', 'Recorder'],
+        'Mobile'                => ['Mobile Phone', 'Tablet'],
+        'Keyboard'              => ['Keyboard and Mouse', 'Accessories'],
+        'Mouse'                 => ['Keyboard and Mouse', 'Accessories'],
+        'Keyboard and Mouse'    => ['Keyboard', 'Mouse', 'Accessories'],
     ];
+}
+
+/**
+ * Every known stored value => its Client menu group: group names, their labels, and the legacy bucket /
+ * import names from the alias table (a legacy name takes the group of its first known aligned label; its
+ * other spellings follow it). Single source for both the group filter and ias_category_group_of(), so the
+ * Deliveries by Category counts and the category filter always agree.
+ *
+ * @return array<string,string>
+ */
+function ias_category_group_members(): array
+{
+    static $members = null;
+    if ($members !== null) {
+        return $members;
+    }
+    if (!function_exists('ep_shop_inventory_category_groups')) {
+        require_once __DIR__ . '/client_shop_taxonomy.php';
+    }
+    $members = [];
+    $known = [];   // lower-case => group, so spellings that differ only in case are not added twice
+    $add = static function (string $name, string $group) use (&$members, &$known): void {
+        $key = strtolower($name);
+        if (!isset($known[$key])) {
+            $known[$key] = $group;
+            $members[$name] = $group;
+        }
+    };
+    foreach (ep_shop_inventory_category_groups() as $group => $subs) {
+        $add((string)$group, (string)$group);
+        foreach ($subs as $label) {
+            $add((string)$label, (string)$group);
+        }
+    }
+    foreach (ias_category_legacy_aliases() as $name => $alts) {
+        $group = $known[strtolower($name)] ?? null;
+        foreach ($alts as $alt) {
+            if ($group !== null) {
+                break;
+            }
+            $group = $known[strtolower($alt)] ?? null;
+        }
+        if ($group === null) {
+            continue;
+        }
+        $add($name, $group);
+        foreach ($alts as $alt) {
+            $add($alt, $group);
+        }
+    }
+    return $members;
 }
 
 /**
  * Every stored value that should match a requested category name. The requested name itself is always
  * included; legacy names add their aligned equivalents; a Client menu group (Accessories, Component,
- * Peripherals, ...) adds all of its labels.
+ * Peripherals, ...) adds every stored value ias_category_group_of() places in it -- its labels plus the legacy
+ * bucket / import names (Cooling, RAM, GPU, Printers and Scanners, ...).
  *
  * @return list<string>
  */
@@ -106,19 +161,21 @@ function ias_category_match_values(string $requested): array
         return [];
     }
     $values = [$requested];
-    $aliases = ias_category_legacy_aliases();
-    $key = strtolower($requested);
-    if (isset($aliases[$key])) {
-        $values = array_merge($values, $aliases[$key]);
+    foreach (ias_category_legacy_aliases() as $name => $alts) {
+        if (strcasecmp($name, $requested) === 0) {
+            $values = array_merge($values, $alts);
+        }
     }
     if (!function_exists('ep_shop_inventory_category_groups')) {
         require_once __DIR__ . '/client_shop_taxonomy.php';
     }
-    // old coarse buckets that belong inside a menu group (so group filters also work before the SQL update)
-    $legacyInGroup = ['Component' => ['Cooling'], 'Peripherals' => ['Display', 'Audio']];
-    foreach (ep_shop_inventory_category_groups() as $group => $subs) {
+    foreach (array_keys(ep_shop_inventory_category_groups()) as $group) {
         if (strcasecmp((string)$group, $requested) === 0) {
-            $values = array_merge($values, $subs, $legacyInGroup[(string)$group] ?? []);
+            foreach (ias_category_group_members() as $name => $memberGroup) {
+                if ($memberGroup === (string)$group) {
+                    $values[] = $name;
+                }
+            }
         }
     }
     return array_values(array_unique($values));
@@ -227,30 +284,7 @@ function ias_category_group_of(string $stored): string
 {
     static $map = null;
     if ($map === null) {
-        if (!function_exists('ep_shop_inventory_category_groups')) {
-            require_once __DIR__ . '/client_shop_taxonomy.php';
-        }
-        $map = [];
-        foreach (ep_shop_inventory_category_groups() as $group => $subs) {
-            $map[strtolower((string)$group)] = (string)$group;
-            foreach ($subs as $label) {
-                $map[strtolower((string)$label)] = (string)$group;
-            }
-        }
-        foreach (ias_category_legacy_aliases() as $name => $alts) {       // legacy name -> group of its first aligned label
-            if (isset($map[$name])) {
-                continue;
-            }
-            foreach ($alts as $alt) {
-                if (isset($map[strtolower($alt)])) {
-                    $map[$name] = $map[strtolower($alt)];
-                    break;
-                }
-            }
-        }
-        foreach (['display' => 'Peripherals', 'audio' => 'Peripherals', 'cooling' => 'Component'] as $k => $g) {
-            $map[$k] = $map[$k] ?? $g;
-        }
+        $map = array_change_key_case(ias_category_group_members(), CASE_LOWER);
     }
     $key = strtolower(trim($stored));
     return $key === '' ? 'Others' : ($map[$key] ?? 'Others');
