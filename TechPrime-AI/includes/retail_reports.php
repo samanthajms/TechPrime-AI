@@ -342,7 +342,8 @@ function ias_deliveries_by_category(array $rows): array
 {
     $out = [];
     foreach ($rows as $r) {
-        $cats = array_filter(array_map('trim', explode(',', $r['categories'] ?? '')));
+        // one count per distinct Client menu GROUP in the order (Component, Peripherals, ...), same as the forecast filter
+        $cats = ias_category_groups_in($r['categories'] ?? '');
         if (empty($cats)) {
             $cats = ['Uncategorized'];
         }

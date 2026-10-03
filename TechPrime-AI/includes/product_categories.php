@@ -114,9 +114,11 @@ function ias_category_match_values(string $requested): array
     if (!function_exists('ep_shop_inventory_category_groups')) {
         require_once __DIR__ . '/client_shop_taxonomy.php';
     }
+    // old coarse buckets that belong inside a menu group (so group filters also work before the SQL update)
+    $legacyInGroup = ['Component' => ['Cooling'], 'Peripherals' => ['Display', 'Audio']];
     foreach (ep_shop_inventory_category_groups() as $group => $subs) {
         if (strcasecmp((string)$group, $requested) === 0) {
-            $values = array_merge($values, $subs);
+            $values = array_merge($values, $subs, $legacyInGroup[(string)$group] ?? []);
         }
     }
     return array_values(array_unique($values));
@@ -198,4 +200,77 @@ function ias_can_access_admin_panel(?string $role): bool
 function ias_can_manage_inventory(?string $role): bool
 {
     return in_array($role, ['admin', 'seller', 'inventory_custodian', 'retail_officer'], true);
+}
+
+/* ------------------------------------------------------------------------------------------
+ * The 8 Client menu groups (Component, Peripherals, Accessories, PC Furnitures, OS & Softwares,
+ * Laptops And Mobile Devices, Desktop, Others) -- the one classification shared by the forecast
+ * category filter and the Retail Officer's Deliveries by Category view.
+ * ---------------------------------------------------------------------------------------- */
+
+/** Group names in Client menu order. @return list<string> */
+function ias_category_groups(): array
+{
+    if (!function_exists('ep_shop_inventory_category_groups')) {
+        require_once __DIR__ . '/client_shop_taxonomy.php';
+    }
+    return array_map('strval', array_keys(ep_shop_inventory_category_groups()));
+}
+
+/**
+ * Group of any stored category value: an aligned label (Monitor -> Peripherals), a group name, or a legacy
+ * bucket / import name (Display, Audio, Cooling, RAM, GPU ... -> via the alias table). Unknown -> 'Others'.
+ * Note: the legacy bucket "Accessories" mixed cases, mice and keyboards; it can only be placed in the
+ * Accessories group until the database holds the aligned labels (SQL script 03).
+ */
+function ias_category_group_of(string $stored): string
+{
+    static $map = null;
+    if ($map === null) {
+        if (!function_exists('ep_shop_inventory_category_groups')) {
+            require_once __DIR__ . '/client_shop_taxonomy.php';
+        }
+        $map = [];
+        foreach (ep_shop_inventory_category_groups() as $group => $subs) {
+            $map[strtolower((string)$group)] = (string)$group;
+            foreach ($subs as $label) {
+                $map[strtolower((string)$label)] = (string)$group;
+            }
+        }
+        foreach (ias_category_legacy_aliases() as $name => $alts) {       // legacy name -> group of its first aligned label
+            if (isset($map[$name])) {
+                continue;
+            }
+            foreach ($alts as $alt) {
+                if (isset($map[strtolower($alt)])) {
+                    $map[$name] = $map[strtolower($alt)];
+                    break;
+                }
+            }
+        }
+        foreach (['display' => 'Peripherals', 'audio' => 'Peripherals', 'cooling' => 'Component'] as $k => $g) {
+            $map[$k] = $map[$k] ?? $g;
+        }
+    }
+    $key = strtolower(trim($stored));
+    return $key === '' ? 'Others' : ($map[$key] ?? 'Others');
+}
+
+/**
+ * Distinct groups for a comma-joined category list (as returned per order by STRING_AGG), in Client menu order.
+ * @return list<string>
+ */
+function ias_category_groups_in(?string $categoriesCsv): array
+{
+    $found = [];
+    foreach (array_filter(array_map('trim', explode(',', (string)$categoriesCsv)), 'strlen') as $c) {
+        $found[ias_category_group_of($c)] = true;
+    }
+    $ordered = [];
+    foreach (ias_category_groups() as $g) {
+        if (isset($found[$g])) {
+            $ordered[] = $g;
+        }
+    }
+    return $ordered;
 }

@@ -12,7 +12,7 @@ checkRole('retail_officer');
 
 $retailId = (int)$_SESSION['user_id'];
 $presets = ias_report_date_presets();
-$categories = ias_product_categories();
+$categories = ias_category_groups();   // 8 Client menu groups (shared with the forecast service filter)
 
 function retail_dashboard_preserve_hidden(array $ownKeys): void
 {
