@@ -308,20 +308,6 @@ EXTRA
 
         <div class="orders-page">
 
-            <section class="orders-chart-panel" aria-label="Weekly total deliveries">
-                <div class="orders-chart-header">
-                    <div>
-                        <h3><span class="card-icon"><i class="fas fa-chart-line"></i></span> Weekly Total Deliveries</h3>
-                        <div class="orders-chart-meta">Shipment totals by week for the last 8 weeks</div>
-                    </div>
-                </div>
-                <div class="orders-chart-body">
-                    <div class="orders-chart-canvas-wrap">
-                        <canvas id="weeklyDeliveriesChart" aria-label="Weekly total deliveries chart"></canvas>
-                    </div>
-                </div>
-            </section>
-
             <div class="card">
                 <div class="card-header orders-card-header">
                     <div>
@@ -441,6 +427,19 @@ EXTRA
                 </div>
             </div>
 
+                    <section class="orders-chart-panel" aria-label="Weekly total deliveries">
+                        <div class="orders-chart-header">
+                            <div>
+                                <h3><span class="card-icon"><i class="fas fa-chart-line"></i></span> Weekly Total Deliveries</h3>
+                                <div class="orders-chart-meta">Shipment totals by week for the last 8 weeks</div>
+                            </div>
+                        </div>
+                        <div class="orders-chart-body">
+                            <div class="orders-chart-canvas-wrap">
+                                <canvas id="weeklyDeliveriesChart" aria-label="Weekly total deliveries chart"></canvas>
+                            </div>
+                        </div>
+                    </section>
         </div>
 
 <?php
