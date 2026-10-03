@@ -7,6 +7,7 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/pc_compatibility.php';
+require_once __DIR__ . '/../includes/product_categories.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -82,7 +83,7 @@ $meta = $slotMap[$slot];
 $db = getDbConnection();
 $vis = ias_client_product_list_sql_condition('p');
 
-$cats = $meta['categories'];
+$cats = ias_category_expand($meta['categories']);   // old buckets + aligned labels
 $catPlaceholders = implode(',', array_fill(0, count($cats), '?'));
 $types = str_repeat('s', count($cats));
 $params = $cats;

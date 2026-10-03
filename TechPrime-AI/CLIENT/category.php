@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/product_categories.php';
 
 $db = getDbConnection();
 
@@ -22,13 +23,14 @@ $categoryHeroTitle = $type;
  * counts stay consistent with whatever ias_client_filter_products_for_display()
  * decides to hide.
  * ------------------------------------------------------------------ */
+$catBind = [];   // matches the old buckets AND the aligned Client/Custodian labels (see includes/product_categories.php)
 $stmt = $db->prepare(
     "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, u.name as seller_name
      FROM products p
      JOIN users u ON p.seller_id = u.id
-     WHERE p.category = ? AND " . ias_client_product_list_sql_condition('p')
+     WHERE " . ias_category_in_sql('p.category', $type, $catBind) . " AND " . ias_client_product_list_sql_condition('p')
 );
-$stmt->execute([$type]);
+$stmt->execute($catBind);
 $baseResult = $stmt;
 $baseRows = $baseResult ? $baseResult->fetchAll(PDO::FETCH_ASSOC) : [];
 $baseProducts = $baseRows;
