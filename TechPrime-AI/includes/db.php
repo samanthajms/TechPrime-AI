@@ -1,15 +1,8 @@
 <?php
-// Shared Database Connection
+// Legacy wrapper — credentials live in .env; use getDbConnection() directly.
+require_once __DIR__ . '/../backend/config/database.php';
+
 function getDb() {
-    $host = 'localhost';
-    $user = 'root';
-    $pass = '';
-    $db   = 'ias_ecommerce';
-    
-    $conn = new mysqli($host, $user, $pass, $db);
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
-    return $conn;
+    return getDbConnection();
 }
 ?>

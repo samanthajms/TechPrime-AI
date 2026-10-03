@@ -10,37 +10,33 @@ $isLoggedIn = isset($_SESSION['user_id']);
 $userName = $isLoggedIn ? h($_SESSION['name']) : 'Guest';
 $activePage = 'home';
 $isHomePage = true;
+$epCsrf = $isLoggedIn ? generateCsrfToken() : '';
+$extraHead = '<link rel="stylesheet" href="primo.css">';
 
-$categories = ['Accessories', 'Audio', 'Cables and Adapters', 'Camera', 'Combo', 'Cooling', 'Customization', 'Display', 'Gaming Surface', 'GPU', 'Graphic Card', 'Hard Disk', 'Home & Office Furniture',
-'Keyboard', 'Laptop GA2', 'Laptop GA3', 'Laptop PR2', 'Laptop PR3', 'Memory', 'Mini PC', 'Motherboard', 'Mouse', 'Network Device', 'Others', 'PC Case', 'Power Station', 'Power Supply', 'Printer and Scanner', 'Printers and Scanners',
-'Processor', 'Promotional', 'RAM', 'Recorder', 'Services', 'Software', 'Solid State Drive', 'Speaker', 'UPS & AVR', 'Value Plus'];
+$categories = []; // unused on homepage render; avoid large unused array work
 
-$productQuery = "SELECT p.*, u.name AS seller_name
+$vis = ias_client_product_list_sql_condition('p');
+$listCols = 'p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, u.name AS seller_name';
+
+$productQuery = "SELECT {$listCols}
                  FROM products p
                  INNER JOIN users u ON p.seller_id = u.id
-                 WHERE " . ias_client_product_list_sql_condition('p') . "
+                 WHERE {$vis}
                  ORDER BY p.id DESC
-                 LIMIT 40";
+                 LIMIT 8";
 $productResult = $db->query($productQuery);
-$allDisplayProducts = ias_client_filter_products_for_display(
-    $productResult ? $productResult->fetch_all(MYSQLI_ASSOC) : [],
-    12
-);
-$topSellers = array_slice($allDisplayProducts, 0, 8);
+$topSellers = $productResult ? $productResult->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // New Arrivals: products added within the last 7 days (uses existing created_at)
-$newArrivalsQuery = "SELECT p.*, u.name AS seller_name
+$newArrivalsQuery = "SELECT {$listCols}
                      FROM products p
                      INNER JOIN users u ON p.seller_id = u.id
-                     WHERE " . ias_client_product_list_sql_condition('p') . "
-                       AND p.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                     WHERE {$vis}
+                       AND p.created_at >= (NOW() - INTERVAL '7 day')
                      ORDER BY p.created_at DESC
-                     LIMIT 12";
+                     LIMIT 6";
 $newArrivalsResult = $db->query($newArrivalsQuery);
-$newArrivals = ias_client_filter_products_for_display(
-    $newArrivalsResult ? $newArrivalsResult->fetch_all(MYSQLI_ASSOC) : [],
-    6
-);
+$newArrivals = $newArrivalsResult ? $newArrivalsResult->fetchAll(PDO::FETCH_ASSOC) : [];
 
 $returnTo = 'index.php';
 ?>
@@ -63,10 +59,12 @@ $returnTo = 'index.php';
                     <?php foreach ($topSellers as $p): ?>
                         <div class="ep-product-card ep-featured-card">
                             <div class="ep-featured-card-media">
-                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>" class="ep-product-img" alt="<?php echo h($p['name']); ?>">
+                                <a href="products.php?id=<?php echo (int)$p['id']; ?>">
+                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>" class="ep-product-img" alt="<?php echo h($p['name']); ?>" loading="lazy" decoding="async">
+                                </a>
                             </div>
                             <div class="ep-featured-card-body">
-                                <div class="ep-product-name"><?php echo h($p['name']); ?></div>
+                                <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
                                 <div class="ep-product-cat"><?php echo h($p['category'] ?: 'Uncategorized'); ?></div>
                                 <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
                                 <div class="ep-card-actions">
@@ -112,12 +110,14 @@ $returnTo = 'index.php';
             <?php if (!empty($newArrivals)): ?>
                 <?php foreach ($newArrivals as $p): ?>
                     <article class="ep-new-arrival-card">
+                        <a href="products.php?id=<?php echo (int)$p['id']; ?>">
                         <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                             alt="<?php echo h($p['name']); ?>">
+                             alt="<?php echo h($p['name']); ?>" loading="lazy" decoding="async">
                         <div class="ep-new-arrival-card-body">
                             <div class="ep-new-arrival-name"><?php echo h($p['name']); ?></div>
                             <div class="ep-new-arrival-price">₱<?php echo number_format((float) $p['price'], 2); ?></div>
                         </div>
+                        </a>
                     </article>
                 <?php endforeach; ?>
             <?php else: ?>
@@ -128,66 +128,25 @@ $returnTo = 'index.php';
             <?php endif; ?>
         </div>
     </section>
-
-    <section class="ep-tech-match">
-        <h2 class="ep-match-title">Tech and Match</h2>
-        <p class="ep-match-subtitle">Find compatible devices for your setup.</p>
-        <div class="ep-match-panel">
-            <div class="ep-match-grid">
-                <div class="ep-match-left">
-                    <h4>Find a match for...</h4>
-                    <label for="epMatchCategory" class="sr-only">Product category</label>
-                    <select id="epMatchCategory" class="ep-category-select" aria-label="Select product category">
-                        <option value="">Choose a category</option>
-                        <?php foreach ($categories as $cat): ?>
-                            <option value="<?php echo h($cat); ?>"><?php echo h($cat); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="ep-match-right">
-                    <h4>Browse category</h4>
-                    <p id="epMatchHint" class="ep-match-subtitle" style="margin:0;">Select a category to browse matching products.</p>
-                    <a id="epMatchBrowse" href="#" class="ep-btn ep-btn-primary" style="display:none;margin-top:12px;">Browse Category</a>
-                </div>
-            </div>
-            <div class="ep-recommendations">
-                <h4>Recommendations</h4>
-                <div class="ep-rec-empty">Recommendations will appear here once configured.</div>
-            </div>
-        </div>
-    </section>
 </main>
 
 <?php
-$extraScripts = <<<'SCRIPTS'
+$extraScripts = '<script>window.EP_CSRF = ' . json_encode($epCsrf) . ';</script>' . <<<'SCRIPTS'
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('added') && typeof IAS_UI !== 'undefined') {
         IAS_UI.alert('Added to cart!', 'success');
     }
-
-    const catSelect = document.getElementById('epMatchCategory');
-    const browseBtn = document.getElementById('epMatchBrowse');
-    const hint = document.getElementById('epMatchHint');
-    if (catSelect && browseBtn) {
-        catSelect.addEventListener('change', function () {
-            const val = this.value;
-            if (!val) {
-                browseBtn.style.display = 'none';
-                hint.textContent = 'Select a category to browse matching products.';
-                return;
-            }
-            browseBtn.href = 'category.php?type=' + encodeURIComponent(val);
-            browseBtn.style.display = 'inline-block';
-            browseBtn.textContent = 'Browse ' + val;
-            hint.textContent = 'View products in the ' + val + ' category.';
-        });
+    if (window.location.hash === '#ep-tech-match') {
+        window.location.replace('build_a_pc.php');
     }
 });
 </script>
+<script src="primo.js" defer></script>
 SCRIPTS;
 ?>
 
+<?php include __DIR__ . '/primo.php'; ?>
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>

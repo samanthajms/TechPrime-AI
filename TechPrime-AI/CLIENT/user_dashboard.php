@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/client_helpers.php';
+require_once __DIR__ . '/../includes/inventory_alerts.php';
+require_once __DIR__ . '/../includes/address_helpers.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -8,6 +11,195 @@ checkRole('client');
 
 $user_id = (int)$_SESSION['user_id'];
 $rawName = trim((string)($_SESSION['name'] ?? 'Customer'));
+$safeName = h($rawName !== '' ? $rawName : 'Customer');
+$initial = strtoupper(substr($rawName !== '' ? $rawName : 'C', 0, 1));
+
+ep_profile_image_ensure_schema($db);
+ep_ensure_session_cart($db);
+
+$profileFlash = '';
+$profileFlashErr = '';
+
+/* ---- Profile picture upload ---- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upload_avatar') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    if (empty($_FILES['avatar']) || !is_uploaded_file($_FILES['avatar']['tmp_name'])) {
+        $profileFlashErr = 'Please choose an image file.';
+    } else {
+        $file = $_FILES['avatar'];
+        $maxBytes = 2 * 1024 * 1024; // 2 MB
+        $allowed = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+        ];
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            $profileFlashErr = 'Upload failed. Please try again.';
+        } elseif ((int)$file['size'] > $maxBytes) {
+            $profileFlashErr = 'Image must be 2 MB or smaller.';
+        } else {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($file['tmp_name']) ?: '';
+            if (!isset($allowed[$mime])) {
+                $profileFlashErr = 'Only JPG, PNG, WEBP, or GIF images are allowed.';
+            } else {
+                $dir = dirname(__DIR__) . '/assets/profiles';
+                if (!is_dir($dir)) {
+                    @mkdir($dir, 0755, true);
+                }
+                $ext = $allowed[$mime];
+                $rel = 'profiles/u' . $user_id . '.' . $ext;
+                $dest = dirname(__DIR__) . '/assets/' . $rel;
+
+                // Remove previous extensions for this user
+                foreach (['jpg', 'jpeg', 'png', 'webp', 'gif'] as $oldExt) {
+                    $old = dirname(__DIR__) . '/assets/profiles/u' . $user_id . '.' . $oldExt;
+                    if (is_file($old) && $old !== $dest) {
+                        @unlink($old);
+                    }
+                }
+
+                if (!move_uploaded_file($file['tmp_name'], $dest)) {
+                    $profileFlashErr = 'Could not save the image.';
+                } else {
+                    $up = $db->prepare('UPDATE users SET profile_image = ? WHERE id = ?');
+                    $up->execute([$rel, $user_id]);
+                    $profileFlash = 'Profile picture updated.';
+                }
+            }
+        }
+    }
+}
+
+/* ---- Profile settings ---- */
+$hasPhone = ep_users_has_phone($db);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_profile') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $name = trim((string)($_POST['name'] ?? ''));
+    $surname = trim((string)($_POST['surname'] ?? ''));
+    $age = (int)($_POST['age'] ?? 0);
+    $addressInput = ep_address_from_input($_POST);
+    $email = strtolower(trim((string)($_POST['email'] ?? '')));
+    $phone = trim((string)($_POST['phone'] ?? ''));
+
+    if ($name === '' || $surname === '') {
+        $profileFlashErr = 'First name and surname are required.';
+    } elseif (mb_strlen($name) > 80 || mb_strlen($surname) > 80) {
+        $profileFlashErr = 'Name fields must be 80 characters or fewer.';
+    } elseif ($age < 13 || $age > 120) {
+        $profileFlashErr = 'Age must be between 13 and 120.';
+    } elseif ($addressInput['error'] !== '') {
+        $profileFlashErr = $addressInput['error'];
+    } elseif ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $profileFlashErr = 'Please enter a valid email address.';
+    } elseif (mb_strlen($email) > 190) {
+        $profileFlashErr = 'Email is too long.';
+    } else {
+        if ($hasPhone) {
+            if ($phone === '') {
+                $profileFlashErr = 'Phone number is required.';
+            } else {
+                $phoneDigits = preg_replace('/\D+/', '', $phone);
+                if (strlen($phoneDigits) < 7 || strlen($phoneDigits) > 15) {
+                    $profileFlashErr = 'Please enter a valid phone number.';
+                } elseif (strlen($phone) > 30) {
+                    $profileFlashErr = 'Phone number is too long.';
+                }
+            }
+        }
+        if ($profileFlashErr === '') {
+            $dup = $db->prepare('SELECT id FROM users WHERE LOWER(email) = ? AND id <> ? LIMIT 1');
+            $dup->execute([$email, $user_id]);
+            if ($dup->fetch(PDO::FETCH_ASSOC)) {
+                $profileFlashErr = 'That email is already in use.';
+            }
+        }
+        if ($profileFlashErr === '') {
+            // users.address gets the formatted one-line address; address_* columns and
+            // phone are included when migration_users_address_phone.sql has been applied.
+            $set = ['name' => $name, 'surname' => $surname, 'age' => $age]
+                + ep_address_columns($db, $addressInput['fields']);
+            if ($hasPhone) {
+                $set['phone'] = $phone;
+            }
+            $set['email'] = $email;
+            $up = $db->prepare(
+                'UPDATE users SET ' . implode(', ', array_map(fn($c) => "$c = ?", array_keys($set))) . ' WHERE id = ?'
+            );
+            $up->execute([...array_values($set), $user_id]);
+            $_SESSION['name'] = $name;
+            $_SESSION['surname'] = $surname;
+            $_SESSION['email'] = $email;
+            logActivity($db, $user_id, 'update_profile', 'Client updated profile settings');
+            header('Location: user_dashboard.php?settings=1&alert=profile_saved');
+            exit;
+        }
+    }
+}
+
+/* ---- Cancel order ---- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'cancel_order') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $oid = (int)($_POST['order_id'] ?? 0);
+    $result = ep_cancel_order($db, $user_id, $oid);
+    $redir = 'user_dashboard.php?';
+    if (!empty($result['ok'])) {
+        $redir .= 'alert=cancelled';
+    } elseif (($result['error'] ?? '') === 'already_cancelled') {
+        $redir .= 'alert=already_cancelled';
+    } elseif (($result['error'] ?? '') === 'not_cancellable') {
+        $redir .= 'alert=not_cancellable';
+    } else {
+        $redir .= 'alert=error';
+    }
+    header('Location: ' . $redir);
+    exit;
+}
+
+$profileCols = 'name, surname, age, address, email, profile_image';
+if (!isset($hasPhone)) {
+    $hasPhone = ep_users_has_phone($db);
+}
+if ($hasPhone) {
+    $profileCols .= ', phone';
+}
+$uStmt = $db->prepare('SELECT ' . $profileCols . ' FROM users WHERE id = ? LIMIT 1');
+$uStmt->execute([$user_id]);
+$uRow = $uStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$profileImageUrl = ep_user_profile_image_url($uRow['profile_image'] ?? null);
+
+$profileForm = [
+    'name' => (string)($uRow['name'] ?? ''),
+    'surname' => (string)($uRow['surname'] ?? ''),
+    'age' => (string)($uRow['age'] ?? ''),
+    'email' => (string)($uRow['email'] ?? ''),
+    'phone' => (string)($uRow['phone'] ?? ''),
+];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_profile' && $profileFlashErr !== '') {
+    $profileForm['name'] = trim((string)($_POST['name'] ?? $profileForm['name']));
+    $profileForm['surname'] = trim((string)($_POST['surname'] ?? $profileForm['surname']));
+    $profileForm['age'] = (string)($_POST['age'] ?? $profileForm['age']);
+    $profileForm['email'] = trim((string)($_POST['email'] ?? $profileForm['email']));
+    $profileForm['phone'] = trim((string)($_POST['phone'] ?? $profileForm['phone']));
+}
+
+// Saved delivery address (structured). Legacy accounts may only have free-text users.address.
+$savedAddress = ep_user_address($db, $user_id);
+$addressComplete = ep_address_is_complete($savedAddress);
+$savedAddressLine = $addressComplete ? ep_address_format($savedAddress) : $savedAddress['full'];
+$profileAddr = $savedAddress;
+if (isset($addressInput) && $profileFlashErr !== '') {
+    $profileAddr = $addressInput['fields'] + $profileAddr;
+}
+
+$rawName = trim((string)($_SESSION['name'] ?? ($profileForm['name'] !== '' ? $profileForm['name'] : 'Customer')));
 $safeName = h($rawName !== '' ? $rawName : 'Customer');
 $initial = strtoupper(substr($rawName !== '' ? $rawName : 'C', 0, 1));
 
@@ -31,35 +223,30 @@ $sql = "SELECT o.*,
         FROM orders o
         WHERE o.user_id = ?";
 $params = [$user_id];
-$types = 'i';
 
 if ($current_filter !== 'All') {
     $sql .= ' AND (o.status = ? OR o.status = ?)';
     $params[] = $current_filter;
     $params[] = $legacyStatus[$current_filter] ?? $current_filter;
-    $types .= 'ss';
 }
 
 if ($search_query !== '') {
     $like = '%' . $search_query . '%';
     $sql .= " AND (
-        CAST(o.id AS CHAR) LIKE ?
-        OR CAST(o.total AS CHAR) LIKE ?
+        CAST(o.id AS TEXT) LIKE ?
+        OR CAST(o.total AS TEXT) LIKE ?
         OR o.status LIKE ?
         OR o.shipping_address LIKE ?
         OR o.customer_phone LIKE ?
-        OR DATE_FORMAT(o.created_at, '%M %d, %Y') LIKE ?
+        OR to_char(o.created_at, 'Month DD, YYYY') LIKE ?
     )";
     array_push($params, $like, $like, $like, $like, $like, $like);
-    $types .= 'ssssss';
 }
 
 $sql .= ' ORDER BY o.id DESC';
 $stOrders = $db->prepare($sql);
-$stOrders->bind_param($types, ...$params);
-$stOrders->execute();
-$orders = $stOrders->get_result();
-
+$stOrders->execute($params);
+$orders = $stOrders->fetchAll(PDO::FETCH_ASSOC);
 $recentResult = $db->query(
     "SELECT p.*, u.name AS seller_name FROM products p
      INNER JOIN users u ON p.seller_id = u.id
@@ -67,9 +254,11 @@ $recentResult = $db->query(
      ORDER BY p.id DESC LIMIT 20"
 );
 $recentProducts = ias_client_filter_products_for_display(
-    $recentResult ? $recentResult->fetch_all(MYSQLI_ASSOC) : [],
+    $recentResult ? $recentResult->fetchAll(PDO::FETCH_ASSOC) : [],
     4
 );
+
+$cancellableStatuses = ['to_pay', 'to_ship', 'To Pay', 'To Ship', 'Pending', 'pending'];
 
 $isLoggedIn = true;
 $activePage = 'account';
@@ -83,21 +272,168 @@ $statusTitles = [
     'to_receive' => 'To Receive',
     'to_review' => 'To Review',
 ];
+
+$alertMsg = '';
+if (!empty($_GET['alert'])) {
+    $alertMap = [
+        'cancelled' => 'Order cancelled. Stock has been restored.',
+        'already_cancelled' => 'This order was already cancelled.',
+        'not_cancellable' => 'This order can no longer be cancelled.',
+        'error' => 'Could not complete the action. Please try again.',
+        'profile_saved' => 'Profile settings saved.',
+    ];
+    $alertMsg = $alertMap[$_GET['alert']] ?? '';
+}
+
+$showSettings = isset($_GET['settings'])
+    || (isset($_POST['keep_settings']) && (string)$_POST['keep_settings'] === '1')
+    || ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_profile');
+if ($showSettings) {
+    $pageTitle = 'Profile Settings';
+}
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
 <main class="ep-main">
     <div class="dashboard-wrapper">
+        <?php if ($profileFlash !== ''): ?>
+            <div class="ep-info-note" style="margin-bottom:16px;"><?php echo h($profileFlash); ?></div>
+        <?php endif; ?>
+        <?php if ($profileFlashErr !== ''): ?>
+            <div class="ep-info-note" style="margin-bottom:16px;color:#c0392b;border-color:#c0392b;"><?php echo h($profileFlashErr); ?></div>
+        <?php endif; ?>
+        <?php if ($alertMsg !== ''): ?>
+            <div class="ep-info-note" style="margin-bottom:16px;"><?php echo h($alertMsg); ?></div>
+        <?php endif; ?>
+
         <section class="profile-banner">
             <div class="user-meta">
-                <div class="avatar-circle"><?php echo h($initial); ?></div>
+                <div class="avatar-wrap">
+                    <?php if ($profileImageUrl !== ''): ?>
+                        <img class="avatar-circle avatar-img" src="<?php echo h($profileImageUrl); ?>" alt="Profile picture">
+                    <?php else: ?>
+                        <div class="avatar-circle"><?php echo h($initial); ?></div>
+                    <?php endif; ?>
+                    <form method="post" enctype="multipart/form-data" class="avatar-upload-form">
+                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                        <input type="hidden" name="action" value="upload_avatar">
+                        <?php if (!empty($showSettings)): ?>
+                            <input type="hidden" name="keep_settings" value="1">
+                        <?php endif; ?>
+                        <label class="avatar-upload-btn" for="avatarInput">
+                            <i class="fas fa-camera" aria-hidden="true"></i>
+                            <span>Change photo</span>
+                        </label>
+                        <input id="avatarInput" type="file" name="avatar" accept="image/jpeg,image/png,image/webp,image/gif" hidden
+                               onchange="this.form.submit()">
+                    </form>
+                </div>
                 <div>
                     <h2 class="dashboard-name"><?php echo $safeName; ?></h2>
                     <p class="user-status">Verified Member</p>
                 </div>
             </div>
-            <a href="../logout.php" class="logout-btn">Log Out Account</a>
+            <div class="profile-banner-actions">
+                <a href="../logout.php" class="logout-btn">Log Out</a>
+                <span class="profile-banner-sep" aria-hidden="true">|</span>
+                <a href="user_dashboard.php?settings=1"
+                   class="profile-settings-btn<?php echo $showSettings ? ' is-active' : ''; ?>"
+                   <?php echo $showSettings ? 'aria-current="page"' : ''; ?>>Profile Settings</a>
+            </div>
         </section>
+
+        <?php if (!$showSettings): ?>
+        <section class="ep-address-card<?php echo $addressComplete ? '' : ' is-incomplete'; ?>">
+            <div class="ep-address-card-icon"><i class="fas <?php echo $addressComplete ? 'fa-map-marker-alt' : 'fa-exclamation'; ?>" aria-hidden="true"></i></div>
+            <div class="ep-address-card-body">
+                <span class="ep-address-card-label">Default delivery address</span>
+                <?php if ($addressComplete): ?>
+                    <p class="ep-address-card-line"><?php echo h($savedAddressLine); ?></p>
+                    <p class="ep-address-card-meta">
+                        <?php if ($profileForm['phone'] !== ''): ?>
+                            <span><i class="fas fa-phone-alt" aria-hidden="true"></i> <?php echo h($profileForm['phone']); ?></span>
+                        <?php endif; ?>
+                        <span><i class="fas fa-check-circle" aria-hidden="true"></i> Used automatically at checkout</span>
+                    </p>
+                <?php else: ?>
+                    <p class="ep-address-card-line">
+                        <?php echo $savedAddressLine !== '' ? h($savedAddressLine) : 'No delivery address yet.'; ?>
+                    </p>
+                    <p class="ep-address-card-meta is-warning">Please complete your address (street, barangay, city, province and ZIP) so we can deliver your orders.</p>
+                <?php endif; ?>
+            </div>
+            <a class="ep-address-card-edit" href="user_dashboard.php?settings=1#delivery">
+                <?php echo $addressComplete ? '<i class="fas fa-pen"></i> Edit' : '<i class="fas fa-pen"></i> Complete address'; ?>
+            </a>
+        </section>
+
+        <div class="profile-shortcuts">
+            <a class="profile-shortcut" href="wishlist.php">
+                <i class="fas fa-heart" aria-hidden="true"></i>
+                <span>View my Wishlists</span>
+            </a>
+            <a class="profile-shortcut" href="saved_builds.php">
+                <i class="fas fa-desktop" aria-hidden="true"></i>
+                <span>View my Saved Build</span>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($showSettings): ?>
+        <section class="panel profile-settings-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-user-cog"></i> Profile Settings</h3>
+            </div>
+            <form method="post" class="profile-settings-form">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                <input type="hidden" name="action" value="update_profile">
+                <div class="profile-settings-grid">
+                    <div>
+                        <label class="ep-form-label" for="profileName">First name</label>
+                        <input class="ep-form-control" id="profileName" type="text" name="name" maxlength="80" required
+                               value="<?php echo h($profileForm['name']); ?>">
+                    </div>
+                    <div>
+                        <label class="ep-form-label" for="profileSurname">Surname</label>
+                        <input class="ep-form-control" id="profileSurname" type="text" name="surname" maxlength="80" required
+                               value="<?php echo h($profileForm['surname']); ?>">
+                    </div>
+                    <div>
+                        <label class="ep-form-label" for="profileAge">Age</label>
+                        <input class="ep-form-control" id="profileAge" type="number" name="age" min="13" max="120" required
+                               value="<?php echo h($profileForm['age']); ?>">
+                    </div>
+                    <div>
+                        <label class="ep-form-label" for="profileEmail">Email</label>
+                        <input class="ep-form-control" id="profileEmail" type="email" name="email" maxlength="190" required
+                               value="<?php echo h($profileForm['email']); ?>">
+                    </div>
+                    <?php if ($hasPhone): ?>
+                    <div>
+                        <label class="ep-form-label" for="profilePhone">Phone number</label>
+                        <input class="ep-form-control" id="profilePhone" type="tel" name="phone" maxlength="30" required
+                               value="<?php echo h($profileForm['phone']); ?>">
+                    </div>
+                    <?php endif; ?>
+                    <div class="profile-settings-full" id="delivery">
+                        <h4 class="ep-address-heading"><i class="fas fa-map-marker-alt"></i> Default delivery address</h4>
+                        <p class="ep-address-hint">Used automatically at checkout. You can still send a single order somewhere else.</p>
+                        <?php if (!$addressComplete && $savedAddress['full'] !== ''): ?>
+                            <div class="ep-address-legacy">
+                                <i class="fas fa-exclamation-circle"></i>
+                                <span>Your current address <strong>"<?php echo h($savedAddress['full']); ?>"</strong> is missing details. Please fill in the fields below.</span>
+                            </div>
+                        <?php endif; ?>
+                        <?php ep_render_address_fields($profileAddr, '../assets/data/psgc', 'profileAddr_'); ?>
+                    </div>
+                </div>
+                <div class="profile-settings-actions">
+                    <a href="user_dashboard.php" class="ep-btn profile-settings-back">Back</a>
+                    <button type="submit" class="ep-btn ep-btn-primary">Save changes</button>
+                </div>
+            </form>
+        </section>
+        <?php else: ?>
 
         <div class="dash-grid">
             <div class="panel">
@@ -115,20 +451,37 @@ $statusTitles = [
                 <div class="table-responsive">
                     <table class="order-list">
                         <thead>
-                            <tr><th>ID</th><th>Date</th><th>Total</th><th>Status</th></tr>
+                            <tr><th>ID</th><th>Date</th><th>Total</th><th>Status</th><th>Action</th></tr>
                         </thead>
                         <tbody>
-                        <?php while ($o = $orders->fetch_assoc()): ?>
+                        <?php foreach ($orders as $o):
+                            $ost = (string)($o['status'] ?? '');
+                            $canCancel = in_array($ost, $cancellableStatuses, true);
+                            ?>
                             <tr>
                                 <td><strong>#ORD-<?php echo (int)$o['id']; ?></strong></td>
                                 <td><span class="meta-text"><?php echo date('M d, Y', strtotime($o['created_at'])); ?></span></td>
                                 <td><b class="dash-price">&#8369;<?php echo number_format((float)$o['total'], 2); ?></b></td>
                                 <td><span class="status-tag"><?php echo h(ias_order_display_status($o['status'] ?? '', $o['shipment_status'] ?? null)); ?></span></td>
+                                <td>
+                                    <?php if ($canCancel): ?>
+                                        <form method="post" class="order-cancel-form" onsubmit="return confirm('Cancel this order? Stock will be restored.');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                            <input type="hidden" name="action" value="cancel_order">
+                                            <input type="hidden" name="order_id" value="<?php echo (int)$o['id']; ?>">
+                                            <button type="submit" class="order-cancel-btn">Cancel</button>
+                                        </form>
+                                    <?php elseif (strcasecmp($ost, 'cancelled') === 0 || strcasecmp($ost, 'canceled') === 0): ?>
+                                        <span class="meta-text">Cancelled</span>
+                                    <?php else: ?>
+                                        <span class="meta-text">—</span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
 
-                        <?php if ($orders->num_rows === 0): ?>
-                            <tr><td colspan="4" class="empty-state">No transactions found.</td></tr>
+                        <?php if (count($orders) === 0): ?>
+                            <tr><td colspan="5" class="empty-state">No transactions found.</td></tr>
                         <?php endif; ?>
                         </tbody>
                     </table>
@@ -164,7 +517,13 @@ $statusTitles = [
             <a href="user_dashboard.php?status=to_receive" class="tab-item <?php echo $current_filter === 'to_receive' ? 'active' : ''; ?>"><i class="fas fa-inbox"></i> To Receive</a>
             <a href="user_dashboard.php?status=to_review" class="tab-item <?php echo $current_filter === 'to_review' ? 'active' : ''; ?>"><i class="fas fa-star"></i> To Review</a>
         </div>
+        <?php endif; ?>
     </div>
 </main>
 
-<?php include __DIR__ . '/ep_footer.php'; ?>
+<?php
+if ($showSettings) {
+    $extraScripts = '<script src="../assets/js/ph-address.js"></script>';
+}
+include __DIR__ . '/ep_footer.php';
+?>

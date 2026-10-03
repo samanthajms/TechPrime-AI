@@ -3,39 +3,13 @@
 function ias_product_categories(): array
 {
     return [
-        'Accessories',
-        'Audio',
-        'Cables and Adapters',
-        'Camera',
-        'Combo',
-        'Cooling',
-        'Customization',
         'Display',
-        'Gaming Surface',
-        'GPU',
-        'Graphic Card',
-        'Hard Disk',
-        'Home & Office Furniture',
-        'Keyboard',
-        'Motherboard',
-        'Mouse',
-        'Network Device',
-        'Others',
-        'PC Case',
-        'Power Station',
-        'Power Supply',
-        'Printer and Scanner',
-        'Printers and Scanners',
-        'Processor',
-        'Promotional',
-        'RAM',
-        'Recorder',
-        'Services',
-        'Software',
-        'Solid State Drive',
+        'Laptops',
+        'Audio',
+        'Cooling',
         'Speaker',
-        'UPS & AVR',
-        'Value Plus',
+        'Accessories',
+        'Others',
     ];
 }
 
@@ -46,19 +20,12 @@ function ias_product_categories(): array
 function ias_inventory_allowed_categories(): array
 {
     return [
+        'Display',
         'Laptops',
-        'Desktop',
-        'Mobile',
-        'Cameras',
-        'Accessories',
-        'GPU',
-        'Printers and Scanners',
         'Audio',
-        'Cables and Adapters',
-        'RAM',
-        'Motherboard',
-        'Power Supply',
-        'Processor',
+        'Cooling',
+        'Speaker',
+        'Accessories',
         'Others',
     ];
 }

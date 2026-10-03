@@ -1,9 +1,9 @@
 -- ============================================================
 -- Migration: Replace MFA code with Google Authenticator TOTP
--- Run this on your existing ias_ecommerce database
+-- Run this on your existing techprime_ai database
 -- ============================================================
 
-USE ias_ecommerce;
+USE techprime_ai;
 
 -- Add TOTP columns
 ALTER TABLE users

@@ -2,15 +2,25 @@
 session_start();
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/paymongo.php';
+require_once __DIR__ . '/../../includes/address_helpers.php';
 
 if (empty($_SESSION['user_id']) || empty($_POST['total'])) {
     header('Location: ../../CLIENT/checkout.php');
     exit;
 }
 
+// Saved profile address or a one-off address for this order (same rules as COD).
+$phone    = trim((string)($_POST['phone'] ?? ''));
+$resolved = ep_checkout_resolve_address(getDbConnection(), (int)$_SESSION['user_id'], $_POST);
+$addrErr  = ep_phone_error($phone) ?: ($resolved['ok'] ? '' : $resolved['error']);
+if ($addrErr !== '') {
+    $_SESSION['checkout_flash_error'] = $addrErr;
+    header('Location: ../../CLIENT/checkout.php');
+    exit;
+}
+
 $total          = (float) $_POST['total'];
-$address        = $_POST['address'] ?? '';
-$phone          = $_POST['phone'] ?? '';
+$address        = $resolved['address'];
 $amountCentavos = (int) round($total * 100);
 
 $_SESSION['pending_order'] = [

@@ -23,15 +23,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = "error";
         } else {
             $stmt = $db->prepare("UPDATE users SET name = ? WHERE id = ?");
-            $stmt->bind_param("si", $newName, $retailId);
-            if ($stmt->execute()) {
+            if ($stmt->execute([$newName, $retailId])) {
             $_SESSION['name'] = $newName;
             $message = "Profile updated successfully!";
             } else {
             $message = "Could not update profile.";
             $messageType = "error";
             }
-            $stmt->close();
         }
     }
 
@@ -47,25 +45,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
             $stmt = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
-            $stmt->bind_param("si", $passwordHash, $retailId);
-            if ($stmt->execute()) {
+            if ($stmt->execute([$passwordHash, $retailId])) {
                 $message = "Password updated successfully!";
             } else {
                 $message = "Could not update password.";
                 $messageType = "error";
             }
-            $stmt->close();
         }
     }
 }
 
 // --- FETCH CURRENT DATA ---
 $stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
-$stmt->bind_param("i", $retailId);
-$stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
-$stmt->close();
-
+$stmt->execute([$retailId]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 staff_page_start([
     'role' => 'retail_officer',
     'title' => 'Settings',

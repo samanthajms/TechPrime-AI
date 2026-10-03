@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/staff_layout.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -12,15 +13,13 @@ $error    = '';
 
 // Ensure settings table & default rows exist (idempotent)
 $db->query("
-    CREATE TABLE IF NOT EXISTS `site_settings` (
-        `id`            INT(11)      NOT NULL AUTO_INCREMENT,
-        `setting_key`   VARCHAR(100) NOT NULL,
-        `setting_value` TEXT         NOT NULL,
-        `updated_by`    INT(11)      DEFAULT NULL,
-        `updated_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (`id`),
-        UNIQUE KEY `uq_setting_key` (`setting_key`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    CREATE TABLE IF NOT EXISTS site_settings (
+        id SERIAL PRIMARY KEY,
+        setting_key VARCHAR(100) NOT NULL UNIQUE,
+        setting_value TEXT NOT NULL,
+        updated_by INTEGER DEFAULT NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
 ");
 
 $defaults = [
@@ -32,16 +31,14 @@ $defaults = [
     'max_failed_attempts'=> '3',
 ];
 foreach ($defaults as $k => $v) {
-    $ins = $db->prepare("INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES (?, ?)");
-    $ins->bind_param('ss', $k, $v);
-    $ins->execute();
-    $ins->close();
+    $ins = $db->prepare("INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT (setting_key) DO NOTHING");
+    $ins->execute([$k, $v]);
 }
 
 function getSettings($db) {
     $res = $db->query("SELECT setting_key, setting_value FROM site_settings");
     $out = [];
-    while ($row = $res->fetch_assoc()) {
+    while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
         $out[$row['setting_key']] = $row['setting_value'];
     }
     return $out;
@@ -72,9 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ok = true;
     foreach ($updates as $k => $v) {
         $upd = $db->prepare("UPDATE site_settings SET setting_value = ?, updated_by = ? WHERE setting_key = ?");
-        $upd->bind_param('sis', $v, $admin_id, $k);
-        if (!$upd->execute()) { $ok = false; }
-        $upd->close();
+        if (!$upd->execute([$v, $admin_id, $k])) { $ok = false; }
     }
 
     if ($ok) {
@@ -87,16 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $cfg = getSettings($db);
 $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings — EasyPC Admin</title>
-    <link rel="stylesheet" href="admin_shared.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <style>
+
+$settingsCss = <<<'CSS'
         .rule-row {
             display: flex; align-items: flex-start;
             gap: 16px; padding: 18px 0;
@@ -157,45 +144,17 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
         .attempts-icon { font-size: 22px; flex-shrink: 0; color: var(--ep-green-dark); }
         .attempts-desc strong { display: block; font-size: 14px; color: var(--teal-deeper); margin-bottom: 4px; }
         .attempts-desc span { font-size: 12.5px; color: var(--slate-500); }
-    </style>
-</head>
-<body>
+CSS;
 
-<div class="sidebar">
-    <div class="sidebar-brand">
-        <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img brand-logo">
-        <div>
-            <div class="brand-text">EasyPC</div>
-            <div class="brand-sub">Admin</div>
-        </div>
-    </div>
-    <nav>
-        <a href="admin_dashboard.php"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
-        <a href="manage_users.php"><i class="fas fa-users"></i><span>Manage Users</span></a>
-        <a href="view_logs.php"><i class="fas fa-clipboard-list"></i><span>Activity Logs</span></a>
-        <a href="admin_profile.php"><i class="fas fa-user"></i><span>My Profile</span></a>
-        <a href="admin_settings.php" class="active"><i class="fas fa-cog"></i><span>Settings</span></a>
-    </nav>
-    <div class="sidebar-footer">
-        <a href="../logout.php"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
-    </div>
-</div>
-
-<div class="main">
-    <div class="topbar">
-        <div class="topbar-left">
-            <h2>Security Settings</h2>
-            <div class="breadcrumb">Configure authentication &amp; password policies</div>
-        </div>
-        <div class="topbar-right">
-            <div class="admin-badge">
-                <div class="avatar"><?php echo $adminInitials; ?></div>
-                <?php echo h($_SESSION['name']); ?>
-            </div>
-        </div>
-    </div>
-
-    <div class="page-content">
+staff_page_start([
+    'role' => 'admin',
+    'title' => 'Settings',
+    'active' => 'settings',
+    'heading' => 'Security Settings',
+    'subtitle' => 'Configure authentication & password policies',
+    'extra_head' => '<style>' . $settingsCss . '</style>',
+]);
+?>
 
         <?php if ($success): ?>
             <div class="alert alert-success">✔ <?php echo h($success); ?></div>
@@ -373,10 +332,9 @@ $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
                 <span class="text-muted text-small">Changes to login attempts take effect immediately.</span>
             </div>
         </form>
-    </div>
-</div>
 
-<script src="../includes/ui_alerts.js"></script>
+<?php
+staff_page_end(<<<'SCRIPTS'
 <script>
 function adjustVal(id, delta, min, max) {
     const inp = document.getElementById(id);
@@ -413,5 +371,4 @@ document.getElementById('toggleLower').addEventListener('change', updatePreview)
 document.getElementById('toggleNum').addEventListener('change', updatePreview);
 document.getElementById('toggleSpec').addEventListener('change', updatePreview);
 </script>
-</body>
-</html>
+SCRIPTS);

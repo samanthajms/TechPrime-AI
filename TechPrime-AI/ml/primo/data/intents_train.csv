@@ -1,0 +1,550 @@
+text,intent
+Good afternoon,greeting
+Good day,greeting
+Good evening,greeting
+Good evening Primo,greeting
+Good morning,greeting
+Good morning Primo,greeting
+Greetings,greeting
+Greetings Primo,greeting
+Hello,greeting
+Hello again Primo,greeting
+Hello can you help,greeting
+Hello EasyPC,greeting
+Hello friend,greeting
+Hello from a customer,greeting
+Hello I just arrived,greeting
+Hello Primo,greeting
+Hello Primo I am new here,greeting
+Hello there,greeting
+"Hello, I need some help",greeting
+Hey,greeting
+Hey assistant,greeting
+Hey I need assistance,greeting
+Hey Primo,greeting
+Hey Primo are you there,greeting
+Hey Primo I am looking around,greeting
+"Hey Primo, can you help me?",greeting
+Hey there Primo,greeting
+Hi,greeting
+Hi again,greeting
+Hi AI,greeting
+Hi buddy,greeting
+Hi can you assist me,greeting
+Hi I would like some help,greeting
+Hi Primo,greeting
+Hi Primo how are you,greeting
+Hi Primo ready to help?,greeting
+Hi there,greeting
+Morning,greeting
+Morning Primo,greeting
+Yo Primo,greeting
+Alright bye,goodbye
+Bye,goodbye
+Bye bye,goodbye
+Bye for now,goodbye
+Bye Primo,goodbye
+Bye see you soon,goodbye
+Bye thank you,goodbye
+Catch you later,goodbye
+End of chat,goodbye
+Farewell,goodbye
+Going offline,goodbye
+Good night,goodbye
+Goodbye,goodbye
+Goodbye Primo,goodbye
+Gotta go,goodbye
+I am done,goodbye
+I am finished,goodbye
+I am good for now bye,goodbye
+I am heading out,goodbye
+I am leaving now,goodbye
+I have to go,goodbye
+I will come back later,goodbye
+I will stop here,goodbye
+Later,goodbye
+Nothing else for now,goodbye
+Ok goodbye,goodbye
+Okay bye,goodbye
+See ya,goodbye
+See you,goodbye
+See you later,goodbye
+Signing off,goodbye
+Take care,goodbye
+Talk to you later,goodbye
+Thanks bye Primo,goodbye
+"Thanks, bye",goodbye
+That is all,goodbye
+"That is all, thanks",goodbye
+That is everything,goodbye
+Until next time,goodbye
+Will chat later,goodbye
+Appreciate it,gratitude
+Appreciate your assistance,gratitude
+Awesome thank you,gratitude
+Cheers thanks,gratitude
+Cool thanks,gratitude
+Grateful for the help,gratitude
+"Great, thanks",gratitude
+I appreciate it Primo,gratitude
+I appreciate your help,gratitude
+Many thanks,gratitude
+Much appreciated,gratitude
+Nice thanks,gratitude
+Ok thanks Primo,gratitude
+"Okay, thank you",gratitude
+Perfect thanks,gratitude
+Thank you,gratitude
+Thank you again Primo,gratitude
+Thank you for helping me,gratitude
+Thank you for the info,gratitude
+Thank you for your time,gratitude
+Thank you kindly,gratitude
+Thank you Primo,gratitude
+Thank you so much,gratitude
+Thanks,gratitude
+Thanks a lot,gratitude
+Thanks again,gratitude
+Thanks for clarifying,gratitude
+Thanks for the product help,gratitude
+Thanks for the recommendation,gratitude
+Thanks for your help,gratitude
+Thanks mate,gratitude
+Thanks Primo,gratitude
+Thanks that answers it,gratitude
+Thanks that was clear,gratitude
+That helped a lot,gratitude
+That is helpful,gratitude
+That was useful thanks,gratitude
+Assist me please,help
+Can you assist me?,help
+Can you guide me,help
+Can you help me find a product?,help
+Can you help me shop,help
+Can you help with products,help
+Explain what you help with,help
+Help,help
+Help me,help
+Help me get started,help
+Help me use this chat,help
+Help with shopping,help
+How can Primo help me,help
+How can you help me?,help
+How do I use you,help
+How do you work?,help
+How may you assist me,help
+I need customer support help,help
+I need guidance from Primo,help
+I need help finding something,help
+List ways you can help,help
+Need help,help
+Show me what you can do,help
+Tell me how you can help,help
+What are you able to help with?,help
+What are your capabilities?,help
+What assistance do you offer,help
+What can I ask you?,help
+What can Primo do,help
+What can you do?,help
+What can you help me with?,help
+What do you do?,help
+What is your purpose,help
+What kind of questions can I ask,help
+What product help can you give,help
+What should I ask you,help
+What support do you provide,help
+What topics can you answer?,help
+Browse laptops in the store,product_search
+Browse the product catalog,product_search
+Display available GPUs,product_search
+Display your headsets,product_search
+Do you sell motherboards,product_search
+Find a webcam,product_search
+Find cooling fans in the shop,product_search
+Find gaming laptops,product_search
+Find me a headset,product_search
+Find me accessories,product_search
+Find me mouse products,product_search
+Find NVMe drives,product_search
+Find power supply units,product_search
+Find products named Logitech,product_search
+Find RTX 4060 products,product_search
+Find RTX 4070 listings,product_search
+I want to browse desktops,product_search
+I want to see graphics cards,product_search
+I want to see motherboards,product_search
+I want to see your PCs,product_search
+List available motherboards,product_search
+List your keyboards,product_search
+Look up Logitech products,product_search
+Search Accutone headsets,product_search
+Search available SSDs,product_search
+Search for a mouse,product_search
+Search for graphics cards,product_search
+Search for keyboard products,product_search
+Search RAM modules,product_search
+Search the catalog for SSD,product_search
+Search your catalog for laptops,product_search
+Show all accessories,product_search
+Show available RAM,product_search
+Show headset products,product_search
+Show me all desktop listings,product_search
+Show me Audio items,product_search
+Show me available products,product_search
+Show me Desktop products,product_search
+Show me gaming laptops,product_search
+Show me gaming PCs,product_search
+Show me GPUs,product_search
+Show me laptops,product_search
+Show me monitors for sale,product_search
+Show me printers,product_search
+Show me RAKK products,product_search
+Show me the product list,product_search
+Show me what is listed under Audio,product_search
+Show me your current product listings,product_search
+Show products in stock,product_search
+What products do you have,product_search
+Advise me on a gaming laptop,product_recommendation
+Best laptop for students,product_recommendation
+Can you help me choose a PC for work,product_recommendation
+Can you recommend a gaming PC?,product_recommendation
+Can you suggest a PC for gaming?,product_recommendation
+Help me choose a gaming PC,product_recommendation
+Help me decide on a gaming laptop,product_recommendation
+Help me find the right PC for my needs,product_recommendation
+Help me pick a desktop for work,product_recommendation
+I am looking for a gaming computer,product_recommendation
+I need a computer for school and light gaming,product_recommendation
+I need a gaming PC,product_recommendation
+I need a laptop for school,product_recommendation
+I need a PC for gaming,product_recommendation
+I need a reliable PC for office tasks,product_recommendation
+I need a work PC,product_recommendation
+I need advice on buying a gaming PC,product_recommendation
+I need something for gaming,product_recommendation
+I want a budget PC,product_recommendation
+I want a computer for gaming,product_recommendation
+I want a gaming PC,product_recommendation
+I want a laptop suited for online classes,product_recommendation
+I want a PC that can handle gaming,product_recommendation
+I want an affordable gaming computer,product_recommendation
+I want an office PC,product_recommendation
+I want to play Valorant. What PC or laptop would you recommend,product_recommendation
+Looking for a machine suited for gaming,product_recommendation
+Recommend a budget laptop,product_recommendation
+Recommend a headset for gaming,product_recommendation
+Recommend a laptop for school,product_recommendation
+Recommend a PC for content creation,product_recommendation
+Recommend a PC for gaming,product_recommendation
+Recommend hardware for gaming,product_recommendation
+Recommend something for office work,product_recommendation
+Suggest a gaming PC,product_recommendation
+Suggest a good starter PC,product_recommendation
+Suggest a laptop for productivity,product_recommendation
+Suggest a PC for gaming,product_recommendation
+Suggest a productivity PC,product_recommendation
+What build do you suggest for Fortnite,product_recommendation
+What computer is good for Valorant,product_recommendation
+What computer should I get for gaming,product_recommendation
+What gaming PC should I buy?,product_recommendation
+What GPU would you recommend,product_recommendation
+What is a good PC for gaming?,product_recommendation
+What is a good starter PC,product_recommendation
+What is good for Call of Duty,product_recommendation
+What is suitable for student use,product_recommendation
+What laptop is good for school work,product_recommendation
+What PC do you recommend for gaming?,product_recommendation
+What PC is good for office use,product_recommendation
+What PC should I buy for gaming,product_recommendation
+What should I get for streaming,product_recommendation
+What would you pick for a gaming setup,product_recommendation
+Which desktop is best for me,product_recommendation
+Which gaming computer should I get?,product_recommendation
+Which gaming PC fits a mid range budget,product_recommendation
+Which PC fits a beginner gamer,product_recommendation
+Which PC is best for gaming,product_recommendation
+Which product should I buy for school,product_recommendation
+Can you tell me the price,product_price
+Cost of RAKK products,product_price
+How expensive is this PC,product_price
+How much does this keyboard cost,product_price
+How much for an RTX 4070,product_price
+How much is Accutone headset,product_price
+How much is the RTX 4060,product_price
+How much is this GPU,product_price
+How much would this keyboard be,product_price
+Price check please,product_price
+Price of the Logitech headset,product_price
+Pricing for gaming laptops,product_price
+Tell me the price of that SSD,product_price
+What does this cost,product_price
+What is the price of this laptop,product_price
+What is the selling price,product_price
+What's the cost of this desktop,product_price
+What's the peso price of this item,product_price
+What's the price of this product,product_price
+Any stock left for this product,stock_inquiry
+Available now or out of stock,stock_inquiry
+Can I buy an RTX 4060 right now,stock_inquiry
+Check availability of this item,stock_inquiry
+Do you currently stock this laptop,stock_inquiry
+Do you have an RTX 4060,stock_inquiry
+Do you have any left,stock_inquiry
+Do you have stock of this headset,stock_inquiry
+Do you have this laptop available,stock_inquiry
+Do you still have the RTX 4060,stock_inquiry
+Do you still have this GPU,stock_inquiry
+Have you got this product in stock,stock_inquiry
+Is the keyboard still available,stock_inquiry
+Is the RTX 4060 available,stock_inquiry
+Is the RTX 4060 in stock,stock_inquiry
+Is there inventory for this GPU,stock_inquiry
+Is this item in stock,stock_inquiry
+Is this product available,stock_inquiry
+Is this still for sale,stock_inquiry
+Stock check please,stock_inquiry
+Any products in Accessories category,product_category
+Browse the Others category,product_category
+Category for motherboards,product_category
+Display products in Audio,product_category
+Do you have gaming monitors,product_category
+List Desktop PCs category,product_category
+List your Accessories,product_category
+Show category Laptops,product_category
+Show Desktop category,product_category
+Show laptop category items,product_category
+Show me Cooling products,product_category
+Show me GPU category,product_category
+Show me your laptops,product_category
+What Audio products do you sell,product_category
+What belongs to Cooling,product_category
+What do you have under RAM,product_category
+What GPUs do you have,product_category
+What is under Graphics Card,product_category
+What keyboards are available,product_category
+What Printers and Scanners do you have,product_category
+Are these parts compatible together,compatibility_question
+Can I install this RAM on AM5,compatibility_question
+Can I pair this GPU with my PSU,compatibility_question
+Check compatibility of this RAM,compatibility_question
+Check if this CPU matches my board,compatibility_question
+Does this GPU fit my case,compatibility_question
+Does this SSD work with my laptop,compatibility_question
+Is this component compatible,compatibility_question
+Is this CPU compatible with AM4,compatibility_question
+Is this GPU compatible with my PC,compatibility_question
+Is this graphics card compatible,compatibility_question
+Is this motherboard compatible with Intel,compatibility_question
+Is this power supply enough for my GPU,compatibility_question
+Will DDR4 work with my board,compatibility_question
+Will NVMe work in my motherboard,compatibility_question
+Will this cooler fit my CPU,compatibility_question
+Will this processor work with B550,compatibility_question
+Will this processor work with this motherboard,compatibility_question
+Will this RAM work with my B450 board,compatibility_question
+Will this RAM work with my motherboard,compatibility_question
+Can I track my order,order_status
+Check my order status,order_status
+Did my order get shipped yet,order_status
+Has my order shipped,order_status
+Has my package been delivered,order_status
+I want to track my purchase,order_status
+Is my package out for delivery,order_status
+Look up my order status,order_status
+Order tracking number please,order_status
+Show my order tracking,order_status
+Status of my recent order,order_status
+Track order please,order_status
+Update on my order please,order_status
+What's happening with my order,order_status
+What's the status of my order,order_status
+When will my order arrive,order_status
+Where is my delivery,order_status
+Where is my order,order_status
+Where is my package,order_status
+Where is order 10234,order_status
+Can defective items be returned,return_refund
+Can I cancel and get refund,return_refund
+Can I exchange this product,return_refund
+Can I get a refund,return_refund
+Can I return this product,return_refund
+Do you accept returns,return_refund
+How do I return an item,return_refund
+How does refund work,return_refund
+How long do I have to return,return_refund
+How to request a return,return_refund
+How to return a laptop,return_refund
+I need a refund for this item,return_refund
+I want to return my purchase,return_refund
+I want to send this back,return_refund
+Is there a money back guarantee,return_refund
+Refund process for EasyPC,return_refund
+Return policy details please,return_refund
+Return this headset please,return_refund
+What is your return policy,return_refund
+What's your refund policy,return_refund
+Are you open today,store_information
+Branch location of EasyPC,store_information
+Business hours for EasyPC,store_information
+Contact information for the shop,store_information
+Customer support contact,store_information
+EasyPC One Oasis location,store_information
+EasyPC store information,store_information
+How can I contact the store,store_information
+How do I reach EasyPC,store_information
+How to visit your branch,store_information
+Store address please,store_information
+Store phone or email,store_information
+Tell me about your store,store_information
+What are your store details,store_information
+What are your store hours,store_information
+Where are you located,store_information
+Where can I visit EasyPC,store_information
+Where is EasyPC,store_information
+Where is One Oasis branch,store_information
+Where is your physical store,store_information
+Book a flight for me,fallback
+Book a flight to Japan,fallback
+Can you hack a website,fallback
+Cook me a recipe,fallback
+Cook pasta for me,fallback
+Do you believe in aliens,fallback
+Hack a website,fallback
+Help me with my homework in history,fallback
+Play music from Spotify,fallback
+Play some music,fallback
+Predict lottery numbers,fallback
+Predict stock prices tomorrow,fallback
+Sing a song,fallback
+Sing me a song,fallback
+Solve my calculus homework entirely,fallback
+Solve this math equation for fun,fallback
+Tell me a joke,fallback
+Tell me a joke about quantum physics,fallback
+Tell me celebrity gossip,fallback
+Tell me random trivia,fallback
+Translate quantum physics into French,fallback
+Translate this to French,fallback
+What is quantum physics,fallback
+What is the meaning of life,fallback
+What is the weather in Mars,fallback
+What is the weather today,fallback
+What should I name my dog,fallback
+What's your favorite movie,fallback
+Who is dating who,fallback
+Who is the president,fallback
+Who will win the lottery,fallback
+Who won the basketball game,fallback
+Write a poem about cats,fallback
+Write me a poem,fallback
+do u have this,stock_inquiry
+do you have this,stock_inquiry
+do you still have this?,stock_inquiry
+is this available?,stock_inquiry
+Is this available?,stock_inquiry
+is this in stock?,stock_inquiry
+Is this item available?,stock_inquiry
+Do you have any left?,stock_inquiry
+Is the product currently in stock?,stock_inquiry
+can i buy this now,stock_inquiry
+Can I buy this now?,stock_inquiry
+do you have RTX 4060,stock_inquiry
+do u still have rtx 4060,stock_inquiry
+got any left of this,stock_inquiry
+how much?,product_price
+How much?,product_price
+how much is this,product_price
+How much is this?,product_price
+what's the price?,product_price
+Whats the price,product_price
+how much does this cost,product_price
+How much does the RTX 4060 cost?,product_price
+What's the cheapest SSD?,product_price
+how much is this product,product_price
+price please,product_price
+Do you have a Ryzen 5?,product_search
+I'm looking for a 1TB SSD.,product_search
+Show me graphics cards.,product_search
+What processors do you have?,product_search
+Do you have RAM?,product_search
+do you have ryzen 5,product_search
+i need an ssd,product_search
+looking for 1tb ssd,product_search
+show me gpus,product_search
+find me a motherboard,product_search
+do u sell monitors,product_category
+Do you sell gaming monitors?,product_category
+Show me motherboards,product_category
+what ram do you sell,product_category
+Tell me about this product.,product_search
+What are the specs?,product_search
+What is this used for?,product_search
+Can you give me more information about this?,product_search
+What's included with this product?,product_search
+tell me more about this,product_search
+specs please,product_search
+Will this RAM work with this motherboard?,compatibility_question
+Is this GPU compatible with my build?,compatibility_question
+Can I use this processor with this motherboard?,compatibility_question
+Will this PSU be enough?,compatibility_question
+Is this SSD compatible?,compatibility_question
+will this work with my motherboard?,compatibility_question
+can this work with my motherboard,compatibility_question
+can I use this RAM?,compatibility_question
+is this compatible with my build?,compatibility_question
+will this fit my pc,compatibility_question
+I want to build a PC.,product_recommendation
+Help me build a PC.,product_recommendation
+help me build a pc,product_recommendation
+I need a computer for work.,product_recommendation
+Can you help me choose components?,product_recommendation
+What PC should I build?,product_recommendation
+Help me find the right components.,product_recommendation
+I don't know which parts to choose.,product_recommendation
+what gpu should i get,product_recommendation
+i need a pc for work,product_recommendation
+help me choose a pc,product_recommendation
+what do you recommend,product_recommendation
+what components should I get?,product_recommendation
+help me customize a build,product_recommendation
+open tech and match,product_recommendation
+try tech and match,product_recommendation
+Show my saved builds.,saved_build
+Where are my saved PCs?,saved_build
+Can I see my saved build?,saved_build
+I want to open my saved build.,saved_build
+What PC builds did I save?,saved_build
+show my saved builds,saved_build
+where can i see my saved build,saved_build
+where are my saved builds?,saved_build
+open my saved build,saved_build
+where can I find my saved PC?,saved_build
+my saved builds please,saved_build
+list my saved pc builds,saved_build
+show saved build,saved_build
+i want to view my saved builds,saved_build
+load my saved build,saved_build
+where is saved build,saved_build
+check my saved builds,saved_build
+see my pc builds i saved,saved_build
+hey primo,greeting
+Hey! Primo,greeting
+good morning,greeting
+good afternoon,greeting
+yo,greeting
+sup primo,greeting
+hiya,greeting
+hellooo,greeting
+thanks,gratitude
+thx,gratitude
+ty,gratitude
+thank u,gratitude
+thanks a bunch,gratitude
+bye,goodbye
+goodbye,goodbye
+see you later,goodbye
+cya,goodbye
+ttyl,goodbye
+What can Primo do?,help
+how do i use this chat,help
+what can you do,help
