@@ -9,6 +9,11 @@ $db = getDbConnection();
 checkSessionTimeout();
 ep_ensure_session_wishlist($db);
 
+// Live search/filter requests (?partial=1) get only the product results as JSON.
+// Drop the flag from $_GET so ep_shop_url() pagination links don't carry it.
+$isPartial = ($_GET['partial'] ?? '') === '1';
+unset($_GET['partial']);
+
 $isLoggedIn = isset($_SESSION['user_id']);
 $activePage = 'shop';
 $pageTitle  = 'Shop Now';
@@ -159,10 +164,12 @@ foreach ($allProducts as $p) {
     $brandCounts[$p['brand']] = ($brandCounts[$p['brand']] ?? 0) + 1;
 }
 ksort($brandCounts, SORT_STRING | SORT_FLAG_CASE);
-$brandLogos = ep_shop_brand_logos($db);
+// Logos are only shown in the Brands directory; skip the per-file hashing elsewhere
+// so live search requests stay fast.
+$brandLogos = $selectedSection === 'brands' ? ep_shop_brand_logos($db) : [];
 $displayBrandLogos = [];
 $seenBrandLogos = [];
-foreach ($brandCounts as $brandName => $_cnt) {
+foreach ($selectedSection === 'brands' ? $brandCounts : [] as $brandName => $_cnt) {
     $brandImg = ep_shop_brand_logo_lookup($brandLogos, $brandName);
     if ($brandImg === '') {
         continue;
@@ -257,6 +264,106 @@ foreach ($allProducts as $p) {
         $subCounts[$p['tax_parent'] . ':' . $p['tax_sub']] = ($subCounts[$p['tax_parent'] . ':' . $p['tax_sub']] ?? 0) + 1;
     }
 }
+
+ob_start();
+?>
+                <?php if (!$isBrandDirectory && $resultCount > 0): ?>
+                    <p class="ep-shop-result-count">
+                        Showing <?php echo number_format(($page - 1) * $perPage + 1); ?>&ndash;<?php echo number_format(($page - 1) * $perPage + count($displayProducts)); ?>
+                        of <?php echo number_format($resultCount); ?> product<?php echo $resultCount === 1 ? '' : 's'; ?>
+                    </p>
+                <?php endif; ?>
+                <?php if (!empty($displayProducts) && !$isBrandDirectory): ?>
+                    <div class="ep-products-grid ep-shop-grid">
+                        <?php foreach ($displayProducts as $p): ?>
+                            <div class="ep-product-card ep-grid-card">
+                                <div class="ep-shop-card-media">
+                                    <a href="products.php?id=<?php echo (int)$p['id']; ?>">
+                                    <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
+                                         class="ep-product-img" alt="<?php echo h($p['name']); ?>"
+                                         loading="lazy" decoding="async">
+                                    </a>
+                                    <form method="POST" action="wishlist.php" class="ep-wish-form ep-wish-overlay">
+                                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                        <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
+                                        <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
+                                        <button type="submit" name="toggle_wishlist" value="1"
+                                                class="ep-wish-btn<?php echo ep_wishlist_has((int)$p['id']) ? ' is-on' : ''; ?>"
+                                                title="<?php echo ep_wishlist_has((int)$p['id']) ? 'Remove from wishlist' : 'Add to wishlist'; ?>">
+                                            <i class="<?php echo ep_wishlist_has((int)$p['id']) ? 'fas' : 'far'; ?> fa-heart" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                                <div class="ep-shop-card-body">
+                                    <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
+                                    <div class="ep-product-cat">
+                                        <?php echo h($p['tax_parent_label']); ?>
+                                        <?php if ($p['tax_sub_label'] !== ''): ?>
+                                            · <?php echo h($p['tax_sub_label']); ?>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if ($p['avg_rating'] !== null): ?>
+                                        <div class="ep-shop-card-rating" title="<?php echo number_format($p['avg_rating'], 1); ?> / 5">
+                                            <?php
+                                            $rounded = (int)round($p['avg_rating']);
+                                            for ($i = 1; $i <= 5; $i++):
+                                            ?>
+                                                <i class="<?php echo $i <= $rounded ? 'fas' : 'far'; ?> fa-star" aria-hidden="true"></i>
+                                            <?php endfor; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div class="ep-product-price">₱<?php echo number_format((float)$p['price'], 2); ?></div>
+                                    <div class="ep-card-actions">
+                                        <form method="POST" action="products.php" class="ep-buy-form">
+                                            <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
+                                            <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
+                                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                            <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
+                                            <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <?php if ($totalPages > 1): ?>
+                        <nav class="ep-pagination" aria-label="Pagination">
+                            <a class="ep-page-link ep-page-nav<?php echo $page <= 1 ? ' disabled' : ''; ?>"
+                               href="<?php echo h(ep_shop_url(['page' => max(1, $page - 1)])); ?>">
+                                <i class="fas fa-arrow-left"></i> Previous
+                            </a>
+                            <?php foreach (ep_shop_pagination_range($page, $totalPages) as $item): ?>
+                                <?php if ($item === '...'): ?>
+                                    <span class="ep-page-ellipsis">…</span>
+                                <?php else: ?>
+                                    <a class="ep-page-link<?php echo $item === $page ? ' active' : ''; ?>"
+                                       href="<?php echo h(ep_shop_url(['page' => $item])); ?>"><?php echo (int)$item; ?></a>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                            <a class="ep-page-link ep-page-nav<?php echo $page >= $totalPages ? ' disabled' : ''; ?>"
+                               href="<?php echo h(ep_shop_url(['page' => min($totalPages, $page + 1)])); ?>">
+                                Next <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </nav>
+                    <?php endif; ?>
+                <?php elseif (!$isBrandDirectory): ?>
+                    <div class="ep-empty-state ep-shop-empty">
+                        <i class="fas fa-box-open" aria-hidden="true"></i>
+                        <h3>No products match your filters</h3>
+                        <p>Try another category, brand, or search, or reset filters to see the full catalog.</p>
+                        <a href="shop.php" class="ep-btn ep-btn-primary" data-shop-reset>Reset Filters</a>
+                    </div>
+                <?php endif; ?>
+<?php
+$productsHtml = ob_get_clean();
+
+if ($isPartial) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode(['ok' => true, 'html' => $productsHtml, 'count' => $resultCount, 'url' => $returnTo], JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
@@ -342,13 +449,13 @@ foreach ($allProducts as $p) {
 
     <div class="ep-page-inner ep-shop-page">
 
-        <form class="ep-shop-searchbar" method="GET" action="shop.php" role="search">
+        <form class="ep-shop-searchbar" id="epShopSearchForm" method="GET" action="shop.php" role="search">
             <?php if ($selectedParent !== ''): ?><input type="hidden" name="cat" value="<?php echo h($selectedParent); ?>"><?php endif; ?>
             <?php if ($selectedSub !== ''): ?><input type="hidden" name="sub" value="<?php echo h($selectedSub); ?>"><?php endif; ?>
             <?php if ($selectedSection !== ''): ?><input type="hidden" name="section" value="<?php echo h($selectedSection); ?>"><?php endif; ?>
             <label class="sr-only" for="epShopSearch">Search this catalog</label>
             <i class="fas fa-search" aria-hidden="true"></i>
-            <input id="epShopSearch" type="search" name="q" value="<?php echo h($shopQuery); ?>"
+            <input id="epShopSearch" type="search" name="q" value="<?php echo h($shopQuery); ?>" autocomplete="off"
                    placeholder="Search products, brands, or categories...">
             <button type="submit" class="ep-btn ep-btn-primary">Search</button>
         </form>
@@ -473,95 +580,14 @@ foreach ($allProducts as $p) {
                     </div>
 
                     <div class="ep-shop-filter-actions">
-                        <a href="shop.php" class="ep-btn ep-shop-reset">Reset Filter</a>
+                        <a href="shop.php" class="ep-btn ep-shop-reset" data-shop-reset>Reset Filter</a>
                         <button type="submit" class="ep-btn ep-btn-primary ep-shop-apply">Apply Filter</button>
                     </div>
                 </form>
             </aside>
 
-            <section class="ep-shop-products" aria-label="Products">
-                <?php if (!empty($displayProducts) && !$isBrandDirectory): ?>
-                    <div class="ep-products-grid ep-shop-grid">
-                        <?php foreach ($displayProducts as $p): ?>
-                            <div class="ep-product-card ep-grid-card">
-                                <div class="ep-shop-card-media">
-                                    <a href="products.php?id=<?php echo (int)$p['id']; ?>">
-                                    <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                         class="ep-product-img" alt="<?php echo h($p['name']); ?>"
-                                         loading="lazy" decoding="async">
-                                    </a>
-                                    <form method="POST" action="wishlist.php" class="ep-wish-form ep-wish-overlay">
-                                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                        <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                        <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
-                                        <button type="submit" name="toggle_wishlist" value="1"
-                                                class="ep-wish-btn<?php echo ep_wishlist_has((int)$p['id']) ? ' is-on' : ''; ?>"
-                                                title="<?php echo ep_wishlist_has((int)$p['id']) ? 'Remove from wishlist' : 'Add to wishlist'; ?>">
-                                            <i class="<?php echo ep_wishlist_has((int)$p['id']) ? 'fas' : 'far'; ?> fa-heart" aria-hidden="true"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                                <div class="ep-shop-card-body">
-                                    <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
-                                    <div class="ep-product-cat">
-                                        <?php echo h($p['tax_parent_label']); ?>
-                                        <?php if ($p['tax_sub_label'] !== ''): ?>
-                                            · <?php echo h($p['tax_sub_label']); ?>
-                                        <?php endif; ?>
-                                    </div>
-                                    <?php if ($p['avg_rating'] !== null): ?>
-                                        <div class="ep-shop-card-rating" title="<?php echo number_format($p['avg_rating'], 1); ?> / 5">
-                                            <?php
-                                            $rounded = (int)round($p['avg_rating']);
-                                            for ($i = 1; $i <= 5; $i++):
-                                            ?>
-                                                <i class="<?php echo $i <= $rounded ? 'fas' : 'far'; ?> fa-star" aria-hidden="true"></i>
-                                            <?php endfor; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                    <div class="ep-product-price">₱<?php echo number_format((float)$p['price'], 2); ?></div>
-                                    <div class="ep-card-actions">
-                                        <form method="POST" action="products.php" class="ep-buy-form">
-                                            <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                            <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
-                                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                            <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
-                                            <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <?php if ($totalPages > 1): ?>
-                        <nav class="ep-pagination" aria-label="Pagination">
-                            <a class="ep-page-link ep-page-nav<?php echo $page <= 1 ? ' disabled' : ''; ?>"
-                               href="<?php echo h(ep_shop_url(['page' => max(1, $page - 1)])); ?>">
-                                <i class="fas fa-arrow-left"></i> Previous
-                            </a>
-                            <?php foreach (ep_shop_pagination_range($page, $totalPages) as $item): ?>
-                                <?php if ($item === '...'): ?>
-                                    <span class="ep-page-ellipsis">…</span>
-                                <?php else: ?>
-                                    <a class="ep-page-link<?php echo $item === $page ? ' active' : ''; ?>"
-                                       href="<?php echo h(ep_shop_url(['page' => $item])); ?>"><?php echo (int)$item; ?></a>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                            <a class="ep-page-link ep-page-nav<?php echo $page >= $totalPages ? ' disabled' : ''; ?>"
-                               href="<?php echo h(ep_shop_url(['page' => min($totalPages, $page + 1)])); ?>">
-                                Next <i class="fas fa-arrow-right"></i>
-                            </a>
-                        </nav>
-                    <?php endif; ?>
-                <?php elseif (!$isBrandDirectory): ?>
-                    <div class="ep-empty-state ep-shop-empty">
-                        <i class="fas fa-box-open" aria-hidden="true"></i>
-                        <h3>No products match your filters</h3>
-                        <p>Try another category, brand, or search, or reset filters to see the full catalog.</p>
-                        <a href="shop.php" class="ep-btn ep-btn-primary">Reset Filters</a>
-                    </div>
-                <?php endif; ?>
+            <section class="ep-shop-products" id="epShopResults" aria-label="Products">
+                <?php echo $productsHtml; ?>
             </section>
         </div>
         <?php endif; ?>
@@ -604,20 +630,182 @@ $extraScripts = <<<'SCRIPTS'
         if (changed === 'max' && maxVal < minVal) maxRange.value = minVal;
         updateUI();
     }
-    minRange.addEventListener('input', function () { syncFromRanges('min'); });
-    maxRange.addEventListener('input', function () { syncFromRanges('max'); });
+    minRange.addEventListener('input', function () { syncFromRanges('min'); scheduleLoad(300); });
+    maxRange.addEventListener('input', function () { syncFromRanges('max'); scheduleLoad(300); });
     updateUI();
 
+    /* ---- Live results: refresh the product grid without reloading the page ---- */
+    var results = document.getElementById('epShopResults');
+    var searchForm = document.getElementById('epShopSearchForm');
+    var searchInput = document.getElementById('epShopSearch');
     var catSelect = document.getElementById('epShopCatSelect');
-    if (catSelect) {
-        catSelect.addEventListener('change', function () {
-            var opt = catSelect.options[catSelect.selectedIndex];
-            var href = opt ? opt.getAttribute('data-href') : '';
-            if (href) {
-                window.location.href = href;
+    var timer = null;
+    var controller = null;
+    var requestSeq = 0;
+    var lastQs = currentQs();
+
+    form.classList.add('is-live');
+
+    function currentQs() {
+        var p = new URLSearchParams(window.location.search);
+        p.delete('partial');
+        return p.toString();
+    }
+
+    function buildParams() {
+        var p = new URLSearchParams();
+        new FormData(form).forEach(function (v, k) {
+            if (k === 'q') return;
+            v = String(v).trim();
+            if (v !== '') p.set(k, v);
+        });
+        if (p.get('price_min') === String(floor)) p.delete('price_min');
+        if (p.get('price_max') === String(ceiling)) p.delete('price_max');
+        var q = searchInput ? searchInput.value.trim() : '';
+        if (q !== '') p.set('q', q);
+        // Keep the same key order as the server-built URLs.
+        var ordered = new URLSearchParams();
+        ['cat', 'sub', 'section', 'q', 'price_min', 'price_max', 'rating', 'brand', 'page'].forEach(function (k) {
+            if (p.has(k)) ordered.set(k, p.get(k));
+        });
+        return ordered;
+    }
+
+    function load(params, opts) {
+        opts = opts || {};
+        var qs = params.toString();
+        if (qs === lastQs && !opts.force) return;
+        lastQs = qs;
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (controller) controller.abort();
+        controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var seq = ++requestSeq;
+        var pageUrl = 'shop.php' + (qs ? '?' + qs : '');
+
+        results.classList.add('is-loading');
+        results.setAttribute('aria-busy', 'true');
+
+        fetch('shop.php?' + (qs ? qs + '&' : '') + 'partial=1', {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+            signal: controller ? controller.signal : undefined
+        }).then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        }).then(function (data) {
+            if (seq !== requestSeq) return;
+            if (!data || !data.ok) throw new Error('Bad response');
+            results.innerHTML = data.html;
+            if (opts.push) {
+                history.pushState({ epShop: true }, '', pageUrl);
+            } else {
+                history.replaceState({ epShop: true }, '', pageUrl);
             }
+            if (opts.scroll) {
+                var top = results.getBoundingClientRect().top + window.pageYOffset - 110;
+                if (window.pageYOffset > top) window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+            }
+        }).catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+            if (seq !== requestSeq) return;
+            // Session expired or network hiccup: fall back to a normal page load.
+            window.location.href = pageUrl;
+        }).then(function () {
+            if (seq !== requestSeq) return;
+            results.classList.remove('is-loading');
+            results.removeAttribute('aria-busy');
         });
     }
+
+    function scheduleLoad(delay) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () {
+            timer = null;
+            load(buildParams());
+        }, delay);
+    }
+
+    function syncActiveOptions(groupSelector, optionSelector) {
+        form.querySelectorAll(groupSelector + ' ' + optionSelector).forEach(function (lbl) {
+            var input = lbl.querySelector('input');
+            lbl.classList.toggle('active', !!(input && input.checked));
+        });
+    }
+
+    // Changing the category (or resetting) leaves the current subcategory / special section.
+    function clearScope() {
+        form.querySelectorAll('input[type="hidden"][name="sub"], input[type="hidden"][name="section"]').forEach(function (el) {
+            el.parentNode.removeChild(el);
+        });
+        var cat = catSelect ? catSelect.value : '';
+        document.querySelectorAll('.ep-shop-cat-nav .ep-shop-cat-btn').forEach(function (btn) {
+            btn.classList.toggle('active', btn.id === 'epMegaBtn' && cat !== '');
+        });
+    }
+
+    if (catSelect) {
+        catSelect.addEventListener('change', function () {
+            clearScope();
+            load(buildParams(), { push: true });
+        });
+    }
+
+    form.addEventListener('change', function (e) {
+        var t = e.target;
+        if (!t || t.type !== 'radio') return;
+        syncActiveOptions('.ep-shop-brand-list', '.ep-shop-brand-option');
+        syncActiveOptions('.ep-shop-rating-list', '.ep-shop-rating-option');
+        load(buildParams(), { push: true });
+    });
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        load(buildParams(), { force: true });
+    });
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function () { scheduleLoad(300); });
+    }
+    if (searchForm) {
+        searchForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            load(buildParams());
+        });
+    }
+
+    function resetFilters() {
+        if (catSelect) catSelect.value = '';
+        clearScope();
+        form.querySelectorAll('input[type="radio"][value=""]').forEach(function (r) { r.checked = true; });
+        syncActiveOptions('.ep-shop-brand-list', '.ep-shop-brand-option');
+        syncActiveOptions('.ep-shop-rating-list', '.ep-shop-rating-option');
+        minRange.value = floor;
+        maxRange.value = ceiling;
+        updateUI();
+        if (searchInput) searchInput.value = '';
+        load(buildParams(), { push: true, scroll: true });
+    }
+
+    document.addEventListener('click', function (e) {
+        var reset = e.target.closest('[data-shop-reset]');
+        if (reset && (form.contains(reset) || results.contains(reset))) {
+            e.preventDefault();
+            resetFilters();
+            return;
+        }
+        var pageLink = e.target.closest('.ep-pagination a.ep-page-link');
+        if (pageLink && results.contains(pageLink)) {
+            e.preventDefault();
+            if (pageLink.classList.contains('disabled') || pageLink.classList.contains('active')) return;
+            var url = new URL(pageLink.href, window.location.href);
+            load(new URLSearchParams(url.search), { push: true, scroll: true });
+        }
+    });
+
+    // Back/forward between live states: reload so the filter controls match the URL.
+    window.addEventListener('popstate', function () {
+        if (currentQs() !== lastQs) window.location.reload();
+    });
 })();
 
 (function () {

@@ -4416,6 +4416,16 @@ body.ep-tm-modal-open { overflow: hidden; }
     background: var(--ep-green-light);
     transform: translateY(-1px);
 }
+/* Live search/filters (shop.php): Apply is redundant once JS refreshes results on change. */
+.ep-shop-filter-card.is-live .ep-shop-apply { display: none; }
+.ep-shop-products { transition: opacity 0.15s ease; }
+.ep-shop-products.is-loading { opacity: 0.5; pointer-events: none; }
+.ep-shop-result-count {
+    margin: 0 0 12px;
+    color: #667066;
+    font-size: 13px;
+    font-weight: 600;
+}
 .ep-shop-empty {
     background: #fff;
     border: 1px dashed var(--ep-border);
