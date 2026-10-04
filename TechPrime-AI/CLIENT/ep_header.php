@@ -39,10 +39,10 @@ $epCartCount  = $epCartPreview['count'];
 $epNotifItems = [];
 $epNotifUnread = 0;
 $epNotifCsrf = '';
+require_once __DIR__ . '/../includes/client_notifications.php';
 if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
-    require_once __DIR__ . '/../includes/inventory_alerts.php';
     $notifDb = $db ?? getDbConnection();
-    $pack = inv_user_notifications($notifDb, (int)$_SESSION['user_id'], 30);
+    $pack = inv_user_notifications($notifDb, (int)$_SESSION['user_id'], 8);
     $epNotifItems = $pack['items'] ?? [];
     $epNotifUnread = (int)($pack['unread'] ?? 0);
     $epNotifCsrf = generateCsrfToken();
@@ -58,7 +58,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <?php else: ?>
         <title>EasyPC</title>
     <?php endif; ?>
-    <link rel="stylesheet" href="styles.css?v=product-page-3">
+    <link rel="stylesheet" href="styles.css?v=notifications-1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -121,17 +121,55 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
             <div id="epCartDropdown" class="ep-cart-dropdown" role="region" aria-label="Cart preview"></div>
         </div>
 
-        <button id="notifBtn" type="button" class="ep-nav-item"
-                onclick="document.getElementById('epNotifPanel').classList.toggle('hidden')"
-                aria-haspopup="true" aria-controls="epNotifPanel">
-            <span class="ep-nav-item-icon">
-                <i class="far fa-bell" aria-hidden="true"></i>
-                <?php if ($epNotifUnread > 0): ?>
-                    <span class="badge ep-notif-badge"><?php echo $epNotifUnread > 99 ? '99+' : (int)$epNotifUnread; ?></span>
+        <?php /* Click → notifications page. Hover (mouse) or keyboard focus → latest-notifications preview. */ ?>
+        <div class="ep-notif-wrap" id="epNotifWrap">
+            <a href="<?php echo !empty($isLoggedIn) ? 'notifications.php' : '../login.php'; ?>" id="notifBtn"
+               class="ep-nav-item ep-notif-trigger<?php echo ($activePage ?? '') === 'notifications' ? ' active' : ''; ?>"
+               <?php echo ($activePage ?? '') === 'notifications' ? 'aria-current="page"' : ''; ?>>
+                <span class="ep-nav-item-icon">
+                    <i class="<?php echo $epNotifUnread > 0 ? 'fas' : 'far'; ?> fa-bell" aria-hidden="true"></i>
+                    <?php if ($epNotifUnread > 0): ?>
+                        <span class="badge ep-notif-badge"><?php echo $epNotifUnread > 99 ? '99+' : (int)$epNotifUnread; ?></span>
+                    <?php endif; ?>
+                </span>
+                <span class="ep-nav-item-label">Notifications</span>
+            </a>
+
+            <div id="epNotifPanel" class="ep-notif-dropdown" role="region" aria-label="Latest notifications">
+                <div class="ep-notif-dd-head">
+                    <div class="ep-notif-dd-title">
+                        <strong>Notifications</strong>
+                        <span class="ep-notif-dd-new" id="epNotifNewChip"<?php echo $epNotifUnread > 0 ? '' : ' hidden'; ?>><?php echo (int)$epNotifUnread; ?> new</span>
+                    </div>
+                    <?php if (!empty($isLoggedIn)): ?>
+                        <button type="button" class="ep-notif-readall" data-notif-readall<?php echo $epNotifUnread > 0 ? '' : ' hidden'; ?>>
+                            <i class="fas fa-check-double" aria-hidden="true"></i> Mark all as read
+                        </button>
+                    <?php endif; ?>
+                </div>
+                <?php if (empty($isLoggedIn)): ?>
+                    <div class="ep-notif-empty">
+                        <span class="ep-notif-empty-icon"><i class="far fa-bell" aria-hidden="true"></i></span>
+                        <strong>Stay in the loop</strong>
+                        <span>Log in to get updates on your orders and payments.</span>
+                        <a href="../login.php" class="ep-cart-dd-btn is-primary">Log in</a>
+                    </div>
+                <?php elseif (empty($epNotifItems)): ?>
+                    <div class="ep-notif-empty">
+                        <span class="ep-notif-empty-icon"><i class="far fa-bell" aria-hidden="true"></i></span>
+                        <strong>You're all caught up</strong>
+                        <span>Order and payment updates will show up here.</span>
+                    </div>
+                <?php else: ?>
+                    <ul class="ep-notif-list" id="epNotifList">
+                        <?php foreach ($epNotifItems as $n) echo ep_notif_render_item($n, 'dropdown'); ?>
+                    </ul>
+                    <a href="notifications.php" class="ep-notif-dd-foot">
+                        View all notifications <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                    </a>
                 <?php endif; ?>
-            </span>
-            <span class="ep-nav-item-label">Notifications</span>
-        </button>
+            </div>
+        </div>
 
         <a href="<?php echo $isLoggedIn ? 'build_a_pc.php' : '../login.php'; ?>"
            class="ep-nav-item<?php echo (($activePage ?? '') === 'build_a_pc' || ($activePage ?? '') === 'saved_builds') ? ' active' : ''; ?>"
@@ -148,39 +186,6 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     </nav>
 </div>
 
-    <div id="epNotifPanel" class="notifications-panel hidden">
-        <div class="ep-notif-head">
-            <strong>Notifications</strong>
-        </div>
-        <?php if (empty($isLoggedIn)): ?>
-            <p class="ep-notif-empty">Log in to see your notifications.</p>
-        <?php elseif (empty($epNotifItems)): ?>
-            <p class="ep-notif-empty">No notifications yet.</p>
-        <?php else: ?>
-            <ul class="ep-notif-list" id="epNotifList">
-                <?php foreach ($epNotifItems as $n):
-                    $nRead = (int)($n['is_read'] ?? 0) === 1;
-                    $when = function_exists('inv_relative_time')
-                        ? inv_relative_time((string)$n['created_at'])
-                        : (string)($n['created_at'] ?? '');
-                    ?>
-                <li class="ep-notif-item<?php echo $nRead ? ' is-read' : ' is-unread'; ?>"
-                    data-id="<?php echo (int)$n['id']; ?>">
-                    <div class="ep-notif-body">
-                        <span class="ep-notif-msg"><?php echo h((string)$n['message']); ?></span>
-                        <span class="ep-notif-time"><?php echo h($when); ?></span>
-                    </div>
-                    <div class="ep-notif-actions">
-                        <?php if (!$nRead): ?>
-                        <button type="button" class="ep-notif-read" title="Mark as read" data-action="read">Read</button>
-                        <?php endif; ?>
-                        <button type="button" class="ep-notif-remove" title="Remove" data-action="delete">&times;</button>
-                    </div>
-                </li>
-                <?php endforeach; ?>
-            </ul>
-        <?php endif; ?>
-    </div>
 </header>
 
 <?php
@@ -310,8 +315,8 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
             // Close header popups so they don't sit on top of the drawer.
             var cw = document.getElementById('epCartWrap');
             if (cw) cw.classList.remove('open');
-            var np = document.getElementById('epNotifPanel');
-            if (np) np.classList.add('hidden');
+            var nw = document.getElementById('epNotifWrap');
+            if (nw) nw.classList.add('is-dismissed');
 
             drawer.classList.add('open');
             drawer.setAttribute('aria-hidden', 'false');
@@ -355,11 +360,10 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
         else if (typeof drawerMq.addListener === 'function') drawerMq.addListener(onDrawerBreakpoint);
     }
 
-    /* Cart: the icon is a plain link to cart.php. The preview opens on mouse hover or
-       keyboard focus (CSS). Escape hides it until the pointer/focus leaves the cart. */
-    var wrap = document.getElementById('epCartWrap');
-    var trigger = document.getElementById('cartBtn');
-    if (wrap && trigger) {
+    /* Cart and Notifications: the icon is a plain link to its page. The preview opens on
+       mouse hover or keyboard focus (CSS). Escape hides it until the pointer/focus leaves. */
+    function epHoverPreview(wrap, trigger) {
+        if (!wrap || !trigger) return;
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             var focusedInside = wrap.contains(document.activeElement);
@@ -373,6 +377,8 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
             if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('is-dismissed');
         });
     }
+    epHoverPreview(document.getElementById('epCartWrap'), document.getElementById('cartBtn'));
+    epHoverPreview(document.getElementById('epNotifWrap'), document.getElementById('notifBtn'));
 
     /* Update header Cart badge + dropdown from cart preview JSON (no page reload). */
     window.epUpdateCartPreview = function (preview) {
@@ -636,59 +642,115 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
         });
     }
 
-    /* ---- Persistent notifications (DB-backed) ---- */
-    var notifList = document.getElementById('epNotifList');
+    /* ---- Persistent notifications (DB-backed) ----
+       Rows (.ep-notif-item[data-id]) live in the header preview and on notifications.php;
+       the same notification can be on screen twice, so updates apply to every copy. */
     var notifCsrf = <?php echo json_encode($epNotifCsrf ?? ''); ?>;
-    if (notifList && notifCsrf) {
-        function postClientNotif(action, id) {
+    if (notifCsrf) {
+        var postClientNotif = function (action, id, keepalive) {
             var body = new URLSearchParams();
             body.set('action', action);
             body.set('csrf_token', notifCsrf);
-            body.set('id', String(id));
+            if (id) body.set('id', String(id));
             return fetch('client_notif_api.php', {
                 method: 'POST',
                 credentials: 'same-origin',
+                keepalive: !!keepalive,
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: body.toString()
             }).then(function (r) { return r.json(); }).catch(function () { return null; });
-        }
-        function refreshNotifBadge() {
-            var badge = document.querySelector('#notifBtn .ep-notif-badge');
-            var unread = notifList.querySelectorAll('.ep-notif-item.is-unread').length;
+        };
+        var notifCopies = function (id) {
+            return document.querySelectorAll('.ep-notif-item[data-id="' + (parseInt(id, 10) || 0) + '"]');
+        };
+        var markItemRead = function (item) {
+            item.classList.remove('is-unread');
+            item.classList.add('is-read');
+            var btn = item.querySelector('[data-notif-action="read"]');
+            if (btn) btn.remove();
+            var sr = item.querySelector('.ep-notif-sr');
+            if (sr) sr.remove();
+        };
+        var setUnread = function (unread) {
+            unread = Math.max(0, parseInt(unread, 10) || 0);
             var icon = document.querySelector('#notifBtn .ep-nav-item-icon');
+            var badge = document.querySelector('#notifBtn .ep-notif-badge');
+            var bell = icon ? icon.querySelector('.fa-bell') : null;
+            if (bell) bell.className = (unread > 0 ? 'fas' : 'far') + ' fa-bell';
             if (unread <= 0) {
                 if (badge) badge.remove();
+            } else {
+                if (!badge && icon) {
+                    badge = document.createElement('span');
+                    badge.className = 'badge ep-notif-badge';
+                    icon.appendChild(badge);
+                }
+                if (badge) badge.textContent = unread > 99 ? '99+' : String(unread);
+            }
+            var chip = document.getElementById('epNotifNewChip');
+            if (chip) {
+                chip.textContent = unread + ' new';
+                chip.hidden = unread <= 0;
+            }
+            document.querySelectorAll('[data-notif-readall]').forEach(function (b) { b.hidden = unread <= 0; });
+            document.dispatchEvent(new CustomEvent('ep:notif-unread', { detail: { unread: unread } }));
+        };
+        var removeItem = function (item) {
+            var list = item.parentNode;
+            item.remove();
+            if (!list || list.querySelector('.ep-notif-item')) return;
+            if (list.id === 'epNotifList') {
+                var foot = document.querySelector('.ep-notif-dd-foot');
+                if (foot) foot.remove();
+                list.outerHTML = '<div class="ep-notif-empty">' +
+                    '<span class="ep-notif-empty-icon"><i class="far fa-bell" aria-hidden="true"></i></span>' +
+                    '<strong>You&rsquo;re all caught up</strong>' +
+                    '<span>Order and payment updates will show up here.</span></div>';
+            } else {
+                document.dispatchEvent(new CustomEvent('ep:notif-list-empty', { detail: { list: list } }));
+            }
+        };
+
+        document.addEventListener('click', function (e) {
+            var readAll = e.target.closest('[data-notif-readall]');
+            if (readAll) {
+                e.preventDefault();
+                readAll.disabled = true;
+                postClientNotif('read_all').then(function (data) {
+                    readAll.disabled = false;
+                    if (!data || !data.ok) return;
+                    document.querySelectorAll('.ep-notif-item.is-unread').forEach(markItemRead);
+                    setUnread(data.unread);
+                });
                 return;
             }
-            if (!badge && icon) {
-                badge = document.createElement('span');
-                badge.className = 'badge ep-notif-badge';
-                icon.appendChild(badge);
-            }
-            if (badge) badge.textContent = unread > 99 ? '99+' : String(unread);
-        }
-        notifList.addEventListener('click', function (e) {
-            var btn = e.target.closest('[data-action]');
-            if (!btn) return;
-            e.stopPropagation();
-            var item = btn.closest('.ep-notif-item');
+
+            var item = e.target.closest('.ep-notif-item[data-id]');
             if (!item) return;
             var id = item.getAttribute('data-id');
-            var action = btn.getAttribute('data-action');
-            postClientNotif(action, id).then(function (data) {
-                if (!data || !data.ok) return;
-                if (action === 'delete') {
-                    item.remove();
-                    if (!notifList.querySelector('.ep-notif-item')) {
-                        notifList.outerHTML = '<p class="ep-notif-empty">No notifications yet.</p>';
-                    }
-                } else if (action === 'read') {
-                    item.classList.remove('is-unread');
-                    item.classList.add('is-read');
-                    btn.remove();
-                }
-                refreshNotifBadge();
-            });
+            var btn = e.target.closest('[data-notif-action]');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                var action = btn.getAttribute('data-notif-action');
+                btn.disabled = true;
+                postClientNotif(action, id).then(function (data) {
+                    btn.disabled = false;
+                    if (!data || !data.ok) return;
+                    notifCopies(id).forEach(action === 'delete' ? removeItem : markItemRead);
+                    setUnread(data.unread);
+                });
+                return;
+            }
+
+            // Opening an unread notification marks it read; links still navigate normally
+            // (keepalive lets the request finish after the page unloads).
+            if (e.target.closest('[data-notif-open]') && item.classList.contains('is-unread')) {
+                notifCopies(id).forEach(markItemRead);
+                postClientNotif('read', id, true).then(function (data) {
+                    if (data && data.ok) setUnread(data.unread);
+                });
+            }
         });
     }
 })();
