@@ -30,7 +30,7 @@
             </div>
             <div class="ep-footer-col">
                 <h5>Shop</h5>
-                <a href="category.php?type=Desktop">Desktop</a>
+                <a href="shop.php?section=desktop">Desktop</a>
                 <a href="category.php?type=Laptops">Laptop</a>
                 <a href="category.php?type=Accessories">Accessories</a>
                 <a href="shop.php">Shop Now</a>
@@ -39,7 +39,7 @@
                 <h5>Explore</h5>
                 <a href="index.php">Home</a>
                 <a href="cart.php">Cart</a>
-                <a href="user_dashboard.php">My Orders</a>
+                <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Orders</a>
             </div>
             <div class="ep-footer-col">
                 <h5>Resources</h5>
@@ -51,6 +51,7 @@
     </footer>
 
     <script src="../includes/ui_alerts.js"></script>
+    <script src="ep_back.js"></script>
     <script>
         // ── Nav dropdown toggle ────────────────────────────────────────────
         function epToggleDropdown(btn) {

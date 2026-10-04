@@ -92,7 +92,7 @@ $bodyClass = 'ep-shop-page-body';
 
 <main class="ep-main">
     <div class="ep-page-inner ep-notif-page">
-        <a href="user_dashboard.php" class="ep-profile-back-arrow" aria-label="Back to Profile">&lt;</a>
+        <a href="user_dashboard.php" class="ep-profile-back-arrow" data-ep-back aria-label="Back">&lt;</a>
 
         <header class="ep-wish-hero ep-notif-hero">
             <div class="ep-wish-hero-icon ep-notif-hero-icon" aria-hidden="true">

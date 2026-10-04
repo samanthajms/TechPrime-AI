@@ -231,7 +231,7 @@ include __DIR__ . '/ep_header.php';
 
 <main class="sb-page">
     <section class="sb-hero">
-        <a class="ep-profile-back-arrow" href="user_dashboard.php" aria-label="Back to Profile">&lt;</a>
+        <a class="ep-profile-back-arrow" href="user_dashboard.php" data-ep-back aria-label="Back">&lt;</a>
         <div class="sb-hero-text">
             <h1><i class="fas fa-folder-open" aria-hidden="true"></i> Saved Builds</h1>
             <p>PC configurations you saved from Build a PC. Only you can see these.</p>

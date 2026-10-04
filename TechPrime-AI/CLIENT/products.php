@@ -21,7 +21,7 @@ if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
 
     $product_id = (int)($_POST['product_id'] ?? 0);
     $returnTo = $_POST['return_to'] ?? 'index.php';
-    if (!preg_match('#^[a-zA-Z0-9_\-./?=&%]+$#', $returnTo)) {
+    if (!preg_match('#^[a-zA-Z0-9_\-./?=&%+]+$#', $returnTo)) {
         $returnTo = 'index.php';
     }
 
