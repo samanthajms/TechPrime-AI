@@ -58,7 +58,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <?php else: ?>
         <title>EasyPC</title>
     <?php endif; ?>
-    <link rel="stylesheet" href="styles.css?v=shop-live-1">
+    <link rel="stylesheet" href="styles.css?v=product-page-3">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
