@@ -12,7 +12,7 @@ $uid = (int)$_SESSION['user_id'];
 $isLoggedIn = true;
 $activePage = 'saved_builds';
 $isHomePage = false;
-$pageTitle = 'Saved Build';
+$pageTitle = 'Saved Builds';
 $csrf = generateCsrfToken();
 
 $db->exec(
@@ -32,13 +32,14 @@ $slotLabels = [
     'processor' => 'Processor',
     'motherboard' => 'Motherboard',
     'memory' => 'Memory',
-    'ssd' => 'SSD',
+    'gpu' => 'Graphics Card',
+    'ssd' => 'SSD (NVMe / M.2)',
     'ssd_sata' => 'SSD (SATA)',
     'hdd' => 'Hard Disk',
-    'gpu' => 'Graphics Card',
     'psu' => 'Power Supply',
-    'case' => 'Case',
+    'case' => 'PC Case',
     'cooler' => 'CPU Cooler',
+    'case_fan' => 'Case Fan',
     'extras' => 'Extras',
 ];
 
@@ -47,177 +48,181 @@ $stmt = $db->prepare(
      FROM saved_builds WHERE user_id = ? ORDER BY created_at DESC, id DESC'
 );
 $stmt->execute([$uid]);
-$res = $stmt;
 $builds = [];
-while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $comps = json_decode((string)$row['components_json'], true);
+    /* created_at holds UTC; show it in Manila time. */
+    $savedLabel = '';
+    $savedTs = 0;
+    try {
+        $dt = new DateTimeImmutable((string)$row['created_at'], new DateTimeZone('UTC'));
+        $savedTs = $dt->getTimestamp();
+        $savedLabel = $dt->setTimezone(new DateTimeZone('Asia/Manila'))->format('M j, Y · g:i A');
+    } catch (Throwable $e) {
+    }
     $builds[] = [
         'id' => (int)$row['id'],
         'name' => (string)$row['build_name'],
         'total' => (float)$row['total_price'],
         'count' => (int)$row['component_count'],
-        'created_at' => (string)$row['created_at'],
+        'saved_label' => $savedLabel,
+        'saved_ts' => $savedTs,
         'components' => is_array($comps) ? $comps : [],
     ];
 }
-$buildsJson = json_encode($builds, JSON_UNESCAPED_UNICODE);
+$buildsJson = json_encode($builds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
 $slotsJson = json_encode($slotLabels, JSON_UNESCAPED_UNICODE);
 
 $extraHead = '<style>
-.sb-page { max-width: 1180px; margin: 0 auto; padding: 24px 18px 80px; }
+.sb-page { max-width: 1180px; margin: 0 auto; padding: 24px 18px 80px; font-family: "Poppins", "Inter", Arial, sans-serif; color: #2a2f36; }
+.sb-page [hidden], .sb-overlay [hidden] { display: none !important; }
 .sb-hero {
-  background: linear-gradient(135deg, #eef8e6 0%, #fff 70%);
+  background: linear-gradient(135deg, var(--ep-green-light, #eef8e6) 0%, #fff 70%);
   border: 1px solid var(--ep-border, #e4e8ea);
   border-radius: 16px;
-  padding: 22px 24px;
-  margin-bottom: 22px;
+  padding: 20px 22px;
+  margin-bottom: 18px;
   box-shadow: 0 8px 22px rgba(75,139,42,0.07);
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
   gap: 16px;
   flex-wrap: wrap;
 }
-.sb-hero h1 { margin: 0 0 6px; font-size: 22px; font-weight: 800; color: var(--ep-green-dark, #4b8b2a); }
+.sb-hero .ep-profile-back-arrow { margin: 0; flex-shrink: 0; }
+.sb-hero-text { flex: 1 1 320px; min-width: 0; }
+.sb-hero h1 { margin: 0 0 4px; font-size: 22px; font-weight: 800; color: var(--ep-green-dark, #4b8b2a); }
 .sb-hero p { margin: 0; color: #6b7280; font-size: 14px; font-weight: 500; }
-.sb-hero .ep-profile-back-arrow { margin: 2px 0 0; flex-shrink: 0; }
+.sb-new-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--ep-green, #62b236); color: #fff; text-decoration: none;
+  border-radius: 12px; padding: 11px 18px; font-size: 13.5px; font-weight: 800;
+  box-shadow: 0 6px 16px rgba(75,139,42,0.24); white-space: nowrap;
+}
+.sb-new-btn:hover { background: var(--ep-green-dark, #4b8b2a); color: #fff; }
 
-.sb-stage {
-  width: 100%;
-  max-width: 960px;
-  margin: 0 auto;
+.sb-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.sb-count { font-size: 13px; font-weight: 700; color: #5b6573; margin-right: auto; }
+.sb-search { position: relative; flex: 0 1 280px; }
+.sb-search i { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: #8a93a0; font-size: 13px; }
+.sb-search input, .sb-sort {
+  width: 100%; box-sizing: border-box; border: 1.5px solid #e4e8ea; border-radius: 10px;
+  padding: 9px 12px 9px 36px; font-family: inherit; font-size: 13px; background: #fff; outline: none;
 }
+.sb-sort { width: auto; padding-left: 12px; cursor: pointer; }
+.sb-search input:focus, .sb-sort:focus { border-color: var(--ep-green, #62b236); box-shadow: 0 0 0 3px rgba(98,178,54,0.15); }
 
-.sb-table-wrap {
-  min-width: 0;
-  background: #fff;
-  border: 1px solid var(--ep-border, #e4e8ea);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(15,23,42,0.06);
-  overflow: auto;
+.sb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.sb-card {
+  background: #fff; border: 1px solid var(--ep-border, #e4e8ea); border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(15,23,42,0.05); padding: 18px;
+  display: flex; flex-direction: column; gap: 14px;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
+.sb-card:hover { border-color: #cfe8bf; box-shadow: 0 12px 26px rgba(15,23,42,0.08); }
+.sb-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sb-card-head > div { min-width: 0; }
+.sb-card-name { margin: 0; font-size: 17px; font-weight: 800; color: #1f2328; overflow-wrap: anywhere; }
+.sb-card-meta { margin: 3px 0 0; font-size: 12px; font-weight: 500; color: #8a93a0; }
+.sb-card-price { font-size: 18px; font-weight: 800; color: var(--ep-green-dark, #4b8b2a); white-space: nowrap; }
 
-.sb-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 720px;
+.sb-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.sb-thumb {
+  width: 54px; height: 54px; border-radius: 10px; background: #f7f8f9; border: 1px solid #eef1f4; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; overflow: hidden; color: #b4bcc6; font-size: 18px;
 }
-.sb-table th,
-.sb-table td {
-  padding: 14px 16px;
-  text-align: left;
-  vertical-align: middle;
-  border-bottom: 1px solid #eef1f4;
-}
-.sb-table th {
-  font-size: 11px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: #5b7c99;
-  background: #f7faf4;
-  font-weight: 800;
-  white-space: nowrap;
-}
-.sb-table tbody tr:last-child td { border-bottom: 0; }
-.sb-table tbody tr:hover td { background: #fbfcfb; }
-.sb-name { font-size: 15px; font-weight: 800; color: #1f2328; }
-.sb-price { font-size: 15px; font-weight: 800; color: var(--ep-green-dark, #4b8b2a); white-space: nowrap; }
+.sb-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 4px; box-sizing: border-box; }
+.sb-thumb.is-more { font-size: 12.5px; font-weight: 800; color: #5b6573; }
+
+.sb-keyparts { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.sb-keyparts li { display: grid; grid-template-columns: 22px 96px minmax(0, 1fr); align-items: center; gap: 6px; font-size: 12.5px; }
+.sb-keyparts i { color: #8a93a0; text-align: center; }
+.sb-keyparts span { color: #8a93a0; font-weight: 600; }
+.sb-keyparts strong { color: #2a2f36; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.sb-status { display: inline-flex; align-items: flex-start; gap: 7px; font-size: 12px; font-weight: 600; border-radius: 9px; padding: 7px 10px; line-height: 1.4; }
+.sb-status i { margin-top: 2px; }
+.sb-status.is-complete { background: #f0f9eb; color: #3d7422; }
+.sb-status.is-partial { background: #f7f8fa; color: #5b6573; }
+
+.sb-card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid #eef1f4; flex-wrap: wrap; }
 .sb-btn {
-  border: 0;
-  border-radius: 9px;
-  padding: 8px 12px;
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
+  border: 0; border-radius: 10px; padding: 9px 13px; font-family: inherit; font-size: 12.5px; font-weight: 700;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.sb-btn-view { background: #eef8e6; color: var(--ep-green-dark, #4b8b2a); }
-.sb-btn-view:hover { background: #e2f2d4; }
-.sb-btn-edit { background: #f0f4f8; color: #334155; }
-.sb-btn-edit:hover { background: #e2e8f0; }
-.sb-btn-delete { background: #fef2f2; color: #b91c1c; }
-.sb-btn-delete:hover { background: #fee2e2; }
-.sb-btn-delete:disabled { opacity: 0.65; cursor: wait; }
-.sb-btn-cart { background: var(--ep-green, #62b236); color: #fff; }
+.sb-btn:disabled { opacity: 0.65; cursor: wait; }
+.sb-btn-cart { background: var(--ep-green, #62b236); color: #fff; flex: 1 1 auto; }
 .sb-btn-cart:hover { background: var(--ep-green-dark, #4b8b2a); }
-.sb-btn-cart:disabled { opacity: 0.65; cursor: wait; }
+.sb-btn-ghost { background: #fff; color: #334155; border: 1.5px solid #e2e8f0; }
+.sb-btn-ghost:hover { border-color: var(--ep-green, #62b236); color: var(--ep-green-dark, #4b8b2a); }
+.sb-btn-delete { background: #fff; color: #b91c1c; border: 1.5px solid #fde2e2; padding: 9px 11px; }
+.sb-btn-delete:hover { background: #fef2f2; border-color: #fca5a5; }
+.sb-btn-danger { background: #dc2626; color: #fff; }
+.sb-btn-danger:hover { background: #b91c1c; }
 
-.sb-pagination {
-  margin-top: 18px;
-}
-.sb-pagination .ep-page-link {
-  cursor: pointer;
-  background: #fff;
-  border: 1px solid transparent;
-  font-family: inherit;
-}
-.sb-pagination button.ep-page-link {
-  appearance: none;
-  -webkit-appearance: none;
-}
-.sb-pagination .ep-page-link.active {
-  background: var(--ep-black, #171717);
-  color: #fff;
-}
-.sb-pagination .ep-page-nav {
-  border: 1px solid var(--ep-border, #e4e8ea);
-}
-.sb-pagination .ep-page-nav.disabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
+.sb-pagination { margin-top: 20px; }
+.sb-pagination .ep-page-link { cursor: pointer; background: #fff; border: 1px solid transparent; font-family: inherit; }
+.sb-pagination button.ep-page-link { appearance: none; -webkit-appearance: none; }
+.sb-pagination .ep-page-link.active { background: var(--ep-black, #171717); color: #fff; }
+.sb-pagination .ep-page-nav { border: 1px solid var(--ep-border, #e4e8ea); }
+.sb-pagination .ep-page-nav.disabled { opacity: 0.4; pointer-events: none; }
 
 .sb-empty {
-  text-align: center;
-  padding: 56px 20px;
-  background: #fff;
-  border: 1px dashed #dfe3e8;
-  border-radius: 14px;
-  color: #6b7280;
+  text-align: center; padding: 56px 20px; background: #fff;
+  border: 1px dashed #dfe3e8; border-radius: 16px; color: #6b7280;
 }
-.sb-empty i { font-size: 28px; color: var(--ep-green-dark); margin-bottom: 10px; display: block; }
+.sb-empty-icon {
+  width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 18px;
+  background: var(--ep-green-light, #eef8e6); color: var(--ep-green-dark, #4b8b2a);
+  display: flex; align-items: center; justify-content: center; font-size: 26px;
+}
 .sb-empty h3 { margin: 0 0 6px; color: #1f2328; font-size: 17px; }
-.sb-empty p { margin: 0 0 16px; }
-.sb-btn-primary { background: var(--ep-green, #62b236); color: #fff; text-decoration: none; padding: 10px 14px; border-radius: 10px; font-weight: 700; display: inline-flex; gap: 6px; align-items: center; }
+.sb-empty p { margin: 0 0 18px; font-size: 14px; }
+.sb-no-match { grid-column: 1 / -1; text-align: center; padding: 36px 16px; color: #8a93a0; font-weight: 600; font-size: 13.5px; }
 
-/* Read-only View modal */
-.sb-view-overlay {
-  position: fixed; inset: 0; z-index: 1300;
-  background: rgba(15,23,42,0.45);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px;
+/* Dialogs (view / confirm delete) */
+.sb-overlay {
+  position: fixed; inset: 0; z-index: 1300; background: rgba(15,23,42,0.45);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
 }
-.sb-view-dialog {
-  width: min(560px, 100%);
-  max-height: min(86vh, 720px);
-  overflow: auto;
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 24px 60px rgba(0,0,0,0.28);
-  padding: 22px 22px 18px;
+.sb-dialog {
+  position: relative; width: min(620px, 100%); box-sizing: border-box; max-height: min(88vh, 760px); overflow: auto;
+  background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.28); padding: 22px;
+  font-family: "Poppins", "Inter", Arial, sans-serif;
 }
-.sb-view-dialog h3 { margin: 0 0 4px; font-size: 18px; color: #1f2328; }
-.sb-view-meta { margin: 0 0 14px; color: #6b7280; font-size: 13px; }
-.sb-view-list { display: grid; gap: 8px; margin-bottom: 16px; }
+.sb-dialog.is-small { width: min(420px, 100%); }
+.sb-dialog-x { position: absolute; top: 10px; right: 14px; border: 0; background: none; font-size: 28px; line-height: 1; color: #888; cursor: pointer; }
+.sb-dialog h3 { margin: 0 32px 4px 0; font-size: 18px; font-weight: 800; color: #1f2328; overflow-wrap: anywhere; }
+.sb-dialog-meta { margin: 0 0 16px; color: #8a93a0; font-size: 12.5px; font-weight: 500; }
+.sb-dialog-text { margin: 0 0 4px; color: #4b5563; font-size: 14px; line-height: 1.5; }
+.sb-view-list { display: grid; gap: 8px; }
 .sb-view-row {
-  display: grid; grid-template-columns: 120px 1fr auto; gap: 10px;
-  padding: 10px 12px; background: #f7f8f9; border-radius: 10px; border: 1px solid #eef1f4;
+  display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 9px 12px 9px 9px; background: #fafbfc; border-radius: 12px; border: 1px solid #eef1f4;
 }
-.sb-view-row strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #5b7c99; }
-.sb-view-row span { font-size: 13px; font-weight: 600; color: #1f2328; }
-.sb-view-row em { font-style: normal; font-weight: 800; color: var(--ep-green-dark); font-size: 13px; }
-.sb-view-total {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 12px 0 4px; border-top: 1px solid #eef1f4; font-weight: 800;
-}
-.sb-view-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-.sb-view-close {
-  border: 1px solid #dfe3e8; background: #fff; border-radius: 10px;
-  padding: 10px 16px; font-weight: 700; cursor: pointer; font-family: inherit;
+.sb-view-row .sb-thumb { width: 48px; height: 48px; background: #fff; }
+.sb-view-row small { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #5b7c99; }
+.sb-view-row a, .sb-view-row b { display: block; font-size: 13px; font-weight: 600; color: #1f2328; text-decoration: none; line-height: 1.35; }
+.sb-view-row a:hover { color: var(--ep-green-dark, #4b8b2a); text-decoration: underline; }
+.sb-view-row em { font-style: normal; font-weight: 800; color: var(--ep-green-dark, #4b8b2a); font-size: 13px; white-space: nowrap; }
+.sb-view-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 2px 0; margin-top: 12px; border-top: 1px solid #eef1f4; font-weight: 800; font-size: 15px; }
+.sb-view-total strong { color: var(--ep-green-dark, #4b8b2a); font-size: 18px; }
+.sb-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.sb-dialog-actions .sb-btn-cart { flex: 0 0 auto; }
+
+@media (max-width: 640px) {
+  .sb-page { padding: 14px 12px 64px; }
+  .sb-hero { padding: 16px; }
+  .sb-hero .sb-new-btn { width: 100%; justify-content: center; }
+  .sb-grid { grid-template-columns: minmax(0, 1fr); }
+  .sb-search { flex: 1 1 100%; }
+  .sb-sort { flex: 1 1 auto; }
+  .sb-card { padding: 14px; }
+  .sb-keyparts li { grid-template-columns: 20px minmax(0, 1fr); }
+  .sb-keyparts li span { display: none; }
+  .sb-view-row { grid-template-columns: 42px minmax(0, 1fr); }
+  .sb-view-row .sb-thumb { width: 42px; height: 42px; }
+  .sb-view-row em { grid-column: 2; }
 }
 </style>';
 
@@ -227,45 +232,37 @@ include __DIR__ . '/ep_header.php';
 <main class="sb-page">
     <section class="sb-hero">
         <a class="ep-profile-back-arrow" href="user_dashboard.php" aria-label="Back to Profile">&lt;</a>
-        <div>
-            <h1><i class="fas fa-desktop" aria-hidden="true"></i> Saved Build</h1>
-            <p>Your saved Tech &amp; Match PC configurations. Only you can see these builds.</p>
+        <div class="sb-hero-text">
+            <h1><i class="fas fa-folder-open" aria-hidden="true"></i> Saved Builds</h1>
+            <p>PC configurations you saved from Build a PC. Only you can see these.</p>
         </div>
+        <a class="sb-new-btn" href="build_a_pc.php"><i class="fas fa-plus" aria-hidden="true"></i> New Build</a>
     </section>
 
-    <?php if (empty($builds)): ?>
-        <div class="sb-empty" id="sbEmpty">
-            <i class="fas fa-box-open" aria-hidden="true"></i>
-            <h3>No saved builds yet</h3>
-            <p>Open Build a PC, select components, then click Save Build.</p>
-            <a class="sb-btn-primary" href="build_a_pc.php">Go to Build a PC</a>
+    <div id="sbStage"<?php echo empty($builds) ? ' hidden' : ''; ?>>
+        <div class="sb-toolbar">
+            <span class="sb-count" id="sbCount"></span>
+            <label class="sb-search">
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <input type="search" id="sbSearch" placeholder="Search builds or parts" autocomplete="off" aria-label="Search saved builds">
+            </label>
+            <select class="sb-sort" id="sbSort" aria-label="Sort saved builds">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+            </select>
         </div>
-    <?php else: ?>
-        <div class="sb-stage" id="sbStage">
-            <div class="sb-table-wrap">
-                <table class="sb-table">
-                    <thead>
-                        <tr>
-                            <th>Build Name</th>
-                            <th>View</th>
-                            <th>Edit</th>
-                            <th>Delete</th>
-                            <th>Price</th>
-                            <th>Add to Cart</th>
-                        </tr>
-                    </thead>
-                    <tbody id="sbTableBody"></tbody>
-                </table>
-            </div>
-            <nav class="ep-pagination sb-pagination" id="sbPagination" aria-label="Saved builds pagination" hidden></nav>
-        </div>
-        <div class="sb-empty" id="sbEmpty" hidden>
-            <i class="fas fa-box-open" aria-hidden="true"></i>
-            <h3>No saved builds yet</h3>
-            <p>Open Build a PC, select components, then click Save Build.</p>
-            <a class="sb-btn-primary" href="build_a_pc.php">Go to Build a PC</a>
-        </div>
-    <?php endif; ?>
+        <div class="sb-grid" id="sbGrid"></div>
+        <nav class="ep-pagination sb-pagination" id="sbPagination" aria-label="Saved builds pagination" hidden></nav>
+    </div>
+
+    <div class="sb-empty" id="sbEmpty"<?php echo empty($builds) ? '' : ' hidden'; ?>>
+        <div class="sb-empty-icon"><i class="fas fa-desktop" aria-hidden="true"></i></div>
+        <h3>No saved builds yet</h3>
+        <p>Pick parts in Build a PC, then click Save Build to keep them here.</p>
+        <a class="sb-new-btn" href="build_a_pc.php"><i class="fas fa-plus" aria-hidden="true"></i> Start a Build</a>
+    </div>
 </main>
 
 <script>
@@ -276,17 +273,23 @@ window.SB_SLOTS = <?php echo $slotsJson ?: '{}'; ?>;
 document.addEventListener('DOMContentLoaded', function () {
     var builds = Array.isArray(window.SB_BUILDS) ? window.SB_BUILDS.slice() : [];
     var slotLabels = window.SB_SLOTS || {};
-    var pageSize = 10;
+    var slotIcons = {
+        processor: 'fa-microchip', motherboard: 'fa-server', memory: 'fa-memory', gpu: 'fa-tv',
+        ssd: 'fa-hdd', ssd_sata: 'fa-hdd', hdd: 'fa-database', psu: 'fa-plug', 'case': 'fa-cube',
+        cooler: 'fa-fan', case_fan: 'fa-wind', extras: 'fa-plus-circle'
+    };
+    var pageSize = 8;
     var currentPage = 1;
-    var tbody = document.getElementById('sbTableBody');
+    var grid = document.getElementById('sbGrid');
     var pagination = document.getElementById('sbPagination');
     var stage = document.getElementById('sbStage');
     var emptyEl = document.getElementById('sbEmpty');
+    var searchEl = document.getElementById('sbSearch');
+    var sortEl = document.getElementById('sbSort');
+    var countEl = document.getElementById('sbCount');
 
-    function buildsByIdMap() {
-        var map = {};
-        builds.forEach(function (b) { map[b.id] = b; });
-        return map;
+    function alertUi(msg, type) {
+        if (typeof IAS_UI !== 'undefined') IAS_UI.alert(msg, type);
     }
 
     function peso(n) {
@@ -294,33 +297,102 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function escapeHtml(str) {
-        return String(str)
+        return String(str == null ? '' : str)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
     }
 
-    function totalPages() {
-        return Math.max(1, Math.ceil(builds.length / pageSize));
+    function findBuild(id) {
+        return builds.find(function (b) { return Number(b.id) === Number(id); }) || null;
     }
 
-    function showEmptyState() {
-        if (stage) stage.hidden = true;
-        if (emptyEl) emptyEl.hidden = false;
+    /* Parts in builder order (processor first ... extras last). */
+    function parts(build) {
+        var comps = build.components || {};
+        return Object.keys(slotLabels).filter(function (k) { return comps[k] && comps[k].id; })
+            .map(function (k) { return { slot: k, item: comps[k] }; });
     }
 
-    function renderPagination() {
+    function missingEssentials(build) {
+        var c = build.components || {};
+        var out = [];
+        if (!c.processor) out.push('Processor');
+        if (!c.motherboard) out.push('Motherboard');
+        if (!c.memory) out.push('Memory');
+        if (!c.ssd && !c.ssd_sata && !c.hdd) out.push('Storage');
+        if (!c.psu) out.push('Power Supply');
+        if (!c['case']) out.push('PC Case');
+        return out;
+    }
+
+    function thumb(slot, item) {
+        var inner = item && item.image
+            ? '<img src="' + escapeHtml(item.image) + '" alt="" loading="lazy">'
+            : '<i class="fas ' + (slotIcons[slot] || 'fa-box') + '" aria-hidden="true"></i>';
+        return '<span class="sb-thumb" title="' + escapeHtml(slotLabels[slot] || '') + (item ? ': ' + escapeHtml(item.name) : '') + '">' + inner + '</span>';
+    }
+
+    function filtered() {
+        var q = String(searchEl ? searchEl.value : '').trim().toLowerCase();
+        var list = builds.filter(function (b) {
+            if (!q) return true;
+            var hay = b.name + ' ' + parts(b).map(function (p) { return p.item.name; }).join(' ');
+            return hay.toLowerCase().indexOf(q) !== -1;
+        });
+        var sort = sortEl ? sortEl.value : 'newest';
+        list.sort(function (a, b) {
+            if (sort === 'oldest') return a.saved_ts - b.saved_ts || a.id - b.id;
+            if (sort === 'price-asc') return a.total - b.total;
+            if (sort === 'price-desc') return b.total - a.total;
+            return b.saved_ts - a.saved_ts || b.id - a.id;
+        });
+        return list;
+    }
+
+    function renderCard(b) {
+        var list = parts(b);
+        var thumbs = list.slice(0, 6).map(function (p) { return thumb(p.slot, p.item); }).join('');
+        if (list.length > 6) thumbs += '<span class="sb-thumb is-more">+' + (list.length - 6) + '</span>';
+        var key = ['processor', 'gpu', 'memory'].filter(function (k) { return b.components && b.components[k]; });
+        if (!key.length) key = list.slice(0, 3).map(function (p) { return p.slot; });
+        var keyHtml = key.map(function (k) {
+            return '<li><i class="fas ' + (slotIcons[k] || 'fa-box') + '" aria-hidden="true"></i>' +
+                '<span>' + escapeHtml(slotLabels[k] || k) + '</span>' +
+                '<strong title="' + escapeHtml(b.components[k].name) + '">' + escapeHtml(b.components[k].name) + '</strong></li>';
+        }).join('');
+        var missing = missingEssentials(b);
+        var status = missing.length
+            ? '<span class="sb-status is-partial"><i class="fas fa-list-ul" aria-hidden="true"></i><span>Still needs: ' + escapeHtml(missing.join(', ')) + '</span></span>'
+            : '<span class="sb-status is-complete"><i class="fas fa-check-circle" aria-hidden="true"></i><span>Complete build: all essential parts included</span></span>';
+        var count = list.length || b.count;
+        return '<article class="sb-card">' +
+            '<header class="sb-card-head"><div>' +
+            '<h3 class="sb-card-name">' + escapeHtml(b.name) + '</h3>' +
+            '<p class="sb-card-meta">' + count + ' part' + (count === 1 ? '' : 's') + (b.saved_label ? ' · Saved ' + escapeHtml(b.saved_label) : '') + '</p>' +
+            '</div><div class="sb-card-price">' + peso(b.total) + '</div></header>' +
+            (thumbs ? '<div class="sb-thumbs">' + thumbs + '</div>' : '') +
+            (keyHtml ? '<ul class="sb-keyparts">' + keyHtml + '</ul>' : '') +
+            '<div>' + status + '</div>' +
+            '<footer class="sb-card-actions">' +
+            '<button type="button" class="sb-btn sb-btn-cart" data-cart="' + b.id + '"><i class="fas fa-shopping-cart" aria-hidden="true"></i> Add to Cart</button>' +
+            '<button type="button" class="sb-btn sb-btn-ghost" data-view="' + b.id + '"><i class="fas fa-eye" aria-hidden="true"></i> View</button>' +
+            '<button type="button" class="sb-btn sb-btn-ghost" data-edit="' + b.id + '"><i class="fas fa-pen" aria-hidden="true"></i> Edit</button>' +
+            '<button type="button" class="sb-btn sb-btn-delete" data-delete="' + b.id + '" aria-label="Delete ' + escapeHtml(b.name) + '" title="Delete"><i class="fas fa-trash-alt" aria-hidden="true"></i></button>' +
+            '</footer></article>';
+    }
+
+    function renderPagination(total) {
         if (!pagination) return;
-        var pages = totalPages();
-        if (builds.length <= pageSize) {
+        var pages = Math.max(1, Math.ceil(total / pageSize));
+        if (total <= pageSize) {
             pagination.hidden = true;
             pagination.innerHTML = '';
             return;
         }
         pagination.hidden = false;
-        var html = '';
-        html += '<button type="button" class="ep-page-link ep-page-nav' + (currentPage <= 1 ? ' disabled' : '') +
+        var html = '<button type="button" class="ep-page-link ep-page-nav' + (currentPage <= 1 ? ' disabled' : '') +
             '" data-sb-page="' + (currentPage - 1) + '"' + (currentPage <= 1 ? ' disabled' : '') + '>' +
             '<i class="fas fa-arrow-left" aria-hidden="true"></i> Previous</button>';
         for (var p = 1; p <= pages; p++) {
@@ -333,211 +405,184 @@ document.addEventListener('DOMContentLoaded', function () {
         pagination.innerHTML = html;
     }
 
-    function renderTable() {
-        if (!tbody) return;
+    function render() {
         if (!builds.length) {
-            showEmptyState();
+            if (stage) stage.hidden = true;
+            if (emptyEl) emptyEl.hidden = false;
             return;
         }
         if (stage) stage.hidden = false;
-        if (emptyEl && stage) emptyEl.hidden = true;
-
-        var pages = totalPages();
+        if (emptyEl) emptyEl.hidden = true;
+        var list = filtered();
+        var pages = Math.max(1, Math.ceil(list.length / pageSize));
         if (currentPage > pages) currentPage = pages;
-        if (currentPage < 1) currentPage = 1;
+        if (countEl) countEl.textContent = builds.length + ' saved build' + (builds.length === 1 ? '' : 's');
+        var slice = list.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+        grid.innerHTML = slice.length
+            ? slice.map(renderCard).join('')
+            : '<div class="sb-no-match">No saved builds match your search.</div>';
+        renderPagination(list.length);
+    }
 
-        var start = (currentPage - 1) * pageSize;
-        var slice = builds.slice(start, start + pageSize);
-        var html = '';
-        slice.forEach(function (b) {
-            html += '<tr data-build-id="' + b.id + '">' +
-                '<td class="sb-name">' + escapeHtml(b.name) + '</td>' +
-                '<td><button type="button" class="sb-btn sb-btn-view sb-view" data-id="' + b.id + '">' +
-                '<i class="fas fa-eye" aria-hidden="true"></i> View</button></td>' +
-                '<td><button type="button" class="sb-btn sb-btn-edit sb-edit" data-id="' + b.id + '">' +
-                '<i class="fas fa-pen" aria-hidden="true"></i> Edit</button></td>' +
-                '<td><button type="button" class="sb-btn sb-btn-delete sb-delete" data-id="' + b.id + '">' +
-                '<i class="fas fa-trash-alt" aria-hidden="true"></i> Delete</button></td>' +
-                '<td class="sb-price">' + peso(b.total) + '</td>' +
-                '<td><button type="button" class="sb-btn sb-btn-cart sb-cart" data-id="' + b.id + '">' +
-                '<i class="fas fa-shopping-cart" aria-hidden="true"></i> Add to Cart</button></td>' +
-                '</tr>';
+    /* ---------- Dialogs ---------- */
+
+    function openDialog(html, small, onReady) {
+        var existing = document.getElementById('sbOverlay');
+        if (existing) existing.remove();
+        var overlay = document.createElement('div');
+        overlay.id = 'sbOverlay';
+        overlay.className = 'sb-overlay';
+        overlay.innerHTML = '<div class="sb-dialog' + (small ? ' is-small' : '') + '" role="dialog" aria-modal="true" aria-labelledby="sbDialogTitle">' +
+            '<button type="button" class="sb-dialog-x" aria-label="Close">&times;</button>' + html + '</div>';
+        document.body.appendChild(overlay);
+        var onKey = function (e) { if (e.key === 'Escape') close(); };
+        var close = function () {
+            document.removeEventListener('keydown', onKey);
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        };
+        document.addEventListener('keydown', onKey);
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay || e.target.closest('.sb-dialog-x') || e.target.closest('[data-close]')) {
+                close();
+                return;
+            }
+            handleAction(e, close);
         });
-        tbody.innerHTML = html;
-        renderPagination();
+        if (onReady) onReady(overlay, close);
     }
 
     function openViewModal(build) {
-        var existing = document.getElementById('sbViewOverlay');
-        if (existing) existing.remove();
-
-        var ts = build.created_at ? new Date(String(build.created_at).replace(' ', 'T')) : null;
-        var dateLabel = ts && !isNaN(ts.getTime())
-            ? ts.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-            : (build.created_at || '');
-
-        var rows = '';
-        Object.keys(slotLabels).forEach(function (key) {
-            var c = build.components && build.components[key];
-            if (!c) return;
-            var pid = parseInt(c.id, 10) || 0;
-            var nameHtml = escapeHtml(c.name || '');
-            if (pid > 0) {
-                nameHtml = '<a href="products.php?id=' + pid + '">' + nameHtml + '</a>';
-            }
-            rows += '<div class="sb-view-row">' +
-                '<strong>' + escapeHtml(slotLabels[key]) + '</strong>' +
-                '<span>' + nameHtml + '</span>' +
-                '<em>' + peso(c.price) + '</em></div>';
-        });
-
-        var overlay = document.createElement('div');
-        overlay.id = 'sbViewOverlay';
-        overlay.className = 'sb-view-overlay';
-        overlay.innerHTML =
-            '<div class="sb-view-dialog" role="dialog" aria-modal="true" aria-labelledby="sbViewTitle">' +
-            '<h3 id="sbViewTitle">' + escapeHtml(build.name || 'Saved Build') + '</h3>' +
-            '<p class="sb-view-meta">Saved: ' + escapeHtml(dateLabel) + ' · Read-only view</p>' +
+        var rows = parts(build).map(function (p) {
+            var pid = parseInt(p.item.id, 10) || 0;
+            var name = escapeHtml(p.item.name || '');
+            return '<div class="sb-view-row">' + thumb(p.slot, p.item) +
+                '<div><small>' + escapeHtml(slotLabels[p.slot] || p.slot) + '</small>' +
+                (pid > 0 ? '<a href="products.php?id=' + pid + '">' + name + '</a>' : '<b>' + name + '</b>') + '</div>' +
+                '<em>' + peso(p.item.price) + '</em></div>';
+        }).join('');
+        var missing = missingEssentials(build);
+        openDialog(
+            '<h3 id="sbDialogTitle">' + escapeHtml(build.name || 'Saved Build') + '</h3>' +
+            '<p class="sb-dialog-meta">' + (build.saved_label ? 'Saved ' + escapeHtml(build.saved_label) + ' · ' : '') +
+            (missing.length ? 'Still needs: ' + escapeHtml(missing.join(', ')) : 'All essential parts included') + '</p>' +
             '<div class="sb-view-list">' + rows + '</div>' +
-            '<div class="sb-view-total"><span>Total Price</span><span>' + peso(build.total) + '</span></div>' +
-            '<div class="sb-view-actions"><button type="button" class="sb-view-close" id="sbViewClose">Close</button></div>' +
-            '</div>';
-        document.body.appendChild(overlay);
-        var close = function () { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
-        document.getElementById('sbViewClose').onclick = close;
-        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+            '<div class="sb-view-total"><span>Total</span><strong>' + peso(build.total) + '</strong></div>' +
+            '<div class="sb-dialog-actions">' +
+            '<button type="button" class="sb-btn sb-btn-ghost" data-close>Close</button>' +
+            '<button type="button" class="sb-btn sb-btn-ghost" data-edit="' + build.id + '"><i class="fas fa-pen" aria-hidden="true"></i> Edit</button>' +
+            '<button type="button" class="sb-btn sb-btn-cart" data-cart="' + build.id + '"><i class="fas fa-shopping-cart" aria-hidden="true"></i> Add to Cart</button>' +
+            '</div>'
+        );
     }
 
-    function loadIntoTechMatch(id, mode) {
+    function confirmDelete(build) {
+        openDialog(
+            '<h3 id="sbDialogTitle">Delete this build?</h3>' +
+            '<p class="sb-dialog-text">"' + escapeHtml(build.name) + '" will be removed permanently. This can\'t be undone.</p>' +
+            '<div class="sb-dialog-actions">' +
+            '<button type="button" class="sb-btn sb-btn-ghost" data-close>Cancel</button>' +
+            '<button type="button" class="sb-btn sb-btn-danger" data-confirm-delete="' + build.id + '"><i class="fas fa-trash-alt" aria-hidden="true"></i> Delete</button>' +
+            '</div>',
+            true,
+            function (overlay) {
+                var btn = overlay.querySelector('[data-confirm-delete]');
+                if (btn) btn.focus();
+            }
+        );
+    }
+
+    /* ---------- Actions ---------- */
+
+    function postJson(body) {
+        body.csrf_token = window.EP_CSRF || '';
+        return fetch('saved_builds_api.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body)
+        }).then(function (r) { return r.json(); });
+    }
+
+    function loadIntoBuilder(id) {
         fetch('saved_builds_api.php?action=get&id=' + encodeURIComponent(id), { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 if (!data || !data.ok || !data.build) {
-                    if (typeof IAS_UI !== 'undefined') IAS_UI.alert('Could not open this build.', 'error');
+                    alertUi('Could not open this build.', 'error');
                     return;
                 }
                 try {
                     sessionStorage.setItem('ep_tm_load_build', JSON.stringify(data.build.components || {}));
                     sessionStorage.setItem('ep_tm_load_name', data.build.name || '');
-                    if (mode === 'edit') {
-                        sessionStorage.setItem('ep_tm_edit_id', String(data.build.id));
-                    } else {
-                        sessionStorage.removeItem('ep_tm_edit_id');
-                    }
+                    sessionStorage.setItem('ep_tm_edit_id', String(data.build.id));
                 } catch (e) {}
                 window.location.href = 'build_a_pc.php';
             })
-            .catch(function () {
-                if (typeof IAS_UI !== 'undefined') IAS_UI.alert('Could not open this build.', 'error');
-            });
+            .catch(function () { alertUi('Could not open this build.', 'error'); });
     }
 
-    function deleteBuild(id, btn) {
-        if (!window.confirm('Are you sure you want to delete this saved build?')) {
-            return;
-        }
+    function deleteBuild(id, btn, close) {
         btn.disabled = true;
-        fetch('saved_builds_api.php', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ action: 'delete', id: Number(id), csrf_token: window.EP_CSRF || '' })
-        })
-            .then(function (r) { return r.json(); })
+        postJson({ action: 'delete', id: Number(id) })
             .then(function (data) {
                 if (!data || !data.ok) {
                     btn.disabled = false;
-                    if (typeof IAS_UI !== 'undefined') {
-                        IAS_UI.alert((data && data.message) || 'Could not delete this build.', 'error');
-                    }
+                    alertUi((data && data.message) || 'Could not delete this build.', 'error');
                     return;
                 }
+                close();
                 builds = builds.filter(function (b) { return Number(b.id) !== Number(id); });
                 window.SB_BUILDS = builds;
-                renderTable();
+                render();
             })
             .catch(function () {
                 btn.disabled = false;
-                if (typeof IAS_UI !== 'undefined') IAS_UI.alert('Could not delete this build.', 'error');
+                alertUi('Could not delete this build.', 'error');
             });
     }
 
-    if (tbody) {
-        tbody.addEventListener('click', function (e) {
-            var viewBtn = e.target.closest('.sb-view');
-            var editBtn = e.target.closest('.sb-edit');
-            var delBtn = e.target.closest('.sb-delete');
-            var cartBtn = e.target.closest('.sb-cart');
-
-            if (viewBtn) {
-                var vid = Number(viewBtn.getAttribute('data-id'));
-                var local = buildsByIdMap()[vid];
-                if (local) {
-                    openViewModal(local);
+    function addToCart(id, btn) {
+        btn.disabled = true;
+        postJson({ action: 'add_to_cart', id: Number(id) })
+            .then(function (data) {
+                btn.disabled = false;
+                if (!data || !data.ok) {
+                    alertUi((data && data.message) || 'Could not add to cart.', 'error');
                     return;
                 }
-                fetch('saved_builds_api.php?action=get&id=' + encodeURIComponent(vid), { credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        if (!data || !data.ok || !data.build) {
-                            if (typeof IAS_UI !== 'undefined') IAS_UI.alert('Could not open this build.', 'error');
-                            return;
-                        }
-                        openViewModal({
-                            id: data.build.id,
-                            name: data.build.name,
-                            total: data.build.total_price,
-                            created_at: data.build.created_at,
-                            components: data.build.components || {}
-                        });
-                    })
-                    .catch(function () {
-                        if (typeof IAS_UI !== 'undefined') IAS_UI.alert('Could not open this build.', 'error');
-                    });
-                return;
-            }
-
-            if (editBtn) {
-                loadIntoTechMatch(editBtn.getAttribute('data-id'), 'edit');
-                return;
-            }
-
-            if (delBtn) {
-                deleteBuild(delBtn.getAttribute('data-id'), delBtn);
-                return;
-            }
-
-            if (cartBtn) {
-                var id = cartBtn.getAttribute('data-id');
-                cartBtn.disabled = true;
-                fetch('saved_builds_api.php', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify({ action: 'add_to_cart', id: Number(id), csrf_token: window.EP_CSRF || '' })
-                })
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        cartBtn.disabled = false;
-                        if (!data || !data.ok) {
-                            if (typeof IAS_UI !== 'undefined') {
-                                IAS_UI.alert((data && data.message) || 'Could not add to cart.', 'error');
-                            }
-                            return;
-                        }
-                        if (data.cart && typeof window.epUpdateCartPreview === 'function') {
-                            window.epUpdateCartPreview(data.cart);
-                        }
-                        if (typeof IAS_UI !== 'undefined') IAS_UI.alert(data.message || 'Added to cart!', 'success');
-                    })
-                    .catch(function () {
-                        cartBtn.disabled = false;
-                        if (typeof IAS_UI !== 'undefined') IAS_UI.alert('Could not add to cart.', 'error');
-                    });
-            }
-        });
+                if (data.cart && typeof window.epUpdateCartPreview === 'function') {
+                    window.epUpdateCartPreview(data.cart);
+                }
+                alertUi(data.message || 'Added to cart!', 'success');
+            })
+            .catch(function () {
+                btn.disabled = false;
+                alertUi('Could not add to cart.', 'error');
+            });
     }
 
+    function handleAction(e, close) {
+        var btn = e.target.closest('[data-view],[data-edit],[data-delete],[data-cart],[data-confirm-delete]');
+        if (!btn || btn.disabled) return;
+        var id;
+        if ((id = btn.getAttribute('data-view'))) {
+            var b = findBuild(id);
+            if (b) openViewModal(b);
+        } else if ((id = btn.getAttribute('data-edit'))) {
+            loadIntoBuilder(id);
+        } else if ((id = btn.getAttribute('data-delete'))) {
+            var d = findBuild(id);
+            if (d) confirmDelete(d);
+        } else if ((id = btn.getAttribute('data-confirm-delete'))) {
+            deleteBuild(id, btn, close || function () {});
+        } else if ((id = btn.getAttribute('data-cart'))) {
+            addToCart(id, btn);
+        }
+    }
+
+    if (grid) grid.addEventListener('click', function (e) { handleAction(e); });
+    if (searchEl) searchEl.addEventListener('input', function () { currentPage = 1; render(); });
+    if (sortEl) sortEl.addEventListener('change', function () { currentPage = 1; render(); });
     if (pagination) {
         pagination.addEventListener('click', function (e) {
             var btn = e.target.closest('[data-sb-page]');
@@ -545,11 +590,12 @@ document.addEventListener('DOMContentLoaded', function () {
             var page = Number(btn.getAttribute('data-sb-page'));
             if (!page || page === currentPage) return;
             currentPage = page;
-            renderTable();
+            render();
+            if (stage) stage.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     }
 
-    if (tbody) renderTable();
+    render();
 });
 </script>
 

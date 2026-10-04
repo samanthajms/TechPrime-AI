@@ -2082,6 +2082,196 @@ html { height: 100%; }
     max-width: 520px;
     line-height: 1.45;
 }
+
+/* ---- Shop by Category (home): horizontal rail of category tiles ---- */
+.ep-cat-rail-section { margin-bottom: 20px; }
+.ep-cat-rail-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+.ep-cat-rail-head h3 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--ep-black);
+}
+.ep-cat-rail-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ep-green-dark);
+    text-decoration: none;
+}
+.ep-cat-rail-all i { font-size: 11px; transition: transform 0.15s ease; }
+.ep-cat-rail-all:hover i { transform: translateX(3px); }
+
+.ep-cat-rail {
+    --cat-gap: 14px;
+    --cat-per-view: 8;
+    position: relative;
+    padding: 18px;
+    border-radius: 20px;
+    background: var(--ep-gray-bg);
+}
+.ep-cat-rail-track {
+    list-style: none;
+    margin: 0;
+    padding: 4px 2px 6px;
+    display: flex;
+    gap: var(--cat-gap);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+}
+.ep-cat-rail-track::-webkit-scrollbar { display: none; }
+.ep-catrail-tile {
+    flex: 0 0 calc((100% - (var(--cat-per-view) - 1) * var(--cat-gap)) / var(--cat-per-view));
+    min-width: 0;
+    scroll-snap-align: start;
+}
+.ep-catrail-tile-link {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 10px 14px;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    background: #fff;
+    color: var(--ep-black);
+    text-align: center;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.ep-catrail-tile-link:hover {
+    transform: translateY(-4px);
+    border-color: rgba(98, 178, 54, 0.45);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+}
+.ep-catrail-tile-link:focus-visible { outline: 3px solid rgba(98, 178, 54, 0.5); outline-offset: 2px; }
+.ep-catrail-tile-media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    max-height: 120px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 8px;
+    color: #b3b9b0;
+    font-size: 28px;
+}
+/* Soft "floor" shadow under the product, like a studio shot */
+.ep-catrail-tile-media::after {
+    content: "";
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    bottom: -2px;
+    height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.16), transparent 70%);
+    transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.ep-catrail-tile-media img {
+    position: relative;
+    z-index: 1;
+    width: 88%;
+    height: 88%;
+    object-fit: contain;
+    mix-blend-mode: multiply;   /* white photo backgrounds blend into the card */
+    transition: transform 0.25s ease;
+}
+.ep-catrail-tile-link:hover .ep-catrail-tile-media img { transform: translateY(-4px) scale(1.06); }
+.ep-catrail-tile-link:hover .ep-catrail-tile-media::after { transform: scaleX(0.85); opacity: 0.7; }
+.ep-catrail-tile-name {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    line-height: 1.25;
+    text-transform: uppercase;
+    min-height: 2.5em;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s ease;
+}
+.ep-catrail-tile-link:hover .ep-catrail-tile-name { color: var(--ep-green-dark); }
+.ep-catrail-tile-count { font-size: 11.5px; font-weight: 600; color: #8a9186; }
+
+.ep-cat-rail-arrow {
+    position: absolute;
+    top: 50%;
+    z-index: 3;
+    width: 42px;
+    height: 42px;
+    margin-top: -21px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--ep-border);
+    border-radius: 50%;
+    background: #fff;
+    color: var(--ep-black);
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.2s ease, transform 0.15s ease;
+}
+.ep-cat-rail-arrow.is-prev { left: -14px; }
+.ep-cat-rail-arrow.is-next { right: -14px; }
+.ep-cat-rail-arrow:hover:not(:disabled) {
+    background: var(--ep-green);
+    border-color: var(--ep-green);
+    color: #fff;
+    transform: scale(1.06);
+}
+.ep-cat-rail-arrow:disabled { opacity: 0; pointer-events: none; }
+.ep-cat-rail-arrow:focus-visible { outline: 3px solid rgba(98, 178, 54, 0.5); outline-offset: 2px; }
+/* Fade the edge that has more tiles behind it */
+.ep-cat-rail::before,
+.ep-cat-rail::after {
+    content: "";
+    position: absolute;
+    top: 18px;
+    bottom: 18px;
+    width: 36px;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.ep-cat-rail::before { left: 18px; background: linear-gradient(90deg, var(--ep-gray-bg), transparent); }
+.ep-cat-rail::after { right: 18px; background: linear-gradient(270deg, var(--ep-gray-bg), transparent); }
+.ep-cat-rail.has-prev::before,
+.ep-cat-rail.has-next::after { opacity: 1; }
+
+@media (max-width: 1280px) { .ep-cat-rail { --cat-per-view: 7; } }
+@media (max-width: 1100px) { .ep-cat-rail { --cat-per-view: 6; } }
+@media (max-width: 900px)  { .ep-cat-rail { --cat-per-view: 4.5; } }
+@media (max-width: 640px) {
+    .ep-cat-rail { --cat-per-view: 2.6; --cat-gap: 10px; padding: 12px; border-radius: 16px; }
+    .ep-cat-rail::before, .ep-cat-rail::after { top: 12px; bottom: 12px; }
+    .ep-cat-rail::before { left: 12px; }
+    .ep-cat-rail::after { right: 12px; }
+    .ep-cat-rail-head h3 { font-size: 22px; }
+    .ep-cat-rail-arrow { display: none; }   /* swipe on phones */
+}
+@media (hover: none) {
+    .ep-catrail-tile-link:hover { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ep-cat-rail-track { scroll-behavior: auto; }
+    .ep-catrail-tile-link,
+    .ep-catrail-tile-media img { transition: none; }
+}
 .ep-featured-card {
     flex: 0 0 260px;
     padding: 0;
