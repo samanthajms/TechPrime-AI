@@ -775,6 +775,7 @@
 .tm-btn-outline { border: 1px solid #d7dbe0; background: #fff; color: #1f2328; }
 .tm-btn-outline:hover { border-color: var(--tm-green); color: var(--tm-green-dark); }
 .tm-btn-outline:disabled { opacity: 0.6; cursor: wait; }
+a.tm-btn-outline { box-sizing: border-box; text-decoration: none; }
 .tm-btn-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .tm-btn-sm { padding: 7px 6px; font-size: 11px; gap: 5px; }
 .tm-btn-danger { color: #dc2626; border-color: #f2a3a3; }

@@ -19,7 +19,7 @@ $isHomePage = false;
 $pageTitle = 'Build a PC';
 $csrf = generateCsrfToken();
 
-$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-5">';
+$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-6">';
 
 include __DIR__ . '/ep_header.php';
 ?>
@@ -156,6 +156,9 @@ include __DIR__ . '/ep_header.php';
             <button type="button" class="tm-btn-outline" id="tmShareBuild">
                 <i class="fas fa-share-alt" aria-hidden="true"></i> Share
             </button>
+            <a class="tm-btn-outline" href="saved_builds.php">
+                <i class="fas fa-folder-open" aria-hidden="true"></i> My Saved Builds
+            </a>
             <div class="tm-btn-row">
                 <button type="button" class="tm-btn-outline tm-btn-sm" id="tmLoadBuild">Load</button>
                 <button type="button" class="tm-btn-outline tm-btn-sm" id="tmReportBuild"><i class="far fa-flag" aria-hidden="true"></i> Report</button>
@@ -212,7 +215,7 @@ include __DIR__ . '/ep_header.php';
 window.EP_CSRF = <?php echo json_encode($csrf); ?>;
 window.EP_TM_USER = <?php echo (int)($_SESSION['user_id'] ?? 0); ?>;
 </script>
-<script src="tech_match.js?v=pcx-5" defer></script>
+<script src="tech_match.js?v=pcx-6" defer></script>
 
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>

@@ -66,8 +66,8 @@
         return SLOTS.find(function (s) { return s.id === id; }) || null;
     }
 
-    function alertUi(msg, type) {
-        if (typeof IAS_UI !== 'undefined') IAS_UI.alert(msg, type);
+    function alertUi(msg, type, opts) {
+        if (typeof IAS_UI !== 'undefined') IAS_UI.alert(msg, type, 0, opts);
     }
 
     /* ---------- Draft (survives a page refresh, per user) ---------- */
@@ -1122,9 +1122,16 @@
                 clearCurrentBuild();
                 if (typeof onDone === 'function') onDone();
                 alertUi(
-                    (wasUpdate ? 'Build Updated Successfully!' : 'Build Saved Successfully!') + '\n\n"' + name + '"\n\n' +
-                    'You can load it again with the Load button. Your builder is now ready for a new PC build.',
-                    'success'
+                    'Find it anytime in Saved Builds or with the Load button. The builder is cleared and ready for your next PC.',
+                    'success',
+                    {
+                        title: wasUpdate ? 'Build updated' : 'Build saved',
+                        detail: name,
+                        actions: [
+                            { label: 'View Saved Builds', href: 'saved_builds.php' },
+                            { label: 'Start New Build', primary: true }
+                        ]
+                    }
                 );
             })
             .catch(function () {
