@@ -1094,14 +1094,17 @@ function generateBarcodes(ids) {
         if (typeof IAS_UI !== 'undefined') IAS_UI.alert('The selected products already have barcodes.', 'info', 0);
         return;
     }
-    var msg = ids.length === 1
-        ? 'Generate an in-store barcode for "' + (findProduct(ids[0]).name || ('Product #' + ids[0])) + '"?'
-        : 'Generate in-store barcodes for ' + ids.length + ' product(s) without one?';
-    if (!confirm(msg + '\\n\\nOnly do this for items with no manufacturer barcode on the box.')) return;
-    document.getElementById('generateBarcodeIds').innerHTML = ids.map(function (id) {
-        return '<input type="hidden" name="ids[]" value="' + id + '">';
-    }).join('');
-    document.getElementById('generateBarcodeForm').submit();
+    IAS_UI.confirm('Only do this for items with no manufacturer barcode on the box.', {
+        title: ids.length === 1 ? 'Generate an in-store barcode?' : 'Generate ' + ids.length + ' in-store barcodes?',
+        detail: ids.length === 1 ? (findProduct(ids[0]).name || ('Product #' + ids[0])) : '',
+        confirmLabel: ids.length === 1 ? 'Generate barcode' : 'Generate barcodes'
+    }).then(function (ok) {
+        if (!ok) return;
+        document.getElementById('generateBarcodeIds').innerHTML = ids.map(function (id) {
+            return '<input type="hidden" name="ids[]" value="' + id + '">';
+        }).join('');
+        document.getElementById('generateBarcodeForm').submit();
+    });
 }
 
 function focusBarcodeField(id) {
@@ -1368,12 +1371,17 @@ document.getElementById('addModal').addEventListener('click', function (e) { if 
 document.getElementById('detailsModal').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('open'); });
 
 function deleteOne(id) {
-    if (!confirm('Delete this product?')) return;
-    var f = document.createElement('form');
-    f.method = 'post';
-    f.innerHTML = '<input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' + id + '">';
-    document.body.appendChild(f);
-    f.submit();
+    var p = findProduct(id);
+    IAS_UI.confirm('This removes the product from the catalog.', {
+        title: 'Delete this product?', detail: p ? p.name : '', confirmLabel: 'Delete', type: 'danger'
+    }).then(function (ok) {
+        if (!ok) return;
+        var f = document.createElement('form');
+        f.method = 'post';
+        f.innerHTML = '<input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' + id + '">';
+        document.body.appendChild(f);
+        f.submit();
+    });
 }
 
 function updateSelectionUI() {
@@ -1410,10 +1418,14 @@ document.getElementById('selectAll').addEventListener('change', function () {
 document.getElementById('bulkDeleteBtn').addEventListener('click', function () {
     var ids = Object.keys(state.selected).filter(function (id) { return state.selected[id]; });
     if (ids.length === 0) return;
-    if (!confirm('Delete ' + ids.length + ' selected product(s)?')) return;
-    var holder = document.getElementById('bulkDeleteIds');
-    holder.innerHTML = ids.map(function (id) { return '<input type="hidden" name="ids[]" value="' + id + '">'; }).join('');
-    document.getElementById('bulkDeleteForm').submit();
+    IAS_UI.confirm('They will be removed from the catalog.', {
+        title: 'Delete ' + ids.length + ' selected product(s)?', confirmLabel: 'Delete', type: 'danger'
+    }).then(function (ok) {
+        if (!ok) return;
+        var holder = document.getElementById('bulkDeleteIds');
+        holder.innerHTML = ids.map(function (id) { return '<input type="hidden" name="ids[]" value="' + id + '">'; }).join('');
+        document.getElementById('bulkDeleteForm').submit();
+    });
 });
 
 if (HAS_BARCODE) {

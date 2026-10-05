@@ -637,7 +637,7 @@ if ($showSettings) {
                                             </button>
                                         <?php endif; ?>
                                         <?php if ($canCancel): ?>
-                                            <form method="post" class="order-cancel-form" onsubmit="return confirm('Cancel this order? Stock will be restored.');">
+                                            <form method="post" class="order-cancel-form" data-confirm="The items go back into stock and the order can't be restored." data-confirm-title="Cancel this order?" data-confirm-ok="Cancel order" data-confirm-cancel="Keep order" data-confirm-type="danger">
                                                 <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                                                 <input type="hidden" name="action" value="cancel_order">
                                                 <input type="hidden" name="order_id" value="<?php echo $oid; ?>">

@@ -58,16 +58,6 @@ html[data-theme="dark"] #tmRadarSvg text { fill: #c4cad3; }
 html[data-theme="dark"] #tmRadarSvg polygon[fill="none"] { stroke: #3a3f47; }
 html[data-theme="dark"] #tmRadarSvg line { stroke: #30343b; }
 
-/* ---- Alert modal (includes/ui_alerts.js injects its own light CSS) ---- */
-html[data-theme="dark"] .ias-alert-box { background: #1b1e23; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55); }
-html[data-theme="dark"] .ias-alert-title { color: #eef0f3; }
-html[data-theme="dark"] .ias-alert-msg { color: #b4bac4; }
-html[data-theme="dark"] .ias-alert-close { color: #8b939f; }
-html[data-theme="dark"] .ias-alert-close:hover { background: #262a31; color: #e4e6ea; }
-html[data-theme="dark"] .ias-alert-btn { background: #22262c; border-color: #363b44; color: #e4e6ea; }
-html[data-theme="dark"] .ias-alert-btn.is-primary { background: var(--ias-accent); border-color: var(--ias-accent); color: #fff; }
-html[data-theme="dark"] .ias-alert-btn.is-primary:hover { background: var(--ias-accent-dark); border-color: var(--ias-accent-dark); }
-
 /* ---- Session timeout dialog (includes/session_timeout.js) ---- */
 html[data-theme="dark"] .ias-sess-card { background: #1b1e23; color: #e4e6ea; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55); }
 html[data-theme="dark"] .ias-sess-title,

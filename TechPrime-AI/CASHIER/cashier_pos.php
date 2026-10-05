@@ -360,11 +360,16 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         if (line) status('info', 'Removed: ' + line.name, 'The line was removed from this sale.');
     });
     el.clearBtn.addEventListener('click', function () {
-        if (!cart.length || !confirm('Clear all items from this sale?')) return;
-        cart = [];
-        saveCart();
-        render();
-        status('info', 'Sale cleared', 'Scan a product to start again.');
+        if (!cart.length) return;
+        IAS_UI.confirm('Every item in this sale will be removed.', {
+            title: 'Clear this sale?', confirmLabel: 'Clear sale', type: 'danger'
+        }).then(function (ok) {
+            if (!ok) return;
+            cart = [];
+            saveCart();
+            render();
+            status('info', 'Sale cleared', 'Scan a product to start again.');
+        });
     });
 
     /** Re-read price and stock for every line (after reload or a price change). */
