@@ -916,62 +916,6 @@ html[data-theme="dark"] .tm-slot-price{color:#b0e097}
 html[data-theme="dark"] .tm-slot-actions button{border:0;background:none}
 html[data-theme="dark"] .tm-slot-actions .tm-change{color:#2563eb}
 html[data-theme="dark"] .tm-slot-actions .tm-remove{color:#dc2626}
-html[data-theme="dark"] .pcx{background:radial-gradient(120% 80% at 50% 0%, #1b3322 0%, #0e1a12 55%, #0a120d 100%);border:1px solid #1f3a26;color:#d8f5c8}
-html[data-theme="dark"] .pcx-floor{background:linear-gradient(to top, rgba(255, 255, 255, 0) 0%, rgba(10, 18, 13, 0.95) 85%),
-        repeating-linear-gradient(90deg, rgba(125, 220, 79, 0.07) 0 1px, transparent 1px 48px),
-        repeating-linear-gradient(0deg, rgba(125, 220, 79, 0.07) 0 1px, transparent 1px 48px)}
-html[data-theme="dark"] .pcx-face{background:linear-gradient(160deg, #1a2a1f, #111b15);border:1px solid rgba(125, 220, 79, 0.16)}
-html[data-theme="dark"] .pcx-back{background:#3b3e45}
-html[data-theme="dark"] .pcx.has-case .pcx-face{border-color:rgba(125, 220, 79, 0.55)}
-html[data-theme="dark"] .pcx-glass{border:1px solid rgba(125, 220, 79, 0.08)}
-html[data-theme="dark"] .pcx.has-case .pcx-glass{border-color:rgba(125, 220, 79, 0.3)}
-html[data-theme="dark"] .pcx-shroud{background:#3d4148;border-top:1px solid rgba(125, 220, 79, 0.22)}
-html[data-theme="dark"] .pcx-part{color:#9fd48a;border:1.5px dashed var(--line);background:var(--fill-empty);outline:none}
-html[data-theme="dark"] .pcx-part.is-filled{border-style:solid;border-color:rgba(125, 220, 79, 0.85);background:#1f3b26;color:#d8f5c8}
-html[data-theme="dark"] .pcx-part:hover,html[data-theme="dark"] .pcx-part:focus-visible,html[data-theme="dark"] .pcx-part.is-hover{border-color:#40632a;background-color:rgba(125, 220, 79, 0.2)}
-html[data-theme="dark"] .pcx-part.is-filled:hover,html[data-theme="dark"] .pcx-part.is-filled:focus-visible,html[data-theme="dark"] .pcx-part.is-filled.is-hover{background-color:#29502f}
-html[data-theme="dark"] .pcx-part.is-focus{border:2px solid #272a30}
-html[data-theme="dark"] .pcx-part.is-focus:not(.is-filled){border-style:dashed;background:rgba(125, 220, 79, 0.18)}
-html[data-theme="dark"] .pcx.show-missing .pcx-part:not(.is-filled){border-color:#ffd23f;background:rgba(255, 210, 63, 0.16);color:#ffd23f}
-html[data-theme="dark"] .pcx-tag{background:#36393f;border:1px solid rgba(125, 220, 79, 0.6);color:#d8f5c8}
-html[data-theme="dark"] .pcx-chip-die{border:1px solid var(--line)}
-html[data-theme="dark"] .pcx-cpu.is-filled{background:#373c45;border-color:#32363d;color:#d7d9dd}
-html[data-theme="dark"] .pcx-cpu.is-filled .pcx-chip-die{background:#8f9aa2;border-color:#6e7a82}
-html[data-theme="dark"] .pcx-cpu.is-filled:hover,html[data-theme="dark"] .pcx-cpu.is-filled.is-hover{background-color:#272b32}
-html[data-theme="dark"] .pcx-mobo.is-filled{background:repeating-linear-gradient(90deg, rgba(125, 220, 79, 0.08) 0 1px, transparent 1px 10px),
-        #1a3a22}
-html[data-theme="dark"] .pcx-stick{border:1px dashed var(--line)}
-html[data-theme="dark"] .pcx-ram.is-filled{background:transparent;border-color:transparent}
-html[data-theme="dark"] .pcx-ram.is-filled .pcx-stick{border:1px solid #8fe063;background:linear-gradient(180deg, #8fe063 0 12%, #23452b 12%)}
-html[data-theme="dark"] .pcx-ram.is-filled:hover,html[data-theme="dark"] .pcx-ram.is-filled.is-hover,html[data-theme="dark"] .pcx-ram.is-focus{border-color:#40632a}
-html[data-theme="dark"] .pcx-gpu.is-filled{background:#3d4148;border-bottom-width:4px}
-html[data-theme="dark"] .pcx-psu.is-filled,html[data-theme="dark"] .pcx-drive.is-filled{background:#40444b}
-html[data-theme="dark"] .pcx-fan{border:1px dashed var(--line)}
-html[data-theme="dark"] .pcx-part.is-filled .pcx-fan{border:1.5px solid #7ddc4f;background:radial-gradient(circle, #7ddc4f 0 14%, transparent 15%)}
-html[data-theme="dark"] .pcx-seg{border:1px solid rgba(125, 220, 79, 0.35);background:rgba(6, 14, 9, 0.6)}
-html[data-theme="dark"] .pcx-seg button,html[data-theme="dark"] .pcx-tool{border:0;background:transparent;color:#a9d79a}
-html[data-theme="dark"] .pcx-seg button.is-on{background:var(--neon);color:#0b1a0f}
-html[data-theme="dark"] .pcx-tool{border:1px solid rgba(125, 220, 79, 0.35);background:rgba(6, 14, 9, 0.6)}
-html[data-theme="dark"] .pcx-tool:hover,html[data-theme="dark"] .pcx-seg button:hover:not(.is-on){color:#e2ffd6}
-html[data-theme="dark"] .pcx-tool[aria-pressed="true"]{background:var(--neon);color:#0b1a0f;border-color:var(--neon)}
-html[data-theme="dark"] .pcx-legend{color:#8fbf80}
-html[data-theme="dark"] .pcx-dot{border:1px dashed var(--line)}
-html[data-theme="dark"] .pcx-dot.is-on{border:1px solid var(--neon);background:#1f3b26}
-html[data-theme="dark"] .pcx-dock{background:rgba(6, 14, 9, 0.75);border:1px solid rgba(125, 220, 79, 0.28)}
-html[data-theme="dark"] .pcx-dock-idle{color:#9fc792}
-html[data-theme="dark"] .pcx-dock-idle strong{color:#d8f5c8}
-html[data-theme="dark"] .pcx-dock-title strong{color:var(--neon)}
-html[data-theme="dark"] .pcx-badge.is-on{background:rgba(125, 220, 79, 0.16);color:var(--neon);border:1px solid rgba(125, 220, 79, 0.5)}
-html[data-theme="dark"] .pcx-badge.is-missing{background:rgba(255, 210, 63, 0.12);color:#ffd23f;border:1px solid rgba(255, 210, 63, 0.45)}
-html[data-theme="dark"] .pcx-badge.is-optional{background:rgba(255, 255, 255, 0.06);color:#b8c7b2;border:1px solid rgba(255, 255, 255, 0.18)}
-html[data-theme="dark"] .pcx-info-name{color:#eefbe7}
-html[data-theme="dark"] .pcx-info-text{color:#a9c7a0}
-html[data-theme="dark"] .pcx-dock .tm-chip{background:rgba(125, 220, 79, 0.1);border-color:rgba(125, 220, 79, 0.3);color:#c8f7b0}
-html[data-theme="dark"] .pcx-info-price{color:var(--neon)}
-html[data-theme="dark"] .pcx-btn-go{border:0;background:var(--neon);color:#0b1a0f}
-html[data-theme="dark"] .pcx-btn-go:hover{background:#9cf075}
-html[data-theme="dark"] .pcx-btn-remove{border:1px solid rgba(255, 120, 120, 0.5);background:transparent;color:#ff9d9d}
-html[data-theme="dark"] .pcx-info-close{border:1px solid rgba(125, 220, 79, 0.3) !important;background:transparent;color:#8fbf80}
 html[data-theme="dark"] .tm-progress-meta{color:#a9b0bb}
 html[data-theme="dark"] .tm-progress-meta b{color:#d7d9dd}
 html[data-theme="dark"] .tm-bar{background:#1f2228}

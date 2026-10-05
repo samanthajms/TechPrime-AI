@@ -69,7 +69,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if (!empty($extraHead)) echo $extraHead; ?>
     <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
-    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-5">
+    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-6">
     <link rel="stylesheet" href="ep_dark.css?v=dark-3">
     <?php echo ias_session_timeout_assets(); ?>
 </head>

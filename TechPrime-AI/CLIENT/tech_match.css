@@ -266,14 +266,17 @@
 
 /* Center: case preview + meters */
 .tm-center { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-/* ---- 3D / 2D case preview stage (static, no glow / spin) ---- */
+/* ---- 3D / 2D case preview stage (static, no glow / spin) ----
+   Side-panel view of an ATX mid-tower: rear wall + I/O on the left, front intake on the right,
+   PSU shroud along the bottom. Part positions follow real ATX proportions. */
 .pcx {
     --neon: #7ddc4f;
     --line: rgba(125, 220, 79, 0.42);
     --fill-empty: rgba(125, 220, 79, 0.07);
-    --cw: 290px;
-    --ch: 410px;
-    --cd: 120px;
+    --metal: linear-gradient(180deg, #6a746d, #2a312c);
+    --cw: 340px;
+    --ch: 380px;
+    --cd: 160px;
     --rx: -6deg;
     --ry: -18deg;
     --ex: 1;
@@ -339,23 +342,65 @@
     transform-style: preserve-3d;
 }
 
-/* Case box */
+/* Case box: back = motherboard tray, right = mesh front panel, left = rear I/O + PCIe covers */
 .pcx-face {
     position: absolute;
-    background: linear-gradient(160deg, #1a2a1f, #111b15);
+    background: linear-gradient(160deg, #1a221d, #0f1511);
     border: 1px solid rgba(125, 220, 79, 0.16);
     pointer-events: none;
     transition: border-color 0.3s ease;
 }
-.pcx-back { inset: 0; border-radius: 8px; background: #121d16; }
+.pcx-back {
+    inset: 0;
+    border-radius: 8px;
+    background:
+        radial-gradient(5px 13px at 66% 24%, #050806 85%, transparent 100%),
+        radial-gradient(5px 13px at 66% 42%, #050806 85%, transparent 100%),
+        radial-gradient(5px 13px at 66% 60%, #050806 85%, transparent 100%),
+        linear-gradient(160deg, #141c17, #0d130f);
+}
 .pcx-top-face,
 .pcx-bottom { left: 0; width: var(--cw); height: var(--cd); }
-.pcx-top-face { top: 0; transform-origin: top; transform: rotateX(-90deg); }
+.pcx-top-face {
+    top: 0;
+    transform-origin: top;
+    transform: rotateX(-90deg);
+    background:
+        radial-gradient(circle, rgba(0, 0, 0, 0.6) 1.1px, transparent 1.6px) 0 0 / 6px 6px,
+        linear-gradient(160deg, #1a221d, #0f1511);
+}
 .pcx-bottom { bottom: 0; transform-origin: bottom; transform: rotateX(90deg); }
 .pcx-front,
 .pcx-rear { top: 0; width: var(--cd); height: var(--ch); }
-.pcx-front { left: 0; transform-origin: left; transform: rotateY(90deg); }
-.pcx-rear { right: 0; transform-origin: right; transform: rotateY(-90deg); }
+.pcx-front {
+    right: 0;
+    transform-origin: right;
+    transform: rotateY(-90deg);
+    background:
+        radial-gradient(circle, rgba(0, 0, 0, 0.65) 1.2px, transparent 1.7px) 0 0 / 6px 6px,
+        linear-gradient(180deg, #19221c, #0e140f);
+}
+.pcx-power {
+    position: absolute;
+    top: 3%;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    margin-left: -6px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(125, 220, 79, 0.5);
+    background: #0b100c;
+}
+.pcx.has-case .pcx-power { border-color: var(--neon); box-shadow: 0 0 6px rgba(125, 220, 79, 0.6); }
+.pcx-rear {
+    left: 0;
+    transform-origin: left;
+    transform: rotateY(90deg);
+    background:
+        linear-gradient(#0a0e0b, #0a0e0b) 18% 13% / 30% 22% no-repeat,
+        repeating-linear-gradient(90deg, #26302a 0 9px, #0a0e0b 9px 12px) 12% 46% / 76% 20% no-repeat,
+        linear-gradient(160deg, #1a221d, #0f1511);
+}
 .pcx.has-case .pcx-face { border-color: rgba(125, 220, 79, 0.55); }
 .pcx-glass {
     position: absolute;
@@ -365,17 +410,48 @@
     border: 1px solid rgba(125, 220, 79, 0.08);
     pointer-events: none;
 }
-.pcx.has-case .pcx-glass { border-color: rgba(125, 220, 79, 0.3); }
+.pcx.has-case .pcx-glass {
+    border-color: rgba(125, 220, 79, 0.3);
+    background: linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 16%, transparent 16% 27%, rgba(255, 255, 255, 0.03) 27% 31%, transparent 31%);
+}
+
+/* Fixed case furniture: PSU shroud with drive cage, rear exhaust fan (seen edge-on) */
 .pcx-shroud {
     position: absolute;
-    left: 2%;
-    top: 66%;
-    width: 96%;
-    height: 32%;
-    border-radius: 4px;
-    background: #16231a;
+    left: 1.5%;
+    top: 70%;
+    width: 97%;
+    height: 28.5%;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #18221b, #101712);
     border-top: 1px solid rgba(125, 220, 79, 0.22);
     pointer-events: none;
+}
+.pcx-cage {
+    position: absolute;
+    left: 68.6%;
+    top: 7%;
+    width: 30.4%;
+    height: 89%;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 2px;
+    background: repeating-linear-gradient(180deg, transparent 0 32%, rgba(125, 220, 79, 0.14) 32% 34%);
+}
+.pcx-rearfan {
+    position: absolute;
+    left: 1%;
+    top: 13%;
+    width: 3.6%;
+    height: 26%;
+    border: 1px dashed var(--line);
+    border-radius: 2px;
+    transform: translateZ(4px);
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+.pcx.has-case_fan .pcx-rearfan {
+    border: 1px solid rgba(125, 220, 79, 0.7);
+    background: repeating-linear-gradient(180deg, #2b3830 0 3px, #141a16 3px 6px);
 }
 
 /* Parts */
@@ -396,12 +472,12 @@
     background: var(--fill-empty);
     cursor: pointer;
     transform: translateZ(calc(var(--z) * var(--ex)));
-    transition: transform 0.35s cubic-bezier(.2, .8, .2, 1), opacity 0.25s ease, background 0.2s ease, border-color 0.2s ease;
+    transition: transform 0.35s cubic-bezier(.2, .8, .2, 1), opacity 0.25s ease, background 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
     outline: none;
 }
 .pcx-part.is-filled {
     border-style: solid;
-    border-color: rgba(125, 220, 79, 0.85);
+    border-color: rgba(125, 220, 79, 0.75);
     background: #1f3b26;
     color: #d8f5c8;
 }
@@ -414,8 +490,11 @@
 }
 .pcx-part.is-filled:hover,
 .pcx-part.is-filled:focus-visible,
-.pcx-part.is-filled.is-hover { background-color: #29502f; }
-.pcx.has-focus .pcx-part:not(.is-focus) { opacity: 0.35; }
+.pcx-part.is-filled.is-hover { border-color: #c4ff9f; filter: brightness(1.2); }
+.pcx.has-focus .pcx-part:not(.is-focus),
+.pcx.has-focus .pcx-rearfan,
+.pcx.has-focus .pcx-tubes,
+.pcx.has-focus .pcx-pump { opacity: 0.35; }
 .pcx.has-focus .pcx-part:not(.is-focus):hover { opacity: 0.8; }
 .pcx-part.is-focus {
     transform: translateZ(calc(var(--z) * var(--ex) + var(--lift))) scale(1.05);
@@ -439,7 +518,7 @@
     text-transform: uppercase;
     pointer-events: none;
 }
-.pcx-name-corner { position: absolute; left: 6px; top: 4px; opacity: 0.8; }
+.pcx-name-corner { position: absolute; left: 6px; bottom: 3px; opacity: 0.8; }
 .pcx-tag {
     position: absolute;
     left: 50%;
@@ -462,54 +541,190 @@
 .pcx-part:focus-visible > .pcx-tag,
 .pcx-part.is-hover > .pcx-tag,
 .pcx-part.is-focus > .pcx-tag { opacity: 1; }
-.pcx-mobo > .pcx-tag { bottom: auto; top: 6px; left: auto; right: 6px; transform: none; }
+.pcx-mobo > .pcx-tag { bottom: 4px; }
+.pcx-cooler > .pcx-tag { bottom: auto; top: calc(100% + 6px); }
+.pcx-casebadge > .pcx-tag { bottom: 1%; }
 
-.pcx-casebadge,
+/* Case: the whole interior; clicking any empty spot selects it */
+.pcx .pcx-part.pcx-casebadge,
+.pcx .pcx-part.pcx-casebadge:hover,
+.pcx .pcx-part.pcx-casebadge:focus-visible,
+.pcx .pcx-part.pcx-casebadge.is-hover { background: transparent; filter: none; border-radius: 8px; }
+.pcx .pcx-part.pcx-casebadge.is-filled { border-color: rgba(125, 220, 79, 0.45); }
+.pcx .pcx-part.pcx-casebadge:hover,
+.pcx .pcx-part.pcx-casebadge.is-hover { border-color: #c4ff9f; }
+.pcx .pcx-part.pcx-casebadge.is-focus { transform: translateZ(var(--z)); border-color: #ffffff; }
+.pcx-case-label {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    opacity: 0.85;
+    pointer-events: none;
+}
+.pcx-case-label i { font-size: 10px; }
+
+/* Motherboard: black PCB with I/O cover, VRM heatsinks, socket, PCIe slots, chipset */
+.pcx-mb {
+    position: absolute;
+    border: 1px dashed rgba(125, 220, 79, 0.18);
+    border-radius: 2px;
+    pointer-events: none;
+}
+.pcx-mb-io { left: 1%; top: 1%; width: 10%; height: 37%; }
+.pcx-mb-vrm-top { left: 21%; top: 3.5%; width: 35%; height: 7%; }
+.pcx-mb-vrm-side { left: 13%; top: 11.5%; width: 9%; height: 26%; }
+.pcx-mb-socket { left: 28.3%; top: 12.8%; width: 25.8%; height: 23.7%; }
+.pcx-mb-atx { left: 90%; top: 18%; width: 5%; height: 21%; }
+.pcx-mb-pcie { left: 3%; width: 62%; height: 2.4%; }
+.pcx-mb-pcie-s { width: 22%; }
+.pcx-mb-chipset { left: 68%; top: 74%; width: 26%; height: 20%; }
+.pcx-mobo.is-filled {
+    border-color: rgba(125, 220, 79, 0.55);
+    background:
+        radial-gradient(circle at 3% 3%, #9aa39c 0 1.6px, transparent 2.2px),
+        radial-gradient(circle at 97% 3%, #9aa39c 0 1.6px, transparent 2.2px),
+        radial-gradient(circle at 3% 97%, #9aa39c 0 1.6px, transparent 2.2px),
+        radial-gradient(circle at 97% 97%, #9aa39c 0 1.6px, transparent 2.2px),
+        radial-gradient(circle at 60% 45%, #9aa39c 0 1.6px, transparent 2.2px),
+        repeating-linear-gradient(90deg, rgba(125, 220, 79, 0.05) 0 1px, transparent 1px 9px),
+        linear-gradient(160deg, #18201b, #0e1310);
+}
+.pcx-mobo.is-filled .pcx-mb { border: 1px solid rgba(255, 255, 255, 0.08); }
+.pcx-mobo.is-filled .pcx-mb-io { background: linear-gradient(90deg, #262d29, #3d4640); box-shadow: inset -2px 0 0 rgba(125, 220, 79, 0.6); }
+.pcx-mobo.is-filled .pcx-mb-vrm-top { background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 4px), var(--metal); }
+.pcx-mobo.is-filled .pcx-mb-vrm-side { background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 4px), var(--metal); }
+.pcx-mobo.is-filled .pcx-mb-socket {
+    border-color: #6d7770;
+    background: radial-gradient(circle, #b7973f 0.6px, transparent 1px) 0 0 / 3px 3px, #1b221e;
+}
+.pcx-mobo.is-filled .pcx-mb-atx { border-color: #2c2c2c; background: radial-gradient(circle, #3d3d3d 0.8px, transparent 1.2px) 0 0 / 4px 4px, #111; }
+.pcx-mobo.is-filled .pcx-mb-pcie { border-color: #4b544e; background: #0a0c0b; }
+.pcx-mobo.is-filled .pcx-mb-chipset { background: linear-gradient(135deg, #505a53, #252b27); box-shadow: inset 0 0 0 1px rgba(125, 220, 79, 0.35); }
+
+/* CPU: silver heat spreader in the socket */
 .pcx-cpu,
 .pcx-m2,
 .pcx-drive { display: flex; align-items: center; justify-content: center; gap: 6px; }
-.pcx-casebadge i { font-size: 10px; }
 .pcx-chip-die { position: absolute; inset: 20%; border-radius: 3px; border: 1px solid var(--line); pointer-events: none; }
-.pcx-cpu .pcx-name { position: relative; }
-.pcx-cpu.is-filled { background: #c9d0d6; border-color: #e7ecef; color: #1d2a20; }
-.pcx-cpu.is-filled .pcx-chip-die { background: #8f9aa2; border-color: #6e7a82; }
-.pcx-cpu.is-filled:hover,
-.pcx-cpu.is-filled.is-hover { background-color: #dfe5e9; }
-.pcx-mobo.is-filled {
-    background:
-        repeating-linear-gradient(90deg, rgba(125, 220, 79, 0.08) 0 1px, transparent 1px 10px),
-        #1a3a22;
-}
-.pcx-ram { display: flex; justify-content: space-evenly; align-items: stretch; padding: 4px 3px; }
-.pcx-stick { width: 6px; border-radius: 2px; border: 1px dashed var(--line); pointer-events: none; }
+.pcx-cpu .pcx-name { position: relative; font-size: 8px; }
+.pcx-cpu.is-filled { background: linear-gradient(135deg, #e5e9ec, #a9b1b7 60%, #cfd5d9); border-color: #eef1f3; color: #1d2a20; border-radius: 3px; }
+.pcx-cpu.is-filled .pcx-chip-die { inset: 16%; border-color: rgba(0, 0, 0, 0.12); }
+
+/* RAM: four DIMMs with RGB tops */
+.pcx-ram { display: flex; justify-content: space-evenly; align-items: stretch; padding: 3px 2px; }
+.pcx-stick { width: 5px; border-radius: 2px; border: 1px dashed var(--line); pointer-events: none; }
 .pcx-ram.is-filled { background: transparent; border-color: transparent; }
-.pcx-ram.is-filled .pcx-stick { border: 1px solid #8fe063; background: linear-gradient(180deg, #8fe063 0 12%, #23452b 12%); }
+.pcx-ram.is-filled .pcx-stick {
+    border: 1px solid #39433d;
+    background: linear-gradient(180deg, #7ddc4f 0 7%, #c4ff9f 7% 9%, #1c2420 9% 100%);
+    box-shadow: 0 -2px 6px rgba(125, 220, 79, 0.35);
+}
 .pcx-ram.is-filled:hover,
 .pcx-ram.is-filled.is-hover,
 .pcx-ram.is-focus { border-color: #c4ff9f; }
-.pcx-gpu,
-.pcx-cooler,
-.pcx-fans,
-.pcx-psu { display: flex; align-items: center; justify-content: space-evenly; }
-.pcx-fans { flex-direction: column; padding: 8% 0; }
-.pcx-gpu.is-filled { background: #17241b; border-bottom-width: 4px; }
-.pcx-psu.is-filled,
-.pcx-drive.is-filled { background: #1c2b21; }
 
-/* Fans: static rings */
+/* M.2 SSD with heatsink, between the socket and the first PCIe slot */
+.pcx-m2.is-filled {
+    border-color: #6b756e;
+    border-radius: 2px;
+    background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 5px), linear-gradient(180deg, #4a534d, #222824);
+}
+
+/* GPU, seen edge-on through the side window: backplate edge, fin stack, light bar, power plug */
+.pcx-gpu { border-radius: 4px; }
+.pcx-gpu-bracket,
+.pcx-gpu-power,
+.pcx-gpu-bar { position: absolute; border: 1px dashed rgba(125, 220, 79, 0.3); border-radius: 2px; pointer-events: none; }
+.pcx-gpu-bracket { left: 0; top: -14%; width: 4.5%; height: 128%; }
+.pcx-gpu-bar { left: 10%; top: 32%; width: 46%; height: 36%; display: flex; align-items: center; justify-content: center; }
+.pcx-gpu-power { right: 7%; top: 30%; width: 8%; height: 40%; }
+.pcx-gpu.is-filled {
+    border-color: rgba(125, 220, 79, 0.6);
+    background:
+        linear-gradient(180deg, #6a746d 0 10%, #0f1311 10% 13%, transparent 13% 84%, #0c0f0d 84%),
+        repeating-linear-gradient(90deg, #29302c 0 2px, #141916 2px 5px);
+}
+.pcx-gpu.is-filled .pcx-gpu-bracket { border: 0; background: linear-gradient(90deg, #8d968f, #d6dcd8, #8d968f); }
+.pcx-gpu.is-filled .pcx-gpu-bar { border: 1px solid rgba(125, 220, 79, 0.6); background: #0a0d0b; box-shadow: inset 0 0 8px rgba(125, 220, 79, 0.35); color: var(--neon); }
+.pcx-gpu.is-filled .pcx-gpu-power { border: 1px solid #2b2b2b; background: radial-gradient(circle, #3a3a3a 0.9px, transparent 1.3px) 0 0 / 4px 4px, #0d0d0d; }
+
+/* CPU cooler: top-mounted radiator (fins + fans edge-on), tubes and pump on the socket */
+.pcx-cooler { display: flex; flex-direction: column; }
+.pcx-rad-fins { flex: 0 0 52%; border-bottom: 1px dashed rgba(125, 220, 79, 0.3); pointer-events: none; }
+.pcx-rad-fans { flex: 1; display: flex; gap: 4%; padding: 0 3%; pointer-events: none; }
+.pcx-rad-fans span { flex: 1; border: 1px dashed rgba(125, 220, 79, 0.3); border-top: 0; }
+.pcx-cooler.is-filled { background: #111613; }
+.pcx-cooler.is-filled .pcx-rad-fins { border-bottom: 1px solid #0a0d0b; background: repeating-linear-gradient(90deg, #8c958f 0 1px, #39413c 1px 3px); border-radius: 3px 3px 0 0; }
+.pcx-cooler.is-filled .pcx-rad-fans span { border: 1px solid rgba(125, 220, 79, 0.6); border-top: 0; background: repeating-linear-gradient(90deg, #2a332e 0 3px, #161c18 3px 6px); }
+.pcx-tubes,
+.pcx-pump { position: absolute; display: none; pointer-events: none; transition: opacity 0.25s ease; }
+.pcx-tubes { inset: 0; width: 100%; height: 100%; overflow: visible; transform: translateZ(15px); }
+.pcx-tubes path { fill: none; stroke: #1d2420; stroke-width: 5px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.pcx-pump {
+    left: 24.6%;
+    top: 22.3%;
+    width: 7.8%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 1.5px solid #59625c;
+    background: radial-gradient(circle, #7ddc4f 0 18%, #0d110e 21% 60%, #2f3833 62%);
+    box-shadow: 0 0 8px rgba(125, 220, 79, 0.35);
+    transform: translateZ(12px);
+    box-sizing: border-box;
+}
+.pcx.has-cooler .pcx-tubes,
+.pcx.has-cooler .pcx-pump { display: block; }
+.pcx.has-cooler .pcx-tubes { filter: drop-shadow(0 0 1px rgba(125, 220, 79, 0.6)); }
+
+/* Front intake fans (face-on) */
+.pcx-fans { display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; padding: 4% 0; }
 .pcx-fan {
-    height: 68%;
+    width: 86%;
     aspect-ratio: 1;
     border-radius: 50%;
     border: 1px dashed var(--line);
     pointer-events: none;
     box-sizing: border-box;
 }
-.pcx-fans .pcx-fan { height: auto; width: 70%; }
-.pcx-psu .pcx-fan { height: 70%; }
-.pcx-part.is-filled .pcx-fan {
-    border: 1.5px solid #7ddc4f;
-    background: radial-gradient(circle, #7ddc4f 0 14%, transparent 15%);
+.pcx-fans.is-filled { background: #111613; }
+.pcx-fans.is-filled .pcx-fan {
+    border: 2px solid #7ddc4f;
+    background:
+        radial-gradient(circle, #1b221e 0 16%, #7ddc4f 17% 19%, transparent 20%),
+        repeating-conic-gradient(from 10deg, #3d4a42 0 16deg, #131915 16deg 51.43deg);
+    box-shadow: 0 0 8px rgba(125, 220, 79, 0.35), inset 0 0 0 2px #0d110e;
+}
+
+/* PSU under the shroud: vents, label, modular sockets facing the front */
+.pcx-psu-vent,
+.pcx-psu-label,
+.pcx-psu-plugs { position: absolute; border: 1px dashed rgba(125, 220, 79, 0.3); border-radius: 2px; pointer-events: none; }
+.pcx-psu-vent { left: 4%; top: 14%; width: 30%; height: 72%; }
+.pcx-psu-label { left: 40%; top: 22%; width: 34%; height: 56%; display: flex; align-items: center; justify-content: center; }
+.pcx-psu-plugs { right: 4%; top: 20%; width: 12%; height: 60%; }
+.pcx-psu.is-filled { border-color: rgba(125, 220, 79, 0.6); background: linear-gradient(180deg, #252c28, #131815); }
+.pcx-psu.is-filled .pcx-psu-vent { border: 0; background: repeating-linear-gradient(90deg, #060807 0 2px, transparent 2px 5px); }
+.pcx-psu.is-filled .pcx-psu-label { border: 1px solid rgba(125, 220, 79, 0.45); background: #0b0e0c; }
+.pcx-psu.is-filled .pcx-psu-plugs { border: 1px solid #39433d; background: radial-gradient(circle, #000 1px, transparent 1.5px) 0 0 / 5px 5px, #2a312d; }
+
+/* Drives: 2.5" SATA SSD on the shroud bracket, 3.5" HDD in the front cage */
+.pcx-sata.is-filled {
+    border-color: rgba(125, 220, 79, 0.6);
+    border-radius: 3px;
+    background: linear-gradient(135deg, #2c332f, #161b18);
+    box-shadow: inset 4px 0 0 rgba(125, 220, 79, 0.7);
+}
+.pcx-hdd.is-filled {
+    border-color: #cfd5d1;
+    border-radius: 2px;
+    color: #1d2a20;
+    background:
+        radial-gradient(circle at 8% 50%, #2b302d 0 2px, transparent 2.5px),
+        radial-gradient(circle at 92% 50%, #2b302d 0 2px, transparent 2.5px),
+        linear-gradient(180deg, #bcc3be, #7d857f 55%, #a3aaa5);
 }
 
 /* 2D (flat) view: no perspective, so depth never shifts parts */
@@ -519,6 +734,7 @@
 [data-view="2d"] .pcx-glass,
 [data-view="2d"] .pcx-floor { display: none; }
 [data-view="2d"] .pcx-part.is-focus { transform: scale(1.06); }
+[data-view="2d"] .pcx-part.pcx-casebadge.is-focus { transform: none; }
 
 /* Toolbar + legend */
 .pcx-toolbar { display: flex; gap: 6px; }

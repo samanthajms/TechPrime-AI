@@ -19,7 +19,7 @@ $isHomePage = false;
 $pageTitle = 'Build a PC';
 $csrf = generateCsrfToken();
 
-$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-6">';
+$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-7">';
 
 include __DIR__ . '/ep_header.php';
 ?>
@@ -75,21 +75,25 @@ include __DIR__ . '/ep_header.php';
                             <div class="pcx-face pcx-back" aria-hidden="true"></div>
                             <div class="pcx-face pcx-top-face" aria-hidden="true"></div>
                             <div class="pcx-face pcx-bottom" aria-hidden="true"></div>
-                            <div class="pcx-face pcx-front" aria-hidden="true"></div>
+                            <div class="pcx-face pcx-front" aria-hidden="true"><span class="pcx-power"></span></div>
                             <div class="pcx-face pcx-rear" aria-hidden="true"></div>
-                            <div class="pcx-shroud" aria-hidden="true"></div>
 
-                            <button type="button" class="pcx-part pcx-casebadge" data-slot="case" style="--x:3%;--y:2%;--w:17%;--h:6.5%;--z:4px;--lift:18px"><i class="fas fa-cube" aria-hidden="true"></i><span class="pcx-name">Case</span><span class="pcx-tag">PC Case</span></button>
-                            <button type="button" class="pcx-part pcx-cooler" data-slot="cooler" style="--x:24%;--y:2%;--w:72%;--h:6.5%;--z:10px"><span class="pcx-fan"></span><span class="pcx-fan"></span><span class="pcx-fan"></span><span class="pcx-tag">CPU Cooler</span></button>
-                            <button type="button" class="pcx-part pcx-fans" data-slot="case_fan" style="--x:3%;--y:11%;--w:17%;--h:52%;--z:10px"><span class="pcx-fan"></span><span class="pcx-fan"></span><span class="pcx-fan"></span><span class="pcx-tag">Case Fans</span></button>
-                            <button type="button" class="pcx-part pcx-mobo" data-slot="motherboard" style="--x:24%;--y:11%;--w:72%;--h:52%;--z:2px;--lift:0px"><span class="pcx-name pcx-name-corner">Motherboard</span><span class="pcx-tag">Motherboard</span></button>
-                            <button type="button" class="pcx-part pcx-cpu" data-slot="processor" style="--x:45%;--y:16%;--w:19%;--h:13.5%;--z:8px"><span class="pcx-chip-die"></span><span class="pcx-name">CPU</span><span class="pcx-tag">Processor</span></button>
-                            <button type="button" class="pcx-part pcx-ram" data-slot="memory" style="--x:72%;--y:15%;--w:17%;--h:22%;--z:8px"><span class="pcx-stick"></span><span class="pcx-stick"></span><span class="pcx-stick"></span><span class="pcx-stick"></span><span class="pcx-tag">Memory</span></button>
-                            <button type="button" class="pcx-part pcx-m2" data-slot="ssd" style="--x:29%;--y:32.5%;--w:17%;--h:4.4%;--z:6px"><span class="pcx-name">M.2</span><span class="pcx-tag">SSD (M.2)</span></button>
-                            <button type="button" class="pcx-part pcx-gpu" data-slot="gpu" style="--x:27%;--y:41%;--w:66%;--h:15%;--z:14px"><span class="pcx-fan"></span><span class="pcx-fan"></span><span class="pcx-fan"></span><span class="pcx-tag">Graphics Card</span></button>
-                            <button type="button" class="pcx-part pcx-psu" data-slot="psu" style="--x:4%;--y:69%;--w:46%;--h:26%;--z:10px"><span class="pcx-fan"></span><span class="pcx-name pcx-name-corner">PSU</span><span class="pcx-tag">Power Supply</span></button>
-                            <button type="button" class="pcx-part pcx-drive" data-slot="ssd_sata" style="--x:55%;--y:69%;--w:41%;--h:11.5%;--z:10px"><span class="pcx-name">SATA SSD</span><span class="pcx-tag">SSD (SATA)</span></button>
-                            <button type="button" class="pcx-part pcx-drive" data-slot="hdd" style="--x:55%;--y:83.5%;--w:41%;--h:11.5%;--z:10px"><span class="pcx-name">HDD</span><span class="pcx-tag">Hard Disk</span></button>
+                            <!-- Side-panel view of an ATX mid-tower: rear (I/O) on the left, front intake on the right. -->
+                            <button type="button" class="pcx-part pcx-casebadge" data-slot="case" style="--x:0%;--y:0%;--w:100%;--h:100%;--z:1px;--lift:0px"><span class="pcx-case-label"><i class="fas fa-cube" aria-hidden="true"></i><span class="pcx-name">Case</span></span><span class="pcx-tag">PC Case</span></button>
+                            <div class="pcx-shroud" aria-hidden="true"><span class="pcx-cage"></span></div>
+                            <div class="pcx-rearfan" aria-hidden="true"></div>
+                            <button type="button" class="pcx-part pcx-mobo" data-slot="motherboard" style="--x:5%;--y:12%;--w:57%;--h:56%;--z:3px;--lift:0px"><span class="pcx-mb pcx-mb-io"></span><span class="pcx-mb pcx-mb-vrm-top"></span><span class="pcx-mb pcx-mb-vrm-side"></span><span class="pcx-mb pcx-mb-socket"></span><span class="pcx-mb pcx-mb-atx"></span><span class="pcx-mb pcx-mb-pcie" style="top:52%"></span><span class="pcx-mb pcx-mb-pcie" style="top:76%"></span><span class="pcx-mb pcx-mb-pcie pcx-mb-pcie-s" style="top:88%"></span><span class="pcx-mb pcx-mb-chipset"></span><span class="pcx-name pcx-name-corner">Motherboard</span><span class="pcx-tag">Motherboard</span></button>
+                            <button type="button" class="pcx-part pcx-cpu" data-slot="processor" style="--x:22%;--y:20%;--w:13%;--h:11.6%;--z:8px"><span class="pcx-chip-die"></span><span class="pcx-name">CPU</span><span class="pcx-tag">Processor</span></button>
+                            <button type="button" class="pcx-part pcx-ram" data-slot="memory" style="--x:43%;--y:15.5%;--w:9.5%;--h:27%;--z:14px"><span class="pcx-stick"></span><span class="pcx-stick"></span><span class="pcx-stick"></span><span class="pcx-stick"></span><span class="pcx-tag">Memory</span></button>
+                            <button type="button" class="pcx-part pcx-m2" data-slot="ssd" style="--x:18%;--y:35.3%;--w:19%;--h:4.4%;--z:6px"><span class="pcx-name">M.2</span><span class="pcx-tag">SSD (M.2)</span></button>
+                            <button type="button" class="pcx-part pcx-gpu" data-slot="gpu" style="--x:2%;--y:41%;--w:72%;--h:11.5%;--z:26px"><span class="pcx-gpu-bracket"></span><span class="pcx-gpu-power"></span><span class="pcx-gpu-bar"><span class="pcx-name">Graphics</span></span><span class="pcx-tag">Graphics Card</span></button>
+                            <button type="button" class="pcx-part pcx-cooler" data-slot="cooler" style="--x:18%;--y:1.8%;--w:55%;--h:9%;--z:18px"><span class="pcx-rad-fins"></span><span class="pcx-rad-fans"><span></span><span></span></span><span class="pcx-tag">CPU Cooler</span></button>
+                            <svg class="pcx-tubes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M29.5 24 C 31 16, 60 18, 66 10.5"/><path d="M27.5 24 C 28 13, 52 14, 58 10.5"/></svg>
+                            <div class="pcx-pump" aria-hidden="true"></div>
+                            <button type="button" class="pcx-part pcx-fans" data-slot="case_fan" style="--x:82%;--y:8%;--w:15%;--h:60%;--z:20px"><span class="pcx-fan"></span><span class="pcx-fan"></span><span class="pcx-fan"></span><span class="pcx-tag">Case Fans</span></button>
+                            <button type="button" class="pcx-part pcx-psu" data-slot="psu" style="--x:3%;--y:77%;--w:38%;--h:18%;--z:20px"><span class="pcx-psu-vent"></span><span class="pcx-psu-label"><span class="pcx-name">PSU</span></span><span class="pcx-psu-plugs"></span><span class="pcx-tag">Power Supply</span></button>
+                            <button type="button" class="pcx-part pcx-drive pcx-sata" data-slot="ssd_sata" style="--x:45%;--y:74%;--w:21%;--h:13%;--z:24px"><span class="pcx-name">SATA SSD</span><span class="pcx-tag">SSD (SATA)</span></button>
+                            <button type="button" class="pcx-part pcx-drive pcx-hdd" data-slot="hdd" style="--x:69.5%;--y:80%;--w:27%;--h:7.5%;--z:24px"><span class="pcx-name">HDD</span><span class="pcx-tag">Hard Disk</span></button>
                             <div class="pcx-glass" aria-hidden="true"></div>
                         </div>
                     </div>
@@ -215,7 +219,7 @@ include __DIR__ . '/ep_header.php';
 window.EP_CSRF = <?php echo json_encode($csrf); ?>;
 window.EP_TM_USER = <?php echo (int)($_SESSION['user_id'] ?? 0); ?>;
 </script>
-<script src="tech_match.js?v=pcx-6" defer></script>
+<script src="tech_match.js?v=pcx-7" defer></script>
 
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>

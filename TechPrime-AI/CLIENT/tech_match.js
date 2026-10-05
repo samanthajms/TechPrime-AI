@@ -570,8 +570,8 @@
             var w = scene.clientWidth || 400;
             var h = scene.clientHeight || 400;
             /* Leave room for rotation / exploded depth so the case never clips. */
-            var roomW = pcx.view === '3d' ? (pcx.explode ? 400 : 350) : 310;
-            stage.style.setProperty('--scale', String(Math.min(1.15, (w - 24) / roomW, (h - 30) / 430).toFixed(3)));
+            var roomW = pcx.view === '3d' ? (pcx.explode ? 470 : 420) : 360;
+            stage.style.setProperty('--scale', String(Math.min(1.15, (w - 24) / roomW, (h - 30) / 420).toFixed(3)));
         }
         stage.querySelectorAll('[data-pcx-view]').forEach(function (b) {
             b.classList.toggle('is-on', b.getAttribute('data-pcx-view') === pcx.view);
@@ -593,8 +593,9 @@
             var item = build[slot];
             el.classList.toggle('is-filled', !!item);
             el.setAttribute('aria-label', (meta ? meta.name : slot) + ': ' + (item ? 'installed, ' + item.name : 'missing'));
+            /* has-case, has-cooler, has-case_fan... drive the decorative bits (tubes, pump, rear fan). */
+            stage.classList.toggle('has-' + slot, !!item);
         });
-        stage.classList.toggle('has-case', !!build['case']);
         pcxRenderInfo();
     }
 

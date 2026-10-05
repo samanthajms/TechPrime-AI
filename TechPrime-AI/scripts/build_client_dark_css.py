@@ -40,6 +40,9 @@ IDENTITY_SELECTORS = re.compile(
     r'|\.ep-theme-toggle|\.ep-pnav|\.ep-account'
 )
 
+# The Build a PC case preview (.pcx) is always dark, so it gets no dark twin at all.
+SKIP_SELECTORS = re.compile(r'^\s*(\.pcx|\[data-view)')
+
 # --------------------------------------------------------------------------- CSS parsing
 
 
@@ -358,7 +361,9 @@ def convert_rule(selector, body):
     if not picked:
         return None
     sels = split_top(selector)
-    identity = all(IDENTITY_SELECTORS.search(s) for s in sels)
+    if all(SKIP_SELECTORS.search(s) for s in sels):
+        return None
+    identity =all(IDENTITY_SELECTORS.search(s) for s in sels)
 
     strong_bg = False
     for p, v, _, role in picked:
