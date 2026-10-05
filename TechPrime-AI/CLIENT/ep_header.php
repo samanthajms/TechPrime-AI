@@ -58,12 +58,19 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <?php else: ?>
         <title>EasyPC</title>
     <?php endif; ?>
-    <link rel="stylesheet" href="styles.css?v=category-rail-1">
+    <script>
+        /* Apply the saved theme before the stylesheets load so dark mode never flashes white. */
+        try { if (localStorage.getItem('ep_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="styles.css?v=theme-toggle-1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if (!empty($extraHead)) echo $extraHead; ?>
+    <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
+    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-1">
+    <link rel="stylesheet" href="ep_dark.css?v=dark-1">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">
@@ -183,6 +190,18 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
             <span class="ep-nav-item-icon"><i class="far fa-user" aria-hidden="true"></i></span>
             <span class="ep-nav-item-label">My Profile</span>
         </button>
+
+        <?php /* Light/dark theme switch. Which icon and label show is decided by CSS from html[data-theme]. */ ?>
+        <button type="button" id="epThemeToggle" class="ep-nav-item ep-theme-toggle" title="Switch light / dark mode">
+            <span class="ep-nav-item-icon">
+                <i class="fas fa-moon ep-theme-when-light" aria-hidden="true"></i>
+                <i class="fas fa-sun ep-theme-when-dark" aria-hidden="true"></i>
+            </span>
+            <span class="ep-nav-item-label">
+                <span class="ep-theme-when-light">Dark Mode</span>
+                <span class="ep-theme-when-dark">Light Mode</span>
+            </span>
+        </button>
     </nav>
 </div>
 
@@ -296,6 +315,23 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
     }
     epSetHeaderOffset();
     window.addEventListener('resize', epSetHeaderOffset);
+
+    /* ---- Light / dark theme (saved per browser; applied early in <head>) ---- */
+    var themeBtn = document.getElementById('epThemeToggle');
+    var applyTheme = function (theme) {
+        document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+    };
+    if (themeBtn) {
+        themeBtn.addEventListener('click', function () {
+            var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            applyTheme(next);
+            try { localStorage.setItem('ep_theme', next); } catch (e) {}
+        });
+    }
+    // Keep other open tabs of the store in sync.
+    window.addEventListener('storage', function (e) {
+        if (e.key === 'ep_theme') applyTheme(e.newValue);
+    });
 
     /* ---- Mobile navigation drawer ---- */
     var menuBtn = document.getElementById('epMenuBtn');

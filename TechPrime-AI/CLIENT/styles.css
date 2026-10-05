@@ -1910,6 +1910,17 @@ html { height: 100%; }
     font-size: 10px;
 }
 
+/* Light / dark theme switch (ep_header.php): show the icon + label for the mode it switches to */
+.ep-theme-toggle .ep-theme-when-dark { display: none; }
+html[data-theme="dark"] .ep-theme-toggle .ep-theme-when-light { display: none; }
+html[data-theme="dark"] .ep-theme-toggle .ep-theme-when-dark { display: inline; }
+.ep-theme-toggle .ep-nav-item-icon i { transition: transform 0.35s ease; }
+.ep-theme-toggle:hover .ep-nav-item-icon i { transform: rotate(-20deg); }
+@media (prefers-reduced-motion: reduce) {
+    .ep-theme-toggle .ep-nav-item-icon i { transition: none; }
+    .ep-theme-toggle:hover .ep-nav-item-icon i { transform: none; }
+}
+
 .ep-logo { display: flex; align-items: center; cursor: pointer; }
 .ep-logo-img { height: 38px; width: auto; display: block; }
 .ep-footer-logo-img { height: 28px; width: auto; display: block; }
