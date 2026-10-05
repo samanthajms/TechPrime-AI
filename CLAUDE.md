@@ -17,6 +17,7 @@ php -l path/to/file.php                     # syntax check (run on every changed
 composer install                            # only dependency is vlucas/phpdotenv (vendor/ is gitignored)
 php scripts/ensure_product_indexes.php      # idempotent product indexes
 php scripts/catalog_db.php count|ensure_sku|validate <csv>   # catalog import helper (used by scripts/import_oasis_catalog.py)
+python scripts/build_client_dark_css.py      # regenerate CLIENT/ep_dark_auto.css — re-run after editing CLIENT/styles.css, primo.css, tech_match.css or saved_builds.php styles
 ```
 
 Primo chatbot intent service (Python, needed only for the client chat):
@@ -29,7 +30,7 @@ python test_intents.py
 
 ## Database — read before touching data
 
-- **PostgreSQL on Supabase via PDO `pgsql`**, not MySQL. `database/schema.sql`, `techprime_ai.sql` and most `migration_*.sql` are stale MySQL/phpMyAdmin dumps; `database/migration_cashier_pos.sql` is Postgres and reflects the real current schema for POS tables. Inspect the live schema via `information_schema`/`pg_catalog` when in doubt.
+- **PostgreSQL on Supabase via PDO `pgsql`**, not MySQL. `database/schema.sql`, `techprime_ai.sql` and most `migration_*.sql` are stale MySQL/phpMyAdmin dumps; `database/migration_cashier_pos.sql`, `migration_messages_features.sql` and `migration_messages_is_read.sql` are Postgres and reflect the real current schema for POS and staff-chat tables. Inspect the live schema via `information_schema`/`pg_catalog` when in doubt.
 - Connection: `getDbConnection()` in `backend/config/database.php` (reads `TechPrime-AI/.env` via phpdotenv — never read, edit or commit `.env`). `includes/db.php` is a legacy `getDb()` with hardcoded credentials; don't use it.
 - **There is only one database: the live, shared Supabase instance.** Migrations are run by hand. Ask before any schema change or data write. Test DB logic inside a transaction that is rolled back (the POS helpers support being called inside an open transaction — they use a SAVEPOINT).
 - Connection goes through the Supabase pooler on port 6543 (transaction pooling): keep work inside one transaction; never use session-level `SET` (it can leak to other clients).
@@ -42,7 +43,9 @@ python test_intents.py
 
 **Auth/guards** (`includes/security.php`): PHP sessions; every page calls `checkSessionTimeout()` (15 min idle, `IAS_SESSION_IDLE_TIMEOUT`; must stay below `session.gc_maxlifetime` 1440 s) and `checkRole('<role>')` (redirects to `ias_login_url()` — never hardcode `/login.php`, the app is not at the web root). An expired session redirects to `login.php?expired=1` (JSON/fetch requests get 401 `session_expired`); `includes/session_timeout.js` (loaded by `staff_page_end()` and `CLIENT/ep_header.php`) shows the idle warning / session-expired dialog via `backend/api/session.php`. JSON endpoints check `$_SESSION['role']` themselves and return `{ok:false,error}` with 403. CSRF via `generateCsrfToken()`/`verifyCsrfToken()`. `h()` for escaping. `logActivity($db, $uid, $action, $details)` writes the audit trail to the `logs` table (shown in Admin → Activity Logs; the custodian Activity page only shows a whitelist of actions and parses `stock X → Y` in details).
 
-**Staff UI shell** (`includes/staff_layout.php` + `includes/staff_shared.css`): pages call `staff_page_start([...role, title, active, heading, subtitle, extra_head])` … `staff_page_end($scripts)`. Nav per role in `staff_nav_for_role()`. Relative asset paths depend on a folder regex `(ADMIN|RETAIL|INVENTORY|CASHIER|courier)` repeated in several helpers — a new role folder must be added there. Custodian and cashier pages get the green `inv-page-banner`. Page-specific CSS is inline in `extra_head` (INVENTORY) or `CASHIER/cashier.css`, built on the `staff_shared.css` tokens (`--ep-green`, etc.). Modal alerts: `IAS_UI.alert()` (`includes/ui_alerts.js`); redirect flash messages use `?alert=`/`?error=` keys mapped in `ias_alert_message_from_request()`.
+**Staff UI shell** (`includes/staff_layout.php` + `includes/staff_shared.css`): pages call `staff_page_start([...role, title, active, heading, subtitle, extra_head])` … `staff_page_end($scripts)`. Nav per role in `staff_nav_for_role()`. Relative asset paths depend on a folder regex `(ADMIN|RETAIL|INVENTORY|CASHIER|courier)` repeated in several helpers — a new role folder must be added there. Custodian and cashier pages get the green `inv-page-banner`. Page-specific CSS is inline in `extra_head` (INVENTORY) or `CASHIER/cashier.css`, built on the `staff_shared.css` tokens (`--ep-green`, etc.). Modal alerts (`includes/ui_alerts.js`, shared by staff and client pages): `IAS_UI.alert(msg, type, ms, opts)` and `IAS_UI.confirm(msg, opts)` → `Promise<boolean>`, or `<form data-confirm="…" data-confirm-ok="…" data-confirm-type="danger">` — don't use the browser's `confirm()`/`alert()` (remaining `window.confirm` calls are only fallbacks when `IAS_UI` is missing). Redirect flash messages use `?alert=`/`?error=` keys mapped in `ias_alert_message_from_request()`. Every staff role's My Profile page is a thin wrapper around `staff_profile_page($db, $role)` in `includes/staff_profile.php` (guards first, then the call; avatars saved to `assets/profiles/u{id}.{ext}`).
+
+**Staff chat** (`includes/staff_chat_*.php`, `staff_messages_ui.php`): admin, retail_officer and inventory_custodian only — **not cashier** (`staff_chat_allowed_roles()`). `staff_chat_messages.php` is the AJAX endpoint (GET get_staff/get_history/poll/file/search/media; POST send/react/unsend/forward/pin/unpin with CSRF; every action re-checks the user is in that conversation). `staff_page_end()` adds the floating widget, which embeds the role's Messages page with `?embed=1` (skipped on the Messages pages themselves or with `STAFF_CHAT_SKIP_WIDGET`). Attachments live in `uploads/chat/` (gitignored except its `.htaccess` guard and `index.html`).
 
 **Page pattern:** POST handlers at the top of the page, then redirect with `?alert=...`; GET renders server-side and often embeds data as JSON for client-side filtering/paging (e.g. `INVENTORY/inventory_stocks.php`). Many pages build their `<script>` inside a PHP heredoc — `$` and `\n` are interpolated there, so use a nowdoc (`<<<'X'`) or escape.
 
@@ -56,6 +59,8 @@ python test_intents.py
 - `includes/barcode_scanner.js` handles USB keyboard-wedge scanners (fast keystrokes + Enter, check-digit validation, dedupe) and must stay in sync with `pos_barcode_analyze()` in PHP. `includes/barcode_label.js` renders printable EAN-13/UPC-A/EAN-8 SVGs (custodian Stocks page → Print Barcode / Generate; generated in-store codes are `21` + 10-digit product id + check digit).
 
 **Client storefront** (`CLIENT/`, `includes/client_helpers.php`): session cart synced to DB on login (`ep_sync_cart_on_login`), COD orders via `ep_place_cod_order()` (atomic stock deduction), PayMongo in `backend/api/create_payment.php`, Primo chat UI → `backend/api/primo_chat.php` → Python service on 127.0.0.1:5055.
+- Every customer page includes `CLIENT/ep_header.php` / `ep_footer.php`. Shop grouping is a client-only taxonomy (`includes/client_shop_taxonomy.php`; it never changes `products.category`). `products.php?id=` renders the full `product_detail.php` page (no popup). Build a PC = `build_a_pc.php` + `tech_match.js/.css` + `tech_match_api.php`, with compatibility derived from product name/description text only (`includes/pc_compatibility.php`) and builds saved via `saved_builds_api.php`. Notifications: `includes/client_notifications.php` (header dropdown + `notifications.php`). Back links use `<a href="fallback.php" data-ep-back>` (`ep_back.js`).
+- **Dark mode:** a header toggle sets `html[data-theme="dark"]` (saved in `localStorage` `ep_theme`). `ep_dark_auto.css` is **generated** — never edit it by hand. Put manual dark fixes in `ep_dark.css` (loads after it), and re-run `scripts/build_client_dark_css.py` after changing client styles, otherwise the dark theme drifts out of sync. Bump the `?v=` on the header's stylesheet links when they change.
 
 **Catalog data:** `Oasis-Itemlist.csv` is the source list (261 products); images in `assets/products/{Category}/`, seller uploads in `uploads/products/`.
 
@@ -66,6 +71,7 @@ python test_intents.py
 - Match existing staff UI (layout shell, tokens, `.card`, `.btn-*`, `.alert-*`, tables, modals) rather than adding new design systems. Note `.alert` is `display:flex` and overrides `[hidden]` unless a page adds `[hidden]{display:none!important}`.
 - Keep scratch/debug output out of the web root — everything under `TechPrime-AI/` is publicly served by Apache.
 - `.gitattributes` uses `text=auto` (repo stores LF); CRLF/LF differences in the working copy are harmless. Work happens on branch `khenzou`.
+- `graphify-out/` (repo root, outside the web root) holds a knowledge graph of the codebase; `/graphify query "<question>"` answers from it, `/graphify update` refreshes it after changes.
 
 ## Verifying changes
 
