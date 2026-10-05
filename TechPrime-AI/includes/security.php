@@ -1,5 +1,14 @@
 <?php
+// Idle session timeout switch. TEMPORARILY DISABLED for local development — set back to true
+// before deployment. When false: no idle sign-out, no idle warning / signed-out dialog
+// (includes/session_timeout.js is not loaded), and PHP keeps idle sessions for 8 hours
+// instead of php.ini's 24 minutes so they are not silently garbage-collected.
+const IAS_SESSION_TIMEOUT_ENABLED = false;
+
 if (session_status() === PHP_SESSION_NONE) {
+    if (!IAS_SESSION_TIMEOUT_ENABLED) {
+        ini_set('session.gc_maxlifetime', '28800');
+    }
     session_start();
 }
 
@@ -94,7 +103,7 @@ function checkSessionTimeout() {
 }
 
 function ias_session_idle_expired(): bool {
-    return !empty($_SESSION['user_id']) && isset($_SESSION['last_activity'])
+    return IAS_SESSION_TIMEOUT_ENABLED && !empty($_SESSION['user_id']) && isset($_SESSION['last_activity'])
         && time() - (int)$_SESSION['last_activity'] >= IAS_SESSION_IDLE_TIMEOUT;
 }
 
@@ -159,7 +168,7 @@ function ias_request_wants_json(): bool {
 
 /** Idle warning + session-expired dialog for signed-in pages (staff layout, client header). */
 function ias_session_timeout_assets(): string {
-    if (empty($_SESSION['user_id'])) {
+    if (!IAS_SESSION_TIMEOUT_ENABLED || empty($_SESSION['user_id'])) {
         return '';
     }
     $base = ias_app_base_url();
