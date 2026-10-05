@@ -34,10 +34,10 @@ SOURCES = [
 
 PREFIX = 'html[data-theme="dark"]'
 
-# Rules on the green header bar keep their colours (white icons, yellow active pill).
+# Rules on the header bar keep their colours (white icons, yellow accents); its dark look is in ep_dark.css.
 IDENTITY_SELECTORS = re.compile(
     r'\.ep-nav-item(?![-\w])|\.ep-nav-item\.active|\.ep-nav-item-(icon|label)|\.ep-menu-btn|^\.ep-header$|\.ep-logo'
-    r'|\.ep-theme-toggle'
+    r'|\.ep-theme-toggle|\.ep-pnav|\.ep-account'
 )
 
 # --------------------------------------------------------------------------- CSS parsing

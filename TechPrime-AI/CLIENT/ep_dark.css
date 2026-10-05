@@ -83,3 +83,55 @@ html[data-theme="dark"] .ias-sess-icon.is-warn { background: #2f2a14; color: #f0
 html[data-theme="dark"] .ias-sess-icon.is-ended { background: #3a1d1b; color: #f08a80; }
 html[data-theme="dark"] .ias-sess-btn.is-ghost { background: #22262c; color: #e4e6ea; border-color: #363b44; }
 html[data-theme="dark"] .ias-sess-btn.is-ghost:hover { background: #2a2f36; }
+
+/* ---- Header (ep_header.php) ----
+   Light mode keeps the brand-green bar; in dark mode it becomes a dark surface with a
+   green top edge, so the page doesn't sit under a bright band. Yellow stays the accent. */
+html[data-theme="dark"] .ep-header {
+    background: #16191d;
+    box-shadow: inset 0 3px 0 var(--ep-green), 0 1px 0 #2a2f36, 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+html[data-theme="dark"] .ep-pnav-link { color: #c9ced6; text-shadow: none; }
+html[data-theme="dark"] .ep-pnav-link:hover,
+html[data-theme="dark"] .ep-pnav-link.active { color: #fff; }
+html[data-theme="dark"] .ep-pnav-link::after { background: rgba(255, 255, 255, 0.3); }
+html[data-theme="dark"] .ep-pnav-link.active::after { background: var(--ep-yellow); }
+
+html[data-theme="dark"] .ep-header .search-wrap input {
+    background: #22262c;
+    border-color: #2f343c;
+    color: #e4e6ea;
+    box-shadow: none;
+}
+html[data-theme="dark"] .ep-header .search-wrap input::placeholder { color: #8b939f; }
+html[data-theme="dark"] .ep-header .search-wrap input:focus {
+    border-color: var(--ep-yellow);
+    box-shadow: 0 0 0 3px rgba(254, 215, 0, 0.2);
+}
+html[data-theme="dark"] .ep-header .search-wrap .search-icon { color: #8fd166; }
+html[data-theme="dark"] .ep-header .search-wrap .search-icon:hover { background: #2b3037; color: #fff; }
+
+html[data-theme="dark"] .ep-nav-item,
+html[data-theme="dark"] .ep-account,
+html[data-theme="dark"] .ep-menu-btn { background: #22262c; color: #dfe3e8; }
+html[data-theme="dark"] .ep-nav-item:hover,
+html[data-theme="dark"] .ep-account:hover,
+html[data-theme="dark"] .ep-menu-btn:hover,
+html[data-theme="dark"] .ep-menu-btn[aria-expanded="true"] { background: #2b3037; color: #fff; }
+html[data-theme="dark"] .ep-nav-item.active { background: var(--ep-yellow); color: var(--ep-black); }
+html[data-theme="dark"] .ep-nav-item .badge { box-shadow: 0 0 0 2px #16191d; }
+html[data-theme="dark"] .ep-account::before { background: #2f343c; }
+html[data-theme="dark"] .ep-account.active { background: #2b3037; color: #fff; box-shadow: inset 0 0 0 1px var(--ep-yellow); }
+html[data-theme="dark"] .ep-account.is-guest { background: var(--ep-green); color: #fff; }
+html[data-theme="dark"] .ep-account.is-guest:hover { background: var(--ep-yellow); color: var(--ep-black); }
+@media (hover: hover) and (pointer: fine) {
+    /* Icon while its preview is open (light mode turns it white, too bright here) */
+    html[data-theme="dark"] .ep-cart-wrap:hover > .ep-nav-item:not(.active),
+    html[data-theme="dark"] .ep-cart-wrap:focus-within > .ep-nav-item:not(.active),
+    html[data-theme="dark"] .ep-notif-wrap:hover > .ep-nav-item:not(.active),
+    html[data-theme="dark"] .ep-notif-wrap:focus-within > .ep-nav-item:not(.active) {
+        background: #2b3037;
+        color: #8fd166;
+        box-shadow: inset 0 0 0 1px #3a4049;
+    }
+}

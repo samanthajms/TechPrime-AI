@@ -62,19 +62,47 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         /* Apply the saved theme before the stylesheets load so dark mode never flashes white. */
         try { if (localStorage.getItem('ep_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
     </script>
-    <link rel="stylesheet" href="styles.css?v=theme-toggle-1">
+    <link rel="stylesheet" href="styles.css?v=orders-1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if (!empty($extraHead)) echo $extraHead; ?>
     <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
-    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-1">
-    <link rel="stylesheet" href="ep_dark.css?v=dark-1">
+    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-5">
+    <link rel="stylesheet" href="ep_dark.css?v=dark-3">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">
 
+<?php
+$epActive   = (string)($activePage ?? '');
+$epUserName = !empty($isLoggedIn) ? trim((string)($_SESSION['name'] ?? '')) : '';
+$epFirstName = $epUserName !== '' ? preg_split('/\s+/', $epUserName)[0] : 'Customer';
+$epInitial  = strtoupper(mb_substr($epFirstName, 0, 1));
+// Profile picture uploaded on user_dashboard.php. The file name is reused on re-upload,
+// so its modified time is added to the URL to show a new photo right away.
+$epAvatarUrl = '';
+if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
+    try {
+        $avStmt = ($db ?? getDbConnection())->prepare('SELECT profile_image FROM users WHERE id = ?');
+        $avStmt->execute([(int)$_SESSION['user_id']]);
+        $avPath = (string)($avStmt->fetchColumn() ?: '');
+        $epAvatarUrl = ep_user_profile_image_url($avPath);
+        if ($epAvatarUrl !== '') {
+            $epAvatarUrl .= '?v=' . (int)@filemtime(__DIR__ . '/../assets/' . $avPath);
+        }
+    } catch (Throwable $e) {
+        $epAvatarUrl = '';   // no profile_image column yet: fall back to the initial
+    }
+}
+$epPrimaryLinks = [
+    ['href' => 'index.php', 'icon' => 'fa-home', 'label' => 'Home', 'active' => $epActive === 'home'],
+    ['href' => 'shop.php', 'icon' => 'fa-store', 'label' => 'Shop Now', 'active' => $epActive === 'shop'],
+    ['href' => !empty($isLoggedIn) ? 'build_a_pc.php' : '../login.php', 'icon' => 'fa-desktop', 'label' => 'Build a PC',
+     'active' => $epActive === 'build_a_pc' || $epActive === 'saved_builds'],
+];
+?>
 <header class="top-header ep-header full-width">
 <div class="ep-header-main">
     <button type="button" class="ep-menu-btn" id="epMenuBtn"
@@ -82,13 +110,25 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         <i class="fas fa-bars" aria-hidden="true"></i>
     </button>
 
-    <div class="logo ep-logo" onclick="location.href='index.php'">
-        <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img">
-    </div>
+    <a href="index.php" class="logo ep-logo">
+        <img src="../assets/logo.png" alt="EasyPC home" class="ep-logo-img">
+    </a>
+
+    <?php /* Page links. Below 900px they move into the drawer. */ ?>
+    <nav class="ep-pnav" aria-label="Primary">
+        <?php foreach ($epPrimaryLinks as $link): ?>
+            <a href="<?php echo h($link['href']); ?>"
+               class="ep-pnav-link<?php echo $link['active'] ? ' active' : ''; ?>"
+               <?php echo $link['active'] ? 'aria-current="page"' : ''; ?>>
+                <i class="fas <?php echo h($link['icon']); ?>" aria-hidden="true"></i>
+                <span><?php echo h($link['label']); ?></span>
+            </a>
+        <?php endforeach; ?>
+    </nav>
 
     <div class="search-wrap" id="epSearchWrap">
-        <form action="search.php" method="GET" id="epSearchForm" autocomplete="off">
-            <input id="epSearchInput" name="q" type="text" placeholder="Search products..."
+        <form action="search.php" method="GET" id="epSearchForm" role="search" autocomplete="off">
+            <input id="epSearchInput" name="q" type="text" placeholder="Search laptops, parts and accessories"
                    value="<?php echo h($searchQuery); ?>" aria-label="Search products"
                    aria-autocomplete="list" aria-controls="epSearchSuggest" aria-expanded="false"
                    autocomplete="off">
@@ -97,42 +137,13 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         <div id="epSearchSuggest" class="ep-search-suggest" role="listbox" hidden></div>
     </div>
 
-    <nav class="ep-nav-actions" aria-label="Primary">
-        <a href="index.php"
-           class="ep-nav-item<?php echo ($activePage ?? '') === 'home' ? ' active' : ''; ?>"
-           <?php echo ($activePage ?? '') === 'home' ? 'aria-current="page"' : ''; ?>>
-            <span class="ep-nav-item-icon"><i class="fas fa-home" aria-hidden="true"></i></span>
-            <span class="ep-nav-item-label">Home</span>
-        </a>
-
-        <a href="shop.php"
-           class="ep-nav-item<?php echo ($activePage ?? '') === 'shop' ? ' active' : ''; ?>"
-           <?php echo ($activePage ?? '') === 'shop' ? 'aria-current="page"' : ''; ?>>
-            <span class="ep-nav-item-icon"><i class="fas fa-store" aria-hidden="true"></i></span>
-            <span class="ep-nav-item-label">Shop Now</span>
-        </a>
-
-        <?php /* Click → cart page. Hover (mouse) or keyboard focus → preview, rendered by epUpdateCartPreview(). */ ?>
-        <div class="ep-cart-wrap" id="epCartWrap">
-            <a href="cart.php" id="cartBtn"
-               class="ep-nav-item ep-cart-trigger<?php echo ($activePage ?? '') === 'cart' ? ' active' : ''; ?>"
-               <?php echo ($activePage ?? '') === 'cart' ? 'aria-current="page"' : ''; ?>>
-                <span class="ep-nav-item-icon">
-                    <i class="fas fa-shopping-bag" aria-hidden="true"></i>
-                    <?php if ($epCartCount > 0): ?>
-                        <span class="badge"><?php echo (int)$epCartCount; ?></span>
-                    <?php endif; ?>
-                </span>
-                <span class="ep-nav-item-label">Cart</span>
-            </a>
-            <div id="epCartDropdown" class="ep-cart-dropdown" role="region" aria-label="Cart preview"></div>
-        </div>
-
+    <?php /* Icon buttons; their labels are visually hidden but stay readable by screen readers. */ ?>
+    <div class="ep-nav-actions">
         <?php /* Click → notifications page. Hover (mouse) or keyboard focus → latest-notifications preview. */ ?>
         <div class="ep-notif-wrap" id="epNotifWrap">
             <a href="<?php echo !empty($isLoggedIn) ? 'notifications.php' : '../login.php'; ?>" id="notifBtn"
-               class="ep-nav-item ep-notif-trigger<?php echo ($activePage ?? '') === 'notifications' ? ' active' : ''; ?>"
-               <?php echo ($activePage ?? '') === 'notifications' ? 'aria-current="page"' : ''; ?>>
+               class="ep-nav-item ep-notif-trigger<?php echo $epActive === 'notifications' ? ' active' : ''; ?>"
+               <?php echo $epActive === 'notifications' ? 'aria-current="page"' : ''; ?>>
                 <span class="ep-nav-item-icon">
                     <i class="<?php echo $epNotifUnread > 0 ? 'fas' : 'far'; ?> fa-bell" aria-hidden="true"></i>
                     <?php if ($epNotifUnread > 0): ?>
@@ -141,7 +152,6 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
                 </span>
                 <span class="ep-nav-item-label">Notifications</span>
             </a>
-
             <div id="epNotifPanel" class="ep-notif-dropdown" role="region" aria-label="Latest notifications">
                 <div class="ep-notif-dd-head">
                     <div class="ep-notif-dd-title">
@@ -178,18 +188,21 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
             </div>
         </div>
 
-        <a href="<?php echo $isLoggedIn ? 'build_a_pc.php' : '../login.php'; ?>"
-           class="ep-nav-item<?php echo (($activePage ?? '') === 'build_a_pc' || ($activePage ?? '') === 'saved_builds') ? ' active' : ''; ?>"
-           <?php echo (($activePage ?? '') === 'build_a_pc' || ($activePage ?? '') === 'saved_builds') ? 'aria-current="page"' : ''; ?>>
-            <span class="ep-nav-item-icon"><i class="fas fa-desktop" aria-hidden="true"></i></span>
-            <span class="ep-nav-item-label">Build a PC</span>
-        </a>
-
-        <button id="profileBtn" type="button" class="ep-nav-item"
-                onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : '../login.php'; ?>'">
-            <span class="ep-nav-item-icon"><i class="far fa-user" aria-hidden="true"></i></span>
-            <span class="ep-nav-item-label">My Profile</span>
-        </button>
+        <?php /* Click → cart page. Hover (mouse) or keyboard focus → preview, rendered by epUpdateCartPreview(). */ ?>
+        <div class="ep-cart-wrap" id="epCartWrap">
+            <a href="cart.php" id="cartBtn"
+               class="ep-nav-item ep-cart-trigger<?php echo $epActive === 'cart' ? ' active' : ''; ?>"
+               <?php echo $epActive === 'cart' ? 'aria-current="page"' : ''; ?>>
+                <span class="ep-nav-item-icon">
+                    <i class="fas fa-shopping-bag" aria-hidden="true"></i>
+                    <?php if ($epCartCount > 0): ?>
+                        <span class="badge"><?php echo (int)$epCartCount; ?></span>
+                    <?php endif; ?>
+                </span>
+                <span class="ep-nav-item-label">Cart</span>
+            </a>
+            <div id="epCartDropdown" class="ep-cart-dropdown" role="region" aria-label="Cart preview"></div>
+        </div>
 
         <?php /* Light/dark theme switch. Which icon and label show is decided by CSS from html[data-theme]. */ ?>
         <button type="button" id="epThemeToggle" class="ep-nav-item ep-theme-toggle" title="Switch light / dark mode">
@@ -202,16 +215,28 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
                 <span class="ep-theme-when-dark">Light Mode</span>
             </span>
         </button>
-    </nav>
+
+        <?php if (!empty($isLoggedIn)): ?>
+            <a href="user_dashboard.php" id="profileBtn"
+               class="ep-account<?php echo $epActive === 'account' ? ' active' : ''; ?>"
+               title="My profile" <?php echo $epActive === 'account' ? 'aria-current="page"' : ''; ?>>
+                <span class="ep-account-avatar" aria-hidden="true"><?php if ($epAvatarUrl !== ''): ?><img src="<?php echo h($epAvatarUrl); ?>" alt=""><?php else: echo h($epInitial); endif; ?></span>
+                <span class="ep-account-name"><span class="sr-only">My profile: </span><?php echo h($epFirstName); ?></span>
+            </a>
+        <?php else: ?>
+            <a href="../login.php" id="profileBtn" class="ep-account is-guest">
+                <i class="far fa-user" aria-hidden="true"></i>
+                <span class="ep-account-name">Log in</span>
+            </a>
+        <?php endif; ?>
+    </div>
 </div>
 
 </header>
 
 <?php
 /* ---- Mobile navigation drawer (≤ 900px; opened by #epMenuBtn) ---- */
-$epActive = (string)($activePage ?? '');
 $epOnSettings = $epActive === 'account' && isset($_GET['settings']);
-$epUserName = !empty($isLoggedIn) ? trim((string)($_SESSION['name'] ?? '')) : '';
 $epDrawerLinks = [
     ['href' => 'index.php', 'icon' => 'fa-home', 'label' => 'Home', 'active' => $epActive === 'home'],
     ['href' => 'shop.php', 'icon' => 'fa-store', 'label' => 'Shop Now', 'active' => $epActive === 'shop'],
@@ -235,7 +260,7 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
 
     <div class="ep-drawer-account">
         <?php if (!empty($isLoggedIn)): ?>
-            <span class="ep-drawer-avatar" aria-hidden="true"><?php echo h(strtoupper(mb_substr($epUserName !== '' ? $epUserName : 'C', 0, 1))); ?></span>
+            <span class="ep-drawer-avatar" aria-hidden="true"><?php if ($epAvatarUrl !== ''): ?><img src="<?php echo h($epAvatarUrl); ?>" alt=""><?php else: echo h($epInitial); endif; ?></span>
             <div class="ep-drawer-account-text">
                 <strong>Hi, <?php echo h($epUserName !== '' ? $epUserName : 'Customer'); ?>!</strong>
                 <a href="user_dashboard.php">View my profile</a>
