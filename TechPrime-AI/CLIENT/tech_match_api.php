@@ -1,11 +1,13 @@
 <?php
 /**
- * Tech & Match — fetch real products for a build slot (JSON).
- * No page redirects; used inside the Tech & Match modal picker.
+ * Build a PC — fetch real products for a build slot (JSON).
+ * Used by the in-page component picker (tech_match.js).
  */
 session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/client_helpers.php';
+require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
 require_once __DIR__ . '/../includes/pc_compatibility.php';
 require_once __DIR__ . '/../includes/product_categories.php';
 
@@ -15,62 +17,25 @@ header('Cache-Control: no-store');
 $slot = trim((string)($_GET['slot'] ?? ''));
 $q = trim((string)($_GET['q'] ?? ''));
 
+/*
+ * Slot => shop taxonomy subcategories (includes/client_shop_taxonomy.php).
+ * products.category is too coarse (most parts are "Others"), and loose keyword
+ * matches pulled laptops ("RTX 4060") and APUs ("Radeon Graphics") into the GPU
+ * slot — so every product is classified from its name, like the shop does.
+ */
 $slotMap = [
-    'processor' => [
-        'label' => 'Processor',
-        'categories' => ['Processor'],
-        'keywords' => ['processor', 'cpu', 'ryzen', 'intel', 'core i'],
-    ],
-    'motherboard' => [
-        'label' => 'Motherboard',
-        'categories' => ['Motherboard'],
-        'keywords' => ['motherboard', 'mainboard', 'b550', 'b650', 'z790'],
-    ],
-    'memory' => [
-        'label' => 'Memory',
-        'categories' => ['Memory', 'RAM'],
-        'keywords' => ['memory', 'ram', 'ddr4', 'ddr5'],
-    ],
-    'ssd' => [
-        'label' => 'SSD',
-        'categories' => ['Solid State Drive'],
-        'keywords' => ['ssd', 'nvme', 'm.2'],
-    ],
-    'ssd_sata' => [
-        'label' => 'SSD (SATA)',
-        'categories' => ['Solid State Drive'],
-        'keywords' => ['sata', 'ssd'],
-    ],
-    'hdd' => [
-        'label' => 'Hard Disk',
-        'categories' => ['Hard Disk'],
-        'keywords' => ['hdd', 'hard disk', 'hard drive'],
-    ],
-    'gpu' => [
-        'label' => 'Graphics Card',
-        'categories' => ['GPU', 'Graphic Card'],
-        'keywords' => ['gpu', 'graphics', 'geforce', 'rtx', 'radeon'],
-    ],
-    'psu' => [
-        'label' => 'Power Supply',
-        'categories' => ['Power Supply'],
-        'keywords' => ['psu', 'power supply', 'watt'],
-    ],
-    'case' => [
-        'label' => 'Case',
-        'categories' => ['PC Case'],
-        'keywords' => ['case', 'chassis', 'cabinet'],
-    ],
-    'cooler' => [
-        'label' => 'CPU Cooler',
-        'categories' => ['Cooling'],
-        'keywords' => ['cooler', 'cooling', 'aio', 'fan'],
-    ],
-    'extras' => [
-        'label' => 'Extras',
-        'categories' => ['Accessories', 'Others', 'Audio'],
-        'keywords' => ['accessory', 'cable', 'headset', 'mouse', 'keyboard'],
-    ],
+    'processor' => ['label' => 'Processor', 'subs' => ['processor-amd', 'processor-intel', 'processor-tray']],
+    'motherboard' => ['label' => 'Motherboard', 'subs' => ['motherboard']],
+    /* SO-DIMM sticks are laptop memory and do not fit a desktop board. */
+    'memory' => ['label' => 'Memory', 'subs' => ['memory'], 'exclude' => '/\bso-?dimm\b/i'],
+    'ssd' => ['label' => 'SSD (NVMe / M.2)', 'subs' => ['ssd'], 'storage' => 'nvme'],
+    'ssd_sata' => ['label' => 'SSD (SATA)', 'subs' => ['ssd'], 'storage' => 'sata'],
+    'hdd' => ['label' => 'Hard Disk', 'subs' => ['hard-disk']],
+    'gpu' => ['label' => 'Graphics Card', 'subs' => ['graphics-card']],
+    'psu' => ['label' => 'Power Supply', 'subs' => ['power-supply']],
+    'case' => ['label' => 'PC Case', 'subs' => ['pc-case']],
+    'cooler' => ['label' => 'CPU Cooler', 'subs' => ['cpu-cooling']],
+    'case_fan' => ['label' => 'Case Fan', 'subs' => ['chassis-fan']],
 ];
 
 if ($slot === '' || !isset($slotMap[$slot])) {
@@ -122,10 +87,9 @@ if (!$stmt) {
     echo json_encode(['ok' => false, 'products' => [], 'error' => 'query_failed']);
     exit;
 }
-$stmt->execute($params);
-$res = $stmt;
-$rows = $res ? $res->fetchAll(PDO::FETCH_ASSOC) : [];
-$rows = ias_client_filter_products_for_display($rows);
+$stmt->execute();
+$rows = ias_client_filter_products_for_display($stmt->fetchAll(PDO::FETCH_ASSOC));
+
 $products = [];
 $seen = [];
 foreach ($rows as $p) {
@@ -133,16 +97,39 @@ foreach ($rows as $p) {
     if ($id <= 0 || isset($seen[$id])) {
         continue;
     }
-    $seen[$id] = true;
     $name = (string)($p['name'] ?? '');
     $category = (string)($p['category'] ?? '');
     $description = (string)($p['description'] ?? '');
+
+    $tax = ep_shop_classify_product($p);
+    if ($tax['is_power_station'] || !in_array($tax['sub'], $meta['subs'], true)) {
+        continue;
+    }
+    if (!empty($meta['exclude']) && preg_match($meta['exclude'], $name)) {
+        continue;
+    }
+    if (!empty($meta['storage'])) {
+        $isSata = (bool)preg_match('/\bsata\b/i', $name) && !preg_match('/\b(nvme|m\.2|pcie)\b/i', $name);
+        if (($meta['storage'] === 'sata') !== $isSata) {
+            continue;
+        }
+    }
+    if ($q !== '') {
+        $hay = $name . ' ' . $tax['brand'] . ' ' . $tax['sub_label'];
+        if (mb_stripos($hay, $q) === false) {
+            continue;
+        }
+    }
+
+    $seen[$id] = true;
     $products[] = [
         'id' => $id,
         'name' => $name,
         'price' => (float)($p['price'] ?? 0),
         'stock' => (int)($p['stock'] ?? 0),
         'category' => $category,
+        'type' => (string)$tax['sub_label'],
+        'brand' => (string)$tax['brand'],
         'description' => $description,
         'image' => ias_client_product_image_url($p),
         'seller' => (string)($p['seller_name'] ?? ''),

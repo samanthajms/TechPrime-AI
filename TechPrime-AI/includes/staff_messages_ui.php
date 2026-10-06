@@ -552,6 +552,66 @@ CSS;
     }
 }
 
+if (!function_exists('staff_messages_is_embed')) {
+    /** `?embed=1`: the Messages page loaded inside the floating chat widget (staff_chat_widget.php). */
+    function staff_messages_is_embed(): bool
+    {
+        return isset($_GET['embed']);
+    }
+}
+
+if (!function_exists('staff_messages_embed_page')) {
+    /**
+     * Bare Messages UI (no sidebar/topbar) for the widget's iframe, then exit.
+     * Same markup, styles and script as the full page, so both always behave the same.
+     */
+    function staff_messages_embed_page(): never
+    {
+        header('X-Frame-Options: SAMEORIGIN');
+        $css = staff_css_href();
+        $alertsJs = preg_replace('#staff_shared\.css$#', 'ui_alerts.js', $css);
+        ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages — EasyPC</title>
+    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-responsive-3">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <?php echo staff_messages_extra_head(); ?>
+    <style>
+    html, body.sm-embed { height: 100%; margin: 0; padding: 0; background: #fff; overflow: hidden; }
+    body.sm-embed .chat-container { height: 100vh; height: 100dvh; min-height: 0; }
+    body.sm-embed .chat-card { border: 0; border-radius: 0; box-shadow: none; }
+    /* The widget's own green header already says "Messages" and shows the unread total. */
+    body.sm-embed .contacts-title { display: none; }
+    body.sm-embed .contacts-head { padding: 10px 12px; }
+    body.sm-embed .contacts-list { padding: 4px 6px 8px; }
+    body.sm-embed .chat-header { padding: 8px 10px 8px 12px; min-height: 56px; gap: 10px; }
+    body.sm-embed .chat-back { margin-left: -4px; }
+    body.sm-embed .chat-icon-btn { width: 34px; height: 34px; font-size: 17px; }
+    body.sm-embed .pin-bar { padding: 7px 12px; }
+    body.sm-embed .chat-messages { padding: 12px 12px 14px; }
+    body.sm-embed .msg-main { max-width: 82%; }
+    body.sm-embed .chat-footer { padding: 8px 10px 10px; }
+    body.sm-embed .composer-tool { width: 34px; height: 34px; font-size: 16px; }
+    body.sm-embed .send-btn { width: 36px; height: 36px; }
+    body.sm-embed .att-image img { max-width: 200px; max-height: 200px; }
+    body.sm-embed .att-file { min-width: 0; max-width: 230px; }
+    body.sm-embed .chat-empty .sm-avatar { width: 60px; height: 60px; font-size: 20px; }
+    </style>
+</head>
+<body class="sm-embed">
+<?php staff_messages_render(); ?>
+<script src="<?php echo h($alertsJs); ?>"></script>
+</body>
+</html>
+        <?php
+        exit;
+    }
+}
+
 if (!function_exists('staff_messages_render')) {
     function staff_messages_render(): void
     {
@@ -568,6 +628,7 @@ if (!function_exists('staff_messages_render')) {
             'quickReactions' => staff_chat_quick_reactions(),
             'exts' => $exts,
             'maxBytes' => staff_chat_max_upload_bytes(),
+            'embed' => staff_messages_is_embed(),
         ];
         ?>
         <div class="chat-container">
@@ -698,6 +759,8 @@ if (!function_exists('staff_messages_render')) {
             const TZ = 'Asia/Manila';
             const GROUP_MS = 5 * 60 * 1000;
             const BASE_TITLE = document.title.replace(/^\(\d+\+?\) /, '');
+            const EMBED = !!CFG.embed && window.parent !== window;
+            let paused = false;       // embedded widget is closed: no polling, so nothing gets marked read
 
             const $ = (id) => document.getElementById(id);
             const card = $('smCard');
@@ -847,6 +910,7 @@ if (!function_exists('staff_messages_render')) {
                 totalEl.hidden = total === 0;
                 totalEl.textContent = total > 99 ? '99+' : String(total);
                 document.title = (total ? '(' + (total > 99 ? '99+' : total) + ') ' : '') + BASE_TITLE;
+                notifyParent(total);
 
                 if (!staff.length) {
                     contactsEl.innerHTML = lastContactsHtml = '<p class="contacts-note">No staff available.</p>';
@@ -940,6 +1004,7 @@ if (!function_exists('staff_messages_render')) {
                 role.textContent = person.role_label || '';
                 $('smFooter').hidden = false;
                 card.classList.add('show-chat');
+                syncComposer(); // size the textarea now that it is visible (it measured 0 while hidden)
                 renderContacts();
                 renderPins();
                 win.innerHTML = '<p class="contacts-note" style="margin:auto;">Loading conversation…</p>';
@@ -958,7 +1023,7 @@ if (!function_exists('staff_messages_render')) {
                     win.innerHTML = '<p class="contacts-note" style="margin:auto;">Could not load this conversation.</p>';
                 }
                 startPoll();
-                if (window.matchMedia('(min-width: 901px)').matches) input.focus();
+                if (window.matchMedia('(min-width: 901px)').matches || (EMBED && window.matchMedia('(pointer: fine)').matches)) input.focus();
             }
 
             function actionsHtml(m) {
@@ -1210,7 +1275,7 @@ if (!function_exists('staff_messages_render')) {
 
             async function pollOnce(forceState) {
                 // Polling marks the peer's messages read, so only do it while the tab is visible.
-                if (!active || document.hidden) return;
+                if (!active || document.hidden || paused) return;
                 if (polling) { pollAgain = true; forceNext = forceNext || !!forceState; return; }
                 polling = true;
                 const id = active.id;
@@ -1249,7 +1314,7 @@ if (!function_exists('staff_messages_render')) {
 
             function startPoll() {
                 if (pollTimer) clearInterval(pollTimer);
-                pollTimer = setInterval(() => pollOnce(false), 3500);
+                pollTimer = setInterval(() => pollOnce(false), 10000);
             }
 
             // ── Sending ──
@@ -1923,6 +1988,29 @@ if (!function_exists('staff_messages_render')) {
                 if (localStorage.getItem('sm_info_open') === '1' && !overlayMode()) card.classList.add('info-open');
             } catch (e) { /* storage blocked */ }
 
+            // ── Floating widget (embed) bridge ──
+            function notifyParent(total) {
+                if (!EMBED) return;
+                window.parent.postMessage({
+                    source: 'staff-messages', unread: total, activeId: active ? active.id : 0,
+                    recent: staff.slice(0, 3).map(s => ({ name: s.name, surname: s.surname, role: s.role, avatar: s.avatar })),
+                }, location.origin);
+            }
+            if (EMBED) {
+                window.addEventListener('message', (e) => {
+                    if (e.origin !== location.origin || e.source !== window.parent || !e.data || e.data.source !== 'staff-chat-widget') return;
+                    if (e.data.type === 'pause') {
+                        paused = true;
+                        closePop();
+                        if (!modal.hidden) closeModal();
+                    } else if (e.data.type === 'resume') {
+                        paused = false;
+                        pollOnce(false);
+                        loadStaff().catch(() => {});
+                    }
+                });
+            }
+
             // ── Start ──
             loadStaff()
                 .then(() => { if (CFG.openId) openChat(CFG.openId); })
@@ -1930,9 +2018,9 @@ if (!function_exists('staff_messages_render')) {
                     contactsEl.innerHTML = lastContactsHtml = '<p class="contacts-note">Could not load staff.</p>';
                 });
             // Keep unread counts and previews for other conversations fresh.
-            setInterval(() => { if (!document.hidden) loadStaff().catch(() => {}); }, 5000);
+            setInterval(() => { if (!document.hidden && !paused) loadStaff().catch(() => {}); }, 30000);
             document.addEventListener('visibilitychange', () => {
-                if (document.hidden) return;
+                if (document.hidden || paused) return;
                 pollOnce(false);
                 loadStaff().catch(() => {});
             });

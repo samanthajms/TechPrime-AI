@@ -11,6 +11,11 @@ checkRole('retail_officer');
 
 define('STAFF_CHAT_SKIP_WIDGET', true);
 
+// Floating chat widget iframe: bare UI, no activity log entry per open.
+if (staff_messages_is_embed()) {
+    staff_messages_embed_page();
+}
+
 logActivity($db, (int)$_SESSION['user_id'], 'view_messages', 'Retail Officer viewed messages');
 
 staff_page_start([

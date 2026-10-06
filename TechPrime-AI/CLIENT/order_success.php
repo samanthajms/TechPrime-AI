@@ -35,7 +35,7 @@ $bodyClass  = 'ep-success-layout';
         </div>
 
         <div class="ep-success-actions">
-            <a href="user_dashboard.php?status=To Ship" class="ep-btn ep-btn-primary">Track My Order</a>
+            <a href="user_dashboard.php?status=to_ship" class="ep-btn ep-btn-primary">Track My Order</a>
             <a href="index.php" class="ep-btn ep-btn-yellow">Return to Homepage</a>
         </div>
     </div>

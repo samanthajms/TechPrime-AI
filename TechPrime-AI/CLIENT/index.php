@@ -3,6 +3,7 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/client_helpers.php';
+require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
 
 $db = getDbConnection();
 
@@ -38,11 +39,51 @@ $newArrivalsQuery = "SELECT {$listCols}
 $newArrivalsResult = $db->query($newArrivalsQuery);
 $newArrivals = $newArrivalsResult ? $newArrivalsResult->fetchAll(PDO::FETCH_ASSOC) : [];
 
+$categoryTiles = ep_shop_category_tiles($db);
+
 $returnTo = 'index.php';
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
 <main class="ep-main ep-home-main">
+    <?php if (!empty($categoryTiles)): ?>
+    <section class="ep-section ep-cat-rail-section" aria-labelledby="epCatRailTitle">
+        <div class="ep-cat-rail-head">
+            <div>
+                <p class="ep-featured-kicker">Browse the store</p>
+                <h3 id="epCatRailTitle">Shop by Category</h3>
+            </div>
+            <a href="shop.php" class="ep-cat-rail-all">View all products <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+        </div>
+
+        <div class="ep-cat-rail" data-cat-rail>
+            <button type="button" class="ep-cat-rail-arrow is-prev" data-cat-rail-prev aria-label="Previous categories" disabled>
+                <i class="fas fa-chevron-left" aria-hidden="true"></i>
+            </button>
+            <ul class="ep-cat-rail-track" data-cat-rail-track>
+                <?php foreach ($categoryTiles as $tile): ?>
+                    <li class="ep-catrail-tile">
+                        <a href="<?php echo h($tile['url']); ?>" class="ep-catrail-tile-link">
+                            <span class="ep-catrail-tile-media">
+                                <?php if ($tile['image'] !== ''): ?>
+                                    <img src="<?php echo h($tile['image']); ?>" alt="" loading="lazy" decoding="async">
+                                <?php else: ?>
+                                    <i class="fas fa-box" aria-hidden="true"></i>
+                                <?php endif; ?>
+                            </span>
+                            <span class="ep-catrail-tile-name"><?php echo h($tile['label']); ?></span>
+                            <span class="ep-catrail-tile-count"><?php echo (int)$tile['count']; ?> item<?php echo (int)$tile['count'] === 1 ? '' : 's'; ?></span>
+                        </a>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+            <button type="button" class="ep-cat-rail-arrow is-next" data-cat-rail-next aria-label="More categories">
+                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            </button>
+        </div>
+    </section>
+    <?php endif; ?>
+
     <section class="ep-section ep-featured-section">
         <div class="ep-featured-head">
             <div>
@@ -141,6 +182,29 @@ document.addEventListener('DOMContentLoaded', function () {
     if (window.location.hash === '#ep-tech-match') {
         window.location.replace('build_a_pc.php');
     }
+
+    /* Shop by Category: arrows page by the visible width and disable at either end. */
+    document.querySelectorAll('[data-cat-rail]').forEach(function (rail) {
+        var track = rail.querySelector('[data-cat-rail-track]');
+        var prev = rail.querySelector('[data-cat-rail-prev]');
+        var next = rail.querySelector('[data-cat-rail-next]');
+        if (!track || !prev || !next) return;
+        function update() {
+            var max = track.scrollWidth - track.clientWidth - 2;
+            prev.disabled = track.scrollLeft <= 2;
+            next.disabled = track.scrollLeft >= max;
+            rail.classList.toggle('has-prev', !prev.disabled);
+            rail.classList.toggle('has-next', !next.disabled);
+        }
+        function page(dir) {
+            track.scrollBy({ left: dir * Math.max(track.clientWidth * 0.85, 160), behavior: 'smooth' });
+        }
+        prev.addEventListener('click', function () { page(-1); });
+        next.addEventListener('click', function () { page(1); });
+        track.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+        update();
+    });
 });
 </script>
 <script src="primo.js" defer></script>

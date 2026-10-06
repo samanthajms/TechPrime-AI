@@ -161,7 +161,7 @@ $csrf                 = generateCsrfToken();
 
 <main class="ep-main ep-cart-main">
         <div class="ep-page-header-row epc-header">
-            <a href="index.php" class="ep-back-link"><i class="fas fa-arrow-left"></i> Continue Shopping</a>
+            <a href="index.php" class="ep-back-link" data-ep-back><i class="fas fa-arrow-left"></i> Continue Shopping</a>
             <h2 class="ep-page-title">
                 My Cart
                 <?php if ($cart_items): ?>

@@ -38,7 +38,8 @@ require_once __DIR__ . '/../includes/security.php';
         <h2>5. Your Rights</h2>
         <p>You have the right to access, correct, or delete your personal data. Please contact our support team for any privacy-related requests.</p>
 
-        <a href="index.php" class="back-link">← Back to Home</a>
+        <a href="index.php" class="back-link" data-ep-back>← Back</a>
     </div>
+    <script src="ep_back.js"></script>
 </body>
 </html>

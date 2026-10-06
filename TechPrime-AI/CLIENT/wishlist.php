@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_wishlist'])) {
         exit;
     }
     $returnTo = $_POST['return_to'] ?? 'wishlist.php';
-    if (!preg_match('#^[a-zA-Z0-9_\-./?=&%]+$#', $returnTo)) {
+    if (!preg_match('#^[a-zA-Z0-9_\-./?=&%+]+$#', $returnTo)) {
         $returnTo = 'wishlist.php';
     }
     header('Location: ' . $returnTo);
@@ -58,7 +58,7 @@ $itemCount = count($items);
 
 <main class="ep-main">
     <div class="ep-page-inner ep-wishlist-page">
-        <a href="user_dashboard.php" class="ep-profile-back-arrow" aria-label="Back to Profile">&lt;</a>
+        <a href="user_dashboard.php" class="ep-profile-back-arrow" data-ep-back aria-label="Back">&lt;</a>
 
         <header class="ep-wish-hero">
             <div class="ep-wish-hero-icon" aria-hidden="true">

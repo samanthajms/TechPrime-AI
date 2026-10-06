@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'cance
     exit;
 }
 
-$profileCols = 'name, surname, age, address, email, profile_image';
+$profileCols = 'name, surname, age, address, email, profile_image, created_at, is_verified';
 if (!isset($hasPhone)) {
     $hasPhone = ep_users_has_phone($db);
 }
@@ -202,6 +202,70 @@ if (isset($addressInput) && $profileFlashErr !== '') {
 $rawName = trim((string)($_SESSION['name'] ?? ($profileForm['name'] !== '' ? $profileForm['name'] : 'Customer')));
 $safeName = h($rawName !== '' ? $rawName : 'Customer');
 $initial = strtoupper(substr($rawName !== '' ? $rawName : 'C', 0, 1));
+$fullName = trim((string)($uRow['name'] ?? '') . ' ' . (string)($uRow['surname'] ?? ''));
+$displayName = $fullName !== '' ? $fullName : ($rawName !== '' ? $rawName : 'Customer');
+$memberSince = !empty($uRow['created_at']) ? date('F Y', strtotime($uRow['created_at'] . ' UTC')) : '';
+$isVerified = !empty($uRow['is_verified']);
+if ($profileImageUrl !== '') {
+    // The file name is reused on re-upload; the version makes a new photo show right away.
+    $profileImageUrl .= '?v=' . (int)@filemtime(dirname(__DIR__) . '/assets/' . $uRow['profile_image']);
+}
+
+/** Colour group for an order status pill. */
+$orderStatusTone = static function (string $label): string {
+    $l = strtolower($label);
+    if ($l === 'cancelled') {
+        return 'is-cancelled';
+    }
+    if ($l === 'to pay') {
+        return 'is-pay';
+    }
+    if ($l === 'delivered' || $l === 'completed') {
+        return 'is-done';
+    }
+    return 'is-progress';
+};
+
+/** One-line progress note shown at the bottom of an order card: [icon, text]. */
+$orderStatusNote = static function (string $label, string $carrier, bool $isPickup): array {
+    $carriers = ['JNT' => 'J&T Express', 'NINJAVAN' => 'Ninja Van', 'LBC' => 'LBC', 'GRAB' => 'Grab', 'LALAMOVE' => 'Lalamove'];
+    $carrierName = $carriers[strtoupper($carrier)] ?? $carrier;
+    switch (strtolower($label)) {
+        case 'cancelled':
+            return ['fa-times-circle', 'This order was cancelled'];
+        case 'to pay':
+            return ['fa-wallet', 'Waiting for payment'];
+        case 'delivered':
+        case 'completed':
+            if ($isPickup) {
+                return ['fa-check-circle', 'Picked up at the store'];
+            }
+            return ['fa-check-circle', $carrierName !== '' ? 'Delivered by ' . $carrierName : 'Order completed'];
+        case 'with courier':
+        case 'shipped':
+        case 'out for delivery':
+            if ($isPickup) {
+                return ['fa-store', 'Ready for pickup at the store'];
+            }
+            return ['fa-truck', $carrierName !== '' ? 'On the way with ' . $carrierName : 'On the way to you'];
+        default:
+            return ['fa-box', $isPickup ? 'EasyPC is preparing your order for pickup' : 'EasyPC is preparing your order'];
+    }
+};
+
+/** Labels for the optional payment / fulfillment columns (empty when not recorded). */
+$paymentLabel = static function (array $o): string {
+    $methods = ['cod' => 'Cash on delivery', 'paymongo' => 'Online payment', 'gcash' => 'GCash', 'card' => 'Card'];
+    $m = strtolower(trim((string)($o['payment_method'] ?? '')));
+    $label = $m === '' ? '' : ($methods[$m] ?? ucfirst($m));
+    $st = strtolower(trim((string)($o['payment_status'] ?? '')));
+    if ($st !== '') {
+        $label .= ($label !== '' ? ' (' . ucfirst($st) . ')' : ucfirst($st));
+    }
+    return $label;
+};
+$fulfillmentLabels = ['pickup' => 'Store pickup', 'delivery' => 'Delivery'];
+$orderItemsShown = 3;   // more items collapse behind "Show N more"
 
 $search_query = trim($_GET['q'] ?? '');
 $current_filter = ias_normalize_order_status_filter($_GET['status'] ?? 'All');
@@ -247,6 +311,43 @@ $sql .= ' ORDER BY o.id DESC';
 $stOrders = $db->prepare($sql);
 $stOrders->execute($params);
 $orders = $stOrders->fetchAll(PDO::FETCH_ASSOC);
+
+// Items of the listed orders, in one query (product may since have been removed: LEFT JOIN).
+$orderItems = [];
+if ($orders) {
+    $orderIds = array_map(static fn($o) => (int)$o['id'], $orders);
+    $stItems = $db->prepare(
+        'SELECT oi.order_id, oi.product_id, oi.quantity, oi.price, p.name, p.image
+         FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+         WHERE oi.order_id IN (' . implode(',', array_fill(0, count($orderIds), '?')) . ')
+         ORDER BY oi.order_id, oi.id'
+    );
+    $stItems->execute($orderIds);
+    foreach ($stItems->fetchAll(PDO::FETCH_ASSOC) as $it) {
+        $orderItems[(int)$it['order_id']][] = $it;
+    }
+}
+
+// Order count per status tab (legacy labels like "To Pay" count toward their tab).
+$statusCounts = array_fill_keys($allowed_filters, 0);
+$stCounts = $db->prepare('SELECT status, COUNT(*) AS n FROM orders WHERE user_id = ? GROUP BY status');
+$stCounts->execute([$user_id]);
+foreach ($stCounts->fetchAll(PDO::FETCH_ASSOC) as $cRow) {
+    $statusCounts['All'] += (int)$cRow['n'];
+    $cKey = ias_normalize_order_status_filter((string)$cRow['status']);
+    if ($cKey !== 'All' && isset($statusCounts[$cKey])) {
+        $statusCounts[$cKey] += (int)$cRow['n'];
+    }
+}
+
+$savedBuildCount = 0;
+try {
+    $stBuilds = $db->prepare('SELECT COUNT(*) FROM saved_builds WHERE user_id = ?');
+    $stBuilds->execute([$user_id]);
+    $savedBuildCount = (int)$stBuilds->fetchColumn();
+} catch (Throwable $e) {
+    $savedBuildCount = 0;   // saved_builds is created on first use by saved_builds_api.php
+}
 $recentResult = $db->query(
     "SELECT p.*, u.name AS seller_name FROM products p
      INNER JOIN users u ON p.seller_id = u.id
@@ -262,6 +363,7 @@ $cancellableStatuses = ['to_pay', 'to_ship', 'To Pay', 'To Ship', 'Pending', 'pe
 
 $isLoggedIn = true;
 $activePage = 'account';
+$bodyClass = 'pf-body';
 $pageTitle = 'My Account';
 $searchQuery = '';
 
@@ -295,7 +397,7 @@ if ($showSettings) {
 <?php include __DIR__ . '/ep_header.php'; ?>
 
 <main class="ep-main">
-    <div class="dashboard-wrapper">
+    <div class="dashboard-wrapper pf-page">
         <?php if ($profileFlash !== ''): ?>
             <div class="ep-info-note" style="margin-bottom:16px;"><?php echo h($profileFlash); ?></div>
         <?php endif; ?>
@@ -306,78 +408,58 @@ if ($showSettings) {
             <div class="ep-info-note" style="margin-bottom:16px;"><?php echo h($alertMsg); ?></div>
         <?php endif; ?>
 
-        <section class="profile-banner">
-            <div class="user-meta">
-                <div class="avatar-wrap">
-                    <?php if ($profileImageUrl !== ''): ?>
-                        <img class="avatar-circle avatar-img" src="<?php echo h($profileImageUrl); ?>" alt="Profile picture">
-                    <?php else: ?>
-                        <div class="avatar-circle"><?php echo h($initial); ?></div>
-                    <?php endif; ?>
-                    <form method="post" enctype="multipart/form-data" class="avatar-upload-form">
-                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                        <input type="hidden" name="action" value="upload_avatar">
-                        <?php if (!empty($showSettings)): ?>
-                            <input type="hidden" name="keep_settings" value="1">
-                        <?php endif; ?>
-                        <label class="avatar-upload-btn" for="avatarInput">
-                            <i class="fas fa-camera" aria-hidden="true"></i>
-                            <span>Change photo</span>
-                        </label>
-                        <input id="avatarInput" type="file" name="avatar" accept="image/jpeg,image/png,image/webp,image/gif" hidden
-                               onchange="this.form.submit()">
-                    </form>
-                </div>
-                <div>
-                    <h2 class="dashboard-name"><?php echo $safeName; ?></h2>
-                    <p class="user-status">Verified Member</p>
-                </div>
-            </div>
-            <div class="profile-banner-actions">
-                <a href="../logout.php" class="logout-btn">Log Out</a>
-                <span class="profile-banner-sep" aria-hidden="true">|</span>
-                <a href="user_dashboard.php?settings=1"
-                   class="profile-settings-btn<?php echo $showSettings ? ' is-active' : ''; ?>"
-                   <?php echo $showSettings ? 'aria-current="page"' : ''; ?>>Profile Settings</a>
-            </div>
-        </section>
-
-        <?php if (!$showSettings): ?>
-        <section class="ep-address-card<?php echo $addressComplete ? '' : ' is-incomplete'; ?>">
-            <div class="ep-address-card-icon"><i class="fas <?php echo $addressComplete ? 'fa-map-marker-alt' : 'fa-exclamation'; ?>" aria-hidden="true"></i></div>
-            <div class="ep-address-card-body">
-                <span class="ep-address-card-label">Default delivery address</span>
-                <?php if ($addressComplete): ?>
-                    <p class="ep-address-card-line"><?php echo h($savedAddressLine); ?></p>
-                    <p class="ep-address-card-meta">
-                        <?php if ($profileForm['phone'] !== ''): ?>
-                            <span><i class="fas fa-phone-alt" aria-hidden="true"></i> <?php echo h($profileForm['phone']); ?></span>
-                        <?php endif; ?>
-                        <span><i class="fas fa-check-circle" aria-hidden="true"></i> Used automatically at checkout</span>
-                    </p>
+        <section class="pf-hero">
+            <div class="pf-avatar">
+                <?php if ($profileImageUrl !== ''): ?>
+                    <img class="pf-avatar-img" src="<?php echo h($profileImageUrl); ?>" alt="Profile picture">
                 <?php else: ?>
-                    <p class="ep-address-card-line">
-                        <?php echo $savedAddressLine !== '' ? h($savedAddressLine) : 'No delivery address yet.'; ?>
-                    </p>
-                    <p class="ep-address-card-meta is-warning">Please complete your address (street, barangay, city, province and ZIP) so we can deliver your orders.</p>
+                    <span class="pf-avatar-initial" aria-hidden="true"><?php echo h($initial); ?></span>
                 <?php endif; ?>
+                <form method="post" enctype="multipart/form-data" class="pf-avatar-form">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                    <input type="hidden" name="action" value="upload_avatar">
+                    <?php if (!empty($showSettings)): ?>
+                        <input type="hidden" name="keep_settings" value="1">
+                    <?php endif; ?>
+                    <label class="pf-avatar-btn" for="avatarInput" title="Change photo">
+                        <i class="fas fa-camera" aria-hidden="true"></i>
+                        <span class="sr-only">Change photo</span>
+                    </label>
+                    <input id="avatarInput" class="pf-avatar-input" type="file" name="avatar"
+                           accept="image/jpeg,image/png,image/webp,image/gif"
+                           onchange="this.form.submit()">
+                </form>
             </div>
-            <a class="ep-address-card-edit" href="user_dashboard.php?settings=1#delivery">
-                <?php echo $addressComplete ? '<i class="fas fa-pen"></i> Edit' : '<i class="fas fa-pen"></i> Complete address'; ?>
-            </a>
-        </section>
 
-        <div class="profile-shortcuts">
-            <a class="profile-shortcut" href="wishlist.php">
-                <i class="fas fa-heart" aria-hidden="true"></i>
-                <span>View my Wishlists</span>
-            </a>
-            <a class="profile-shortcut" href="saved_builds.php">
-                <i class="fas fa-desktop" aria-hidden="true"></i>
-                <span>View my Saved Build</span>
-            </a>
-        </div>
-        <?php endif; ?>
+            <div class="pf-identity">
+                <h1 class="pf-name">
+                    <?php echo h($displayName); ?>
+                    <?php if ($isVerified): ?>
+                        <i class="fas fa-check-circle pf-verified" title="Verified account" aria-hidden="true"></i>
+                        <span class="sr-only">(verified account)</span>
+                    <?php endif; ?>
+                </h1>
+                <ul class="pf-meta">
+                    <?php if ($profileForm['email'] !== ''): ?>
+                        <li><i class="far fa-envelope" aria-hidden="true"></i> <span class="pf-meta-email"><?php echo h($profileForm['email']); ?></span></li>
+                    <?php endif; ?>
+                    <?php if ($memberSince !== ''): ?>
+                        <li><i class="far fa-calendar" aria-hidden="true"></i> Member since <?php echo h($memberSince); ?></li>
+                    <?php endif; ?>
+                </ul>
+            </div>
+
+            <div class="pf-hero-actions">
+                <a href="user_dashboard.php?settings=1"
+                   class="pf-btn pf-btn-primary<?php echo $showSettings ? ' is-active' : ''; ?>"
+                   <?php echo $showSettings ? 'aria-current="page"' : ''; ?>>
+                    <i class="fas fa-user-cog" aria-hidden="true"></i> Profile settings
+                </a>
+                <a href="../logout.php" class="pf-btn pf-btn-quiet">
+                    <i class="fas fa-sign-out-alt" aria-hidden="true"></i> Log out
+                </a>
+            </div>
+        </section>
 
         <?php if ($showSettings): ?>
         <section class="panel profile-settings-panel">
@@ -435,87 +517,239 @@ if ($showSettings) {
         </section>
         <?php else: ?>
 
-        <div class="dash-grid">
-            <div class="panel">
-                <div class="panel-header dashboard-panel-header">
-                    <h3><i class="fas fa-box"></i> <?php echo h($statusTitles[$current_filter] ?? 'Orders'); ?></h3>
-                    <form action="user_dashboard.php" method="GET" class="search-form dashboard-order-search">
+        <div class="pf-layout">
+            <section class="pf-card pf-orders" aria-labelledby="pfOrdersTitle">
+                <div class="pf-card-head">
+                    <h2 class="pf-card-title" id="pfOrdersTitle">My orders</h2>
+                    <form action="user_dashboard.php" method="GET" class="pf-order-search" role="search">
                         <?php if ($current_filter !== 'All'): ?>
                             <input type="hidden" name="status" value="<?php echo h($current_filter); ?>">
                         <?php endif; ?>
-                        <input type="text" name="q" placeholder="Search your past orders..." value="<?php echo h($search_query); ?>">
-                        <button type="submit" class="search-icon" aria-label="Search orders"><i class="fas fa-search"></i></button>
+                        <i class="fas fa-search" aria-hidden="true"></i>
+                        <input type="text" name="q" placeholder="Search by order number or date"
+                               aria-label="Search your orders" value="<?php echo h($search_query); ?>">
                     </form>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="order-list">
-                        <thead>
-                            <tr><th>ID</th><th>Date</th><th>Total</th><th>Status</th><th>Action</th></tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ($orders as $o):
-                            $ost = (string)($o['status'] ?? '');
-                            $canCancel = in_array($ost, $cancellableStatuses, true);
-                            ?>
-                            <tr>
-                                <td><strong>#ORD-<?php echo (int)$o['id']; ?></strong></td>
-                                <td><span class="meta-text"><?php echo date('M d, Y', strtotime($o['created_at'])); ?></span></td>
-                                <td><b class="dash-price">&#8369;<?php echo number_format((float)$o['total'], 2); ?></b></td>
-                                <td><span class="status-tag"><?php echo h(ias_order_display_status($o['status'] ?? '', $o['shipment_status'] ?? null)); ?></span></td>
-                                <td>
-                                    <?php if ($canCancel): ?>
-                                        <form method="post" class="order-cancel-form" onsubmit="return confirm('Cancel this order? Stock will be restored.');">
-                                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                            <input type="hidden" name="action" value="cancel_order">
-                                            <input type="hidden" name="order_id" value="<?php echo (int)$o['id']; ?>">
-                                            <button type="submit" class="order-cancel-btn">Cancel</button>
-                                        </form>
-                                    <?php elseif (strcasecmp($ost, 'cancelled') === 0 || strcasecmp($ost, 'canceled') === 0): ?>
-                                        <span class="meta-text">Cancelled</span>
-                                    <?php else: ?>
-                                        <span class="meta-text">—</span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-
-                        <?php if (count($orders) === 0): ?>
-                            <tr><td colspan="5" class="empty-state">No transactions found.</td></tr>
-                        <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header"><h3><i class="fas fa-search"></i> Recently Added</h3></div>
-                <div class="recent-grid">
-                    <?php foreach ($recentProducts as $rp): ?>
-                        <a class="mini-card" href="products.php?id=<?php echo (int)$rp['id']; ?>">
-                            <div class="mini-card-media">
-                                <span class="mini-card-badge">New</span>
-                                <img src="<?php echo h(ias_client_product_image_url($rp)); ?>" alt="<?php echo h($rp['name']); ?>">
-                            </div>
-                            <div class="mini-card-body">
-                                <span class="mini-card-title"><?php echo h($rp['name']); ?></span>
-                                <span class="p-price">&#8369;<?php echo number_format((float)$rp['price'], 2); ?></span>
-                            </div>
+                <?php
+                $orderTabs = [
+                    'All' => 'All',
+                    'to_pay' => 'To pay',
+                    'to_ship' => 'To ship',
+                    'to_receive' => 'To receive',
+                    'to_review' => 'To review',
+                ];
+                ?>
+                <nav class="pf-tabs" aria-label="Filter orders by status">
+                    <?php foreach ($orderTabs as $tabKey => $tabLabel): ?>
+                        <a href="user_dashboard.php?status=<?php echo h($tabKey); ?>"
+                           class="pf-tab<?php echo $current_filter === $tabKey ? ' is-active' : ''; ?>"
+                           <?php echo $current_filter === $tabKey ? 'aria-current="page"' : ''; ?>>
+                            <?php echo h($tabLabel); ?>
+                            <?php if ($statusCounts[$tabKey] > 0): ?>
+                                <span class="pf-tab-count"><?php echo (int)$statusCounts[$tabKey]; ?></span>
+                            <?php endif; ?>
                         </a>
                     <?php endforeach; ?>
-                    <?php if (empty($recentProducts)): ?>
-                        <div class="empty-state">No recent products yet.</div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
+                </nav>
 
-        <div class="status-bar">
-            <a href="user_dashboard.php?status=All" class="tab-item <?php echo $current_filter === 'All' ? 'active' : ''; ?>"><i class="fas fa-list"></i> All History</a>
-            <a href="user_dashboard.php?status=to_pay" class="tab-item <?php echo $current_filter === 'to_pay' ? 'active' : ''; ?>"><i class="fas fa-credit-card"></i> To Pay</a>
-            <a href="user_dashboard.php?status=to_ship" class="tab-item <?php echo $current_filter === 'to_ship' ? 'active' : ''; ?>"><i class="fas fa-truck"></i> To Ship</a>
-            <a href="user_dashboard.php?status=to_receive" class="tab-item <?php echo $current_filter === 'to_receive' ? 'active' : ''; ?>"><i class="fas fa-inbox"></i> To Receive</a>
-            <a href="user_dashboard.php?status=to_review" class="tab-item <?php echo $current_filter === 'to_review' ? 'active' : ''; ?>"><i class="fas fa-star"></i> To Review</a>
+                <?php if (count($orders) > 0): ?>
+                    <ul class="pf-order-list">
+                        <?php foreach ($orders as $o):
+                            $oid = (int)$o['id'];
+                            $ost = (string)($o['status'] ?? '');
+                            $canCancel = in_array($ost, $cancellableStatuses, true);
+                            $statusLabel = ias_order_display_status($o['status'] ?? '', $o['shipment_status'] ?? null);
+                            $fulfilKey = strtolower(trim((string)($o['fulfillment_type'] ?? '')));
+                            $fulfil = $fulfillmentLabels[$fulfilKey] ?? '';
+                            [$noteIcon, $noteText] = $orderStatusNote($statusLabel, trim((string)($o['carrier'] ?? '')), $fulfilKey === 'pickup');
+                            $items = $orderItems[$oid] ?? [];
+                            $itemQty = array_sum(array_map(static fn($it) => (int)$it['quantity'], $items));
+                            $hiddenCount = max(0, count($items) - $orderItemsShown);
+                            $payLabel = $paymentLabel($o);
+                            $shipTo = trim((string)($o['shipping_address'] ?? ''));
+                            $phone = trim((string)($o['customer_phone'] ?? ''));
+                            $hasDetails = $shipTo !== '' || $phone !== '' || $payLabel !== '' || $fulfil !== '';
+                            ?>
+                            <li class="pf-order <?php echo $orderStatusTone($statusLabel); ?>">
+                                <div class="pf-order-head">
+                                    <div class="pf-order-ref">
+                                        <strong>Order #ORD-<?php echo $oid; ?></strong>
+                                        <span>Placed <?php echo date('M d, Y', strtotime($o['created_at'])); ?></span>
+                                    </div>
+                                    <span class="pf-status <?php echo $orderStatusTone($statusLabel); ?>"><?php echo h($statusLabel); ?></span>
+                                </div>
+
+                                <?php if ($items): ?>
+                                    <ul class="pf-order-items" id="pfOrderItems<?php echo $oid; ?>">
+                                        <?php foreach ($items as $i => $it):
+                                            $itName = trim((string)($it['name'] ?? ''));
+                                            $itImg = $itName !== '' ? ias_client_product_image_url($it) : '';
+                                            $itQty = (int)$it['quantity'];
+                                            $itPrice = (float)$it['price'];
+                                            $itLink = $itName !== '' ? 'products.php?id=' . (int)$it['product_id'] : '';
+                                            ?>
+                                            <li class="pf-item"<?php echo $i >= $orderItemsShown ? ' data-extra hidden' : ''; ?>>
+                                                <span class="pf-item-thumb">
+                                                    <?php if ($itImg !== ''): ?>
+                                                        <img src="<?php echo h($itImg); ?>" alt="" loading="lazy">
+                                                    <?php else: ?>
+                                                        <i class="fas fa-box" aria-hidden="true"></i>
+                                                    <?php endif; ?>
+                                                </span>
+                                                <span class="pf-item-info">
+                                                    <?php if ($itLink !== ''): ?>
+                                                        <a class="pf-item-name" href="<?php echo h($itLink); ?>"><?php echo h($itName); ?></a>
+                                                    <?php else: ?>
+                                                        <span class="pf-item-name is-gone">Product no longer available</span>
+                                                    <?php endif; ?>
+                                                    <span class="pf-item-qty">Qty <?php echo $itQty; ?> &times; &#8369;<?php echo number_format($itPrice, 2); ?></span>
+                                                </span>
+                                                <strong class="pf-item-sub">&#8369;<?php echo number_format($itPrice * $itQty, 2); ?></strong>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                    <?php if ($hiddenCount > 0): ?>
+                                        <button type="button" class="pf-more-items" aria-expanded="false"
+                                                aria-controls="pfOrderItems<?php echo $oid; ?>" data-more-items
+                                                data-label-closed="Show <?php echo $hiddenCount; ?> more <?php echo $hiddenCount === 1 ? 'item' : 'items'; ?>"
+                                                data-label-open="Show fewer items">
+                                            <span>Show <?php echo $hiddenCount; ?> more <?php echo $hiddenCount === 1 ? 'item' : 'items'; ?></span>
+                                            <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                                        </button>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+
+                                <div class="pf-order-foot">
+                                    <p class="pf-order-note"><i class="fas <?php echo h($noteIcon); ?>" aria-hidden="true"></i> <?php echo h($noteText); ?></p>
+                                    <p class="pf-order-total">
+                                        <span>Order total<?php echo $itemQty > 0 ? ' (' . $itemQty . ' ' . ($itemQty === 1 ? 'item' : 'items') . ')' : ''; ?></span>
+                                        <strong>&#8369;<?php echo number_format((float)$o['total'], 2); ?></strong>
+                                    </p>
+                                </div>
+
+                                <?php if ($hasDetails || $canCancel): ?>
+                                    <div class="pf-order-actions">
+                                        <?php if ($hasDetails): ?>
+                                            <button type="button" class="pf-order-btn" aria-expanded="false"
+                                                    aria-controls="pfOrderDetails<?php echo $oid; ?>" data-order-details>
+                                                Order details <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                        <?php if ($canCancel): ?>
+                                            <form method="post" class="order-cancel-form" data-confirm="The items go back into stock and the order can't be restored." data-confirm-title="Cancel this order?" data-confirm-ok="Cancel order" data-confirm-cancel="Keep order" data-confirm-type="danger">
+                                                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                                <input type="hidden" name="action" value="cancel_order">
+                                                <input type="hidden" name="order_id" value="<?php echo $oid; ?>">
+                                                <button type="submit" class="pf-order-btn is-danger">Cancel order</button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if ($hasDetails): ?>
+                                        <dl class="pf-order-details" id="pfOrderDetails<?php echo $oid; ?>" hidden>
+                                            <?php if ($fulfil !== ''): ?>
+                                                <div><dt>Fulfillment</dt><dd><?php echo h($fulfil); ?></dd></div>
+                                            <?php endif; ?>
+                                            <?php if ($shipTo !== ''): ?>
+                                                <div><dt><?php echo $fulfilKey === 'pickup' ? 'Pickup location' : 'Ship to'; ?></dt><dd><?php echo h($shipTo); ?></dd></div>
+                                            <?php endif; ?>
+                                            <?php if ($phone !== ''): ?>
+                                                <div><dt>Contact number</dt><dd><?php echo h($phone); ?></dd></div>
+                                            <?php endif; ?>
+                                            <?php if ($payLabel !== ''): ?>
+                                                <div><dt>Payment</dt><dd><?php echo h($payLabel); ?></dd></div>
+                                            <?php endif; ?>
+                                        </dl>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php elseif ($search_query !== '' || $current_filter !== 'All'): ?>
+                    <div class="pf-empty">
+                        <span class="pf-empty-icon"><i class="fas fa-search" aria-hidden="true"></i></span>
+                        <strong>No orders match</strong>
+                        <span>Try another status or search term.</span>
+                        <a href="user_dashboard.php" class="pf-btn pf-btn-outline">Show all orders</a>
+                    </div>
+                <?php else: ?>
+                    <div class="pf-empty">
+                        <span class="pf-empty-icon"><i class="fas fa-box-open" aria-hidden="true"></i></span>
+                        <strong>No orders yet</strong>
+                        <span>Your orders and their delivery status will show up here.</span>
+                        <a href="shop.php" class="pf-btn pf-btn-primary">Start shopping</a>
+                    </div>
+                <?php endif; ?>
+            </section>
+
+            <aside class="pf-side">
+                <section class="pf-card pf-address<?php echo $addressComplete ? '' : ' is-incomplete'; ?>" aria-labelledby="pfAddrTitle">
+                    <div class="pf-card-head">
+                        <h2 class="pf-card-title" id="pfAddrTitle">Delivery address</h2>
+                        <a class="pf-link" href="user_dashboard.php?settings=1#delivery">
+                            <?php echo $addressComplete ? 'Edit' : 'Complete'; ?>
+                        </a>
+                    </div>
+                    <?php if ($addressComplete): ?>
+                        <p class="pf-address-line"><?php echo h($savedAddressLine); ?></p>
+                        <?php if ($profileForm['phone'] !== ''): ?>
+                            <p class="pf-address-meta"><i class="fas fa-phone-alt" aria-hidden="true"></i> <?php echo h($profileForm['phone']); ?></p>
+                        <?php endif; ?>
+                        <p class="pf-address-meta"><i class="fas fa-check-circle" aria-hidden="true"></i> Used automatically at checkout</p>
+                    <?php else: ?>
+                        <p class="pf-address-line"><?php echo $savedAddressLine !== '' ? h($savedAddressLine) : 'No delivery address yet.'; ?></p>
+                        <p class="pf-address-meta is-warning">
+                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                            Add your street, barangay, city, province and ZIP so we can deliver your orders.
+                        </p>
+                    <?php endif; ?>
+                </section>
+
+                <nav class="pf-card pf-shortcuts" aria-label="My saved items">
+                    <a class="pf-shortcut" href="wishlist.php">
+                        <span class="pf-shortcut-icon"><i class="fas fa-heart" aria-hidden="true"></i></span>
+                        <span class="pf-shortcut-label">Wishlist</span>
+                        <span class="pf-shortcut-count"><?php echo (int)($epWishCount ?? 0); ?></span>
+                        <i class="fas fa-chevron-right pf-shortcut-caret" aria-hidden="true"></i>
+                    </a>
+                    <a class="pf-shortcut" href="saved_builds.php">
+                        <span class="pf-shortcut-icon"><i class="fas fa-desktop" aria-hidden="true"></i></span>
+                        <span class="pf-shortcut-label">Saved builds</span>
+                        <span class="pf-shortcut-count"><?php echo (int)$savedBuildCount; ?></span>
+                        <i class="fas fa-chevron-right pf-shortcut-caret" aria-hidden="true"></i>
+                    </a>
+                    <a class="pf-shortcut" href="notifications.php">
+                        <span class="pf-shortcut-icon"><i class="fas fa-bell" aria-hidden="true"></i></span>
+                        <span class="pf-shortcut-label">Notifications</span>
+                        <?php if (!empty($epNotifUnread)): ?>
+                            <span class="pf-shortcut-count is-new"><?php echo (int)$epNotifUnread; ?> new</span>
+                        <?php endif; ?>
+                        <i class="fas fa-chevron-right pf-shortcut-caret" aria-hidden="true"></i>
+                    </a>
+                </nav>
+
+                <?php if (!empty($recentProducts)): ?>
+                    <section class="pf-card pf-new" aria-labelledby="pfNewTitle">
+                        <div class="pf-card-head">
+                            <h2 class="pf-card-title" id="pfNewTitle">New in store</h2>
+                            <a class="pf-link" href="shop.php">Shop all</a>
+                        </div>
+                        <ul class="pf-new-list">
+                            <?php foreach ($recentProducts as $rp): ?>
+                                <li>
+                                    <a class="pf-new-item" href="products.php?id=<?php echo (int)$rp['id']; ?>">
+                                        <span class="pf-new-thumb"><img src="<?php echo h(ias_client_product_image_url($rp)); ?>" alt="" loading="lazy"></span>
+                                        <span class="pf-new-info">
+                                            <span class="pf-new-name"><?php echo h($rp['name']); ?></span>
+                                            <span class="pf-new-price">&#8369;<?php echo number_format((float)$rp['price'], 2); ?></span>
+                                        </span>
+                                    </a>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </section>
+                <?php endif; ?>
+            </aside>
         </div>
         <?php endif; ?>
     </div>
@@ -524,6 +758,26 @@ if ($showSettings) {
 <?php
 if ($showSettings) {
     $extraScripts = '<script src="../assets/js/ph-address.js"></script>';
+} else {
+    // Order cards: "Order details" and "Show N more items" toggles.
+    $extraScripts = <<<'JS'
+<script>
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-order-details], [data-more-items]');
+    if (!btn) return;
+    var open = btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var target = document.getElementById(btn.getAttribute('aria-controls'));
+    if (!target) return;
+    if (btn.hasAttribute('data-order-details')) {
+        target.hidden = !open;
+    } else {
+        target.querySelectorAll('[data-extra]').forEach(function (li) { li.hidden = !open; });
+        btn.querySelector('span').textContent = btn.getAttribute(open ? 'data-label-open' : 'data-label-closed');
+    }
+});
+</script>
+JS;
 }
 include __DIR__ . '/ep_footer.php';
 ?>

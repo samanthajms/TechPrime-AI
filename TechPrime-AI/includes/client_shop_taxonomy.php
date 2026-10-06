@@ -522,3 +522,68 @@ function ep_shop_brand_logo_lookup(array $logos, string $brandName): string
     }
     return '';
 }
+
+/**
+ * "Shop by Category" tiles for the homepage carousel: every shop subcategory (or
+ * sub-less parent such as Desktop) that has visible products, with a product photo.
+ * Common PC-building categories come first, the rest follow by product count.
+ *
+ * @return list<array{label:string,url:string,image:string,count:int}>
+ */
+function ep_shop_category_tiles(PDO $db): array
+{
+    $vis = ias_client_product_list_sql_condition('p');
+    $st = $db->query(
+        "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url
+         FROM products p
+         INNER JOIN users u ON p.seller_id = u.id
+         WHERE {$vis}"
+    );
+    $products = ep_shop_attach_taxonomy($st ? $st->fetchAll(PDO::FETCH_ASSOC) : []);
+    $tax = ep_shop_taxonomy();
+
+    $tiles = [];
+    $best = [];
+    foreach ($products as $p) {
+        $parent = (string)$p['tax_parent'];
+        $sub = (string)$p['tax_sub'];
+        if (!isset($tax[$parent]) || ($sub === '' && !empty($tax[$parent]['subs'])) || $parent === 'others') {
+            continue;
+        }
+        $key = $parent . '/' . $sub;
+        if (!isset($tiles[$key])) {
+            $tiles[$key] = [
+                'label' => $sub !== '' ? (string)$p['tax_sub_label'] : (string)$tax[$parent]['label'],
+                'url' => ep_shop_url(['cat' => $parent, 'sub' => $sub !== '' ? $sub : null], []),
+                'image' => '',
+                'count' => 0,
+            ];
+        }
+        $tiles[$key]['count']++;
+        // Photo: the priciest in-stock product with an image (usually the best-looking hero shot).
+        $img = ias_client_product_image_url($p);
+        if ($img === '') {
+            continue;
+        }
+        $score = [(int)($p['stock'] ?? 0) > 0 ? 1 : 0, (float)($p['price'] ?? 0)];
+        if (!isset($best[$key]) || $score > $best[$key]) {
+            $best[$key] = $score;
+            $tiles[$key]['image'] = $img;
+        }
+    }
+
+    $order = [
+        'component/processor-amd', 'component/processor-intel', 'component/motherboard',
+        'component/graphics-card', 'component/memory', 'component/ssd', 'component/hard-disk',
+        'component/power-supply', 'component/pc-case', 'component/cpu-cooling', 'component/chassis-fan',
+        'laptops-mobile/laptops', 'desktop/', 'peripherals/monitor', 'peripherals/keyboard',
+        'peripherals/mouse', 'peripherals/headset', 'peripherals/speaker',
+    ];
+    $rank = array_flip($order);
+    uksort($tiles, static function ($a, $b) use ($rank, $tiles) {
+        $ra = $rank[$a] ?? PHP_INT_MAX;
+        $rb = $rank[$b] ?? PHP_INT_MAX;
+        return $ra === $rb ? $tiles[$b]['count'] <=> $tiles[$a]['count'] : $ra <=> $rb;
+    });
+    return array_values($tiles);
+}

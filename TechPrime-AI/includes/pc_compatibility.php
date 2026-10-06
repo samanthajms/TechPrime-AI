@@ -26,6 +26,8 @@ function ep_pc_compat_tags(string $name, string $description = '', string $categ
         $tags['socket'] = 'AM5';
     } elseif (preg_match('/\bam4\b/', $raw)) {
         $tags['socket'] = 'AM4';
+    } elseif (preg_match('/\blga\s*1851\b/', $raw)) {
+        $tags['socket'] = 'LGA1851';
     } elseif (preg_match('/\blga\s*1700\b/', $raw)) {
         $tags['socket'] = 'LGA1700';
     } elseif (preg_match('/\blga\s*1200\b/', $raw)) {
@@ -54,6 +56,25 @@ function ep_pc_compat_tags(string $name, string $description = '', string $categ
         $tags['form'] = 'ATX';
     }
 
+    /* Motherboard names carry the chipset (B550M, A520M-K, X870-P): an "M" suffix means micro-ATX. */
+    $lname = strtolower($name);
+    if (preg_match('/\bmotherboard\b/', $lname) && preg_match('/\b[abhxz]\d{3}(m?)/', $lname, $cm)) {
+        if ($tags['form'] === null) {
+            $tags['form'] = $cm[1] === 'm' ? 'MATX' : 'ATX';
+        }
+        if ($tags['socket'] === null) {
+            if (preg_match('/\b(a320|b350|x370|b450|x470|a520|b550|x570)/', $lname)) {
+                $tags['socket'] = 'AM4';
+            } elseif (preg_match('/\b(a620|b650|x670|b840|b850|x870)/', $lname)) {
+                $tags['socket'] = 'AM5';
+            } elseif (preg_match('/\b(h610|b660|h670|z690|b760|z790)/', $lname)) {
+                $tags['socket'] = 'LGA1700';
+            } elseif (preg_match('/\b(h810|b860|z890)/', $lname)) {
+                $tags['socket'] = 'LGA1851';
+            }
+        }
+    }
+
     if (preg_match('/\bnvme\b|\bm\.?2\b/', $raw)) {
         $tags['storage'] = 'NVME';
     } elseif (preg_match('/\bsata\b/', $raw)) {
@@ -68,6 +89,16 @@ function ep_pc_compat_tags(string $name, string $description = '', string $categ
     }
 
     return $tags;
+}
+
+/**
+ * RAM generation a processor requires, when its socket supports only one
+ * (AM4 = DDR4, AM5 / LGA1851 = DDR5; LGA1700 boards exist for both).
+ */
+function ep_pc_cpu_ddr(array $cpuTags): ?string
+{
+    $bySocket = ['AM4' => 'DDR4', 'AM5' => 'DDR5', 'LGA1851' => 'DDR5'];
+    return $bySocket[$cpuTags['socket'] ?? ''] ?? null;
 }
 
 /**
@@ -103,6 +134,18 @@ function ep_pc_compat_reason_for_candidate(string $slot, array $candidateTags, a
     if ($slot === 'memory' && $mobo && !empty($mobo['ddr']) && !empty($candidateTags['ddr'])) {
         if ($mobo['ddr'] !== $candidateTags['ddr']) {
             return 'Not compatible with the selected motherboard — RAM type mismatch.';
+        }
+    }
+    if ($slot === 'memory' && $cpu && !empty($candidateTags['ddr'])) {
+        $cpuDdr = ep_pc_cpu_ddr($cpu);
+        if ($cpuDdr !== null && $cpuDdr !== $candidateTags['ddr']) {
+            return 'Not compatible with the selected processor — it needs ' . $cpuDdr . ' memory.';
+        }
+    }
+    if ($slot === 'processor' && $ram && !empty($ram['ddr'])) {
+        $cpuDdr = ep_pc_cpu_ddr($candidateTags);
+        if ($cpuDdr !== null && $cpuDdr !== $ram['ddr']) {
+            return 'Not compatible with the selected memory — this processor needs ' . $cpuDdr . '.';
         }
     }
     if ($slot === 'cooler') {

@@ -382,7 +382,16 @@
     }
 
     function deleteStoredConversation(id) {
-        if (!window.confirm('Delete this conversation?')) return;
+        if (typeof IAS_UI === 'undefined') {
+            if (window.confirm('Delete this conversation?')) sendDeleteConversation(id);
+            return;
+        }
+        IAS_UI.confirm('This chat will be removed from your history.', {
+            title: 'Delete this conversation?', confirmLabel: 'Delete', type: 'danger'
+        }).then(function (ok) { if (ok) sendDeleteConversation(id); });
+    }
+
+    function sendDeleteConversation(id) {
         fetch(HISTORY_URL, {
             method: 'POST',
             credentials: 'same-origin',

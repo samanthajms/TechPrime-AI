@@ -1,10 +1,11 @@
 <?php
 /**
- * Client notification actions (read / delete) — uses existing notifications table.
+ * Client notification actions (read / read_all / delete) — uses existing notifications table.
+ * Every success response includes the user's new unread count for the header badge.
  */
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
-require_once __DIR__ . '/../includes/inventory_alerts.php';
+require_once __DIR__ . '/../includes/client_notifications.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -36,14 +37,20 @@ $action = (string)($_POST['action'] ?? '');
 if ($action === 'read') {
     $id = (int)($_POST['id'] ?? 0);
     $ok = $id > 0 && inv_mark_notification_read($db, $uid, $id);
-    echo json_encode(['ok' => $ok]);
+    echo json_encode(['ok' => $ok, 'unread' => ep_notif_unread_count($db, $uid)]);
+    exit;
+}
+
+if ($action === 'read_all') {
+    $ok = inv_mark_all_notifications_read($db, $uid);
+    echo json_encode(['ok' => $ok, 'unread' => ep_notif_unread_count($db, $uid)]);
     exit;
 }
 
 if ($action === 'delete') {
     $id = (int)($_POST['id'] ?? 0);
     $ok = $id > 0 && inv_delete_notification($db, $uid, $id);
-    echo json_encode(['ok' => $ok]);
+    echo json_encode(['ok' => $ok, 'unread' => ep_notif_unread_count($db, $uid)]);
     exit;
 }
 

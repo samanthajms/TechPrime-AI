@@ -21,11 +21,12 @@ if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
 
     $product_id = (int)($_POST['product_id'] ?? 0);
     $returnTo = $_POST['return_to'] ?? 'index.php';
-    if (!preg_match('#^[a-zA-Z0-9_\-./?=&%]+$#', $returnTo)) {
+    if (!preg_match('#^[a-zA-Z0-9_\-./?=&%+]+$#', $returnTo)) {
         $returnTo = 'index.php';
     }
 
-    $added = ep_add_product_to_cart($db, $product_id, 1);
+    $quantity = max(1, min(99, (int)($_POST['quantity'] ?? 1)));
+    $added = ep_add_product_to_cart($db, $product_id, $quantity);
     if (isset($_POST['ajax']) && (string)$_POST['ajax'] === '1') {
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([
@@ -50,7 +51,10 @@ if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
 }
 
 $viewId = (int)($_GET['id'] ?? 0);
-$openProductModalId = $viewId > 0 ? $viewId : 0;
+if ($viewId > 0) {
+    require __DIR__ . '/product_detail.php';
+    exit;
+}
 
 $displayProducts = [];
 $productResult = $db->query(

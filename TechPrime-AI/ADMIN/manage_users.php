@@ -559,7 +559,7 @@ staff_page_start([
                                             <button type="submit" class="btn btn-warn btn-xs">Block</button>
                                         </form>
                                     <?php endif; ?>
-                                    <form method="post" onsubmit="return confirm('Permanently delete this user?')">
+                                    <form method="post" data-confirm="This permanently deletes the account and cannot be undone." data-confirm-title="Delete this user?" data-confirm-ok="Delete user" data-confirm-type="danger">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
                                         <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">

@@ -546,7 +546,14 @@ EXTRA
     var avRemove = document.getElementById('spAvatarRemoveForm');
     if (avRemove) {
         avRemove.addEventListener('submit', function (e) {
-            if (!window.confirm('Remove your profile picture?')) e.preventDefault();
+            if (typeof IAS_UI === 'undefined') {
+                if (!window.confirm('Remove your profile picture?')) e.preventDefault();
+                return;
+            }
+            e.preventDefault();
+            IAS_UI.confirm('Your initials will show instead.', {
+                title: 'Remove your profile picture?', confirmLabel: 'Remove', type: 'danger'
+            }).then(function (ok) { if (ok) avRemove.submit(); });
         });
     }
 

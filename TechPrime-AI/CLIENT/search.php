@@ -83,9 +83,9 @@ if (!empty($query)) {
     <div class="ep-page-inner">
 
         <div class="ep-page-header-row">
-            <button class="ep-back-btn" onclick="history.back()">
+            <a href="index.php" class="ep-back-btn" data-ep-back>
                 <i class="fas fa-arrow-left"></i> Back
-            </button>
+            </a>
             <h2 class="ep-page-title">Search Results</h2>
         </div>
 
@@ -114,7 +114,7 @@ if (!empty($query)) {
                             <div class="ep-card-actions">
                                 <form action="products.php" method="POST" class="ep-buy-form">
                                     <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                    <input type="hidden" name="return_to" value="<?php echo h('search.php?q=' . urlencode($query)); ?>">
+                                    <input type="hidden" name="return_to" value="<?php echo h('search.php?q=' . rawurlencode($query)); ?>">
                                     <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                                     <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
                                     <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>

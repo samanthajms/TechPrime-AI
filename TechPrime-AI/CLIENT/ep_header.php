@@ -39,10 +39,10 @@ $epCartCount  = $epCartPreview['count'];
 $epNotifItems = [];
 $epNotifUnread = 0;
 $epNotifCsrf = '';
+require_once __DIR__ . '/../includes/client_notifications.php';
 if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
-    require_once __DIR__ . '/../includes/inventory_alerts.php';
     $notifDb = $db ?? getDbConnection();
-    $pack = inv_user_notifications($notifDb, (int)$_SESSION['user_id'], 30);
+    $pack = inv_user_notifications($notifDb, (int)$_SESSION['user_id'], 8);
     $epNotifItems = $pack['items'] ?? [];
     $epNotifUnread = (int)($pack['unread'] ?? 0);
     $epNotifCsrf = generateCsrfToken();
@@ -58,16 +58,51 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <?php else: ?>
         <title>EasyPC</title>
     <?php endif; ?>
-    <link rel="stylesheet" href="styles.css?v=cart-2">
+    <script>
+        /* Apply the saved theme before the stylesheets load so dark mode never flashes white. */
+        try { if (localStorage.getItem('ep_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="styles.css?v=orders-1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if (!empty($extraHead)) echo $extraHead; ?>
+    <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
+    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-6">
+    <link rel="stylesheet" href="ep_dark.css?v=dark-3">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">
 
+<?php
+$epActive   = (string)($activePage ?? '');
+$epUserName = !empty($isLoggedIn) ? trim((string)($_SESSION['name'] ?? '')) : '';
+$epFirstName = $epUserName !== '' ? preg_split('/\s+/', $epUserName)[0] : 'Customer';
+$epInitial  = strtoupper(mb_substr($epFirstName, 0, 1));
+// Profile picture uploaded on user_dashboard.php. The file name is reused on re-upload,
+// so its modified time is added to the URL to show a new photo right away.
+$epAvatarUrl = '';
+if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
+    try {
+        $avStmt = ($db ?? getDbConnection())->prepare('SELECT profile_image FROM users WHERE id = ?');
+        $avStmt->execute([(int)$_SESSION['user_id']]);
+        $avPath = (string)($avStmt->fetchColumn() ?: '');
+        $epAvatarUrl = ep_user_profile_image_url($avPath);
+        if ($epAvatarUrl !== '') {
+            $epAvatarUrl .= '?v=' . (int)@filemtime(__DIR__ . '/../assets/' . $avPath);
+        }
+    } catch (Throwable $e) {
+        $epAvatarUrl = '';   // no profile_image column yet: fall back to the initial
+    }
+}
+$epPrimaryLinks = [
+    ['href' => 'index.php', 'icon' => 'fa-home', 'label' => 'Home', 'active' => $epActive === 'home'],
+    ['href' => 'shop.php', 'icon' => 'fa-store', 'label' => 'Shop Now', 'active' => $epActive === 'shop'],
+    ['href' => !empty($isLoggedIn) ? 'build_a_pc.php' : '../login.php', 'icon' => 'fa-desktop', 'label' => 'Build a PC',
+     'active' => $epActive === 'build_a_pc' || $epActive === 'saved_builds'],
+];
+?>
 <header class="top-header ep-header full-width">
 <div class="ep-header-main">
     <button type="button" class="ep-menu-btn" id="epMenuBtn"
@@ -75,13 +110,25 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         <i class="fas fa-bars" aria-hidden="true"></i>
     </button>
 
-    <div class="logo ep-logo" onclick="location.href='index.php'">
-        <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img">
-    </div>
+    <a href="index.php" class="logo ep-logo">
+        <img src="../assets/logo.png" alt="EasyPC home" class="ep-logo-img">
+    </a>
+
+    <?php /* Page links. Below 900px they move into the drawer. */ ?>
+    <nav class="ep-pnav" aria-label="Primary">
+        <?php foreach ($epPrimaryLinks as $link): ?>
+            <a href="<?php echo h($link['href']); ?>"
+               class="ep-pnav-link<?php echo $link['active'] ? ' active' : ''; ?>"
+               <?php echo $link['active'] ? 'aria-current="page"' : ''; ?>>
+                <i class="fas <?php echo h($link['icon']); ?>" aria-hidden="true"></i>
+                <span><?php echo h($link['label']); ?></span>
+            </a>
+        <?php endforeach; ?>
+    </nav>
 
     <div class="search-wrap" id="epSearchWrap">
-        <form action="search.php" method="GET" id="epSearchForm" autocomplete="off">
-            <input id="epSearchInput" name="q" type="text" placeholder="Search products..."
+        <form action="search.php" method="GET" id="epSearchForm" role="search" autocomplete="off">
+            <input id="epSearchInput" name="q" type="text" placeholder="Search laptops, parts and accessories"
                    value="<?php echo h($searchQuery); ?>" aria-label="Search products"
                    aria-autocomplete="list" aria-controls="epSearchSuggest" aria-expanded="false"
                    autocomplete="off">
@@ -90,26 +137,62 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         <div id="epSearchSuggest" class="ep-search-suggest" role="listbox" hidden></div>
     </div>
 
-    <nav class="ep-nav-actions" aria-label="Primary">
-        <a href="index.php"
-           class="ep-nav-item<?php echo ($activePage ?? '') === 'home' ? ' active' : ''; ?>"
-           <?php echo ($activePage ?? '') === 'home' ? 'aria-current="page"' : ''; ?>>
-            <span class="ep-nav-item-icon"><i class="fas fa-home" aria-hidden="true"></i></span>
-            <span class="ep-nav-item-label">Home</span>
-        </a>
-
-        <a href="shop.php"
-           class="ep-nav-item<?php echo ($activePage ?? '') === 'shop' ? ' active' : ''; ?>"
-           <?php echo ($activePage ?? '') === 'shop' ? 'aria-current="page"' : ''; ?>>
-            <span class="ep-nav-item-icon"><i class="fas fa-store" aria-hidden="true"></i></span>
-            <span class="ep-nav-item-label">Shop Now</span>
-        </a>
+    <?php /* Icon buttons; their labels are visually hidden but stay readable by screen readers. */ ?>
+    <div class="ep-nav-actions">
+        <?php /* Click → notifications page. Hover (mouse) or keyboard focus → latest-notifications preview. */ ?>
+        <div class="ep-notif-wrap" id="epNotifWrap">
+            <a href="<?php echo !empty($isLoggedIn) ? 'notifications.php' : '../login.php'; ?>" id="notifBtn"
+               class="ep-nav-item ep-notif-trigger<?php echo $epActive === 'notifications' ? ' active' : ''; ?>"
+               <?php echo $epActive === 'notifications' ? 'aria-current="page"' : ''; ?>>
+                <span class="ep-nav-item-icon">
+                    <i class="<?php echo $epNotifUnread > 0 ? 'fas' : 'far'; ?> fa-bell" aria-hidden="true"></i>
+                    <?php if ($epNotifUnread > 0): ?>
+                        <span class="badge ep-notif-badge"><?php echo $epNotifUnread > 99 ? '99+' : (int)$epNotifUnread; ?></span>
+                    <?php endif; ?>
+                </span>
+                <span class="ep-nav-item-label">Notifications</span>
+            </a>
+            <div id="epNotifPanel" class="ep-notif-dropdown" role="region" aria-label="Latest notifications">
+                <div class="ep-notif-dd-head">
+                    <div class="ep-notif-dd-title">
+                        <strong>Notifications</strong>
+                        <span class="ep-notif-dd-new" id="epNotifNewChip"<?php echo $epNotifUnread > 0 ? '' : ' hidden'; ?>><?php echo (int)$epNotifUnread; ?> new</span>
+                    </div>
+                    <?php if (!empty($isLoggedIn)): ?>
+                        <button type="button" class="ep-notif-readall" data-notif-readall<?php echo $epNotifUnread > 0 ? '' : ' hidden'; ?>>
+                            <i class="fas fa-check-double" aria-hidden="true"></i> Mark all as read
+                        </button>
+                    <?php endif; ?>
+                </div>
+                <?php if (empty($isLoggedIn)): ?>
+                    <div class="ep-notif-empty">
+                        <span class="ep-notif-empty-icon"><i class="far fa-bell" aria-hidden="true"></i></span>
+                        <strong>Stay in the loop</strong>
+                        <span>Log in to get updates on your orders and payments.</span>
+                        <a href="../login.php" class="ep-cart-dd-btn is-primary">Log in</a>
+                    </div>
+                <?php elseif (empty($epNotifItems)): ?>
+                    <div class="ep-notif-empty">
+                        <span class="ep-notif-empty-icon"><i class="far fa-bell" aria-hidden="true"></i></span>
+                        <strong>You're all caught up</strong>
+                        <span>Order and payment updates will show up here.</span>
+                    </div>
+                <?php else: ?>
+                    <ul class="ep-notif-list" id="epNotifList">
+                        <?php foreach ($epNotifItems as $n) echo ep_notif_render_item($n, 'dropdown'); ?>
+                    </ul>
+                    <a href="notifications.php" class="ep-notif-dd-foot">
+                        View all notifications <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
 
         <?php /* Click → cart page. Hover (mouse) or keyboard focus → preview, rendered by epUpdateCartPreview(). */ ?>
         <div class="ep-cart-wrap" id="epCartWrap">
             <a href="cart.php" id="cartBtn"
-               class="ep-nav-item ep-cart-trigger<?php echo ($activePage ?? '') === 'cart' ? ' active' : ''; ?>"
-               <?php echo ($activePage ?? '') === 'cart' ? 'aria-current="page"' : ''; ?>>
+               class="ep-nav-item ep-cart-trigger<?php echo $epActive === 'cart' ? ' active' : ''; ?>"
+               <?php echo $epActive === 'cart' ? 'aria-current="page"' : ''; ?>>
                 <span class="ep-nav-item-icon">
                     <i class="fas fa-shopping-bag" aria-hidden="true"></i>
                     <?php if ($epCartCount > 0): ?>
@@ -121,73 +204,39 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
             <div id="epCartDropdown" class="ep-cart-dropdown" role="region" aria-label="Cart preview"></div>
         </div>
 
-        <button id="notifBtn" type="button" class="ep-nav-item"
-                onclick="document.getElementById('epNotifPanel').classList.toggle('hidden')"
-                aria-haspopup="true" aria-controls="epNotifPanel">
+        <?php /* Light/dark theme switch. Which icon and label show is decided by CSS from html[data-theme]. */ ?>
+        <button type="button" id="epThemeToggle" class="ep-nav-item ep-theme-toggle" title="Switch light / dark mode">
             <span class="ep-nav-item-icon">
-                <i class="far fa-bell" aria-hidden="true"></i>
-                <?php if ($epNotifUnread > 0): ?>
-                    <span class="badge ep-notif-badge"><?php echo $epNotifUnread > 99 ? '99+' : (int)$epNotifUnread; ?></span>
-                <?php endif; ?>
+                <i class="fas fa-moon ep-theme-when-light" aria-hidden="true"></i>
+                <i class="fas fa-sun ep-theme-when-dark" aria-hidden="true"></i>
             </span>
-            <span class="ep-nav-item-label">Notifications</span>
+            <span class="ep-nav-item-label">
+                <span class="ep-theme-when-light">Dark Mode</span>
+                <span class="ep-theme-when-dark">Light Mode</span>
+            </span>
         </button>
 
-        <a href="<?php echo $isLoggedIn ? 'build_a_pc.php' : '../login.php'; ?>"
-           class="ep-nav-item<?php echo (($activePage ?? '') === 'build_a_pc' || ($activePage ?? '') === 'saved_builds') ? ' active' : ''; ?>"
-           <?php echo (($activePage ?? '') === 'build_a_pc' || ($activePage ?? '') === 'saved_builds') ? 'aria-current="page"' : ''; ?>>
-            <span class="ep-nav-item-icon"><i class="fas fa-desktop" aria-hidden="true"></i></span>
-            <span class="ep-nav-item-label">Build a PC</span>
-        </a>
-
-        <button id="profileBtn" type="button" class="ep-nav-item"
-                onclick="location.href='<?php echo $isLoggedIn ? 'user_dashboard.php' : '../login.php'; ?>'">
-            <span class="ep-nav-item-icon"><i class="far fa-user" aria-hidden="true"></i></span>
-            <span class="ep-nav-item-label">My Profile</span>
-        </button>
-    </nav>
-</div>
-
-    <div id="epNotifPanel" class="notifications-panel hidden">
-        <div class="ep-notif-head">
-            <strong>Notifications</strong>
-        </div>
-        <?php if (empty($isLoggedIn)): ?>
-            <p class="ep-notif-empty">Log in to see your notifications.</p>
-        <?php elseif (empty($epNotifItems)): ?>
-            <p class="ep-notif-empty">No notifications yet.</p>
+        <?php if (!empty($isLoggedIn)): ?>
+            <a href="user_dashboard.php" id="profileBtn"
+               class="ep-account<?php echo $epActive === 'account' ? ' active' : ''; ?>"
+               title="My profile" <?php echo $epActive === 'account' ? 'aria-current="page"' : ''; ?>>
+                <span class="ep-account-avatar" aria-hidden="true"><?php if ($epAvatarUrl !== ''): ?><img src="<?php echo h($epAvatarUrl); ?>" alt=""><?php else: echo h($epInitial); endif; ?></span>
+                <span class="ep-account-name"><span class="sr-only">My profile: </span><?php echo h($epFirstName); ?></span>
+            </a>
         <?php else: ?>
-            <ul class="ep-notif-list" id="epNotifList">
-                <?php foreach ($epNotifItems as $n):
-                    $nRead = (int)($n['is_read'] ?? 0) === 1;
-                    $when = function_exists('inv_relative_time')
-                        ? inv_relative_time((string)$n['created_at'])
-                        : (string)($n['created_at'] ?? '');
-                    ?>
-                <li class="ep-notif-item<?php echo $nRead ? ' is-read' : ' is-unread'; ?>"
-                    data-id="<?php echo (int)$n['id']; ?>">
-                    <div class="ep-notif-body">
-                        <span class="ep-notif-msg"><?php echo h((string)$n['message']); ?></span>
-                        <span class="ep-notif-time"><?php echo h($when); ?></span>
-                    </div>
-                    <div class="ep-notif-actions">
-                        <?php if (!$nRead): ?>
-                        <button type="button" class="ep-notif-read" title="Mark as read" data-action="read">Read</button>
-                        <?php endif; ?>
-                        <button type="button" class="ep-notif-remove" title="Remove" data-action="delete">&times;</button>
-                    </div>
-                </li>
-                <?php endforeach; ?>
-            </ul>
+            <a href="../login.php" id="profileBtn" class="ep-account is-guest">
+                <i class="far fa-user" aria-hidden="true"></i>
+                <span class="ep-account-name">Log in</span>
+            </a>
         <?php endif; ?>
     </div>
+</div>
+
 </header>
 
 <?php
 /* ---- Mobile navigation drawer (≤ 900px; opened by #epMenuBtn) ---- */
-$epActive = (string)($activePage ?? '');
 $epOnSettings = $epActive === 'account' && isset($_GET['settings']);
-$epUserName = !empty($isLoggedIn) ? trim((string)($_SESSION['name'] ?? '')) : '';
 $epDrawerLinks = [
     ['href' => 'index.php', 'icon' => 'fa-home', 'label' => 'Home', 'active' => $epActive === 'home'],
     ['href' => 'shop.php', 'icon' => 'fa-store', 'label' => 'Shop Now', 'active' => $epActive === 'shop'],
@@ -211,7 +260,7 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
 
     <div class="ep-drawer-account">
         <?php if (!empty($isLoggedIn)): ?>
-            <span class="ep-drawer-avatar" aria-hidden="true"><?php echo h(strtoupper(mb_substr($epUserName !== '' ? $epUserName : 'C', 0, 1))); ?></span>
+            <span class="ep-drawer-avatar" aria-hidden="true"><?php if ($epAvatarUrl !== ''): ?><img src="<?php echo h($epAvatarUrl); ?>" alt=""><?php else: echo h($epInitial); endif; ?></span>
             <div class="ep-drawer-account-text">
                 <strong>Hi, <?php echo h($epUserName !== '' ? $epUserName : 'Customer'); ?>!</strong>
                 <a href="user_dashboard.php">View my profile</a>
@@ -292,6 +341,23 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
     epSetHeaderOffset();
     window.addEventListener('resize', epSetHeaderOffset);
 
+    /* ---- Light / dark theme (saved per browser; applied early in <head>) ---- */
+    var themeBtn = document.getElementById('epThemeToggle');
+    var applyTheme = function (theme) {
+        document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+    };
+    if (themeBtn) {
+        themeBtn.addEventListener('click', function () {
+            var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            applyTheme(next);
+            try { localStorage.setItem('ep_theme', next); } catch (e) {}
+        });
+    }
+    // Keep other open tabs of the store in sync.
+    window.addEventListener('storage', function (e) {
+        if (e.key === 'ep_theme') applyTheme(e.newValue);
+    });
+
     /* ---- Mobile navigation drawer ---- */
     var menuBtn = document.getElementById('epMenuBtn');
     var drawer = document.getElementById('epDrawer');
@@ -310,8 +376,8 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
             // Close header popups so they don't sit on top of the drawer.
             var cw = document.getElementById('epCartWrap');
             if (cw) cw.classList.remove('open');
-            var np = document.getElementById('epNotifPanel');
-            if (np) np.classList.add('hidden');
+            var nw = document.getElementById('epNotifWrap');
+            if (nw) nw.classList.add('is-dismissed');
 
             drawer.classList.add('open');
             drawer.setAttribute('aria-hidden', 'false');
@@ -355,11 +421,10 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
         else if (typeof drawerMq.addListener === 'function') drawerMq.addListener(onDrawerBreakpoint);
     }
 
-    /* Cart: the icon is a plain link to cart.php. The preview opens on mouse hover or
-       keyboard focus (CSS). Escape hides it until the pointer/focus leaves the cart. */
-    var wrap = document.getElementById('epCartWrap');
-    var trigger = document.getElementById('cartBtn');
-    if (wrap && trigger) {
+    /* Cart and Notifications: the icon is a plain link to its page. The preview opens on
+       mouse hover or keyboard focus (CSS). Escape hides it until the pointer/focus leaves. */
+    function epHoverPreview(wrap, trigger) {
+        if (!wrap || !trigger) return;
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             var focusedInside = wrap.contains(document.activeElement);
@@ -373,6 +438,8 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
             if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('is-dismissed');
         });
     }
+    epHoverPreview(document.getElementById('epCartWrap'), document.getElementById('cartBtn'));
+    epHoverPreview(document.getElementById('epNotifWrap'), document.getElementById('notifBtn'));
 
     /* Update header Cart badge + dropdown from cart preview JSON (no page reload). */
     window.epUpdateCartPreview = function (preview) {
@@ -636,59 +703,115 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
         });
     }
 
-    /* ---- Persistent notifications (DB-backed) ---- */
-    var notifList = document.getElementById('epNotifList');
+    /* ---- Persistent notifications (DB-backed) ----
+       Rows (.ep-notif-item[data-id]) live in the header preview and on notifications.php;
+       the same notification can be on screen twice, so updates apply to every copy. */
     var notifCsrf = <?php echo json_encode($epNotifCsrf ?? ''); ?>;
-    if (notifList && notifCsrf) {
-        function postClientNotif(action, id) {
+    if (notifCsrf) {
+        var postClientNotif = function (action, id, keepalive) {
             var body = new URLSearchParams();
             body.set('action', action);
             body.set('csrf_token', notifCsrf);
-            body.set('id', String(id));
+            if (id) body.set('id', String(id));
             return fetch('client_notif_api.php', {
                 method: 'POST',
                 credentials: 'same-origin',
+                keepalive: !!keepalive,
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: body.toString()
             }).then(function (r) { return r.json(); }).catch(function () { return null; });
-        }
-        function refreshNotifBadge() {
-            var badge = document.querySelector('#notifBtn .ep-notif-badge');
-            var unread = notifList.querySelectorAll('.ep-notif-item.is-unread').length;
+        };
+        var notifCopies = function (id) {
+            return document.querySelectorAll('.ep-notif-item[data-id="' + (parseInt(id, 10) || 0) + '"]');
+        };
+        var markItemRead = function (item) {
+            item.classList.remove('is-unread');
+            item.classList.add('is-read');
+            var btn = item.querySelector('[data-notif-action="read"]');
+            if (btn) btn.remove();
+            var sr = item.querySelector('.ep-notif-sr');
+            if (sr) sr.remove();
+        };
+        var setUnread = function (unread) {
+            unread = Math.max(0, parseInt(unread, 10) || 0);
             var icon = document.querySelector('#notifBtn .ep-nav-item-icon');
+            var badge = document.querySelector('#notifBtn .ep-notif-badge');
+            var bell = icon ? icon.querySelector('.fa-bell') : null;
+            if (bell) bell.className = (unread > 0 ? 'fas' : 'far') + ' fa-bell';
             if (unread <= 0) {
                 if (badge) badge.remove();
+            } else {
+                if (!badge && icon) {
+                    badge = document.createElement('span');
+                    badge.className = 'badge ep-notif-badge';
+                    icon.appendChild(badge);
+                }
+                if (badge) badge.textContent = unread > 99 ? '99+' : String(unread);
+            }
+            var chip = document.getElementById('epNotifNewChip');
+            if (chip) {
+                chip.textContent = unread + ' new';
+                chip.hidden = unread <= 0;
+            }
+            document.querySelectorAll('[data-notif-readall]').forEach(function (b) { b.hidden = unread <= 0; });
+            document.dispatchEvent(new CustomEvent('ep:notif-unread', { detail: { unread: unread } }));
+        };
+        var removeItem = function (item) {
+            var list = item.parentNode;
+            item.remove();
+            if (!list || list.querySelector('.ep-notif-item')) return;
+            if (list.id === 'epNotifList') {
+                var foot = document.querySelector('.ep-notif-dd-foot');
+                if (foot) foot.remove();
+                list.outerHTML = '<div class="ep-notif-empty">' +
+                    '<span class="ep-notif-empty-icon"><i class="far fa-bell" aria-hidden="true"></i></span>' +
+                    '<strong>You&rsquo;re all caught up</strong>' +
+                    '<span>Order and payment updates will show up here.</span></div>';
+            } else {
+                document.dispatchEvent(new CustomEvent('ep:notif-list-empty', { detail: { list: list } }));
+            }
+        };
+
+        document.addEventListener('click', function (e) {
+            var readAll = e.target.closest('[data-notif-readall]');
+            if (readAll) {
+                e.preventDefault();
+                readAll.disabled = true;
+                postClientNotif('read_all').then(function (data) {
+                    readAll.disabled = false;
+                    if (!data || !data.ok) return;
+                    document.querySelectorAll('.ep-notif-item.is-unread').forEach(markItemRead);
+                    setUnread(data.unread);
+                });
                 return;
             }
-            if (!badge && icon) {
-                badge = document.createElement('span');
-                badge.className = 'badge ep-notif-badge';
-                icon.appendChild(badge);
-            }
-            if (badge) badge.textContent = unread > 99 ? '99+' : String(unread);
-        }
-        notifList.addEventListener('click', function (e) {
-            var btn = e.target.closest('[data-action]');
-            if (!btn) return;
-            e.stopPropagation();
-            var item = btn.closest('.ep-notif-item');
+
+            var item = e.target.closest('.ep-notif-item[data-id]');
             if (!item) return;
             var id = item.getAttribute('data-id');
-            var action = btn.getAttribute('data-action');
-            postClientNotif(action, id).then(function (data) {
-                if (!data || !data.ok) return;
-                if (action === 'delete') {
-                    item.remove();
-                    if (!notifList.querySelector('.ep-notif-item')) {
-                        notifList.outerHTML = '<p class="ep-notif-empty">No notifications yet.</p>';
-                    }
-                } else if (action === 'read') {
-                    item.classList.remove('is-unread');
-                    item.classList.add('is-read');
-                    btn.remove();
-                }
-                refreshNotifBadge();
-            });
+            var btn = e.target.closest('[data-notif-action]');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                var action = btn.getAttribute('data-notif-action');
+                btn.disabled = true;
+                postClientNotif(action, id).then(function (data) {
+                    btn.disabled = false;
+                    if (!data || !data.ok) return;
+                    notifCopies(id).forEach(action === 'delete' ? removeItem : markItemRead);
+                    setUnread(data.unread);
+                });
+                return;
+            }
+
+            // Opening an unread notification marks it read; links still navigate normally
+            // (keepalive lets the request finish after the page unloads).
+            if (e.target.closest('[data-notif-open]') && item.classList.contains('is-unread')) {
+                notifCopies(id).forEach(markItemRead);
+                postClientNotif('read', id, true).then(function (data) {
+                    if (data && data.ok) setUnread(data.unread);
+                });
+            }
         });
     }
 })();
