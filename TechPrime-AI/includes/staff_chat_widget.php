@@ -126,7 +126,7 @@ body.sidebar-open #cwFab, body.sidebar-open #cwPanel { display: none; }
     const ENDPOINT = <?php echo json_encode($_cw_endpoint); ?>;
     const PAGE = <?php echo json_encode($_cw_messages); ?>;
     const OPEN_ID = <?php echo (int)$_cw_openStaff; ?>;
-    const BADGE_POLL_MS = 20000;
+    const BADGE_POLL_MS = 60000;
 
     const fab = document.getElementById('cwFab');
     const panel = document.getElementById('cwPanel');

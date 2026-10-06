@@ -1314,7 +1314,7 @@ if (!function_exists('staff_messages_render')) {
 
             function startPoll() {
                 if (pollTimer) clearInterval(pollTimer);
-                pollTimer = setInterval(() => pollOnce(false), 3500);
+                pollTimer = setInterval(() => pollOnce(false), 10000);
             }
 
             // ── Sending ──
@@ -2018,7 +2018,7 @@ if (!function_exists('staff_messages_render')) {
                     contactsEl.innerHTML = lastContactsHtml = '<p class="contacts-note">Could not load staff.</p>';
                 });
             // Keep unread counts and previews for other conversations fresh.
-            setInterval(() => { if (!document.hidden && !paused) loadStaff().catch(() => {}); }, 5000);
+            setInterval(() => { if (!document.hidden && !paused) loadStaff().catch(() => {}); }, 30000);
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden || paused) return;
                 pollOnce(false);
