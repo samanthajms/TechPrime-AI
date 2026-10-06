@@ -21,8 +21,8 @@ const LOW_STOCK_MAX = 15;       // 0 < stock <= 15 (includes critical)
 
 function inventory_product_category(array $allowed): string
 {
-    $category = $_POST['category'] ?? 'Accessories';
-    return in_array($category, $allowed, true) ? $category : 'Accessories';
+    $category = $_POST['category'] ?? 'Others';
+    return in_array($category, $allowed, true) ? $category : 'Others';
 }
 
 /** Feature-detect optional columns so this page works with or without migration_inventory_sku.sql applied. */

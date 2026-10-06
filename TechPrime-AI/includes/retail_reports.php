@@ -4,6 +4,8 @@
  * Shared by RETAIL/retail_reports.php, RETAIL/retail_history.php and RETAIL/retail_export.php.
  */
 
+require_once __DIR__ . '/product_categories.php';
+
 /** Preset date ranges. Returns ['from' => Y-m-d, 'to' => Y-m-d, 'label' => string] */
 function ias_report_date_presets(): array
 {
@@ -115,9 +117,9 @@ function ias_fetch_sales_rows(PDO $db, int $sellerId, DateTime $from, DateTime $
     $bind = [$sellerId, $from->format('Y-m-d 00:00:00'), (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00')];
 
     if (!empty($filters['category'])) {
-        $sql .= " AND p.category = ?";
-        $types .= 's';
-        $bind[] = $filters['category'];
+        $before = count($bind);
+        $sql .= ' AND ' . ias_category_in_sql('p.category', (string)$filters['category'], $bind);
+        $types .= str_repeat('s', count($bind) - $before);
     }
     if (!empty($filters['product_id'])) {
         $sql .= " AND p.id = ?";
@@ -340,7 +342,8 @@ function ias_deliveries_by_category(array $rows): array
 {
     $out = [];
     foreach ($rows as $r) {
-        $cats = array_filter(array_map('trim', explode(',', $r['categories'] ?? '')));
+        // one count per distinct Client menu GROUP in the order (Component, Peripherals, ...), same as the forecast filter
+        $cats = ias_category_groups_in($r['categories'] ?? '');
         if (empty($cats)) {
             $cats = ['Uncategorized'];
         }
@@ -463,9 +466,9 @@ function ias_fetch_all_sales_rows(PDO $db, DateTime $from, DateTime $to, array $
     $bind = [$from->format('Y-m-d 00:00:00'), (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00')];
 
     if (!empty($filters['category'])) {
-        $sql .= ' AND p.category = ?';
-        $types .= 's';
-        $bind[] = $filters['category'];
+        $before = count($bind);
+        $sql .= ' AND ' . ias_category_in_sql('p.category', (string)$filters['category'], $bind);
+        $types .= str_repeat('s', count($bind) - $before);
     }
     if (!empty($filters['customer'])) {
         $sql .= ' AND (u.name LIKE ? OR u.surname LIKE ? OR u.email LIKE ?)';

@@ -15,7 +15,7 @@ checkRole('admin');
 $admin_id = (int)$_SESSION['user_id'];
 
 $presets = ias_report_date_presets();
-$categories = ias_product_categories();
+$categories = ias_category_groups();   // 8 Client menu groups (shared with the forecast service filter)
 
 $dfRange = ias_resolve_section_range($_GET, 'df', 'this_month');
 $dfCategory = trim($_GET['df_category'] ?? '');

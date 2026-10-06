@@ -6,6 +6,7 @@
 session_start();
 require_once __DIR__ . '/../../includes/security.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../includes/product_categories.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -428,12 +429,12 @@ function primo_find_products(PDO $db, string $message, string $intent): array
         'audio' => 'Audio',
         'headset' => 'Audio',
         'headsets' => 'Audio',
-        'speaker' => 'Audio',
+        'speaker' => 'Speaker',
         'cooling' => 'Cooling',
         'accessories' => 'Accessories',
         'accessory' => 'Accessories',
-        'keyboard' => 'Accessories',
-        'mouse' => 'Accessories',
+        'keyboard' => 'Keyboard',
+        'mouse' => 'Mouse',
         'printer' => 'Printers and Scanners',
         'scanner' => 'Printers and Scanners',
         'gpu' => 'GPU',
@@ -575,23 +576,14 @@ function primo_query_products(PDO $db, string $condition, ?string $category, ?ar
     $params = [];
 
     if ($category !== null) {
-        if ($category === 'Printers and Scanners') {
-            $sql .= " AND (p.category = ? OR p.category = ?)";
-            $types .= 'ss';
-            $params[] = 'Printers and Scanners';
-            $params[] = 'Printer and Scanner';
-        } else {
-            $sql .= ' AND p.category = ?';
-            $types .= 's';
-            $params[] = $category;
-        }
+        // matches the old buckets AND the aligned Client/Custodian labels (includes/product_categories.php)
+        $before = count($params);
+        $sql .= ' AND ' . ias_category_in_sql('p.category', $category, $params);
+        $types .= str_repeat('s', count($params) - $before);
     } elseif (!empty($cats)) {
-        $placeholders = implode(',', array_fill(0, count($cats), '?'));
-        $sql .= " AND p.category IN ($placeholders)";
-        $types .= str_repeat('s', count($cats));
-        foreach ($cats as $c) {
-            $params[] = $c;
-        }
+        $before = count($params);
+        $sql .= ' AND ' . ias_category_in_sql('p.category', $cats, $params);
+        $types .= str_repeat('s', count($params) - $before);
     }
 
     if (!empty($keywords)) {

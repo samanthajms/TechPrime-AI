@@ -9,6 +9,7 @@ require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/client_helpers.php';
 require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
 require_once __DIR__ . '/../includes/pc_compatibility.php';
+require_once __DIR__ . '/../includes/product_categories.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -47,14 +48,41 @@ $meta = $slotMap[$slot];
 $db = getDbConnection();
 $vis = ias_client_product_list_sql_condition('p');
 
-$stmt = $db->prepare(
-    "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, p.description,
-            u.name AS seller_name
-     FROM products p
-     INNER JOIN users u ON u.id = p.seller_id
-     WHERE {$vis}
-     ORDER BY p.stock DESC, p.name ASC"
-);
+$cats = ias_category_expand($meta['categories']);   // old buckets + aligned labels
+$catPlaceholders = implode(',', array_fill(0, count($cats), '?'));
+$types = str_repeat('s', count($cats));
+$params = $cats;
+
+$kwSql = [];
+foreach ($meta['keywords'] as $kw) {
+    $kwSql[] = 'p.name LIKE ?';
+    $kwSql[] = 'COALESCE(p.description, \'\') LIKE ?';
+    $types .= 'ss';
+    $like = '%' . $kw . '%';
+    $params[] = $like;
+    $params[] = $like;
+}
+$kwClause = $kwSql ? (' OR (' . implode(' OR ', $kwSql) . ')') : '';
+
+$sql = "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, p.description,
+               u.name AS seller_name
+        FROM products p
+        INNER JOIN users u ON u.id = p.seller_id
+        WHERE {$vis}
+          AND (p.category IN ({$catPlaceholders}){$kwClause})";
+
+if ($q !== '') {
+    $sql .= ' AND (p.name LIKE ? OR COALESCE(p.description, \'\') LIKE ? OR COALESCE(p.category, \'\') LIKE ?)';
+    $qlike = '%' . $q . '%';
+    $types .= 'sss';
+    $params[] = $qlike;
+    $params[] = $qlike;
+    $params[] = $qlike;
+}
+
+$sql .= ' ORDER BY p.stock DESC, p.name ASC LIMIT 48';
+
+$stmt = $db->prepare($sql);
 if (!$stmt) {
     echo json_encode(['ok' => false, 'products' => [], 'error' => 'query_failed']);
     exit;

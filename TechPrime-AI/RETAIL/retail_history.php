@@ -196,7 +196,7 @@ $logoPath = staff_logo_href();
                                     <div style="padding:10px 16px;">
                                         <div class="text-small"><strong>Customer email:</strong> <?php echo h($r['customer_email']); ?></div>
                                         <div class="text-small"><strong>Products:</strong> <?php echo h($r['products']); ?></div>
-                                        <div class="text-small"><strong>Category:</strong> <?php echo h($r['categories']); ?></div>
+                                        <div class="text-small"><strong>Category:</strong> <?php echo h(implode(', ', ias_category_groups_in($r['categories'] ?? ''))); ?></div>
                                         <div class="text-small"><strong>Order placed:</strong> <?php echo h($r['order_created']); ?></div>
                                     </div>
                                 </td>
