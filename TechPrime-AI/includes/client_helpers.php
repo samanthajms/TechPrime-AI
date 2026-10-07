@@ -103,63 +103,88 @@ function ep_ensure_session_cart(PDO $db): void
 }
 
 /**
- * Place a COD order with stock checks, atomic deduction, and notifications.
+ * Place unpaid order (Cart → Place Order → To Pay). No payment, no stock deduction.
  * @param list<array{id:int,qty:int,price:float|int,name?:string}> $items
  * @return array{ok:bool,order_id?:int,error?:string}
  */
-function ep_place_cod_order(PDO $db, int $userId, array $items, float $total, string $address, string $phone): array
-{
+function ep_place_unpaid_order(
+    PDO $db,
+    int $userId,
+    array $items,
+    float $total,
+    string $address,
+    string $phone,
+    string $fulfillmentType = 'delivery'
+): array {
     if ($userId <= 0 || empty($items) || $address === '' || $phone === '') {
         return ['ok' => false, 'error' => 'invalid'];
     }
+    $fulfillmentType = strtolower(trim($fulfillmentType));
+    if (!in_array($fulfillmentType, ['pickup', 'delivery'], true)) {
+        $fulfillmentType = 'delivery';
+    }
 
+    $orderId = 0;
     try {
         $db->beginTransaction();
 
+        foreach ($items as $item) {
+            $pid = (int)($item['id'] ?? 0);
+            $qty = (int)($item['qty'] ?? 0);
+            if ($pid <= 0 || $qty < 1) {
+                $db->rollBack();
+                return ['ok' => false, 'error' => 'invalid_item'];
+            }
+            $chk = $db->prepare('SELECT COALESCE(stock, 0) AS stock FROM products WHERE id = ? FOR UPDATE');
+            $chk->execute([$pid]);
+            $prod = $chk->fetch(PDO::FETCH_ASSOC);
+            if (!$prod || (int)$prod['stock'] < $qty) {
+                $db->rollBack();
+                return ['ok' => false, 'error' => 'stock'];
+            }
+        }
+
         $ins = $db->prepare(
-            "INSERT INTO orders (user_id, total, status, shipping_address, customer_phone) VALUES (?, ?, 'to_ship', ?, ?)"
+            "INSERT INTO orders (
+                user_id, total, status, shipping_address, customer_phone,
+                payment_method, payment_status, stock_deducted, fulfillment_type
+             ) VALUES (?, ?, 'to_pay', ?, ?, NULL, 'unpaid', FALSE, ?)
+             RETURNING id"
         );
-        $ins->execute([$userId, $total, $address, $phone]);
-        $orderId = (int)$db->lastInsertId();
+        $ins->execute([$userId, $total, $address, $phone, $fulfillmentType]);
+        $orderId = (int)$ins->fetchColumn();
+        if ($orderId <= 0) {
+            $orderId = (int)$db->lastInsertId('orders_id_seq');
+        }
         if ($orderId <= 0) {
             $db->rollBack();
             return ['ok' => false, 'error' => 'create_failed'];
         }
 
-        $itemStmt = $db->prepare('INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)');
-        $stockStmt = $db->prepare(
-            'UPDATE products SET stock = stock - ? WHERE id = ? AND COALESCE(stock, 0) >= ?'
+        $itemStmt = $db->prepare(
+            'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)'
         );
-
+        $orderedIds = [];
         foreach ($items as $item) {
-            $pid = (int)($item['id'] ?? 0);
-            $qty = (int)($item['qty'] ?? 0);
-            $price = (float)($item['price'] ?? 0);
-            if ($pid <= 0 || $qty < 1) {
-                $db->rollBack();
-                return ['ok' => false, 'error' => 'invalid_item'];
-            }
+            $pid = (int)$item['id'];
+            $qty = (int)$item['qty'];
+            $price = (float)$item['price'];
             $itemStmt->execute([$orderId, $pid, $qty, $price]);
-            $stockStmt->execute([$qty, $pid, $qty]);
-            if ($stockStmt->rowCount() < 1) {
-                $db->rollBack();
-                return ['ok' => false, 'error' => 'stock'];
-            }
-            $nameStmt = $db->prepare('SELECT name, stock FROM products WHERE id = ?');
-            $nameStmt->execute([$pid]);
-            $prod = $nameStmt->fetch(PDO::FETCH_ASSOC);
-            if ($prod) {
-                inv_notify_stock_change(
-                    $db,
-                    (string)$prod['name'],
-                    $pid,
-                    (int)$prod['stock'] + $qty,
-                    (int)$prod['stock']
-                );
-            }
+            $orderedIds[] = $pid;
         }
 
-        $db->prepare('DELETE FROM cart WHERE user_id = ?')->execute([$userId]);
+        if ($orderedIds) {
+            $in = implode(',', array_map('intval', $orderedIds));
+            $db->exec("DELETE FROM cart WHERE user_id = {$userId} AND product_id IN ({$in})");
+            foreach ($orderedIds as $pid) {
+                unset($_SESSION['cart'][$pid]);
+            }
+            $_SESSION['cart_selected'] = array_values(array_filter(
+                array_map('intval', (array)($_SESSION['cart_selected'] ?? [])),
+                static fn($id) => !in_array($id, $orderedIds, true)
+            ));
+        }
+
         $db->commit();
     } catch (Throwable $e) {
         if ($db->inTransaction()) {
@@ -168,42 +193,251 @@ function ep_place_cod_order(PDO $db, int $userId, array $items, float $total, st
         return ['ok' => false, 'error' => 'exception'];
     }
 
-    unset($_SESSION['cart']);
-
     inv_notify_user(
         $db,
         $userId,
-        "Your order #ORD-{$orderId} was placed successfully.",
+        "Order #ORD-{$orderId} placed. Please pay under Order Summary → To Pay.",
         'order_placed',
-        'user_dashboard.php'
-    );
-    inv_notify_role(
-        $db,
-        'inventory_custodian',
-        "New order #ORD-{$orderId} placed (₱" . number_format($total, 2) . ").",
-        'new_order',
-        'inventory_orders.php'
+        'user_dashboard.php?status=to_pay'
     );
 
     return ['ok' => true, 'order_id' => $orderId];
 }
 
 /**
- * Cancel an order if still cancellable. Restores stock exactly once (idempotent).
+ * Legacy alias — places unpaid to_pay order (no stock). Prefer ep_place_unpaid_order.
+ * @param list<array{id:int,qty:int,price:float|int,name?:string}> $items
+ */
+function ep_place_cod_order(PDO $db, int $userId, array $items, float $total, string $address, string $phone): array
+{
+    return ep_place_unpaid_order($db, $userId, $items, $total, $address, $phone, 'delivery');
+}
+
+/**
+ * Mark an existing to_pay order as paid (placeholder payment). Does not create a new order.
  * @return array{ok:bool,error?:string}
  */
-function ep_cancel_order(PDO $db, int $userId, int $orderId): array
+function ep_mark_order_paid(PDO $db, int $userId, int $orderId, string $paymentRef): array
+{
+    if ($userId <= 0 || $orderId <= 0 || trim($paymentRef) === '') {
+        return ['ok' => false, 'error' => 'invalid'];
+    }
+
+    try {
+        $db->beginTransaction();
+
+        $byRef = $db->prepare('SELECT id, user_id, payment_status FROM orders WHERE payment_ref = ? LIMIT 1');
+        $byRef->execute([$paymentRef]);
+        $existing = $byRef->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            $db->commit();
+            if ((int)$existing['user_id'] === $userId && (int)$existing['id'] === $orderId) {
+                return ['ok' => true];
+            }
+            return ['ok' => false, 'error' => 'ref_taken'];
+        }
+
+        $st = $db->prepare(
+            'SELECT id, status, payment_status FROM orders WHERE id = ? AND user_id = ? FOR UPDATE'
+        );
+        $st->execute([$orderId, $userId]);
+        $order = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_found'];
+        }
+        if ((string)$order['status'] !== 'to_pay') {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_payable'];
+        }
+        if (strtolower((string)($order['payment_status'] ?? '')) === 'paid') {
+            $db->commit();
+            return ['ok' => true];
+        }
+
+        $up = $db->prepare(
+            "UPDATE orders
+             SET payment_status = 'paid',
+                 payment_method = 'online',
+                 payment_ref = ?,
+                 paid_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND user_id = ? AND status = 'to_pay'
+               AND COALESCE(payment_status, 'unpaid') <> 'paid'"
+        );
+        $up->execute([$paymentRef, $orderId, $userId]);
+        if ($up->rowCount() < 1) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'already_paid'];
+        }
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        return ['ok' => false, 'error' => 'exception'];
+    }
+
+    inv_notify_user(
+        $db,
+        $userId,
+        "Payment successful for order #ORD-{$orderId}. Waiting for store acceptance.",
+        'order_paid',
+        'user_dashboard.php?status=to_pay'
+    );
+    inv_notify_role(
+        $db,
+        'inventory_custodian',
+        "Paid order #ORD-{$orderId} ready to Accept.",
+        'new_order',
+        'inventory_orders.php?status=to_pay'
+    );
+
+    return ['ok' => true];
+}
+
+/** Custodian accepts a paid to_pay order → to_ship (client sees To Ship + To Receive). */
+function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
+{
+    if ($orderId <= 0) {
+        return ['ok' => false, 'error' => 'invalid'];
+    }
+
+    $clientId = 0;
+    $isDelivery = false;
+    try {
+        $db->beginTransaction();
+        $st = $db->prepare(
+            'SELECT id, user_id, status, payment_status, cancel_requested, fulfillment_type
+             FROM orders WHERE id = ? FOR UPDATE'
+        );
+        $st->execute([$orderId]);
+        $order = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_found'];
+        }
+        if ((string)$order['status'] !== 'to_pay') {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_acceptable'];
+        }
+        if (!empty($order['cancel_requested'])) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'cancel_pending'];
+        }
+        if (strtolower((string)($order['payment_status'] ?? '')) !== 'paid') {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_paid'];
+        }
+
+        $up = $db->prepare(
+            "UPDATE orders SET status = 'to_ship'
+             WHERE id = ? AND status = 'to_pay' AND COALESCE(cancel_requested, FALSE) = FALSE"
+        );
+        $up->execute([$orderId]);
+        if ($up->rowCount() < 1) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_acceptable'];
+        }
+
+        $isDelivery = strtolower(trim((string)($order['fulfillment_type'] ?? ''))) === 'delivery';
+        $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
+        $chk->execute([$orderId]);
+        $ship = $chk->fetch(PDO::FETCH_ASSOC);
+        if (!$ship) {
+            if ($isDelivery) {
+                $db->prepare(
+                    "INSERT INTO shipments (order_id, shipment_status, carrier) VALUES (?, 'processing', 'LALAMOVE')"
+                )->execute([$orderId]);
+            } else {
+                $db->prepare("INSERT INTO shipments (order_id, shipment_status) VALUES (?, 'processing')")
+                    ->execute([$orderId]);
+            }
+        } else {
+            if ($isDelivery) {
+                $db->prepare(
+                    "UPDATE shipments SET shipment_status = 'processing', carrier = 'LALAMOVE' WHERE id = ?"
+                )->execute([(int)$ship['id']]);
+            } else {
+                $db->prepare("UPDATE shipments SET shipment_status = 'processing' WHERE id = ?")
+                    ->execute([(int)$ship['id']]);
+            }
+        }
+
+        $clientId = (int)$order['user_id'];
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        return ['ok' => false, 'error' => 'exception'];
+    }
+
+    if ($clientId > 0) {
+        inv_notify_user(
+            $db,
+            $clientId,
+            "Your order #ORD-{$orderId} was accepted.",
+            'order_status',
+            'user_dashboard.php?status=to_ship'
+        );
+    }
+    if ($staffUserId > 0 && function_exists('logActivity')) {
+        logActivity($db, $staffUserId, 'accept_order', "Order #$orderId accepted → to_ship");
+    }
+    return ['ok' => true];
+}
+
+/**
+ * Soft-remove an order from the client's Order Summary / History lists.
+ * Does not change order status or stock — only hides it for this client.
+ * @return array{ok:bool,error?:string}
+ */
+function ep_hide_client_order(PDO $db, int $userId, int $orderId): array
 {
     if ($userId <= 0 || $orderId <= 0) {
         return ['ok' => false, 'error' => 'invalid'];
     }
 
-    $cancellable = ['to_pay', 'to_ship', 'To Pay', 'To Ship', 'Pending', 'pending'];
+    try {
+        $st = $db->prepare(
+            'SELECT id, status FROM orders WHERE id = ? AND user_id = ? LIMIT 1'
+        );
+        $st->execute([$orderId, $userId]);
+        $order = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            return ['ok' => false, 'error' => 'not_found'];
+        }
+
+        $status = strtolower(trim((string)($order['status'] ?? '')));
+        // Active fulfillment orders stay visible so Item Received remains available.
+        if (in_array($status, ['to_ship', 'to_receive', 'to ship', 'to receive'], true)) {
+            return ['ok' => false, 'error' => 'not_removable'];
+        }
+
+        $up = $db->prepare(
+            'UPDATE orders SET client_history_hidden = TRUE
+             WHERE id = ? AND user_id = ? AND COALESCE(client_history_hidden, FALSE) = FALSE'
+        );
+        $up->execute([$orderId, $userId]);
+        return ['ok' => true];
+    } catch (Throwable $e) {
+        return ['ok' => false, 'error' => 'exception'];
+    }
+}
+
+/** Client Item Received — mark successful and deduct stock once. */
+function ep_confirm_order_received(PDO $db, int $userId, int $orderId): array
+{
+    if ($userId <= 0 || $orderId <= 0) {
+        return ['ok' => false, 'error' => 'invalid'];
+    }
 
     try {
         $db->beginTransaction();
-
-        $st = $db->prepare('SELECT id, status, total FROM orders WHERE id = ? AND user_id = ? FOR UPDATE');
+        $st = $db->prepare(
+            'SELECT id, status, payment_status, stock_deducted
+             FROM orders WHERE id = ? AND user_id = ? FOR UPDATE'
+        );
         $st->execute([$orderId, $userId]);
         $order = $st->fetch(PDO::FETCH_ASSOC);
         if (!$order) {
@@ -212,45 +446,67 @@ function ep_cancel_order(PDO $db, int $userId, int $orderId): array
         }
 
         $status = (string)($order['status'] ?? '');
-        if (strcasecmp($status, 'cancelled') === 0 || strcasecmp($status, 'Canceled') === 0) {
-            $db->rollBack();
-            return ['ok' => false, 'error' => 'already_cancelled'];
-        }
-        if (!in_array($status, $cancellable, true)) {
-            $db->rollBack();
-            return ['ok' => false, 'error' => 'not_cancellable'];
+        $alreadyDeducted = !empty($order['stock_deducted']);
+
+        if ($status === 'to_review' && $alreadyDeducted) {
+            $db->commit();
+            return ['ok' => true];
         }
 
-        $up = $db->prepare(
-            "UPDATE orders SET status = 'cancelled' WHERE id = ? AND user_id = ? AND status = ?"
-        );
-        $up->execute([$orderId, $userId, $status]);
-        if ($up->rowCount() < 1) {
+        if (!in_array($status, ['to_ship', 'to_receive'], true)) {
             $db->rollBack();
-            return ['ok' => false, 'error' => 'already_cancelled'];
+            return ['ok' => false, 'error' => 'not_receivable'];
         }
 
-        $items = $db->prepare('SELECT product_id, quantity FROM order_items WHERE order_id = ?');
-        $items->execute([$orderId]);
-        $restore = $db->prepare('UPDATE products SET stock = COALESCE(stock, 0) + ? WHERE id = ?');
-        while ($row = $items->fetch(PDO::FETCH_ASSOC)) {
-            $pid = (int)$row['product_id'];
-            $qty = (int)$row['quantity'];
-            if ($pid > 0 && $qty > 0) {
-                $before = $db->prepare('SELECT name, stock FROM products WHERE id = ?');
+        if (!$alreadyDeducted) {
+            $items = $db->prepare('SELECT product_id, quantity FROM order_items WHERE order_id = ?');
+            $items->execute([$orderId]);
+            $stockStmt = $db->prepare(
+                'UPDATE products SET stock = stock - ? WHERE id = ? AND COALESCE(stock, 0) >= ?'
+            );
+            while ($row = $items->fetch(PDO::FETCH_ASSOC)) {
+                $pid = (int)$row['product_id'];
+                $qty = (int)$row['quantity'];
+                if ($pid <= 0 || $qty < 1) {
+                    continue;
+                }
+                $before = $db->prepare('SELECT name, COALESCE(stock, 0) AS stock FROM products WHERE id = ?');
                 $before->execute([$pid]);
                 $prod = $before->fetch(PDO::FETCH_ASSOC);
-                $restore->execute([$qty, $pid]);
+                $stockStmt->execute([$qty, $pid, $qty]);
+                if ($stockStmt->rowCount() < 1) {
+                    $db->rollBack();
+                    return ['ok' => false, 'error' => 'stock'];
+                }
                 if ($prod) {
                     inv_notify_stock_change(
                         $db,
                         (string)$prod['name'],
                         $pid,
                         (int)$prod['stock'],
-                        (int)$prod['stock'] + $qty
+                        (int)$prod['stock'] - $qty
                     );
                 }
             }
+        }
+
+        $up = $db->prepare(
+            "UPDATE orders
+             SET status = 'to_review', stock_deducted = TRUE
+             WHERE id = ? AND user_id = ? AND status IN ('to_ship', 'to_receive')"
+        );
+        $up->execute([$orderId, $userId]);
+        if ($up->rowCount() < 1 && !$alreadyDeducted) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'already_received'];
+        }
+
+        $ship = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
+        $ship->execute([$orderId]);
+        $shipRow = $ship->fetch(PDO::FETCH_ASSOC);
+        if ($shipRow) {
+            $db->prepare("UPDATE shipments SET shipment_status = 'delivered' WHERE id = ?")
+                ->execute([(int)$shipRow['id']]);
         }
 
         $db->commit();
@@ -264,19 +520,204 @@ function ep_cancel_order(PDO $db, int $userId, int $orderId): array
     inv_notify_user(
         $db,
         $userId,
-        "Your order #ORD-{$orderId} was cancelled. Stock has been restored.",
-        'order_cancelled',
-        'user_dashboard.php'
+        "Order #ORD-{$orderId} completed. Thank you!",
+        'order_received',
+        'user_dashboard.php#order-history'
     );
     inv_notify_role(
         $db,
         'inventory_custodian',
-        "Order #ORD-{$orderId} was cancelled by the customer.",
-        'order_cancelled',
+        "Order #ORD-{$orderId} Item Received — stock deducted once.",
+        'order_received',
         'inventory_orders.php'
     );
 
     return ['ok' => true];
+}
+
+/** Allowed client cancellation reasons. */
+function ep_order_cancel_reasons(): array
+{
+    return [
+        'Changed my mind',
+        'Ordered by mistake',
+        'Found another product',
+        'Wrong product/order',
+        'Other',
+    ];
+}
+
+/**
+ * Client requests cancellation (To Pay). Needs Inventory Custodian Accept Cancel.
+ * Does not deduct or restore stock (stock is never deducted until Item Received).
+ * @return array{ok:bool,error?:string}
+ */
+function ep_request_order_cancel(PDO $db, int $userId, int $orderId, string $reason): array
+{
+    if ($userId <= 0 || $orderId <= 0) {
+        return ['ok' => false, 'error' => 'invalid'];
+    }
+    $reason = trim($reason);
+    $allowed = ep_order_cancel_reasons();
+    if ($reason === '' || !in_array($reason, $allowed, true)) {
+        return ['ok' => false, 'error' => 'reason'];
+    }
+
+    try {
+        $db->beginTransaction();
+        $st = $db->prepare(
+            'SELECT id, status, cancel_requested, stock_deducted
+             FROM orders WHERE id = ? AND user_id = ? FOR UPDATE'
+        );
+        $st->execute([$orderId, $userId]);
+        $order = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_found'];
+        }
+        $status = (string)($order['status'] ?? '');
+        if (strcasecmp($status, 'cancelled') === 0 || strcasecmp($status, 'Canceled') === 0) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'already_cancelled'];
+        }
+        if (!empty($order['cancel_requested'])) {
+            $db->commit();
+            return ['ok' => true];
+        }
+        if ($status !== 'to_pay') {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_cancellable'];
+        }
+        if (!empty($order['stock_deducted'])) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_cancellable'];
+        }
+
+        $up = $db->prepare(
+            "UPDATE orders
+             SET cancel_requested = TRUE,
+                 cancel_reason = ?,
+                 cancel_requested_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND user_id = ? AND status = 'to_pay'
+               AND COALESCE(cancel_requested, FALSE) = FALSE"
+        );
+        $up->execute([$reason, $orderId, $userId]);
+        if ($up->rowCount() < 1) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_cancellable'];
+        }
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        return ['ok' => false, 'error' => 'exception'];
+    }
+
+    inv_notify_user(
+        $db,
+        $userId,
+        "Cancellation requested for order #ORD-{$orderId}. Waiting for store approval.",
+        'cancel_requested',
+        'user_dashboard.php?status=to_pay'
+    );
+    inv_notify_role(
+        $db,
+        'inventory_custodian',
+        "Cancel request for order #ORD-{$orderId}. Reason: {$reason}",
+        'cancel_requested',
+        'inventory_orders.php?status=cancel_requested'
+    );
+
+    return ['ok' => true];
+}
+
+/**
+ * Custodian Accept Cancel Order — mark cancelled. No stock change.
+ * @return array{ok:bool,error?:string}
+ */
+function ep_accept_order_cancel(PDO $db, int $orderId, int $staffUserId = 0): array
+{
+    if ($orderId <= 0) {
+        return ['ok' => false, 'error' => 'invalid'];
+    }
+
+    $clientId = 0;
+    $reason = '';
+    try {
+        $db->beginTransaction();
+        $st = $db->prepare(
+            'SELECT id, user_id, status, cancel_requested, cancel_reason, stock_deducted
+             FROM orders WHERE id = ? FOR UPDATE'
+        );
+        $st->execute([$orderId]);
+        $order = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_found'];
+        }
+        if (strcasecmp((string)$order['status'], 'cancelled') === 0) {
+            $db->commit();
+            return ['ok' => true];
+        }
+        if (empty($order['cancel_requested'])) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'no_request'];
+        }
+        if (!empty($order['stock_deducted'])) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'stock_deducted'];
+        }
+
+        $reason = trim((string)($order['cancel_reason'] ?? ''));
+        $up = $db->prepare(
+            "UPDATE orders
+             SET status = 'cancelled',
+                 cancel_requested = FALSE
+             WHERE id = ? AND COALESCE(cancel_requested, FALSE) = TRUE"
+        );
+        $up->execute([$orderId]);
+        if ($up->rowCount() < 1) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_found'];
+        }
+        $clientId = (int)$order['user_id'];
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        return ['ok' => false, 'error' => 'exception'];
+    }
+
+    if ($clientId > 0) {
+        $msg = "Your order #ORD-{$orderId} was cancelled.";
+        if ($reason !== '') {
+            $msg .= " Reason: {$reason}";
+        }
+        inv_notify_user($db, $clientId, $msg, 'order_cancelled', 'user_dashboard.php');
+    }
+    if ($staffUserId > 0 && function_exists('logActivity')) {
+        logActivity(
+            $db,
+            $staffUserId,
+            'accept_order_cancel',
+            "Order #$orderId cancelled" . ($reason !== '' ? ". Reason: {$reason}" : '')
+        );
+    }
+    return ['ok' => true];
+}
+
+/**
+ * Legacy alias — request cancel without a reason is not allowed; use ep_request_order_cancel.
+ * @return array{ok:bool,error?:string}
+ */
+function ep_cancel_order(PDO $db, int $userId, int $orderId, string $reason = ''): array
+{
+    if ($reason === '') {
+        $reason = 'Changed my mind';
+    }
+    return ep_request_order_cancel($db, $userId, $orderId, $reason);
 }
 
 /** Load cart preview rows for header dropdown. */
@@ -320,6 +761,54 @@ function ep_get_cart_preview(PDO $db): array
     }
 
     return ['items' => $items, 'total' => $total, 'count' => $count];
+}
+
+/**
+ * Stage a Buy Now product for checkout without adding it to the cart.
+ * @return bool false if product invalid / unavailable
+ */
+function ep_set_buy_now(PDO $db, int $productId, int $qty = 1): bool
+{
+    if ($productId <= 0 || $qty < 1) {
+        return false;
+    }
+    $chk = $db->prepare(
+        'SELECT p.* FROM products p WHERE p.id = ? AND ' . ias_client_product_list_sql_condition('p') . ' LIMIT 1'
+    );
+    $chk->execute([$productId]);
+    $productRow = $chk->fetch(PDO::FETCH_ASSOC);
+    if (!$productRow || ias_client_product_image_url($productRow) === '') {
+        return false;
+    }
+    $stock = (int)($productRow['stock'] ?? 0);
+    if ($stock < 1) {
+        return false;
+    }
+    $qty = min($qty, $stock, 99);
+    $_SESSION['buy_now'] = [$productId => $qty];
+    return true;
+}
+
+function ep_clear_buy_now(): void
+{
+    unset($_SESSION['buy_now']);
+}
+
+/** @return array<int,int> product_id => qty */
+function ep_buy_now_map(): array
+{
+    if (empty($_SESSION['buy_now']) || !is_array($_SESSION['buy_now'])) {
+        return [];
+    }
+    $out = [];
+    foreach ($_SESSION['buy_now'] as $pid => $qty) {
+        $pid = (int)$pid;
+        $qty = (int)$qty;
+        if ($pid > 0 && $qty > 0) {
+            $out[$pid] = $qty;
+        }
+    }
+    return $out;
 }
 
 /** Add a product to session (and DB cart when logged in). Returns false if invalid. */

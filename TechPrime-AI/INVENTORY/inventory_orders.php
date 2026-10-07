@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 require_once __DIR__ . '/../includes/inventory_alerts.php';
+require_once __DIR__ . '/../includes/client_helpers.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -16,7 +17,52 @@ $orderStatusOptions = [
     'to_receive' => 'With Courier',
     'to_review' => 'Completed',
 ];
-$orderStatusFilters = $orderStatusOptions + ['cancelled' => 'Cancelled'];
+$orderStatusFilters = $orderStatusOptions + [
+    'cancelled' => 'Cancelled',
+    'cancel_requested' => 'Cancel Requests',
+];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'accept_order') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $oid = (int)($_POST['order_id'] ?? 0);
+    $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
+    $returnStatus = trim((string)($_POST['return_status'] ?? ''));
+    $result = ep_accept_order($db, $oid, $uid);
+    $params = [
+        'page' => $returnPage,
+        'alert' => !empty($result['ok']) ? 'accepted' : 'error',
+    ];
+    if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
+        $params['status'] = $returnStatus;
+    } elseif (!empty($result['ok'])) {
+        $params['status'] = 'to_ship';
+    }
+    header('Location: inventory_orders.php?' . http_build_query($params));
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'accept_cancel') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $oid = (int)($_POST['order_id'] ?? 0);
+    $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
+    $returnStatus = trim((string)($_POST['return_status'] ?? ''));
+    $result = ep_accept_order_cancel($db, $oid, $uid);
+    $params = [
+        'page' => $returnPage,
+        'alert' => !empty($result['ok']) ? 'cancel_accepted' : 'error',
+    ];
+    if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
+        $params['status'] = $returnStatus;
+    } elseif (!empty($result['ok'])) {
+        $params['status'] = 'cancelled';
+    }
+    header('Location: inventory_orders.php?' . http_build_query($params));
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_status') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
@@ -62,14 +108,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
             inv_notify_user(
                 $db,
                 $orderUserId,
-                "Your order #ORD-{$oid} status is now: {$label}.",
+                "Order #ORD-{$oid}: {$label}.",
                 'order_status',
                 'user_dashboard.php'
             );
         }
 
         logActivity($db, $uid, 'update_order_status', "Order #$oid -> $status");
-        $redirectParams = ['alert' => 'updated', 'page' => $returnPage];
+        $redirectParams = ['alert' => 'order_updated', 'page' => $returnPage];
         if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
             $redirectParams['status'] = $returnStatus;
         }
@@ -81,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
 }
 
 $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.customer_phone,
+               o.payment_status, o.payment_method, o.cancel_requested, o.cancel_reason,
                u.name, u.surname, u.email, u.address AS user_address,
                (SELECT STRING_AGG(pr.name || ' x' || oi.quantity::text, ', ')
                 FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
@@ -88,7 +135,9 @@ $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.cust
                (SELECT shipment_status FROM shipments WHERE order_id = o.id ORDER BY id DESC LIMIT 1) AS shipment_status
         FROM orders o
         INNER JOIN users u ON u.id = o.user_id
-        ORDER BY o.id DESC";
+        ORDER BY
+            CASE WHEN COALESCE(o.cancel_requested, FALSE) = TRUE AND o.status <> 'cancelled' THEN 0 ELSE 1 END,
+            o.id DESC";
 $allRows = $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
 $selectedStatus = trim((string)($_GET['status'] ?? ''));
@@ -97,7 +146,11 @@ if ($selectedStatus !== '' && !isset($orderStatusFilters[$selectedStatus])) {
 }
 
 $filteredRows = $allRows;
-if ($selectedStatus !== '') {
+if ($selectedStatus === 'cancel_requested') {
+    $filteredRows = array_values(array_filter($allRows, static function ($row) {
+        return !empty($row['cancel_requested']) && ($row['status'] ?? '') !== 'cancelled';
+    }));
+} elseif ($selectedStatus !== '') {
     $filteredRows = array_values(array_filter($allRows, static function ($row) use ($selectedStatus) {
         return ($row['status'] ?? '') === $selectedStatus;
     }));
@@ -348,8 +401,15 @@ EXTRA
                             </thead>
                             <tbody>
                                 <?php foreach ($pagedRows as $r):
-                                    $ost = $r['status'] ?? '';
+                                    $ost = (string)($r['status'] ?? '');
+                                    $payStatus = strtolower((string)($r['payment_status'] ?? 'unpaid'));
+                                    $isPaid = ($payStatus === 'paid');
+                                    $cancelRequested = !empty($r['cancel_requested']) && $ost !== 'cancelled';
+                                    $canAcceptCancel = $cancelRequested;
+                                    $canAccept = ($ost === 'to_pay' && $isPaid && !$cancelRequested);
+                                    $awaitingPayment = ($ost === 'to_pay' && !$isPaid && !$cancelRequested);
                                     $addr = $r['shipping_address'] ?: ($r['user_address'] ?? '');
+                                    $cancelReason = trim((string)($r['cancel_reason'] ?? ''));
                                 ?>
                                 <tr>
                                     <td><strong>#<?php echo (int)$r['id']; ?></strong></td>
@@ -358,6 +418,9 @@ EXTRA
                                         <div class="text-muted text-small"><?php echo h($r['email']); ?></div>
                                         <div class="text-muted text-small"><?php echo h($r['customer_phone'] ?? ''); ?></div>
                                         <div class="text-small"><?php echo h($addr); ?></div>
+                                        <?php if ($cancelRequested && $cancelReason !== ''): ?>
+                                            <div class="text-muted text-small" style="margin-top:4px;"><strong>Cancel reason:</strong> <?php echo h($cancelReason); ?></div>
+                                        <?php endif; ?>
                                     </td>
                                     <td><small><?php echo h($r['products'] ?? ''); ?></small></td>
                                     <td class="price-tag">₱<?php echo number_format((float)$r['total'], 2); ?></td>
@@ -365,6 +428,31 @@ EXTRA
                                     <td>
                                         <div class="action-row">
                                             <a href="inventory_details.php?id=<?php echo (int)$r['id']; ?>" class="btn btn-outline btn-sm">View</a>
+                                            <?php if ($canAcceptCancel): ?>
+                                                <form method="post" style="display:inline;margin:0;"
+                                                      data-confirm="Accept this cancellation?"
+                                                      data-confirm-title="Accept cancel?"
+                                                      data-confirm-ok="Accept Cancel"
+                                                      data-confirm-type="danger">
+                                                    <input type="hidden" name="action" value="accept_cancel">
+                                                    <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                                    <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
+                                                    <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
+                                                    <button type="submit" class="btn btn-primary btn-sm">Accept Cancel Order</button>
+                                                </form>
+                                            <?php elseif ($awaitingPayment): ?>
+                                                <span class="text-muted text-small" style="font-weight:700;">Awaiting Payment</span>
+                                            <?php elseif ($canAccept): ?>
+                                                <form method="post" style="display:inline;margin:0;">
+                                                    <input type="hidden" name="action" value="accept_order">
+                                                    <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                                    <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
+                                                    <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
+                                                    <button type="submit" class="btn btn-primary btn-sm">Accept</button>
+                                                </form>
+                                            <?php else: ?>
                                             <form method="post" style="display:flex;gap:6px;margin:0;align-items:center;flex-wrap:wrap;">
                                                 <input type="hidden" name="action" value="update_status">
                                                 <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
@@ -386,6 +474,7 @@ EXTRA
                                                 </select>
                                                 <button type="submit" class="btn btn-primary btn-sm">Update</button>
                                             </form>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>

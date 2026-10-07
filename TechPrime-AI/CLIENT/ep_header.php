@@ -62,14 +62,14 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         /* Apply the saved theme before the stylesheets load so dark mode never flashes white. */
         try { if (localStorage.getItem('ep_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
     </script>
-    <link rel="stylesheet" href="styles.css?v=orders-1">
+    <link rel="stylesheet" href="styles.css?v=click-panels-1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if (!empty($extraHead)) echo $extraHead; ?>
     <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
-    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-6">
+    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-9">
     <link rel="stylesheet" href="ep_dark.css?v=dark-3">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
@@ -139,11 +139,11 @@ $epPrimaryLinks = [
 
     <?php /* Icon buttons; their labels are visually hidden but stay readable by screen readers. */ ?>
     <div class="ep-nav-actions">
-        <?php /* Click → notifications page. Hover (mouse) or keyboard focus → latest-notifications preview. */ ?>
+        <?php /* Bell opens the preview on click only. Full page via "Show all notifications". */ ?>
         <div class="ep-notif-wrap" id="epNotifWrap">
-            <a href="<?php echo !empty($isLoggedIn) ? 'notifications.php' : '../login.php'; ?>" id="notifBtn"
+            <button type="button" id="notifBtn"
                class="ep-nav-item ep-notif-trigger<?php echo $epActive === 'notifications' ? ' active' : ''; ?>"
-               <?php echo $epActive === 'notifications' ? 'aria-current="page"' : ''; ?>>
+               aria-expanded="false" aria-controls="epNotifPanel" aria-haspopup="true">
                 <span class="ep-nav-item-icon">
                     <i class="<?php echo $epNotifUnread > 0 ? 'fas' : 'far'; ?> fa-bell" aria-hidden="true"></i>
                     <?php if ($epNotifUnread > 0): ?>
@@ -151,7 +151,7 @@ $epPrimaryLinks = [
                     <?php endif; ?>
                 </span>
                 <span class="ep-nav-item-label">Notifications</span>
-            </a>
+            </button>
             <div id="epNotifPanel" class="ep-notif-dropdown" role="region" aria-label="Latest notifications">
                 <div class="ep-notif-dd-head">
                     <div class="ep-notif-dd-title">
@@ -177,22 +177,25 @@ $epPrimaryLinks = [
                         <strong>You're all caught up</strong>
                         <span>Order and payment updates will show up here.</span>
                     </div>
+                    <a href="notifications.php" class="ep-notif-dd-foot">
+                        Show all notifications <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                    </a>
                 <?php else: ?>
                     <ul class="ep-notif-list" id="epNotifList">
                         <?php foreach ($epNotifItems as $n) echo ep_notif_render_item($n, 'dropdown'); ?>
                     </ul>
                     <a href="notifications.php" class="ep-notif-dd-foot">
-                        View all notifications <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                        Show all notifications <i class="fas fa-arrow-right" aria-hidden="true"></i>
                     </a>
                 <?php endif; ?>
             </div>
         </div>
 
-        <?php /* Click → cart page. Hover (mouse) or keyboard focus → preview, rendered by epUpdateCartPreview(). */ ?>
+        <?php /* Bag opens the cart preview on click only. Full page via "View Cart". */ ?>
         <div class="ep-cart-wrap" id="epCartWrap">
-            <a href="cart.php" id="cartBtn"
+            <button type="button" id="cartBtn"
                class="ep-nav-item ep-cart-trigger<?php echo $epActive === 'cart' ? ' active' : ''; ?>"
-               <?php echo $epActive === 'cart' ? 'aria-current="page"' : ''; ?>>
+               aria-expanded="false" aria-controls="epCartDropdown" aria-haspopup="true">
                 <span class="ep-nav-item-icon">
                     <i class="fas fa-shopping-bag" aria-hidden="true"></i>
                     <?php if ($epCartCount > 0): ?>
@@ -200,7 +203,7 @@ $epPrimaryLinks = [
                     <?php endif; ?>
                 </span>
                 <span class="ep-nav-item-label">Cart</span>
-            </a>
+            </button>
             <div id="epCartDropdown" class="ep-cart-dropdown" role="region" aria-label="Cart preview"></div>
         </div>
 
@@ -219,9 +222,11 @@ $epPrimaryLinks = [
         <?php if (!empty($isLoggedIn)): ?>
             <a href="user_dashboard.php" id="profileBtn"
                class="ep-account<?php echo $epActive === 'account' ? ' active' : ''; ?>"
-               title="My profile" <?php echo $epActive === 'account' ? 'aria-current="page"' : ''; ?>>
+               title="My profile"
+               aria-label="My profile: <?php echo h($epFirstName); ?>"
+               <?php echo $epActive === 'account' ? 'aria-current="page"' : ''; ?>>
                 <span class="ep-account-avatar" aria-hidden="true"><?php if ($epAvatarUrl !== ''): ?><img src="<?php echo h($epAvatarUrl); ?>" alt=""><?php else: echo h($epInitial); endif; ?></span>
-                <span class="ep-account-name"><span class="sr-only">My profile: </span><?php echo h($epFirstName); ?></span>
+                <span class="ep-account-name"><?php echo h($epFirstName); ?></span>
             </a>
         <?php else: ?>
             <a href="../login.php" id="profileBtn" class="ep-account is-guest">
@@ -421,25 +426,53 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
         else if (typeof drawerMq.addListener === 'function') drawerMq.addListener(onDrawerBreakpoint);
     }
 
-    /* Cart and Notifications: the icon is a plain link to its page. The preview opens on
-       mouse hover or keyboard focus (CSS). Escape hides it until the pointer/focus leaves. */
-    function epHoverPreview(wrap, trigger) {
-        if (!wrap || !trigger) return;
+    /* Notifications + Cart: open on click only (no hover). Outside click / Escape closes.
+       Full pages are reached via "Show all notifications" / "View Cart" inside the panels. */
+    (function () {
+        var panels = [
+            { wrap: document.getElementById('epNotifWrap'), trigger: document.getElementById('notifBtn') },
+            { wrap: document.getElementById('epCartWrap'), trigger: document.getElementById('cartBtn') }
+        ].filter(function (p) { return p.wrap && p.trigger; });
+
+        function setOpen(panel, open) {
+            panel.wrap.classList.toggle('is-open', open);
+            panel.trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+
+        function closeAll(except) {
+            panels.forEach(function (p) {
+                if (except && p.wrap === except) return;
+                setOpen(p, false);
+            });
+        }
+
+        panels.forEach(function (panel) {
+            panel.trigger.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var willOpen = !panel.wrap.classList.contains('is-open');
+                closeAll(panel.wrap);
+                setOpen(panel, willOpen);
+            });
+        });
+
+        document.addEventListener('click', function (e) {
+            panels.forEach(function (panel) {
+                if (!panel.wrap.classList.contains('is-open')) return;
+                if (panel.wrap.contains(e.target)) return;
+                setOpen(panel, false);
+            });
+        });
+
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
-            var focusedInside = wrap.contains(document.activeElement);
-            if (!focusedInside && !wrap.matches(':hover')) return;
-            wrap.classList.add('is-dismissed');
-            if (focusedInside) trigger.focus();
+            panels.forEach(function (panel) {
+                if (!panel.wrap.classList.contains('is-open')) return;
+                setOpen(panel, false);
+                panel.trigger.focus();
+            });
         });
-        wrap.addEventListener('mouseenter', function () { wrap.classList.remove('is-dismissed'); });
-        wrap.addEventListener('mouseleave', function () { wrap.classList.remove('is-dismissed'); });
-        wrap.addEventListener('focusout', function (e) {
-            if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('is-dismissed');
-        });
-    }
-    epHoverPreview(document.getElementById('epCartWrap'), document.getElementById('cartBtn'));
-    epHoverPreview(document.getElementById('epNotifWrap'), document.getElementById('notifBtn'));
+    })();
 
     /* Update header Cart badge + dropdown from cart preview JSON (no page reload). */
     window.epUpdateCartPreview = function (preview) {
@@ -515,6 +548,7 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
                 '<strong>Your cart is empty</strong>' +
                 '<span>Browse our products and add something you like.</span>' +
                 '<a href="shop.php" class="ep-cart-dd-btn is-primary">Start Shopping</a>' +
+                '<a href="cart.php" class="ep-cart-dd-btn">View Cart</a>' +
                 '</div>';
         }
         dropdown.innerHTML = html;
@@ -761,12 +795,11 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
             item.remove();
             if (!list || list.querySelector('.ep-notif-item')) return;
             if (list.id === 'epNotifList') {
-                var foot = document.querySelector('.ep-notif-dd-foot');
-                if (foot) foot.remove();
                 list.outerHTML = '<div class="ep-notif-empty">' +
                     '<span class="ep-notif-empty-icon"><i class="far fa-bell" aria-hidden="true"></i></span>' +
                     '<strong>You&rsquo;re all caught up</strong>' +
                     '<span>Order and payment updates will show up here.</span></div>';
+                /* Keep the existing "Show all notifications" footer link. */
             } else {
                 document.dispatchEvent(new CustomEvent('ep:notif-list-empty', { detail: { list: list } }));
             }

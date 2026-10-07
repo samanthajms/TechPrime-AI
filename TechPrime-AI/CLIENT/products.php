@@ -26,6 +26,17 @@ if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
     }
 
     $quantity = max(1, min(99, (int)($_POST['quantity'] ?? 1)));
+
+    // Buy Now: stage for checkout only — do NOT add to cart.
+    if (isset($_POST['buy_now'])) {
+        if (!ep_set_buy_now($db, $product_id, $quantity)) {
+            header('Location: products.php?alert=error');
+            exit;
+        }
+        header('Location: checkout.php');
+        exit;
+    }
+
     $added = ep_add_product_to_cart($db, $product_id, $quantity);
     if (isset($_POST['ajax']) && (string)$_POST['ajax'] === '1') {
         header('Content-Type: application/json; charset=utf-8');
@@ -38,11 +49,6 @@ if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
 
     if (!$added) {
         header('Location: products.php?alert=error');
-        exit;
-    }
-
-    if (isset($_POST['buy_now'])) {
-        header('Location: checkout.php');
         exit;
     }
 

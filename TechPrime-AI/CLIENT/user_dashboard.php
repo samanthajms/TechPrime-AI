@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/client_helpers.php';
+require_once __DIR__ . '/../includes/client_order_ui.php';
 require_once __DIR__ . '/../includes/inventory_alerts.php';
 require_once __DIR__ . '/../includes/address_helpers.php';
 
@@ -142,20 +143,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     }
 }
 
-/* ---- Cancel order ---- */
+/* ---- Cancel order request (To Pay → Custodian Accept Cancel) ---- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'cancel_order') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
         die('Invalid CSRF token.');
     }
     $oid = (int)($_POST['order_id'] ?? 0);
-    $result = ep_cancel_order($db, $user_id, $oid);
-    $redir = 'user_dashboard.php?';
+    $reason = trim((string)($_POST['cancel_reason'] ?? ''));
+    $result = ep_request_order_cancel($db, $user_id, $oid, $reason);
+    $redir = 'user_dashboard.php?status=to_pay&';
     if (!empty($result['ok'])) {
-        $redir .= 'alert=cancelled';
+        $redir .= 'alert=cancel_requested';
     } elseif (($result['error'] ?? '') === 'already_cancelled') {
         $redir .= 'alert=already_cancelled';
     } elseif (($result['error'] ?? '') === 'not_cancellable') {
         $redir .= 'alert=not_cancellable';
+    } elseif (($result['error'] ?? '') === 'reason') {
+        $redir .= 'alert=cancel_reason';
+    } else {
+        $redir .= 'alert=error';
+    }
+    header('Location: ' . $redir);
+    exit;
+}
+
+/* ---- Item Received (To Receive) → moves to Order History ---- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'receive_order') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $oid = (int)($_POST['order_id'] ?? 0);
+    $result = ep_confirm_order_received($db, $user_id, $oid);
+    $redir = 'user_dashboard.php?';
+    if (!empty($result['ok'])) {
+        $redir .= 'alert=received#order-history';
+    } elseif (($result['error'] ?? '') === 'stock') {
+        $redir .= 'status=to_receive&alert=receive_stock';
+    } elseif (($result['error'] ?? '') === 'not_receivable') {
+        $redir .= 'status=to_receive&alert=not_receivable';
+    } else {
+        $redir .= 'status=to_receive&alert=error';
+    }
+    header('Location: ' . $redir);
+    exit;
+}
+
+/* ---- Remove order from client Order Summary / History lists ---- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'hide_order') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $oid = (int)($_POST['order_id'] ?? 0);
+    $from = strtolower(trim((string)($_POST['from'] ?? 'summary')));
+    $result = ep_hide_client_order($db, $user_id, $oid);
+    $redir = 'user_dashboard.php?';
+    if ($from === 'history') {
+        $redir .= 'alert=' . (!empty($result['ok']) ? 'order_removed' : 'error') . '#order-history';
+    } elseif (!empty($result['ok'])) {
+        $redir .= 'alert=order_removed';
+    } elseif (($result['error'] ?? '') === 'not_removable') {
+        $redir .= 'status=to_receive&alert=not_removable';
     } else {
         $redir .= 'alert=error';
     }
@@ -226,10 +273,8 @@ $orderStatusTone = static function (string $label): string {
     return 'is-progress';
 };
 
-/** One-line progress note shown at the bottom of an order card: [icon, text]. */
+/** One-line progress note shown at the bottom of an order card: [icon, text]. Delivery is always Lalamove. */
 $orderStatusNote = static function (string $label, string $carrier, bool $isPickup): array {
-    $carriers = ['JNT' => 'J&T Express', 'NINJAVAN' => 'Ninja Van', 'LBC' => 'LBC', 'GRAB' => 'Grab', 'LALAMOVE' => 'Lalamove'];
-    $carrierName = $carriers[strtoupper($carrier)] ?? $carrier;
     switch (strtolower($label)) {
         case 'cancelled':
             return ['fa-times-circle', 'This order was cancelled'];
@@ -237,25 +282,58 @@ $orderStatusNote = static function (string $label, string $carrier, bool $isPick
             return ['fa-wallet', 'Waiting for payment'];
         case 'delivered':
         case 'completed':
+        case 'to review':
             if ($isPickup) {
                 return ['fa-check-circle', 'Picked up at the store'];
             }
-            return ['fa-check-circle', $carrierName !== '' ? 'Delivered by ' . $carrierName : 'Order completed'];
+            return ['fa-check-circle', 'Delivered by Lalamove'];
         case 'with courier':
         case 'shipped':
         case 'out for delivery':
+        case 'to receive':
             if ($isPickup) {
                 return ['fa-store', 'Ready for pickup at the store'];
             }
-            return ['fa-truck', $carrierName !== '' ? 'On the way with ' . $carrierName : 'On the way to you'];
+            return ['fa-truck', 'On the way with Lalamove'];
+        case 'to ship':
+            if ($isPickup) {
+                return ['fa-box', 'EasyPC is preparing your order for pickup'];
+            }
+            return ['fa-truck', 'Preparing for Lalamove delivery'];
         default:
-            return ['fa-box', $isPickup ? 'EasyPC is preparing your order for pickup' : 'EasyPC is preparing your order'];
+            return ['fa-box', $isPickup ? 'EasyPC is preparing your order for pickup' : 'EasyPC is preparing your Lalamove delivery'];
     }
+};
+
+/** Compact page range for order table pagination. */
+$epOrderPageRange = static function (int $current, int $total): array {
+    if ($total <= 7) {
+        return range(1, max(1, $total));
+    }
+    $pages = [1];
+    $start = max(2, $current - 1);
+    $end = min($total - 1, $current + 1);
+    if ($start > 2) {
+        $pages[] = '...';
+    }
+    for ($i = $start; $i <= $end; $i++) {
+        $pages[] = $i;
+    }
+    if ($end < $total - 1) {
+        $pages[] = '...';
+    }
+    $pages[] = $total;
+    return $pages;
 };
 
 /** Labels for the optional payment / fulfillment columns (empty when not recorded). */
 $paymentLabel = static function (array $o): string {
-    $methods = ['cod' => 'Cash on delivery', 'paymongo' => 'Online payment', 'gcash' => 'GCash', 'card' => 'Card'];
+    $methods = [
+        'cod' => 'Cash on delivery',
+        'online' => 'Online payment',
+        'gcash' => 'GCash',
+        'card' => 'Card',
+    ];
     $m = strtolower(trim((string)($o['payment_method'] ?? '')));
     $label = $m === '' ? '' : ($methods[$m] ?? ucfirst($m));
     $st = strtolower(trim((string)($o['payment_status'] ?? '')));
@@ -269,7 +347,8 @@ $orderItemsShown = 3;   // more items collapse behind "Show N more"
 
 $search_query = trim($_GET['q'] ?? '');
 $current_filter = ias_normalize_order_status_filter($_GET['status'] ?? 'All');
-$allowed_filters = ['All', 'to_pay', 'to_ship', 'to_receive', 'to_review'];
+// Order Summary tabs only — completed (to_review) and cancelled live in Order History.
+$allowed_filters = ['All', 'to_pay', 'to_ship', 'to_receive'];
 if (!in_array($current_filter, $allowed_filters, true)) {
     $current_filter = 'All';
 }
@@ -281,22 +360,22 @@ $legacyStatus = [
     'to_review' => 'To Review',
 ];
 
-$sql = "SELECT o.*,
+$perPage = 5;
+$summaryPage = max(1, (int)($_GET['spage'] ?? 1));
+$historyPage = max(1, (int)($_GET['hpage'] ?? 1));
+
+$orderSelect = "SELECT o.*,
                (SELECT s.shipment_status FROM shipments s WHERE s.order_id = o.id ORDER BY s.id DESC LIMIT 1) AS shipment_status,
                (SELECT s.carrier FROM shipments s WHERE s.order_id = o.id ORDER BY s.id DESC LIMIT 1) AS carrier
         FROM orders o
-        WHERE o.user_id = ?";
-$params = [$user_id];
+        WHERE o.user_id = ?
+          AND COALESCE(o.client_history_hidden, FALSE) = FALSE";
 
-if ($current_filter !== 'All') {
-    $sql .= ' AND (o.status = ? OR o.status = ?)';
-    $params[] = $current_filter;
-    $params[] = $legacyStatus[$current_filter] ?? $current_filter;
-}
-
+$searchSql = '';
+$searchParams = [];
 if ($search_query !== '') {
     $like = '%' . $search_query . '%';
-    $sql .= " AND (
+    $searchSql = " AND (
         CAST(o.id AS TEXT) LIKE ?
         OR CAST(o.total AS TEXT) LIKE ?
         OR o.status LIKE ?
@@ -304,18 +383,60 @@ if ($search_query !== '') {
         OR o.customer_phone LIKE ?
         OR to_char(o.created_at, 'Month DD, YYYY') LIKE ?
     )";
-    array_push($params, $like, $like, $like, $like, $like, $like);
+    $searchParams = [$like, $like, $like, $like, $like, $like];
 }
 
-$sql .= ' ORDER BY o.id DESC';
-$stOrders = $db->prepare($sql);
-$stOrders->execute($params);
+// ---- Order Summary (active only) ----
+$summaryWhere = " AND LOWER(TRIM(o.status)) IN ('to_pay', 'to_ship', 'to_receive', 'to pay', 'to ship', 'to receive')";
+$summaryParams = [$user_id];
+if ($current_filter === 'to_ship' || $current_filter === 'to_receive') {
+    $summaryWhere .= " AND LOWER(TRIM(o.status)) IN ('to_ship', 'to_receive', 'to ship', 'to receive')";
+} elseif ($current_filter === 'to_pay') {
+    $summaryWhere .= ' AND (o.status = ? OR o.status = ?)';
+    $summaryParams[] = 'to_pay';
+    $summaryParams[] = 'To Pay';
+}
+$summaryWhere .= $searchSql;
+$summaryParams = array_merge($summaryParams, $searchParams);
+
+$stSumCount = $db->prepare('SELECT COUNT(*) FROM orders o WHERE o.user_id = ? AND COALESCE(o.client_history_hidden, FALSE) = FALSE' . $summaryWhere);
+$stSumCount->execute($summaryParams);
+$summaryTotal = (int)$stSumCount->fetchColumn();
+$summaryPages = max(1, (int)ceil($summaryTotal / $perPage));
+if ($summaryPage > $summaryPages) {
+    $summaryPage = $summaryPages;
+}
+$summaryOffset = ($summaryPage - 1) * $perPage;
+
+$stOrders = $db->prepare($orderSelect . $summaryWhere . ' ORDER BY o.id DESC LIMIT ' . (int)$perPage . ' OFFSET ' . (int)$summaryOffset);
+$stOrders->execute($summaryParams);
 $orders = $stOrders->fetchAll(PDO::FETCH_ASSOC);
 
-// Items of the listed orders, in one query (product may since have been removed: LEFT JOIN).
+// ---- Order History (received / cancelled) ----
+$historyWhere = " AND (
+    LOWER(TRIM(o.status)) IN ('to_review', 'to review', 'cancelled', 'canceled')
+)";
+$historyWhere .= $searchSql;
+$historyParams = array_merge([$user_id], $searchParams);
+
+$stHistCount = $db->prepare('SELECT COUNT(*) FROM orders o WHERE o.user_id = ? AND COALESCE(o.client_history_hidden, FALSE) = FALSE' . $historyWhere);
+$stHistCount->execute($historyParams);
+$historyTotal = (int)$stHistCount->fetchColumn();
+$historyPages = max(1, (int)ceil($historyTotal / $perPage));
+if ($historyPage > $historyPages) {
+    $historyPage = $historyPages;
+}
+$historyOffset = ($historyPage - 1) * $perPage;
+
+$stHistory = $db->prepare($orderSelect . $historyWhere . ' ORDER BY o.id DESC LIMIT ' . (int)$perPage . ' OFFSET ' . (int)$historyOffset);
+$stHistory->execute($historyParams);
+$historyOrders = $stHistory->fetchAll(PDO::FETCH_ASSOC);
+
+// Items for both lists in one query.
 $orderItems = [];
-if ($orders) {
-    $orderIds = array_map(static fn($o) => (int)$o['id'], $orders);
+$allListed = array_merge($orders, $historyOrders);
+if ($allListed) {
+    $orderIds = array_values(array_unique(array_map(static fn($o) => (int)$o['id'], $allListed)));
     $stItems = $db->prepare(
         'SELECT oi.order_id, oi.product_id, oi.quantity, oi.price, p.name, p.image
          FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
@@ -328,14 +449,22 @@ if ($orders) {
     }
 }
 
-// Order count per status tab (legacy labels like "To Pay" count toward their tab).
+// Summary tab counts (active, not hidden).
 $statusCounts = array_fill_keys($allowed_filters, 0);
-$stCounts = $db->prepare('SELECT status, COUNT(*) AS n FROM orders WHERE user_id = ? GROUP BY status');
+$stCounts = $db->prepare(
+    "SELECT status, COUNT(*) AS n FROM orders
+     WHERE user_id = ? AND COALESCE(client_history_hidden, FALSE) = FALSE
+       AND LOWER(TRIM(status)) IN ('to_pay', 'to_ship', 'to_receive', 'to pay', 'to ship', 'to receive')
+     GROUP BY status"
+);
 $stCounts->execute([$user_id]);
 foreach ($stCounts->fetchAll(PDO::FETCH_ASSOC) as $cRow) {
     $statusCounts['All'] += (int)$cRow['n'];
     $cKey = ias_normalize_order_status_filter((string)$cRow['status']);
-    if ($cKey !== 'All' && isset($statusCounts[$cKey])) {
+    if ($cKey === 'to_ship' || $cKey === 'to_receive') {
+        $statusCounts['to_ship'] += (int)$cRow['n'];
+        $statusCounts['to_receive'] += (int)$cRow['n'];
+    } elseif ($cKey !== 'All' && isset($statusCounts[$cKey])) {
         $statusCounts[$cKey] += (int)$cRow['n'];
     }
 }
@@ -359,8 +488,6 @@ $recentProducts = ias_client_filter_products_for_display(
     4
 );
 
-$cancellableStatuses = ['to_pay', 'to_ship', 'To Pay', 'To Ship', 'Pending', 'pending'];
-
 $isLoggedIn = true;
 $activePage = 'account';
 $bodyClass = 'pf-body';
@@ -368,24 +495,62 @@ $pageTitle = 'My Account';
 $searchQuery = '';
 
 $statusTitles = [
-    'All' => 'Transaction History',
+    'All' => 'Order Summary',
     'to_pay' => 'To Pay',
     'to_ship' => 'To Ship',
     'to_receive' => 'To Receive',
-    'to_review' => 'To Review',
 ];
 
+$paidOrderId = (int)($_GET['order_id'] ?? 0);
+$showPaidSuccess = isset($_GET['alert']) && (string)$_GET['alert'] === 'paid';
+
 $alertMsg = '';
-if (!empty($_GET['alert'])) {
+if (!empty($_GET['alert']) && !$showPaidSuccess) {
     $alertMap = [
-        'cancelled' => 'Order cancelled. Stock has been restored.',
+        'cancelled' => 'Order cancelled successfully.',
+        'cancel_requested' => 'Cancellation requested.',
+        'cancel_reason' => 'Please choose a cancellation reason.',
         'already_cancelled' => 'This order was already cancelled.',
         'not_cancellable' => 'This order can no longer be cancelled.',
+        'already_paid' => 'This order was already paid.',
+        'received' => 'Item received successfully.',
+        'receive_stock' => 'Could not confirm receipt — stock is insufficient.',
+        'not_receivable' => 'This order cannot be marked as received.',
+        'order_removed' => 'Order removed successfully.',
+        'not_removable' => 'This order cannot be removed yet.',
         'error' => 'Could not complete the action. Please try again.',
         'profile_saved' => 'Profile settings saved.',
     ];
     $alertMsg = $alertMap[$_GET['alert']] ?? '';
 }
+$cancelReasons = ep_order_cancel_reasons();
+
+/** Build pagination query string preserving filter/search and the other table's page. */
+$epOrdersUrl = static function (array $overrides = []) use ($current_filter, $search_query, $summaryPage, $historyPage): string {
+    $q = [
+        'status' => $current_filter,
+        'q' => $search_query,
+        'spage' => $summaryPage,
+        'hpage' => $historyPage,
+    ];
+    foreach ($overrides as $k => $v) {
+        $q[$k] = $v;
+    }
+    if (($q['status'] ?? 'All') === 'All') {
+        unset($q['status']);
+    }
+    if (($q['q'] ?? '') === '') {
+        unset($q['q']);
+    }
+    if ((int)($q['spage'] ?? 1) <= 1) {
+        unset($q['spage']);
+    }
+    if ((int)($q['hpage'] ?? 1) <= 1) {
+        unset($q['hpage']);
+    }
+    $qs = http_build_query($q);
+    return 'user_dashboard.php' . ($qs !== '' ? '?' . $qs : '');
+};
 
 $showSettings = isset($_GET['settings'])
     || (isset($_POST['keep_settings']) && (string)$_POST['keep_settings'] === '1')
@@ -517,13 +682,36 @@ if ($showSettings) {
         </section>
         <?php else: ?>
 
+        <?php if ($showPaidSuccess): ?>
+            <div class="ep-pay-success-backdrop" id="epPaySuccessBackdrop" aria-hidden="false"></div>
+            <div class="ep-pay-success" id="epPaySuccess" role="alertdialog" aria-modal="true" aria-labelledby="epPaySuccessTitle">
+                <button type="button" class="ep-pay-success-close" id="epPaySuccessClose" aria-label="Close">&times;</button>
+                <div class="ep-pay-success-badge" aria-hidden="true"><i class="fas fa-wallet"></i></div>
+                <h3 class="ep-pay-success-title" id="epPaySuccessTitle">Payment successful</h3>
+                <p class="ep-pay-success-msg">
+                    <?php if ($paidOrderId > 0): ?>
+                        Payment for order <strong>#ORD-<?php echo (int)$paidOrderId; ?></strong> was successful.
+                    <?php else: ?>
+                        Your payment was successful.
+                    <?php endif; ?>
+                </p>
+                <div class="ep-pay-success-actions">
+                    <button type="button" class="ep-btn ep-btn-primary" id="epPaySuccessOk">Got it</button>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <div class="pf-layout">
-            <section class="pf-card pf-orders" aria-labelledby="pfOrdersTitle">
+            <div class="pf-orders-col">
+            <section class="pf-card pf-orders" id="order-summary" aria-labelledby="pfOrdersTitle">
                 <div class="pf-card-head">
-                    <h2 class="pf-card-title" id="pfOrdersTitle">My orders</h2>
+                    <h2 class="pf-card-title" id="pfOrdersTitle">Order Summary</h2>
                     <form action="user_dashboard.php" method="GET" class="pf-order-search" role="search">
                         <?php if ($current_filter !== 'All'): ?>
                             <input type="hidden" name="status" value="<?php echo h($current_filter); ?>">
+                        <?php endif; ?>
+                        <?php if ($historyPage > 1): ?>
+                            <input type="hidden" name="hpage" value="<?php echo (int)$historyPage; ?>">
                         <?php endif; ?>
                         <i class="fas fa-search" aria-hidden="true"></i>
                         <input type="text" name="q" placeholder="Search by order number or date"
@@ -537,12 +725,20 @@ if ($showSettings) {
                     'to_pay' => 'To pay',
                     'to_ship' => 'To ship',
                     'to_receive' => 'To receive',
-                    'to_review' => 'To review',
+                ];
+                $cardCtx = [
+                    'current_filter' => $current_filter,
+                    'orderItemsShown' => $orderItemsShown,
+                    'cancelReasons' => $cancelReasons,
+                    'orderStatusTone' => $orderStatusTone,
+                    'orderStatusNote' => $orderStatusNote,
+                    'paymentLabel' => $paymentLabel,
+                    'fulfillmentLabels' => $fulfillmentLabels,
                 ];
                 ?>
-                <nav class="pf-tabs" aria-label="Filter orders by status">
+                <nav class="pf-tabs" aria-label="Filter Order Summary by status">
                     <?php foreach ($orderTabs as $tabKey => $tabLabel): ?>
-                        <a href="user_dashboard.php?status=<?php echo h($tabKey); ?>"
+                        <a href="<?php echo h($epOrdersUrl(['status' => $tabKey, 'spage' => 1])); ?>"
                            class="pf-tab<?php echo $current_filter === $tabKey ? ' is-active' : ''; ?>"
                            <?php echo $current_filter === $tabKey ? 'aria-current="page"' : ''; ?>>
                             <?php echo h($tabLabel); ?>
@@ -553,118 +749,26 @@ if ($showSettings) {
                     <?php endforeach; ?>
                 </nav>
 
+                <p class="pf-orders-sub">Active orders only. Received orders move to Order History below. Delivery is handled by Lalamove.</p>
+
                 <?php if (count($orders) > 0): ?>
                     <ul class="pf-order-list">
                         <?php foreach ($orders as $o):
-                            $oid = (int)$o['id'];
-                            $ost = (string)($o['status'] ?? '');
-                            $canCancel = in_array($ost, $cancellableStatuses, true);
-                            $statusLabel = ias_order_display_status($o['status'] ?? '', $o['shipment_status'] ?? null);
-                            $fulfilKey = strtolower(trim((string)($o['fulfillment_type'] ?? '')));
-                            $fulfil = $fulfillmentLabels[$fulfilKey] ?? '';
-                            [$noteIcon, $noteText] = $orderStatusNote($statusLabel, trim((string)($o['carrier'] ?? '')), $fulfilKey === 'pickup');
-                            $items = $orderItems[$oid] ?? [];
-                            $itemQty = array_sum(array_map(static fn($it) => (int)$it['quantity'], $items));
-                            $hiddenCount = max(0, count($items) - $orderItemsShown);
-                            $payLabel = $paymentLabel($o);
-                            $shipTo = trim((string)($o['shipping_address'] ?? ''));
-                            $phone = trim((string)($o['customer_phone'] ?? ''));
-                            $hasDetails = $shipTo !== '' || $phone !== '' || $payLabel !== '' || $fulfil !== '';
-                            ?>
-                            <li class="pf-order <?php echo $orderStatusTone($statusLabel); ?>">
-                                <div class="pf-order-head">
-                                    <div class="pf-order-ref">
-                                        <strong>Order #ORD-<?php echo $oid; ?></strong>
-                                        <span>Placed <?php echo date('M d, Y', strtotime($o['created_at'])); ?></span>
-                                    </div>
-                                    <span class="pf-status <?php echo $orderStatusTone($statusLabel); ?>"><?php echo h($statusLabel); ?></span>
-                                </div>
-
-                                <?php if ($items): ?>
-                                    <ul class="pf-order-items" id="pfOrderItems<?php echo $oid; ?>">
-                                        <?php foreach ($items as $i => $it):
-                                            $itName = trim((string)($it['name'] ?? ''));
-                                            $itImg = $itName !== '' ? ias_client_product_image_url($it) : '';
-                                            $itQty = (int)$it['quantity'];
-                                            $itPrice = (float)$it['price'];
-                                            $itLink = $itName !== '' ? 'products.php?id=' . (int)$it['product_id'] : '';
-                                            ?>
-                                            <li class="pf-item"<?php echo $i >= $orderItemsShown ? ' data-extra hidden' : ''; ?>>
-                                                <span class="pf-item-thumb">
-                                                    <?php if ($itImg !== ''): ?>
-                                                        <img src="<?php echo h($itImg); ?>" alt="" loading="lazy">
-                                                    <?php else: ?>
-                                                        <i class="fas fa-box" aria-hidden="true"></i>
-                                                    <?php endif; ?>
-                                                </span>
-                                                <span class="pf-item-info">
-                                                    <?php if ($itLink !== ''): ?>
-                                                        <a class="pf-item-name" href="<?php echo h($itLink); ?>"><?php echo h($itName); ?></a>
-                                                    <?php else: ?>
-                                                        <span class="pf-item-name is-gone">Product no longer available</span>
-                                                    <?php endif; ?>
-                                                    <span class="pf-item-qty">Qty <?php echo $itQty; ?> &times; &#8369;<?php echo number_format($itPrice, 2); ?></span>
-                                                </span>
-                                                <strong class="pf-item-sub">&#8369;<?php echo number_format($itPrice * $itQty, 2); ?></strong>
-                                            </li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                    <?php if ($hiddenCount > 0): ?>
-                                        <button type="button" class="pf-more-items" aria-expanded="false"
-                                                aria-controls="pfOrderItems<?php echo $oid; ?>" data-more-items
-                                                data-label-closed="Show <?php echo $hiddenCount; ?> more <?php echo $hiddenCount === 1 ? 'item' : 'items'; ?>"
-                                                data-label-open="Show fewer items">
-                                            <span>Show <?php echo $hiddenCount; ?> more <?php echo $hiddenCount === 1 ? 'item' : 'items'; ?></span>
-                                            <i class="fas fa-chevron-down" aria-hidden="true"></i>
-                                        </button>
-                                    <?php endif; ?>
-                                <?php endif; ?>
-
-                                <div class="pf-order-foot">
-                                    <p class="pf-order-note"><i class="fas <?php echo h($noteIcon); ?>" aria-hidden="true"></i> <?php echo h($noteText); ?></p>
-                                    <p class="pf-order-total">
-                                        <span>Order total<?php echo $itemQty > 0 ? ' (' . $itemQty . ' ' . ($itemQty === 1 ? 'item' : 'items') . ')' : ''; ?></span>
-                                        <strong>&#8369;<?php echo number_format((float)$o['total'], 2); ?></strong>
-                                    </p>
-                                </div>
-
-                                <?php if ($hasDetails || $canCancel): ?>
-                                    <div class="pf-order-actions">
-                                        <?php if ($hasDetails): ?>
-                                            <button type="button" class="pf-order-btn" aria-expanded="false"
-                                                    aria-controls="pfOrderDetails<?php echo $oid; ?>" data-order-details>
-                                                Order details <i class="fas fa-chevron-down" aria-hidden="true"></i>
-                                            </button>
-                                        <?php endif; ?>
-                                        <?php if ($canCancel): ?>
-                                            <form method="post" class="order-cancel-form" data-confirm="The items go back into stock and the order can't be restored." data-confirm-title="Cancel this order?" data-confirm-ok="Cancel order" data-confirm-cancel="Keep order" data-confirm-type="danger">
-                                                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                                <input type="hidden" name="action" value="cancel_order">
-                                                <input type="hidden" name="order_id" value="<?php echo $oid; ?>">
-                                                <button type="submit" class="pf-order-btn is-danger">Cancel order</button>
-                                            </form>
-                                        <?php endif; ?>
-                                    </div>
-                                    <?php if ($hasDetails): ?>
-                                        <dl class="pf-order-details" id="pfOrderDetails<?php echo $oid; ?>" hidden>
-                                            <?php if ($fulfil !== ''): ?>
-                                                <div><dt>Fulfillment</dt><dd><?php echo h($fulfil); ?></dd></div>
-                                            <?php endif; ?>
-                                            <?php if ($shipTo !== ''): ?>
-                                                <div><dt><?php echo $fulfilKey === 'pickup' ? 'Pickup location' : 'Ship to'; ?></dt><dd><?php echo h($shipTo); ?></dd></div>
-                                            <?php endif; ?>
-                                            <?php if ($phone !== ''): ?>
-                                                <div><dt>Contact number</dt><dd><?php echo h($phone); ?></dd></div>
-                                            <?php endif; ?>
-                                            <?php if ($payLabel !== ''): ?>
-                                                <div><dt>Payment</dt><dd><?php echo h($payLabel); ?></dd></div>
-                                            <?php endif; ?>
-                                        </dl>
-                                    <?php endif; ?>
-                                <?php endif; ?>
-                            </li>
-                        <?php endforeach; ?>
+                            ep_render_client_order_card($o, $orderItems[(int)$o['id']] ?? [], $cardCtx + ['list' => 'summary']);
+                        endforeach; ?>
                     </ul>
+                    <?php
+                    ep_render_orders_pagination(
+                        $summaryPage,
+                        $summaryPages,
+                        $summaryTotal,
+                        count($orders),
+                        'spage',
+                        $epOrdersUrl,
+                        $epOrderPageRange,
+                        'Order Summary pagination'
+                    );
+                    ?>
                 <?php elseif ($search_query !== '' || $current_filter !== 'All'): ?>
                     <div class="pf-empty">
                         <span class="pf-empty-icon"><i class="fas fa-search" aria-hidden="true"></i></span>
@@ -675,12 +779,49 @@ if ($showSettings) {
                 <?php else: ?>
                     <div class="pf-empty">
                         <span class="pf-empty-icon"><i class="fas fa-box-open" aria-hidden="true"></i></span>
-                        <strong>No orders yet</strong>
-                        <span>Your orders and their delivery status will show up here.</span>
+                        <strong>No active orders</strong>
+                        <span>Placed and in-progress orders will show up here.</span>
                         <a href="shop.php" class="pf-btn pf-btn-primary">Start shopping</a>
                     </div>
                 <?php endif; ?>
             </section>
+
+            <section class="pf-card pf-orders pf-order-history" id="order-history" aria-labelledby="pfHistoryTitle">
+                <div class="pf-card-head">
+                    <h2 class="pf-card-title" id="pfHistoryTitle">Order History</h2>
+                    <?php if ($historyTotal > 0): ?>
+                        <span class="pf-history-count"><?php echo (int)$historyTotal; ?> completed / cancelled</span>
+                    <?php endif; ?>
+                </div>
+                <p class="pf-orders-sub">Orders you marked as received (and cancelled orders) appear here.</p>
+
+                <?php if (count($historyOrders) > 0): ?>
+                    <ul class="pf-order-list">
+                        <?php foreach ($historyOrders as $o):
+                            ep_render_client_order_card($o, $orderItems[(int)$o['id']] ?? [], $cardCtx + ['list' => 'history']);
+                        endforeach; ?>
+                    </ul>
+                    <?php
+                    ep_render_orders_pagination(
+                        $historyPage,
+                        $historyPages,
+                        $historyTotal,
+                        count($historyOrders),
+                        'hpage',
+                        $epOrdersUrl,
+                        $epOrderPageRange,
+                        'Order History pagination'
+                    );
+                    ?>
+                <?php else: ?>
+                    <div class="pf-empty pf-empty-compact">
+                        <span class="pf-empty-icon"><i class="fas fa-history" aria-hidden="true"></i></span>
+                        <strong>No order history yet</strong>
+                        <span>When you confirm Item Received, that order moves here.</span>
+                    </div>
+                <?php endif; ?>
+            </section>
+            </div>
 
             <aside class="pf-side">
                 <section class="pf-card pf-address<?php echo $addressComplete ? '' : ' is-incomplete'; ?>" aria-labelledby="pfAddrTitle">
@@ -759,7 +900,7 @@ if ($showSettings) {
 if ($showSettings) {
     $extraScripts = '<script src="../assets/js/ph-address.js"></script>';
 } else {
-    // Order cards: "Order details" and "Show N more items" toggles.
+    // Order cards + payment success dialog.
     $extraScripts = <<<'JS'
 <script>
 document.addEventListener('click', function (e) {
@@ -776,6 +917,29 @@ document.addEventListener('click', function (e) {
         btn.querySelector('span').textContent = btn.getAttribute(open ? 'data-label-open' : 'data-label-closed');
     }
 });
+(function () {
+    var box = document.getElementById('epPaySuccess');
+    if (!box) return;
+    var backdrop = document.getElementById('epPaySuccessBackdrop');
+    function closePay() {
+        box.hidden = true;
+        if (backdrop) backdrop.hidden = true;
+        try {
+            var u = new URL(window.location.href);
+            u.searchParams.delete('alert');
+            u.searchParams.delete('order_id');
+            window.history.replaceState({}, '', u.pathname + (u.search ? u.search : '') + u.hash);
+        } catch (err) {}
+    }
+    var closeBtn = document.getElementById('epPaySuccessClose');
+    var okBtn = document.getElementById('epPaySuccessOk');
+    if (closeBtn) closeBtn.addEventListener('click', closePay);
+    if (okBtn) okBtn.addEventListener('click', closePay);
+    if (backdrop) backdrop.addEventListener('click', closePay);
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !box.hidden) closePay();
+    });
+})();
 </script>
 JS;
 }

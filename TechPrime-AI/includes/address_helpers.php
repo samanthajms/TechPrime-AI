@@ -232,23 +232,32 @@ function ep_render_address_fields(array $v, string $psgcBase, string $idPrefix):
 }
 
 /**
- * Delivery address for a checkout submission (COD and Pay Online).
- * address_mode=saved uses the profile address; anything else validates the
- * posted addr_* fields (a one-off address that does not change the profile).
- * @return array{ok: bool, address: string, error: string}
+ * Delivery / pickup for a checkout submission.
+ * address_mode: saved | custom | pickup
+ * @return array{ok: bool, address: string, error: string, fulfillment: string}
  */
 function ep_checkout_resolve_address(PDO $db, int $userId, array $post): array
 {
-    if (($post['address_mode'] ?? '') === 'saved') {
+    $mode = (string)($post['address_mode'] ?? '');
+    if ($mode === 'pickup') {
+        return [
+            'ok' => true,
+            'address' => 'Pick Up — EasyPC One Oasis Branch, Rosario, Pasig',
+            'error' => '',
+            'fulfillment' => 'pickup',
+        ];
+    }
+    if ($mode === 'saved') {
         $saved = ep_user_address($db, $userId);
         if (!ep_address_is_complete($saved)) {
-            return ['ok' => false, 'address' => '', 'error' => 'Your saved address is incomplete. Please enter a complete delivery address.'];
+            return ['ok' => false, 'address' => '', 'error' => 'Your saved address is incomplete. Please enter a complete delivery address.', 'fulfillment' => 'delivery'];
         }
-        return ['ok' => true, 'address' => ep_address_format($saved), 'error' => ''];
+        return ['ok' => true, 'address' => ep_address_format($saved), 'error' => '', 'fulfillment' => 'delivery'];
     }
+    // custom / different address
     $parsed = ep_address_from_input($post);
     if ($parsed['error'] !== '') {
-        return ['ok' => false, 'address' => '', 'error' => $parsed['error']];
+        return ['ok' => false, 'address' => '', 'error' => $parsed['error'], 'fulfillment' => 'delivery'];
     }
-    return ['ok' => true, 'address' => ep_address_format($parsed['fields']), 'error' => ''];
+    return ['ok' => true, 'address' => ep_address_format($parsed['fields']), 'error' => '', 'fulfillment' => 'delivery'];
 }
