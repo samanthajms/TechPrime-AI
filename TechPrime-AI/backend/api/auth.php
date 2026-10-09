@@ -17,80 +17,14 @@ $connection = getDbConnection();
 $action = $_POST['action'] ?? '';
 
 // Check CSRF for POST actions
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'login' && $action !== 'register') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'login') {
     $csrfToken = $_POST['csrf_token'] ?? '';
     if (!verifyCsrfToken($csrfToken)) {
         json_exit(403, ['success' => false, 'message' => 'Invalid CSRF token.']);
     }
 }
 
-// ── Register ────────────────────────────────────────────────────────────────
-if ($action === 'register') {
-    $name     = trim($_POST['name'] ?? '');
-    $surname  = trim($_POST['surname'] ?? '');
-    $age      = (int)($_POST['age'] ?? 0);
-    $address  = trim($_POST['address'] ?? '');
-    $email    = strtolower(trim($_POST['email'] ?? ''));
-    $password = (string)($_POST['password'] ?? '');
-    // Registration is public, so it may only create client accounts. Staff
-    // accounts are created by an authenticated admin in Manage Users.
-    $role     = 'client';
-    $allowedRoles = ['client'];
-
-    if ($name === '' || $surname === '' || $age < 13 || $address === '' || $email === '' || $password === '') {
-        json_exit(422, ['success' => false, 'message' => 'Please complete all required fields.']);
-    }
-
-    if (!isPasswordComplex($password, $connection)) {
-        $rules = getPasswordRules($connection);
-        $msg = 'Password must be at least ' . $rules['min_length'] . ' characters';
-        $parts = [];
-        if ($rules['require_upper'])   $parts[] = 'uppercase letter';
-        if ($rules['require_lower'])   $parts[] = 'lowercase letter';
-        if ($rules['require_number'])  $parts[] = 'number';
-        if ($rules['require_special']) $parts[] = 'special character';
-        if (!empty($parts)) $msg .= ' and include: ' . implode(', ', $parts);
-        $msg .= '.';
-        json_exit(422, ['success' => false, 'message' => $msg]);
-    }
-
-    if (!in_array($role, $allowedRoles, true)) {
-        json_exit(422, ['success' => false, 'message' => 'Invalid account type.']);
-    }
-
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        json_exit(422, ['success' => false, 'message' => 'Invalid email address.']);
-    }
-
-    $chk = $connection->prepare('SELECT id FROM users WHERE LOWER(TRIM(email)) = ? LIMIT 1');
-    $chk->execute([$email]);
-    if ($chk->fetch(PDO::FETCH_ASSOC)) {
-        json_exit(409, ['success' => false, 'message' => 'Email already registered.']);
-    }
-    $hash = password_hash($password, PASSWORD_DEFAULT);
-    $activationToken = ias_new_activation_token();
-
-    $ins = $connection->prepare(
-        'INSERT INTO users (name, surname, age, address, email, password, role, is_verified, is_locked, failed_attempts, activation_token)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?)'
-    );
-    if (!$ins->execute([$name, $surname, $age, $address, $email, $hash, $role, $activationToken])) {
-        json_exit(500, ['success' => false, 'message' => 'Registration failed.']);
-    }
-    $userId = $connection->lastInsertId();
-    // Send activation email via PHPMailer
-    require_once __DIR__ . '/../../includes/mailer.php';
-    $activationLink = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-        . '://' . $_SERVER['HTTP_HOST'] . '/activitate.php?token=' . $activationToken;
-    sendActivationEmail($email, $name, $activationLink);
-
-    logActivity($connection, $userId, 'registration', 'User registered. Activation email sent to: ' . $email);
-
-    json_exit(200, [
-        'success' => true,
-        'message' => 'Registration successful! Please check your Gmail to activate your account.'
-    ]);
-}
+// Registration lives in register.php (phone/email checks, activation email resend limits).
 
 // ── Login ────────────────────────────────────────────────────────────────────
 if ($action === 'login') {
