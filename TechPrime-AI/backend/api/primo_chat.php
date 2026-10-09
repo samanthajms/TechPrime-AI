@@ -624,7 +624,7 @@ function primo_query_products(PDO $db, string $condition, ?string $category, ?ar
 
 /**
  * @param list<array> $filtered
- * @return list<array{id:int,name:string,price:float,stock:int,category:string}>
+ * @return list<array{id:int,name:string,price:float,stock:int,category:string,image:string}>
  */
 function primo_map_product_rows(array $filtered): array
 {
@@ -636,6 +636,8 @@ function primo_map_product_rows(array $filtered): array
             'price' => (float) $p['price'],
             'stock' => (int) ($p['stock'] ?? 0),
             'category' => (string) ($p['category'] ?? ''),
+            // relative to CLIENT/ pages, where the Primo widget renders product cards
+            'image' => ias_client_product_image_url($p),
         ];
     }
     return $out;

@@ -86,6 +86,104 @@ function ph_day_label(string $datetime): string
     return date('M j, Y', $ts);
 }
 
+/**
+ * Product names from a stored Primo reply. primo_product_intent() (backend/api/primo_chat.php)
+ * writes one line per product: "• {name} — ₱{price} — {category} — {availability}".
+ * @return list<string>
+ */
+function ph_bullet_product_names(string $content): array
+{
+    $names = [];
+    foreach (preg_split('/\R/u', $content) ?: [] as $line) {
+        if (preg_match('/^\s*•\s+(.+?)\s+—\s+₱[\d,]+(?:\.\d+)?\s+—\s/u', $line, $m)) {
+            $names[] = trim($m[1]);
+        }
+    }
+    return $names;
+}
+
+/**
+ * Re-attach product cards to stored bot replies (same shape as primo_chat.php's "products"),
+ * with current price/stock. A reply only gets cards when every listed product still resolves,
+ * otherwise it stays as text so no line silently disappears.
+ * @param list<array{role:string,content:string}> $messages
+ * @return list<array>
+ */
+function ph_attach_products(PDO $db, array $messages): array
+{
+    $perMessage = [];
+    $all = [];
+    foreach ($messages as $i => $m) {
+        if ($m['role'] !== 'bot') {
+            continue;
+        }
+        $names = ph_bullet_product_names($m['content']);
+        if ($names) {
+            $perMessage[$i] = $names;
+            foreach ($names as $n) {
+                $all[$n] = true;
+            }
+        }
+    }
+    if (!$all) {
+        return $messages;
+    }
+
+    $names = array_slice(array_keys($all), 0, 200);
+    $place = implode(',', array_fill(0, count($names), '?'));
+    $stmt = $db->prepare(
+        "SELECT id, name, price, stock, category, image, image_url
+         FROM products WHERE name IN ({$place}) ORDER BY id DESC"
+    );
+    $stmt->execute($names);
+    $byName = [];
+    while ($p = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $key = (string)$p['name'];
+        $img = ias_client_product_image_url($p);
+        if (isset($byName[$key]) || $img === '') {
+            continue;
+        }
+        $byName[$key] = [
+            'id' => (int)$p['id'],
+            'name' => $key,
+            'price' => (float)$p['price'],
+            'stock' => (int)($p['stock'] ?? 0),
+            'category' => (string)($p['category'] ?? ''),
+            'image' => $img,
+        ];
+    }
+
+    foreach ($perMessage as $i => $list) {
+        $cards = [];
+        foreach ($list as $n) {
+            if (!isset($byName[$n])) {
+                $cards = [];
+                break;
+            }
+            $cards[] = $byName[$n];
+        }
+        if ($cards) {
+            $messages[$i]['products'] = $cards;
+        }
+    }
+    return $messages;
+}
+
+/** One-line preview of a stored message for the Recent chats list. */
+function ph_preview(string $content): string
+{
+    $line = '';
+    foreach (preg_split('/\R/u', $content) ?: [] as $l) {
+        $l = trim($l);
+        if ($l !== '') {
+            $line = $l;
+            break;
+        }
+    }
+    $line = preg_replace('/\s+/u', ' ', $line) ?? $line;
+    return mb_strlen($line) > 90 ? mb_substr($line, 0, 87) . '…' : $line;
+}
+
 checkSessionTimeout();
 if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'client') {
     ph_json(['ok' => false, 'error' => 'auth_required', 'message' => 'Please log in to use chat history.'], 401);
@@ -123,11 +221,17 @@ if ($action === 'reset_context' && $method === 'POST') {
 if ($action === 'list') {
     $days = PRIMO_HISTORY_DAYS;
     $stmt = $db->prepare(
-        "SELECT id, title, created_at, updated_at
-         FROM primo_conversations
-         WHERE user_id = ?
-           AND updated_at >= (NOW() - make_interval(days => {$days}))
-         ORDER BY updated_at DESC, id DESC
+        "SELECT c.id, c.title, c.created_at, c.updated_at,
+                (SELECT COUNT(*) FROM primo_messages m WHERE m.conversation_id = c.id) AS message_count,
+                lm.role AS last_role, lm.content AS last_content
+         FROM primo_conversations c
+         LEFT JOIN LATERAL (
+             SELECT m.role, m.content FROM primo_messages m
+             WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1
+         ) lm ON TRUE
+         WHERE c.user_id = ?
+           AND c.updated_at >= (NOW() - make_interval(days => {$days}))
+         ORDER BY c.updated_at DESC, c.id DESC
          LIMIT 50"
     );
     $stmt->execute([$uid]);
@@ -142,6 +246,9 @@ if ($action === 'list') {
             'created_at' => (string)$row['created_at'],
             'updated_at' => (string)$row['updated_at'],
             'day_label' => $label,
+            'message_count' => (int)$row['message_count'],
+            'last_role' => (string)($row['last_role'] ?? ''),
+            'preview' => ph_preview((string)($row['last_content'] ?? '')),
         ];
         $conversations[] = $item;
         if (!isset($groups[$label])) {
@@ -186,6 +293,7 @@ if ($action === 'get') {
             'created_at' => (string)$m['created_at'],
         ];
     }
+    $messages = ph_attach_products($db, $messages);
     ph_json([
         'ok' => true,
         'conversation' => [

@@ -125,3 +125,16 @@ html[data-theme="dark"] .ep-account.is-guest:hover { background: var(--ep-yellow
         box-shadow: inset 0 0 0 1px #3a4049;
     }
 }
+
+/* ---- Primo chat (primo.css): things the generator does not map ---- */
+html[data-theme="dark"] .primo-panel-body,
+html[data-theme="dark"] .primo-history-body { scrollbar-color: #3a4136 transparent; }
+html[data-theme="dark"] .primo-panel-body::-webkit-scrollbar-thumb { background: #3a4136; border-color: #1b1d22; }
+html[data-theme="dark"] .primo-chip:focus-visible,
+html[data-theme="dark"] .primo-product:focus-visible,
+html[data-theme="dark"] .primo-history-back:focus-visible,
+html[data-theme="dark"] .primo-history-open:focus-visible,
+html[data-theme="dark"] .primo-history-del:focus-visible,
+html[data-theme="dark"] .primo-retry:focus-visible,
+html[data-theme="dark"] .primo-jump:focus-visible,
+html[data-theme="dark"] .primo-send-btn:focus-visible { outline-color: #8fd166; }

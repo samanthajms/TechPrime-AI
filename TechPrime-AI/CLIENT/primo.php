@@ -4,9 +4,9 @@
  * CSS robot UI + SVM-backed chat via backend/api/primo_chat.php
  */
 ?>
-<div id="primoRoot" class="primo-root is-collapsed" aria-live="polite">
+<div id="primoRoot" class="primo-root is-collapsed">
     <div class="primo-stage">
-        <button type="button" class="primo-mascot" id="primoMascot" aria-label="Primo, AI Product Assistant. Click to expand or open chat." aria-expanded="false">
+        <button type="button" class="primo-mascot" id="primoMascot" aria-label="Chat with Primo, AI Product Assistant" aria-expanded="false" aria-controls="primoPanel">
             <span class="primo-figure" id="primoFigure" aria-hidden="true">
                 <!-- Compact robot built from CSS shapes -->
                 <span class="primo-antenna"><span class="primo-antenna-tip"></span></span>
@@ -39,7 +39,7 @@
 
     <div class="primo-backdrop" id="primoBackdrop" hidden></div>
 
-    <div class="primo-panel" id="primoPanel" role="dialog" aria-modal="true" aria-labelledby="primoPanelTitle" hidden>
+    <section class="primo-panel" id="primoPanel" role="dialog" aria-modal="false" aria-labelledby="primoPanelTitle" hidden>
         <header class="primo-panel-header">
             <div class="primo-panel-identity">
                 <span class="primo-mini" aria-hidden="true">
@@ -49,39 +49,52 @@
                     </span>
                     <span class="primo-mini-body"></span>
                 </span>
-                <div>
+                <div class="primo-panel-titles">
                     <h2 id="primoPanelTitle">Primo</h2>
-                    <p>AI Product Assistant</p>
+                    <p class="primo-status" id="primoStatus"><span class="primo-status-dot" aria-hidden="true"></span><span id="primoStatusText">AI Product Assistant</span></p>
                 </div>
             </div>
             <div class="primo-panel-actions">
-                <button type="button" class="primo-panel-history" id="primoHistoryBtn" aria-label="Recent chats" title="Recent chats">
-                    <i class="fas fa-clock" aria-hidden="true"></i>
+                <button type="button" class="primo-icon-btn" id="primoResetBtn" aria-label="Start a new chat" title="New chat">
+                    <i class="fas fa-plus" aria-hidden="true"></i>
                 </button>
-                <button type="button" class="primo-panel-reset" id="primoResetBtn" aria-label="Reset chat" title="Reset Chat">
-                    <i class="fas fa-redo-alt" aria-hidden="true"></i>
-                    <span>Reset</span>
+                <button type="button" class="primo-icon-btn" id="primoHistoryBtn" aria-label="Recent chats" title="Recent chats" aria-expanded="false" aria-controls="primoHistory">
+                    <i class="fas fa-history" aria-hidden="true"></i>
                 </button>
-                <button type="button" class="primo-panel-close" id="primoClose" aria-label="Close Primo chat">
+                <button type="button" class="primo-icon-btn primo-size-btn" id="primoSizeBtn" aria-label="Expand chat" title="Expand" aria-pressed="false">
+                    <i class="fas fa-expand-alt" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="primo-icon-btn" id="primoClose" aria-label="Close Primo chat" title="Close">
                     <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
         </header>
 
-        <div class="primo-history" id="primoHistory" hidden>
+        <div class="primo-history" id="primoHistory" aria-label="Recent chats" inert>
             <div class="primo-history-head">
-                <strong>Recent Chats</strong>
-                <button type="button" class="primo-history-back" id="primoHistoryBack" aria-label="Back to chat">
-                    <i class="fas fa-arrow-left" aria-hidden="true"></i> Back
+                <button type="button" class="primo-history-back" id="primoHistoryBack" aria-label="Back to chat" title="Back to chat">
+                    <i class="fas fa-arrow-left" aria-hidden="true"></i>
                 </button>
+                <div class="primo-history-titles">
+                    <strong>Recent chats</strong>
+                    <span id="primoHistoryCount">Last 7 days</span>
+                </div>
+                <button type="button" class="primo-history-new" id="primoHistoryNew">
+                    <i class="fas fa-plus" aria-hidden="true"></i><span>New chat</span>
+                </button>
+            </div>
+            <div class="primo-history-search" id="primoHistorySearchWrap" hidden>
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <label class="sr-only" for="primoHistorySearch">Search recent chats</label>
+                <input type="search" id="primoHistorySearch" placeholder="Search chats" autocomplete="off">
             </div>
             <div class="primo-history-body" id="primoHistoryBody">
                 <p class="primo-history-empty">Loading…</p>
             </div>
-            <p class="primo-history-note">Kept for 7 days. Reset Chat clears the current chat only.</p>
+            <p class="primo-history-note"><i class="far fa-clock" aria-hidden="true"></i>Chats are kept for 7 days. New chat starts fresh without deleting these.</p>
         </div>
 
-        <div class="primo-panel-body" id="primoPanelBody">
+        <div class="primo-panel-body" id="primoPanelBody" role="log" aria-live="polite" aria-relevant="additions" tabindex="-1">
             <div class="primo-msg primo-msg-bot" id="primoWelcomeMsg">
                 <div class="primo-msg-avatar" aria-hidden="true">
                     <span class="primo-mini primo-mini-sm">
@@ -92,21 +105,31 @@
                         <span class="primo-mini-body"></span>
                     </span>
                 </div>
-                <div class="primo-msg-bubble" id="primoWelcomeBubble">
-                    Hi! 👋 I&rsquo;m <strong>Primo</strong>, your EasyPC assistant!<br><br>
-                    How can I help you today? 💚
+                <div class="primo-msg-content">
+                    <div class="primo-msg-bubble" id="primoWelcomeBubble">
+                        Hi! 👋 I&rsquo;m <strong>Primo</strong>, your EasyPC assistant!<br><br>
+                        How can I help you today? 💚
+                    </div>
                 </div>
             </div>
         </div>
 
+        <button type="button" class="primo-jump" id="primoJump" hidden>
+            <i class="fas fa-arrow-down" aria-hidden="true"></i> New message
+        </button>
+
         <form class="primo-panel-input" id="primoChatForm" action="#" method="post" autocomplete="off">
-            <label class="sr-only" for="primoChatInput">Ask Primo about a product</label>
-            <input type="text" id="primoChatInput" name="primo_message"
-                   placeholder="Ask Primo about a product..." maxlength="200">
-            <button type="submit" class="primo-send-btn" aria-label="Send message">
+            <label class="sr-only" for="primoChatInput">Message Primo</label>
+            <div class="primo-compose">
+                <textarea id="primoChatInput" name="primo_message" rows="1"
+                          placeholder="Ask Primo about a product…" maxlength="400"
+                          aria-describedby="primoComposeHint"></textarea>
+                <span class="primo-count" id="primoCount" aria-live="polite" hidden></span>
+            </div>
+            <button type="submit" class="primo-send-btn" id="primoSendBtn" aria-label="Send message" disabled>
                 <i class="fas fa-paper-plane" aria-hidden="true"></i>
             </button>
+            <p class="primo-compose-hint" id="primoComposeHint">Enter to send · Shift + Enter for a new line</p>
         </form>
-        <div class="primo-soon" id="primoSoon" hidden></div>
-    </div>
+    </section>
 </div>

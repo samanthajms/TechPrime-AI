@@ -1,0 +1,15 @@
+[    1089ms] Identifier 'IAS_UI' has already been declared
+[    7782ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost/TechPrime-AI/TechPrime-AI/CLIENT/primo_history_api.php:0
+[  117748ms] Identifier 'IAS_UI' has already been declared
+[  120895ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost/TechPrime-AI/TechPrime-AI/CLIENT/primo_history_api.php:0
+[  123245ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost/TechPrime-AI/TechPrime-AI/CLIENT/primo_history_api.php?action=list:0
+[  125370ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost/TechPrime-AI/TechPrime-AI/backend/api/primo_chat.php:0
+[  127244ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost/TechPrime-AI/TechPrime-AI/CLIENT/primo_history_api.php:0
+[  128483ms] Identifier 'IAS_UI' has already been declared
+[  130853ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost/TechPrime-AI/TechPrime-AI/CLIENT/primo_history_api.php:0
+[  176556ms] Identifier 'IAS_UI' has already been declared
+[  178719ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost/TechPrime-AI/TechPrime-AI/CLIENT/primo_history_api.php:0
+[  180046ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost/TechPrime-AI/TechPrime-AI/backend/api/primo_chat.php:0
+[  198209ms] Identifier 'IAS_UI' has already been declared
+[  199557ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost/TechPrime-AI/TechPrime-AI/backend/api/primo_chat.php:0
+[  200517ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost/TechPrime-AI/TechPrime-AI/backend/api/primo_chat.php:0
