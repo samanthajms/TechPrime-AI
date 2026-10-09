@@ -583,6 +583,33 @@
         pcxRenderInfo();
     }
 
+    /* Short label for an installed part: the model for CPUs/GPUs ("Ryzen 5 5600X", "RX 580"), else the product name (CSS truncates it). */
+    function pcxShortName(slot, name) {
+        var n = String(name || '').replace(/\s+/g, ' ').trim();
+        var m = null;
+        if (slot === 'gpu') {
+            m = n.match(/\b(?:rtx|gtx|rx|arc)\s?[a-z]?\d{3,4}[a-z]*(?:\s(?:ti|super|xtx|xt|gre))?\b/i);
+        } else if (slot === 'processor') {
+            m = n.match(/\bryzen\s?\d\s?(?:pro\s)?\d{4}[a-z0-9]*\b/i) ||
+                n.match(/\bcore\sultra\s?\d(?:\sprocessor)?\s\d{3}[a-z]*\b/i) ||
+                n.match(/\bi[3579][-\s]?\d{4,5}[a-z]*\b/i) ||
+                n.match(/\b(?:ryzen\s?\d|athlon|pentium|celeron)\b[^,(]*/i);
+        }
+        if (m) return m[0].replace(/\sprocessor\b/i, '').trim();
+        /* The case label only has room for the brand; RAM shows brand + size + type ("Kingston 16GB DDR4"). */
+        if (slot === 'case') return n.split(' ')[0];
+        if (slot === 'memory') {
+            var gb = n.match(/\b\d{1,3}\s?gb\b/i);
+            var ddr = n.match(/\b(?:lp)?ddr\d\b/i);
+            if (gb || ddr) return [n.split(' ')[0], gb ? gb[0].replace(/\s/, '') : '', ddr ? ddr[0] : ''].join(' ').replace(/\s+/g, ' ').trim();
+        }
+        /* Elsewhere drop the socket/spec tail, then trailing colour and category words. */
+        var s = n.split(/\s(?:socket|with)\b|\s?[(\/|,]/i)[0].trim();
+        var tail = /\s(?:black(?:\sgold)?|white|silver|motherboard|processor|videocard|power supply|psu|(?:pc\s)?case|ssd|hdd|hard (?:disk|drive)|(?:single\s)?chassis fan|(?:cpu\s)?(?:air|liquid)\scooler|liquid cooling|heatsink fan)$/i;
+        while (tail.test(s)) s = s.replace(tail, '');
+        return s || n;
+    }
+
     /* Mark installed parts and refresh labels / info card. */
     function pcxSync() {
         var stage = pcxStage();
@@ -593,6 +620,13 @@
             var item = build[slot];
             el.classList.toggle('is-filled', !!item);
             el.setAttribute('aria-label', (meta ? meta.name : slot) + ': ' + (item ? 'installed, ' + item.name : 'missing'));
+            /* Show the chosen product's name on the part; restore the generic label when it is removed. */
+            var label = el.querySelector('.pcx-name');
+            if (label) {
+                if (!label.hasAttribute('data-default')) label.setAttribute('data-default', label.textContent);
+                label.textContent = item ? pcxShortName(slot, item.name) : label.getAttribute('data-default');
+                label.classList.toggle('is-product', !!item);
+            }
             /* has-case, has-cooler, has-case_fan... drive the decorative bits (tubes, pump, rear fan). */
             stage.classList.toggle('has-' + slot, !!item);
         });
