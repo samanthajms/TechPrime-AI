@@ -19,7 +19,7 @@ $isHomePage = false;
 $pageTitle = 'Build a PC';
 $csrf = generateCsrfToken();
 
-$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-9">';
+$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-10">';
 
 include __DIR__ . '/ep_header.php';
 ?>
@@ -144,6 +144,9 @@ include __DIR__ . '/ep_header.php';
                     <strong id="tmSummaryCount">0 / 11</strong>
                 </div>
                 <div class="tm-bar tm-bar-thin"><span id="tmSummaryBar"></span></div>
+                <div class="tm-summary-list" id="tmSummaryList">
+                    <p class="tm-summary-empty">No components selected yet.</p>
+                </div>
                 <div class="tm-summary-total">
                     <span>Total</span>
                     <strong id="tmSummaryTotal">₱0</strong>
@@ -219,7 +222,7 @@ include __DIR__ . '/ep_header.php';
 window.EP_CSRF = <?php echo json_encode($csrf); ?>;
 window.EP_TM_USER = <?php echo (int)($_SESSION['user_id'] ?? 0); ?>;
 </script>
-<script src="tech_match.js?v=pcx-9" defer></script>
+<script src="tech_match.js?v=pcx-10" defer></script>
 
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>

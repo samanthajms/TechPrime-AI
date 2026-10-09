@@ -1022,6 +1022,14 @@ html[data-theme="dark"] .tm-score-den{color:var(--tm-muted)}
 html[data-theme="dark"] .tm-score-actions span{border:1px solid #33373f;background:#181a1e;color:#b4bcc6}
 html[data-theme="dark"] .tm-score-actions span.is-good{color:#b0e097;border-color:#3f6129;background:#253419}
 html[data-theme="dark"] .tm-score-actions span.is-bad{color:#dc2626;border-color:#5a2727;background:#181b1f}
+html[data-theme="dark"] .tm-summary-empty{color:var(--tm-muted)}
+html[data-theme="dark"] .tm-summary-line{border:0;border-bottom:1px solid #2e3239;background:transparent;color:inherit}
+html[data-theme="dark"] .tm-summary-line:last-child{border-bottom:0}
+html[data-theme="dark"] .tm-summary-line:hover,html[data-theme="dark"] .tm-summary-line:focus-visible{background:#191b20;outline:none}
+html[data-theme="dark"] .tm-summary-line:focus-visible{box-shadow:inset 0 0 0 1.5px var(--tm-green)}
+html[data-theme="dark"] .tm-summary-label{color:#b5bcc7}
+html[data-theme="dark"] .tm-summary-price{color:#d7d9dd}
+html[data-theme="dark"] .tm-summary-total{border-top:2px solid var(--tm-green)}
 html[data-theme="dark"] .tm-compat-line.is-ok{background:#1d1f25;color:#bce6a8}
 html[data-theme="dark"] .tm-compat-line.is-error{background:#181b1f;color:#e77777}
 html[data-theme="dark"] .tm-compat-line.is-todo{background:#181a1e;color:#a9b0bb}

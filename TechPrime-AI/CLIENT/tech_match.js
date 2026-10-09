@@ -20,6 +20,8 @@
         { id: 'case_fan', group: 'CHASSIS & COOLING', label: 'CASE FAN', name: 'Case Fan', select: 'Select Case Fan', icon: 'fa-wind', step: 7, watts: 5, optional: true }
     ];
     var TOTAL_SLOTS = SLOTS.length;
+    /* Build Summary line order (matches the EasyPC website summary). */
+    var SUMMARY_ORDER = ['processor', 'cooler', 'motherboard', 'memory', 'gpu', 'ssd', 'ssd_sata', 'hdd', 'psu', 'case', 'case_fan'];
 
     var STEPS = [
         { id: 1, label: 'Core' },
@@ -396,6 +398,23 @@
         return { pct: pct, psu: psu };
     }
 
+    /* Per-component price lines; each line reopens the picker for that slot. */
+    function renderSummaryList() {
+        var el = $('tmSummaryList');
+        if (!el) return;
+        var html = '';
+        SUMMARY_ORDER.forEach(function (id) {
+            var s = slotMeta(id);
+            var item = build[id];
+            if (!s || !item) return;
+            html += '<button type="button" class="tm-summary-line" data-pick="' + s.id + '" title="' + escapeHtml(item.name) + ' (click to change)">' +
+                '<span class="tm-summary-label">' + escapeHtml(s.name) + '</span>' +
+                '<strong class="tm-summary-price">' + peso(item.price) + '</strong>' +
+                '</button>';
+        });
+        el.innerHTML = html || '<p class="tm-summary-empty">No components selected yet.</p>';
+    }
+
     function renderRight(power) {
         var count = filledCount();
         var total = totalPrice();
@@ -405,6 +424,7 @@
         if ($('tmSummaryCount')) $('tmSummaryCount').textContent = count + ' / ' + TOTAL_SLOTS;
         if ($('tmSummaryBar')) $('tmSummaryBar').style.width = Math.round((count / TOTAL_SLOTS) * 100) + '%';
         if ($('tmSummaryTotal')) $('tmSummaryTotal').textContent = peso(total);
+        renderSummaryList();
         if ($('tmMobileTotal')) $('tmMobileTotal').textContent = peso(total);
         if ($('tmMobileCount')) $('tmMobileCount').textContent = count + ' / ' + TOTAL_SLOTS + ' components';
 
@@ -792,6 +812,17 @@
             list.addEventListener('mouseout', function (e) {
                 var slot = e.target.closest('.tm-slot');
                 if (slot && !slot.contains(e.relatedTarget)) pcxHover(slot.getAttribute('data-pick'), false);
+            });
+        }
+        var summary = $('tmSummaryList');
+        if (summary) {
+            summary.addEventListener('mouseover', function (e) {
+                var line = e.target.closest('.tm-summary-line');
+                if (line) pcxHover(line.getAttribute('data-pick'), true);
+            });
+            summary.addEventListener('mouseout', function (e) {
+                var line = e.target.closest('.tm-summary-line');
+                if (line && !line.contains(e.relatedTarget)) pcxHover(line.getAttribute('data-pick'), false);
             });
         }
         var addMissing = $('tmAddMissing');
