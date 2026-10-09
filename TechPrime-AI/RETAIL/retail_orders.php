@@ -4,6 +4,7 @@ require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 
+checkSessionTimeout();
 if (empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'retail_officer') {
     header('Location: ../login.php');
     exit;

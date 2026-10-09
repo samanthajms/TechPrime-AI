@@ -22,6 +22,12 @@ if (!is_array($payload)) {
     $payload = $_POST;
 }
 
+if (!verifyCsrfToken((string)($payload['csrf_token'] ?? ''))) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'csrf', 'reply' => 'Your session expired. Please refresh the page and try again.']);
+    exit;
+}
+
 $message = isset($payload['message']) ? trim((string) $payload['message']) : '';
 if ($message === '' || mb_strlen($message) > 400) {
     http_response_code(400);

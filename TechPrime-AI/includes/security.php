@@ -31,6 +31,21 @@ function verifyCsrfToken($token) {
     return true;
 }
 
+// Activation links work for 24 hours. The expiry is part of the token itself
+// ("<64 hex>.<unix expiry>"); the whole string must match users.activation_token,
+// so it can't be edited in the link.
+const IAS_ACTIVATION_TTL = 86400;
+
+function ias_new_activation_token(): string {
+    return bin2hex(random_bytes(32)) . '.' . (time() + IAS_ACTIVATION_TTL);
+}
+
+/** True once the token's 24 hours are up; tokens issued before expiry existed (no ".time") count as expired. */
+function ias_activation_token_expired(string $token): bool {
+    $dot = strrpos($token, '.');
+    return $dot === false || (int)substr($token, $dot + 1) < time();
+}
+
 // XSS Protection
 function h($string) {
     return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');

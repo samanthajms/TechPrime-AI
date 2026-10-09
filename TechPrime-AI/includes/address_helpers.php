@@ -80,32 +80,42 @@ function ep_address_from_input(array $in): array
     }
 
     $error = '';
+    $field = '';   // which address key the error is about
     if ($f['street'] === '') {
         $error = 'House / lot number and street are required.';
+        $field = 'street';
     } elseif (mb_strlen($f['street']) < 5 || !preg_match('/\p{L}/u', $f['street'])
         || !preg_match('/\S\s+\S/u', $f['street'])) {
         // At least two words, e.g. "123 Rizal St." or "Purok 3", not just "Pasig".
         $error = 'Please enter your full house / lot number and street name (e.g. 123 Rizal St.).';
+        $field = 'street';
     } elseif (mb_strlen($f['street']) > 150) {
         $error = 'Street address must be 150 characters or fewer.';
+        $field = 'street';
     } elseif (mb_strlen($f['unit']) > 100) {
         $error = 'Unit / building details must be 100 characters or fewer.';
+        $field = 'unit';
     } elseif ($f['province'] === '' || $f['city'] === '' || $f['barangay'] === '') {
         $error = 'Please select your province, city / municipality and barangay.';
+        $field = $f['province'] === '' ? 'province' : ($f['city'] === '' ? 'city' : 'barangay');
     } elseif (!preg_match('/^\d{4}$/', $f['zip'])) {
         $error = 'ZIP code must be 4 digits.';
+        $field = 'zip';
     } else {
         $provinces = ep_psgc_provinces();
         $prov = $provinces[$f['province']] ?? null;
         if ($prov === null) {
             $error = 'Please select a valid province.';
+            $field = 'province';
         } elseif (!isset($prov['cities'][$f['city']])) {
             $error = 'Please select a valid city / municipality for that province.';
+            $field = 'city';
         } elseif (!in_array($f['barangay'], ep_psgc_barangays($prov['code'], $prov['cities'][$f['city']]), true)) {
             $error = 'Please select a valid barangay for that city / municipality.';
+            $field = 'barangay';
         }
     }
-    return ['fields' => $f, 'error' => $error];
+    return ['fields' => $f, 'error' => $error, 'field' => $field];
 }
 
 function ep_address_is_complete(array $f): bool

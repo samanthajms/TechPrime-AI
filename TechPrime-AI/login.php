@@ -31,11 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    if ((int)$user['is_verified'] === 0) {
-        header("Location: login.php?error=" . urlencode("Account not activated. Please check your Gmail."));
-        exit;
-    }
-
+    // Password first, for activated and unactivated accounts alike: every wrong guess
+    // counts toward the 3-attempt lockout, so no account can be guessed without limit.
     if (!password_verify($password, $user['password'])) {
         $failed = (int)$user['failed_attempts'] + 1;
         $locked = $failed >= 3 ? 1 : 0;
@@ -57,6 +54,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $up = $connection->prepare('UPDATE users SET failed_attempts = 0 WHERE id = ?');
     $up->execute([$user['id']]);
 
+    if ((int)$user['is_verified'] === 0) {
+        // Right password, not activated yet: let this browser resend the activation email (register.php?activate=1).
+        $_SESSION['activation_pending'] = ['user_id' => (int)$user['id'], 'email' => (string)$user['email']];
+        header("Location: login.php?error=" . urlencode("Account not activated. Please check your Gmail."));
+        exit;
+    }
+
+    // New session id on login (prevents session fixation); the guest cart is kept.
+    session_regenerate_id(true);
     $_SESSION['user_id']       = $user['id'];
     $_SESSION['role']          = $user['role'];
     $_SESSION['email']         = $user['email'];
@@ -323,7 +329,7 @@ function redirectByRole($role) {
             <p class="subtitle reveal" style="--d:2">Enter your details below</p>
 
             <?php if ($error): ?>
-                <div class="error-box"><i class="fas fa-exclamation-triangle"></i><span><?php echo htmlspecialchars($error); ?></span></div>
+                <div class="error-box"><i class="fas fa-exclamation-triangle"></i><span><?php echo htmlspecialchars($error); ?><?php if (!empty($_SESSION['activation_pending']) && stripos($error, 'not activated') !== false): ?> <a href="register.php?activate=1" style="color:inherit;text-decoration:underline;white-space:nowrap">Resend activation email</a><?php endif; ?></span></div>
             <?php endif; ?>
 
             <?php if ($success): ?>

@@ -1,3 +1,52 @@
 <Files .env>
     Require all denied
 </Files>
+
+# No folder listings (assets/, uploads/products/ ...)
+Options -Indexes
+
+# Never serve dev-only or private files: dotfiles (.env, .git, .htaccess), SQL dumps,
+# CLI scripts, the Primo ML service, Composer/vendored libraries and source data sheets.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule (^|/)\.(?!well-known/) - [R=404,L]
+    RewriteRule ^(database|scripts|ml|vendor|backend/vendor)(/|$) - [R=404,L]
+    RewriteRule ^composer\.(json|lock)$ - [R=404,L]
+    RewriteRule \.(sql|md|py|bat|xlsx|csv|zip|bak|log)$ - [R=404,L]
+    # Upload/image folders only hold images and attachments: never run scripts from them
+    RewriteRule ^(uploads|assets)/.*\.(php[0-9]?|phtml|pht|phar|phps|cgi|pl|sh)$ - [NC,R=404,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header unset X-Powered-By
+    # Clickjacking: only this site may show its pages in a frame (the staff chat widget embeds its own pages)
+    Header set X-Frame-Options "SAMEORIGIN"
+    # Browsers must trust the declared file type (no guessing an upload is a script)
+    Header set X-Content-Type-Options "nosniff"
+    # Don't leak full page URLs (with ?id=, ?token=) to other sites
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# PHP settings (mod_php — XAMPP and the php:apache Docker image)
+<IfModule mod_php.c>
+    # Errors go to the server log, never to the visitor's browser
+    php_flag display_errors Off
+    php_flag display_startup_errors Off
+    php_flag log_errors On
+
+    # Session cookie hardening
+    php_flag session.cookie_httponly On
+    php_value session.cookie_samesite Lax
+    php_flag session.use_strict_mode On
+    php_flag session.use_only_cookies On
+</IfModule>
+<If "%{HTTPS} == 'on' || %{HTTP:X-Forwarded-Proto} == 'https'">
+    <IfModule mod_php.c>
+        # HTTPS only (Render terminates TLS at its proxy): cookie never sent over plain HTTP
+        php_flag session.cookie_secure On
+    </IfModule>
+    <IfModule mod_headers.c>
+        # Browsers remember to use HTTPS only for this site for a year
+        Header always set Strict-Transport-Security "max-age=31536000"
+    </IfModule>
+</If>

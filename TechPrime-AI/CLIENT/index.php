@@ -11,7 +11,7 @@ $isLoggedIn = isset($_SESSION['user_id']);
 $userName = $isLoggedIn ? h($_SESSION['name']) : 'Guest';
 $activePage = 'home';
 $isHomePage = true;
-$epCsrf = $isLoggedIn ? generateCsrfToken() : '';
+$epCsrf = generateCsrfToken(); // guests too: the Primo chat endpoint requires it
 $extraHead = '<link rel="stylesheet" href="primo.css">';
 
 $categories = []; // unused on homepage render; avoid large unused array work
@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-<script src="primo.js" defer></script>
+<script src="primo.js?v=csrf-1" defer></script>
 SCRIPTS;
 ?>
 

@@ -4,6 +4,7 @@ require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 
+checkSessionTimeout();
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'retail_officer') {
     header('Location: ../login.php'); exit;
 }
@@ -12,6 +13,9 @@ $db = getDbConnection();
 $retailId = (int)$_SESSION['user_id'];
 
 // --- HANDLE RETAIL REPLY ---
+if (isset($_POST['submit_reply']) && !verifyCsrfToken((string)($_POST['csrf_token'] ?? ''))) {
+    header("Location: retail_reviews.php?error=csrf"); exit;
+}
 if (isset($_POST['submit_reply'])) {
     $reviewId = (int)$_POST['review_id'];
     $replyText = $_POST['reply_text'];
@@ -74,6 +78,9 @@ EXTRA
 ]);
 ?>
 
+        <?php if (($_GET['error'] ?? '') === 'csrf'): ?>
+            <div class="alert alert-error" style="margin-bottom:18px;">Your session expired. Please reload the page and send your reply again.</div>
+        <?php endif; ?>
         <?php if (count($reviews) > 0): ?>
             <div class="review-list">
             <?php foreach ($reviews as $rev): ?>
@@ -108,6 +115,7 @@ EXTRA
                         <?php else: ?>
                             <form method="POST" class="reply-section">
                                 <span class="reply-label">Write a Response</span>
+                                <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
                                 <input type="hidden" name="review_id" value="<?php echo $rev['id']; ?>">
                                 <div class="form-group" style="margin-bottom:10px;">
                                     <textarea name="reply_text" class="form-control" rows="2" placeholder="Thank the customer or address their concerns..." required></textarea>

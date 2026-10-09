@@ -68,7 +68,7 @@ if ($action === 'register') {
         json_exit(409, ['success' => false, 'message' => 'Email already registered.']);
     }
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    $activationToken = bin2hex(random_bytes(32));
+    $activationToken = ias_new_activation_token();
 
     $ins = $connection->prepare(
         'INSERT INTO users (name, surname, age, address, email, password, role, is_verified, is_locked, failed_attempts, activation_token)
@@ -189,6 +189,7 @@ if ($action === 'verify_totp') {
     $up = $connection->prepare('UPDATE users SET failed_attempts = 0 WHERE id = ?');
     $up->execute([$user['id']]);
     unset($_SESSION['partial_user_id']);
+    session_regenerate_id(true); // new session id on login (prevents session fixation)
     $_SESSION['user_id']       = (int)$user['id'];
     $_SESSION['role']          = $user['role'];
     $_SESSION['email']         = $user['email'];
@@ -235,6 +236,7 @@ if ($action === 'confirm_totp_setup') {
     $q->execute([$userId]);
     $user = $q->fetch(PDO::FETCH_ASSOC);
     unset($_SESSION['partial_user_id']);
+    session_regenerate_id(true); // new session id on login (prevents session fixation)
     $_SESSION['user_id']       = (int)$user['id'];
     $_SESSION['role']          = $user['role'];
     $_SESSION['email']         = $user['email'];
@@ -261,8 +263,8 @@ if ($action === 'confirm_totp_setup') {
 
 // ── Activate account (GET) ───────────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'activate') {
-    $token = $_GET['token'] ?? '';
-    if ($token !== '') {
+    $token = (string)($_GET['token'] ?? '');
+    if ($token !== '' && !ias_activation_token_expired($token)) {
         $up = $connection->prepare('UPDATE users SET is_verified = 1, activation_token = NULL WHERE activation_token = ?');
         if ($up->execute([$token]) && $up->rowCount() > 0) {
             header("Location: /login.php?success=" . urlencode("Account activated! You can now sign in."));

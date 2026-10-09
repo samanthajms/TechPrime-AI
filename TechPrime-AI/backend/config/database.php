@@ -22,6 +22,9 @@ function getDbConnection(): PDO
         ]);
         return $connection;
     } catch (PDOException $e) {
-        die('Database connection failed: ' . $e->getMessage());
+        // Details (host, user) go to the server log only — never to the visitor.
+        error_log('Database connection failed: ' . $e->getMessage());
+        http_response_code(503);
+        die('Service temporarily unavailable. Please try again later.');
     }
 }

@@ -425,7 +425,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ message: message })
+                body: JSON.stringify({ message: message, csrf_token: csrf() })
             });
             var data = null;
             try {

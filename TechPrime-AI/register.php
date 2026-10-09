@@ -11,6 +11,10 @@ require_once __DIR__ . '/includes/address_helpers.php';
 $error = $_GET['error'] ?? '';
 $registered = false;
 $registeredEmail = '';
+// On a failed submit the form is re-rendered with what the user typed ($old);
+// only the fields listed in $fieldErrors are cleared.
+$old = [];
+$fieldErrors = [];
 
 // Load DB connection and current password rules for frontend display
 $connection = getDbConnection();
@@ -32,7 +36,181 @@ function register_users_has_phone(PDO $db): bool
     return $has;
 }
 
+function register_email_taken(PDO $db, string $email): bool
+{
+    $stmt = $db->prepare('SELECT 1 FROM users WHERE LOWER(email) = ? LIMIT 1');
+    $stmt->execute([strtolower(trim($email))]);
+    return (bool)$stmt->fetchColumn();
+}
+
+/**
+ * Phones are stored as typed, so compare digits only and, for 10+ digits, just the
+ * last 10 — 09171234567, +63 917 123 4567 and 917-123-4567 are the same number.
+ */
+function register_phone_taken(PDO $db, string $phone): bool
+{
+    if (!register_users_has_phone($db)) {
+        return false;
+    }
+    $digits = preg_replace('/\D+/', '', $phone);
+    if ($digits === '') {
+        return false;
+    }
+    if (strlen($digits) >= 10) {
+        $stmt = $db->prepare("SELECT 1 FROM users WHERE RIGHT(regexp_replace(phone, '\\D', '', 'g'), 10) = ? LIMIT 1");
+        $stmt->execute([substr($digits, -10)]);
+    } else {
+        $stmt = $db->prepare("SELECT 1 FROM users WHERE regexp_replace(phone, '\\D', '', 'g') = ? LIMIT 1");
+        $stmt->execute([$digits]);
+    }
+    return (bool)$stmt->fetchColumn();
+}
+
+// Live "already in use" check for the email / phone fields (fetched by the form below).
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['check'])) {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    $value = trim((string)($_GET['value'] ?? ''));
+    if ($_GET['check'] === 'email') {
+        if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            echo json_encode(['ok' => false, 'error' => 'invalid']);
+            exit;
+        }
+        $taken = register_email_taken($connection, $value);
+        echo json_encode(['ok' => true, 'available' => !$taken,
+            'message' => $taken ? 'Email already in use.' : 'Email is available.']);
+        exit;
+    }
+    if ($_GET['check'] === 'phone') {
+        $len = strlen(preg_replace('/\D+/', '', $value));
+        if ($len < 7 || $len > 15) {
+            echo json_encode(['ok' => false, 'error' => 'invalid']);
+            exit;
+        }
+        $taken = register_phone_taken($connection, $value);
+        echo json_encode(['ok' => true, 'available' => !$taken,
+            'message' => $taken ? 'Phone number already in use.' : 'Phone number is available.']);
+        exit;
+    }
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'bad_request']);
+    exit;
+}
+
+// ── Activation email + resend ────────────────────────────────────────────────
+// After signing up (or a correct-password login to an unactivated account, see
+// login.php) $_SESSION['activation_pending'] = ['user_id', 'email'] lets this
+// browser — and only this browser — request a new activation email.
+const REG_RESEND_COOLDOWN = 60;      // seconds between emails to one account
+const REG_RESEND_MAX_PER_HOUR = 5;   // emails per account per hour
+
+function register_activation_link(string $token): string
+{
+    $https = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+    return ($https ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST']
+        . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/activitate.php?token=' . urlencode($token);
+}
+
+/** Seconds until another activation email may go to this user (0 = now). Sends are counted from `logs`. */
+function register_resend_wait(PDO $db, int $userId): int
+{
+    $stmt = $db->prepare(
+        "SELECT EXTRACT(EPOCH FROM (NOW() AT TIME ZONE 'UTC') - created_at)::int
+         FROM logs
+         WHERE user_id = ? AND action IN ('activation_email_sent', 'activation_email_failed')
+           AND created_at > (NOW() AT TIME ZONE 'UTC') - INTERVAL '1 hour'
+         ORDER BY created_at DESC"
+    );
+    $stmt->execute([$userId]);
+    $ages = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    if (count($ages) >= REG_RESEND_MAX_PER_HOUR) {
+        return max(1, 3600 - max($ages));
+    }
+    if ($ages && $ages[0] < REG_RESEND_COOLDOWN) {
+        return REG_RESEND_COOLDOWN - $ages[0];
+    }
+    return 0;
+}
+
+/** Email the activation link and record the attempt (it feeds register_resend_wait). */
+function register_send_activation(PDO $db, int $userId, string $email, string $name, string $token): bool
+{
+    $sent = (bool)sendActivationEmail($email, $name, register_activation_link($token));
+    logActivity($db, $userId, $sent ? 'activation_email_sent' : 'activation_email_failed',
+        ($sent ? 'Activation email sent to ' : 'Activation email could not be sent to ') . $email);
+    return $sent;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'resend_activation') {
+    $pending = $_SESSION['activation_pending'] ?? null;
+    if (!$pending) {
+        header('Location: login.php?error=' . urlencode('Log in with your email and password to resend the activation email.'));
+        exit;
+    }
+    if (!verifyCsrfToken((string)($_POST['csrf_token'] ?? ''))) {
+        $_SESSION['activation_flash'] = ['type' => 'bad', 'text' => 'Your session expired. Please try again.'];
+        header('Location: register.php?activate=1');
+        exit;
+    }
+
+    $stmt = $connection->prepare('SELECT id, name, email, is_verified, activation_token FROM users WHERE id = ? LIMIT 1');
+    $stmt->execute([(int)$pending['user_id']]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$user || strtolower((string)$user['email']) !== strtolower((string)$pending['email'])) {
+        unset($_SESSION['activation_pending']);
+        header('Location: login.php?error=' . urlencode('Account not found. Please register again.'));
+        exit;
+    }
+    if ((int)$user['is_verified'] === 1) {
+        unset($_SESSION['activation_pending']);
+        header('Location: login.php?success=' . urlencode('Your account is already activated. You can now log in.'));
+        exit;
+    }
+
+    $wait = register_resend_wait($connection, (int)$user['id']);
+    if ($wait > 0) {
+        $_SESSION['activation_flash'] = ['type' => 'bad',
+            'text' => 'Please wait ' . ($wait >= 120 ? ceil($wait / 60) . ' minutes' : $wait . ' seconds') . ' before requesting another email.'];
+    } else {
+        // Keep the current token so a late-arriving first email still works — unless its 24 h are up.
+        $token = (string)($user['activation_token'] ?? '');
+        if ($token === '' || ias_activation_token_expired($token)) {
+            $token = ias_new_activation_token();
+            $connection->prepare('UPDATE users SET activation_token = ? WHERE id = ? AND is_verified = 0')
+                ->execute([$token, (int)$user['id']]);
+        }
+        $sent = register_send_activation($connection, (int)$user['id'], (string)$user['email'], (string)$user['name'], $token);
+        $_SESSION['activation_flash'] = $sent
+            ? ['type' => 'ok', 'text' => 'A new activation link was sent. It can take a minute to arrive.']
+            : ['type' => 'bad', 'text' => "We couldn't send the email right now. Please try again in a minute."];
+    }
+    header('Location: register.php?activate=1');
+    exit;
+}
+
+// "Check your Gmail" screen, shown after signing up and after each resend.
+$activationFlash = null;
+$resendWait = 0;
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['activate']) && !empty($_SESSION['activation_pending'])) {
+    $stmt = $connection->prepare('SELECT is_verified FROM users WHERE id = ? LIMIT 1');
+    $stmt->execute([(int)$_SESSION['activation_pending']['user_id']]);
+    $verified = $stmt->fetchColumn();
+    if ($verified === false || (int)$verified === 1) {
+        unset($_SESSION['activation_pending'], $_SESSION['activation_flash']);
+        header('Location: login.php' . ($verified === false ? '' : '?success=' . urlencode('Your account is already activated. You can now log in.')));
+        exit;
+    }
+    $registered = true;
+    $registeredEmail = (string)$_SESSION['activation_pending']['email'];
+    $activationFlash = $_SESSION['activation_flash'] ?? null;
+    unset($_SESSION['activation_flash']);
+    $resendWait = register_resend_wait($connection, (int)$_SESSION['activation_pending']['user_id']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // The re-rendered form may carry the typed password back; keep it out of caches.
+    header('Cache-Control: no-store');
+
     // Public registration is limited to customer accounts. Never trust a
     // role submitted by the browser, as it could be modified outside the form.
     $role            = 'client';
@@ -45,101 +223,148 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password        = $_POST['password'] ?? '';
     $confirm         = $_POST['confirm_password'] ?? '';
 
-    if ($name === '' || $surname === '') {
-        header("Location: register.php?error=" . urlencode('First name and surname are required.'));
-        exit;
-    }
-    if ($age < 13) {
-        header("Location: register.php?error=" . urlencode('Age must be 13 or older.'));
-        exit;
-    }
-    if ($addressInput['error'] !== '') {
-        header("Location: register.php?error=" . urlencode($addressInput['error']));
-        exit;
-    }
-    if ($phone === '') {
-        header("Location: register.php?error=" . urlencode('Phone number is required.'));
-        exit;
-    }
-    // Keep phone reasonably sane without being overly strict by country.
-    $phoneDigits = preg_replace('/\D+/', '', $phone);
-    if (strlen($phoneDigits) < 7 || strlen($phoneDigits) > 15) {
-        header("Location: register.php?error=" . urlencode('Please enter a valid phone number.'));
-        exit;
-    }
-    if (strlen($phone) > 30) {
-        header("Location: register.php?error=" . urlencode('Phone number is too long.'));
-        exit;
+    $old = [
+        'name' => $name,
+        'surname' => $surname,
+        'age' => trim((string)($_POST['age'] ?? '')),
+        'phone' => $phone,
+        'email' => $email,
+        'password' => $password,
+        'confirm_password' => $confirm,
+    ];
+    foreach ($addressInput['fields'] as $k => $v) {
+        $old['addr_' . $k] = $v;
     }
 
-    if (empty($password) || $password !== $confirm) {
-        header("Location: register.php?error=Passwords do not match!");
-        exit;
+    if ($name === '') {
+        $fieldErrors['name'] = 'First name is required.';
+    }
+    if ($surname === '') {
+        $fieldErrors['surname'] = 'Surname is required.';
+    }
+    if ($age < 13) {
+        $fieldErrors['age'] = 'Age must be 13 or older.';
+    }
+
+    // Keep phone reasonably sane without being overly strict by country.
+    $phoneDigits = preg_replace('/\D+/', '', $phone);
+    if ($phone === '') {
+        $fieldErrors['phone'] = 'Phone number is required.';
+    } elseif (strlen($phone) > 30) {
+        $fieldErrors['phone'] = 'Phone number is too long.';
+    } elseif (strlen($phoneDigits) < 7 || strlen($phoneDigits) > 15) {
+        $fieldErrors['phone'] = 'Please enter a valid phone number.';
+    } elseif (register_phone_taken($connection, $phone)) {
+        $fieldErrors['phone'] = 'Phone number already in use.';
+    }
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $fieldErrors['email'] = 'Please enter a valid email address.';
+    } elseif (register_email_taken($connection, $email)) {
+        $fieldErrors['email'] = 'Email already in use.';
+    }
+
+    if ($addressInput['error'] !== '') {
+        $fieldErrors['addr_' . ($addressInput['field'] ?: 'street')] = $addressInput['error'];
     }
 
     // ── Enforce admin-configured password complexity rules ──────────────────
     if (!isPasswordComplex($password, $connection)) {
-        $rules = getPasswordRules($connection);
-        $msg = 'Password must be at least ' . $rules['min_length'] . ' characters';
+        $msg = 'Password must be at least ' . $pwRules['min_length'] . ' characters';
         $parts = [];
-        if ($rules['require_upper'])   $parts[] = 'uppercase letter';
-        if ($rules['require_lower'])   $parts[] = 'lowercase letter';
-        if ($rules['require_number'])  $parts[] = 'number';
-        if ($rules['require_special']) $parts[] = 'special character';
+        if ($pwRules['require_upper'])   $parts[] = 'uppercase letter';
+        if ($pwRules['require_lower'])   $parts[] = 'lowercase letter';
+        if ($pwRules['require_number'])  $parts[] = 'number';
+        if ($pwRules['require_special']) $parts[] = 'special character';
         if (!empty($parts)) $msg .= ' and include: ' . implode(', ', $parts);
         $msg .= '.';
-        header("Location: register.php?error=" . urlencode($msg));
-        exit;
+        $fieldErrors['password'] = $msg;
+        $fieldErrors['confirm_password'] = 'Re-enter your new password.';
+    } elseif ($password !== $confirm) {
+        $fieldErrors['confirm_password'] = 'Passwords do not match!';
     }
 
-    $checkEmail = $connection->prepare("SELECT email FROM users WHERE email = ? LIMIT 1");
-    $checkEmail->execute([$email]);
-    if ($checkEmail->fetch(PDO::FETCH_ASSOC)) {
-        header("Location: register.php?error=Email already in use.");
-        exit;
-    }
-
-    $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-    $activationToken = bin2hex(random_bytes(32));
-    $hasPhone = register_users_has_phone($connection);
-
-    // users.address gets the formatted one-line address; structured address_* columns
-    // and phone are included when migration_users_address_phone.sql has been applied.
-    $values = [
-        'name' => $name,
-        'surname' => $surname,
-        'age' => $age,
-    ] + ep_address_columns($connection, $addressInput['fields']);
-    if ($hasPhone) {
-        $values['phone'] = $phone;
-    }
-    $values += [
-        'email' => $email,
-        'password' => $hashedPassword,
-        'role' => $role,
-        'is_verified' => 0,
-        'activation_token' => $activationToken,
-    ];
-    $stmt = $connection->prepare(
-        'INSERT INTO users (' . implode(', ', array_keys($values)) . ')
-         VALUES (' . implode(', ', array_fill(0, count($values), '?')) . ')'
-    );
-    $ok = $stmt->execute(array_values($values));
-
-    if ($ok) {
-        // Send activation email
-        $activationLink = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-            . '://' . $_SERVER['HTTP_HOST']
-            . dirname($_SERVER['REQUEST_URI']) . '/activitate.php?token=' . $activationToken;
-
-        sendActivationEmail($email, $name, $activationLink);
-
-        $registered = true;
-        $registeredEmail = $email;
+    if ($fieldErrors) {
+        // Clear only what needs re-entering. A rejected province/city also
+        // invalidates the dropdowns that depend on it.
+        if (isset($fieldErrors['addr_province'])) {
+            $old['addr_city'] = $old['addr_barangay'] = '';
+        } elseif (isset($fieldErrors['addr_city'])) {
+            $old['addr_barangay'] = '';
+        }
+        foreach (array_keys($fieldErrors) as $k) {
+            $old[$k] = '';
+        }
+        $error = count($fieldErrors) === 1
+            ? reset($fieldErrors)
+            : 'Please fix the ' . count($fieldErrors) . ' highlighted fields.';
     } else {
-        header("Location: register.php?error=Registration failed. Try again.");
-        exit;
+        $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+        $activationToken = ias_new_activation_token();
+        $hasPhone = register_users_has_phone($connection);
+
+        // users.address gets the formatted one-line address; structured address_* columns
+        // and phone are included when migration_users_address_phone.sql has been applied.
+        $values = [
+            'name' => $name,
+            'surname' => $surname,
+            'age' => $age,
+        ] + ep_address_columns($connection, $addressInput['fields']);
+        if ($hasPhone) {
+            $values['phone'] = $phone;
+        }
+        $values += [
+            'email' => $email,
+            'password' => $hashedPassword,
+            'role' => $role,
+            'is_verified' => 0,
+            'activation_token' => $activationToken,
+        ];
+        $stmt = $connection->prepare(
+            'INSERT INTO users (' . implode(', ', array_keys($values)) . ')
+             VALUES (' . implode(', ', array_fill(0, count($values), '?')) . ')
+             RETURNING id'
+        );
+        $ok = $stmt->execute(array_values($values));
+        $newUserId = $ok ? (int)$stmt->fetchColumn() : 0;
+
+        if ($newUserId > 0) {
+            $sent = register_send_activation($connection, $newUserId, $email, $name, $activationToken);
+
+            $_SESSION['activation_pending'] = ['user_id' => $newUserId, 'email' => $email];
+            $_SESSION['activation_flash'] = $sent
+                ? ['type' => 'ok', 'text' => '', 'fresh' => true]
+                : ['type' => 'bad', 'text' => "Your account was created, but we couldn't send the activation email. Use Resend below to try again."];
+            // Redirect so a refresh doesn't re-submit the registration.
+            header('Location: register.php?activate=1');
+            exit;
+        } else {
+            $error = 'Registration failed. Try again.';
+        }
     }
+}
+
+/** Previously typed value for a field (escaped), for re-rendering after a failed submit. */
+function reg_old(array $old, string $key): string
+{
+    return h($old[$key] ?? '');
+}
+
+/** ' is-invalid' when the server rejected this field. */
+function reg_invalid(array $fieldErrors, string $key): string
+{
+    return isset($fieldErrors[$key]) ? ' is-invalid' : '';
+}
+
+/** Inline hint under a field, holding the server's message when that field was rejected. */
+function reg_hint(array $fieldErrors, string $key, string $id = ''): string
+{
+    $idAttr = $id !== '' ? ' id="' . h($id) . '"' : '';
+    if (!isset($fieldErrors[$key])) {
+        return '<div class="field-hint"' . $idAttr . ' aria-live="polite"></div>';
+    }
+    return '<div class="field-hint bad" data-server' . $idAttr . ' aria-live="polite"><i class="fas fa-times"></i> '
+        . h($fieldErrors[$key]) . '</div>';
 }
 ?>
 <!DOCTYPE html>
@@ -352,6 +577,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .match-hint { font-size: 11px; font-weight: 600; margin-top: 7px; min-height: 16px; transition: color .2s; }
         .match-hint.ok { color: var(--ep-green-dark); }
         .match-hint.bad { color: var(--danger); }
+        /* inline per-field message (server errors, email/phone availability) */
+        .field-hint { font-size: 11px; font-weight: 600; margin-top: 6px; color: var(--muted); }
+        .field-hint:empty { display: none; }
+        .field-hint.ok { color: var(--ep-green-dark); }
+        .field-hint.bad { color: var(--danger); }
 
         .btn-reg {
             position: relative; overflow: hidden;
@@ -400,6 +630,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .gmail-btn { display: inline-flex; align-items: center; gap: 8px; background: #EA4335; color: #fff; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 14px; transition: .2s; }
         .gmail-btn:hover { background: #c5221f; transform: translateY(-1px); box-shadow: 0 8px 18px rgba(234,67,53,0.25); }
         .note { color: #999; font-size: 12px; margin-top: 16px; line-height: 1.6; }
+        .resend-notice {
+            display: flex; gap: 10px; align-items: flex-start; text-align: left;
+            padding: 12px 14px; border-radius: 12px; font-size: 13px; font-weight: 600; margin: 0 0 18px;
+        }
+        .resend-notice.ok { background: #eef8e6; color: var(--ep-green-dark); border: 1px solid #d4efc4; }
+        .resend-notice.bad { background: #fff5f5; color: var(--danger); border: 1px solid #ffd3d6; }
+        .resend-form { margin-top: 22px; padding-top: 18px; border-top: 1px solid #eef1ec; }
+        .resend-label { color: #999; font-size: 12px; margin: 0 0 10px; }
+        .resend-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 20px; border-radius: 12px;
+            border: 1.5px solid var(--ep-green); background: #fff; color: var(--ep-green-dark);
+            font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+            transition: background .2s, color .2s, border-color .2s;
+        }
+        .resend-btn:hover:not(:disabled) { background: var(--ep-green); color: #fff; }
+        .resend-btn:disabled { cursor: not-allowed; border-color: var(--line); color: #a9b1a5; background: #f4f6f3; }
+        .resend-btn .spinner { display: none; width: 14px; height: 14px; border: 2px solid rgba(75,139,42,.3); border-top-color: var(--ep-green-dark); border-radius: 50%; animation: spin .7s linear infinite; }
+        .resend-btn.loading { pointer-events: none; }
+        .resend-btn.loading .spinner { display: inline-block; }
+        .resend-btn.loading .fa-redo-alt { display: none; }
 
         @keyframes fadeUp { to { opacity: 1; transform: none; } }
         @keyframes slideIn { to { opacity: 1; transform: none; } }
@@ -455,8 +706,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <span class="email-highlight"><?php echo htmlspecialchars($registeredEmail); ?></span><br><br>
                     Please open your Gmail and click the activation link to verify your account before logging in.
                 </div>
+                <?php if ($activationFlash && $activationFlash['text'] !== ''): ?>
+                    <div class="resend-notice <?php echo $activationFlash['type'] === 'ok' ? 'ok' : 'bad'; ?>" role="status">
+                        <i class="fas <?php echo $activationFlash['type'] === 'ok' ? 'fa-check-circle' : 'fa-exclamation-triangle'; ?>"></i>
+                        <span><?php echo h($activationFlash['text']); ?></span>
+                    </div>
+                <?php endif; ?>
                 <a href="https://mail.google.com" target="_blank" rel="noopener" class="gmail-btn"><i class="fas fa-inbox"></i> Open Gmail</a>
-                <p class="note">Didn't receive it? Check your spam folder.<br>The link expires in 24 hours.</p>
+
+                <form method="POST" action="register.php" class="resend-form" id="resendForm">
+                    <input type="hidden" name="action" value="resend_activation">
+                    <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+                    <p class="resend-label">Didn't get the email? Check your spam folder, or</p>
+                    <button type="submit" class="resend-btn" id="resendBtn" data-wait="<?php echo (int)$resendWait; ?>"<?php echo $resendWait > 0 ? ' disabled' : ''; ?>>
+                        <span class="spinner"></span>
+                        <i class="fas fa-redo-alt"></i>
+                        <span id="resendText"><?php echo $resendWait > 0 ? 'Resend link in ' . (int)$resendWait . 's' : 'Resend activation link'; ?></span>
+                    </button>
+                </form>
             </div>
             <div class="footer-link reveal" style="--d:2">
                 Already activated? <a href="login.php">Sign In</a>
@@ -480,15 +747,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-grid three reveal" style="--d:5">
                     <div class="field">
                         <label for="f-name">First Name</label>
-                        <div class="input-wrap"><i class="fas fa-user lead"></i><input type="text" id="f-name" name="name" autocomplete="given-name" placeholder="Juan" required><i class="fas fa-check-circle ok"></i></div>
+                        <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'name'); ?>"><i class="fas fa-user lead"></i><input type="text" id="f-name" name="name" autocomplete="given-name" placeholder="Juan" value="<?php echo reg_old($old, 'name'); ?>" required><i class="fas fa-check-circle ok"></i></div>
+                        <?php echo reg_hint($fieldErrors, 'name'); ?>
                     </div>
                     <div class="field">
                         <label for="f-surname">Surname</label>
-                        <div class="input-wrap"><i class="fas fa-user lead"></i><input type="text" id="f-surname" name="surname" autocomplete="family-name" placeholder="Dela Cruz" required><i class="fas fa-check-circle ok"></i></div>
+                        <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'surname'); ?>"><i class="fas fa-user lead"></i><input type="text" id="f-surname" name="surname" autocomplete="family-name" placeholder="Dela Cruz" value="<?php echo reg_old($old, 'surname'); ?>" required><i class="fas fa-check-circle ok"></i></div>
+                        <?php echo reg_hint($fieldErrors, 'surname'); ?>
                     </div>
                     <div class="field">
                         <label for="f-age">Age</label>
-                        <div class="input-wrap"><i class="fas fa-birthday-cake lead"></i><input type="number" id="f-age" name="age" min="13" max="120" inputmode="numeric" placeholder="18" required><i class="fas fa-check-circle ok"></i></div>
+                        <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'age'); ?>"><i class="fas fa-birthday-cake lead"></i><input type="number" id="f-age" name="age" min="13" max="120" inputmode="numeric" placeholder="18" value="<?php echo reg_old($old, 'age'); ?>" required><i class="fas fa-check-circle ok"></i></div>
+                        <?php echo reg_hint($fieldErrors, 'age'); ?>
                     </div>
                 </div>
 
@@ -496,42 +766,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-grid reveal" style="--d:7">
                     <div class="field">
                         <label for="f-phone">Phone Number</label>
-                        <div class="input-wrap"><i class="fas fa-phone-alt lead"></i><input type="tel" id="f-phone" name="phone" autocomplete="tel" inputmode="tel" maxlength="30" pattern="[0-9+\(\)\-\s]{7,30}" placeholder="e.g. 09171234567" required><i class="fas fa-check-circle ok"></i></div>
+                        <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'phone'); ?>"><i class="fas fa-phone-alt lead"></i><input type="tel" id="f-phone" name="phone" autocomplete="tel" inputmode="tel" maxlength="30" pattern="[0-9+\(\)\-\s]{7,30}" placeholder="e.g. 09171234567" value="<?php echo reg_old($old, 'phone'); ?>" data-check="phone" required><i class="fas fa-check-circle ok"></i></div>
+                        <?php echo reg_hint($fieldErrors, 'phone', 'phoneHint'); ?>
                     </div>
                     <div class="field">
                         <label for="f-email">Email Address</label>
-                        <div class="input-wrap"><i class="fas fa-envelope lead"></i><input type="email" id="f-email" name="email" autocomplete="email" placeholder="you@gmail.com" required><i class="fas fa-check-circle ok"></i></div>
+                        <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'email'); ?>"><i class="fas fa-envelope lead"></i><input type="email" id="f-email" name="email" autocomplete="email" placeholder="you@gmail.com" value="<?php echo reg_old($old, 'email'); ?>" data-check="email" required><i class="fas fa-check-circle ok"></i></div>
+                        <?php echo reg_hint($fieldErrors, 'email', 'emailHint'); ?>
                     </div>
                 </div>
 
                 <div class="section-title reveal" style="--d:8">Delivery address</div>
                 <div class="field reveal" style="--d:8">
                     <label for="f-street">House / Lot No. &amp; Street</label>
-                    <div class="input-wrap"><i class="fas fa-home lead"></i><input type="text" id="f-street" name="addr_street" autocomplete="address-line1" minlength="5" maxlength="150" pattern=".*\S\s+\S.*" title="Enter your house / lot number and street name, e.g. 123 Rizal St." placeholder="e.g. 123 Rizal St." required><i class="fas fa-check-circle ok"></i></div>
+                    <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'addr_street'); ?>"><i class="fas fa-home lead"></i><input type="text" id="f-street" name="addr_street" autocomplete="address-line1" minlength="5" maxlength="150" pattern=".*\S\s+\S.*" title="Enter your house / lot number and street name, e.g. 123 Rizal St." placeholder="e.g. 123 Rizal St." value="<?php echo reg_old($old, 'addr_street'); ?>" required><i class="fas fa-check-circle ok"></i></div>
+                    <?php echo reg_hint($fieldErrors, 'addr_street'); ?>
                 </div>
                 <div class="field reveal" style="--d:9">
                     <label for="f-unit">Unit / Floor / Building / Subdivision <span class="optional">(optional)</span></label>
-                    <div class="input-wrap"><i class="fas fa-building lead"></i><input type="text" id="f-unit" name="addr_unit" autocomplete="address-line2" maxlength="100" placeholder="e.g. Unit 4B, Oasis Tower"><i class="fas fa-check-circle ok"></i></div>
+                    <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'addr_unit'); ?>"><i class="fas fa-building lead"></i><input type="text" id="f-unit" name="addr_unit" autocomplete="address-line2" maxlength="100" placeholder="e.g. Unit 4B, Oasis Tower" value="<?php echo reg_old($old, 'addr_unit'); ?>"><i class="fas fa-check-circle ok"></i></div>
+                    <?php echo reg_hint($fieldErrors, 'addr_unit'); ?>
                 </div>
-                <div class="ph-address reveal" style="--d:10" data-psgc="assets/data/psgc">
+                <div class="ph-address reveal" style="--d:10" data-psgc="assets/data/psgc" data-province="<?php echo reg_old($old, 'addr_province'); ?>" data-city="<?php echo reg_old($old, 'addr_city'); ?>" data-barangay="<?php echo reg_old($old, 'addr_barangay'); ?>">
                     <div class="form-grid">
                         <div class="field">
                             <label for="f-province">Province</label>
-                            <div class="input-wrap"><i class="fas fa-map lead"></i><select id="f-province" name="addr_province" data-ph="province" autocomplete="address-level1" required></select><i class="fas fa-check-circle ok"></i></div>
+                            <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'addr_province'); ?>"><i class="fas fa-map lead"></i><select id="f-province" name="addr_province" data-ph="province" autocomplete="address-level1" required></select><i class="fas fa-check-circle ok"></i></div>
+                            <?php echo reg_hint($fieldErrors, 'addr_province'); ?>
                         </div>
                         <div class="field">
                             <label for="f-city">City / Municipality</label>
-                            <div class="input-wrap"><i class="fas fa-city lead"></i><select id="f-city" name="addr_city" data-ph="city" autocomplete="address-level2" required></select><i class="fas fa-check-circle ok"></i></div>
+                            <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'addr_city'); ?>"><i class="fas fa-city lead"></i><select id="f-city" name="addr_city" data-ph="city" autocomplete="address-level2" required></select><i class="fas fa-check-circle ok"></i></div>
+                            <?php echo reg_hint($fieldErrors, 'addr_city'); ?>
                         </div>
                     </div>
                     <div class="form-grid zip">
                         <div class="field">
                             <label for="f-barangay">Barangay</label>
-                            <div class="input-wrap"><i class="fas fa-map-marker-alt lead"></i><select id="f-barangay" name="addr_barangay" data-ph="barangay" autocomplete="address-level3" required></select><i class="fas fa-check-circle ok"></i></div>
+                            <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'addr_barangay'); ?>"><i class="fas fa-map-marker-alt lead"></i><select id="f-barangay" name="addr_barangay" data-ph="barangay" autocomplete="address-level3" required></select><i class="fas fa-check-circle ok"></i></div>
+                            <?php echo reg_hint($fieldErrors, 'addr_barangay'); ?>
                         </div>
                         <div class="field">
                             <label for="f-zip">ZIP Code</label>
-                            <div class="input-wrap"><i class="fas fa-mail-bulk lead"></i><input type="text" id="f-zip" name="addr_zip" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{4}" placeholder="1600" required><i class="fas fa-check-circle ok"></i></div>
+                            <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'addr_zip'); ?>"><i class="fas fa-mail-bulk lead"></i><input type="text" id="f-zip" name="addr_zip" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{4}" placeholder="1600" value="<?php echo reg_old($old, 'addr_zip'); ?>" required><i class="fas fa-check-circle ok"></i></div>
+                            <?php echo reg_hint($fieldErrors, 'addr_zip'); ?>
                         </div>
                     </div>
                 </div>
@@ -539,9 +817,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="section-title reveal" style="--d:9">Security</div>
                 <div class="field reveal" style="--d:10">
                     <label for="regPassword">Password</label>
-                    <div class="input-wrap">
+                    <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'password'); ?>">
                         <i class="fas fa-lock lead"></i>
-                        <input type="password" name="password" id="regPassword" autocomplete="new-password" placeholder="Create a strong password" oninput="checkPasswordComplexity(this.value)" required>
+                        <input type="password" name="password" id="regPassword" autocomplete="new-password" placeholder="Create a strong password" value="<?php echo reg_old($old, 'password'); ?>" oninput="checkPasswordComplexity(this.value)" required>
                         <button type="button" class="pw-toggle" data-target="regPassword" aria-label="Show password"><i class="fas fa-eye"></i></button>
                     </div>
                     <div class="strength" id="pwStrength" data-level="0">
@@ -563,15 +841,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <li id="pw-special" class="rule"><span class="tick"><i class="fas fa-check"></i></span>Special (!@#$%…)</li>
                         <?php endif; ?>
                     </ul>
+                    <?php if (isset($fieldErrors['password'])) echo reg_hint($fieldErrors, 'password'); ?>
                 </div>
 
                 <div class="field reveal" style="--d:11">
                     <label for="f-confirm">Confirm Password</label>
-                    <div class="input-wrap">
+                    <div class="input-wrap<?php echo reg_invalid($fieldErrors, 'confirm_password'); ?>">
                         <i class="fas fa-shield-alt lead"></i>
-                        <input type="password" id="f-confirm" name="confirm_password" autocomplete="new-password" placeholder="Re-enter your password" required>
+                        <input type="password" id="f-confirm" name="confirm_password" autocomplete="new-password" placeholder="Re-enter your password" value="<?php echo reg_old($old, 'confirm_password'); ?>" required>
                         <button type="button" class="pw-toggle" data-target="f-confirm" aria-label="Show password"><i class="fas fa-eye"></i></button>
                     </div>
+                    <?php if (isset($fieldErrors['confirm_password'])) echo reg_hint($fieldErrors, 'confirm_password'); ?>
                     <div class="match-hint" id="matchHint" aria-live="polite"></div>
                 </div>
 
@@ -613,12 +893,11 @@ function checkPasswordComplexity(password) {
     if (PW_RULES.reqNumber)  checks.push(setCheck('pw-num',     /[0-9]/.test(password)));
     if (PW_RULES.reqSpecial) checks.push(setCheck('pw-special', /[^A-Za-z0-9]/.test(password)));
 
-    // Strength meter: share of rules met, with a bonus for longer passwords.
+    // Strength meter: share of rules met; all four bars only once every rule is met.
     const met = checks.filter(Boolean).length;
     let level = 0;
     if (password.length) {
-        level = Math.max(1, Math.round(met / checks.length * 3));
-        if (met === checks.length && password.length >= PW_RULES.minLen + 4) level = 4;
+        level = met === checks.length ? 4 : Math.max(1, Math.min(3, Math.round(met / checks.length * 4)));
     }
     const meter = document.getElementById('pwStrength');
     if (meter) {
@@ -656,12 +935,87 @@ function checkPasswordComplexity(password) {
         return input.value.trim() !== '' && input.checkValidity();
     }
 
+    // Message the server left under a field it rejected on the last submit.
+    function serverHint(input) {
+        return input.closest('.field').querySelector('.field-hint[data-server]');
+    }
+
+    function clearServerHint(input) {
+        const el = serverHint(input);
+        if (!el) return;
+        el.removeAttribute('data-server');
+        el.className = 'field-hint';
+        el.textContent = '';
+    }
+
     function mark(input, touched) {
         const wrap = input.closest('.input-wrap');
         const valid = fieldValid(input);
         wrap.classList.toggle('is-valid', valid && input.type !== 'password');
-        wrap.classList.toggle('is-invalid', touched && !valid && input.value !== '');
+        wrap.classList.toggle('is-invalid', (touched && !valid && input.value !== '') || !!serverHint(input));
     }
+
+    // Email / phone "already in use": asked once the user stops typing or leaves the field.
+    // Registered before the generic listeners below so they see the reset validity.
+    form.querySelectorAll('[data-check]').forEach(function (input) {
+        const hintEl = document.getElementById(input.dataset.check + 'Hint');
+        let timer = null;
+        let checked = null;   // value the current hint is about
+        let seq = 0;          // ignore responses for values the user already changed
+
+        function setHint(cls, icon, text) {
+            hintEl.removeAttribute('data-server');
+            hintEl.className = 'field-hint' + (cls ? ' ' + cls : '');
+            hintEl.textContent = '';
+            if (!text) return;
+            const i = document.createElement('i');
+            i.className = 'fas ' + icon;
+            hintEl.append(i, ' ' + text);
+        }
+
+        function check() {
+            clearTimeout(timer);
+            const value = input.value.trim();
+            if (value === checked) return;
+            checked = value;
+            // Malformed values are handled by the normal validation; only ask about real ones.
+            if (!value || !input.checkValidity()) {
+                setHint('', '', '');
+                return;
+            }
+            const mine = ++seq;
+            setHint('', 'fa-spinner fa-spin', 'Checking…');
+            fetch('register.php?check=' + input.dataset.check + '&value=' + encodeURIComponent(value), {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' }
+            }).then(function (r) { return r.json(); }).then(function (data) {
+                if (mine !== seq) return;
+                if (!data.ok) { setHint('', '', ''); return; }
+                if (data.available) {
+                    setHint('ok', 'fa-check', data.message);
+                } else {
+                    input.setCustomValidity(data.message);
+                    setHint('bad', 'fa-times', data.message);
+                }
+                mark(input, true);
+                updateProgress();
+            }).catch(function () {
+                if (mine === seq) { checked = null; setHint('', '', ''); }
+            });
+        }
+
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            if (input.value.trim() !== checked) {
+                seq++;
+                checked = null;
+                input.setCustomValidity('');
+                setHint('', '', '');
+            }
+            timer = setTimeout(check, 700);
+        });
+        input.addEventListener('blur', check);
+    });
 
     function updateProgress() {
         const done = fields.filter(fieldValid).length;
@@ -671,7 +1025,9 @@ function checkPasswordComplexity(password) {
     }
 
     fields.forEach(function (input) {
-        function onEdit() {
+        function onEdit(e) {
+            // ph-address.js also fires (untrusted) change events when it reloads a list.
+            if (e && e.isTrusted) clearServerHint(input);
             if (input === zip) zip.value = zip.value.replace(/\D+/g, '').slice(0, 4);
             if (input === pw || input === confirm) checkMatch();
             mark(input, input.closest('.input-wrap').classList.contains('is-invalid'));
@@ -685,6 +1041,8 @@ function checkPasswordComplexity(password) {
 
     // Optional unit/building field: just show the check once something is entered.
     unit.addEventListener('input', function () {
+        clearServerHint(unit);
+        unit.closest('.input-wrap').classList.remove('is-invalid');
         unit.closest('.input-wrap').classList.toggle('is-valid', unit.value.trim() !== '');
     });
 
@@ -713,12 +1071,45 @@ function checkPasswordComplexity(password) {
         document.getElementById('regSubmit').classList.add('loading');
     });
 
+    // After a rejected submit the server re-fills the fields that were fine; show them as done.
+    if (pw.value) checkPasswordComplexity(pw.value);
+    if (confirm.value) checkMatch();
+    fields.forEach(function (input) { if (input.value) mark(input, false); });
+    if (unit.value.trim() !== '' && !serverHint(unit)) unit.closest('.input-wrap').classList.add('is-valid');
     updateProgress();
 })();
 </script>
 <?php ias_alert_footer(); ?>
-<?php if ($registered): ?>
+<?php if ($registered && !empty($activationFlash['fresh'])): ?>
 <script>document.addEventListener('DOMContentLoaded',function(){if(typeof IAS_UI!=='undefined')IAS_UI.alert('Registration successful. Please check your email to activate your account.','success',0);});</script>
+<?php endif; ?>
+<?php if ($registered): ?>
+<script>
+// Resend button: count down the cooldown the server reported, then re-enable.
+(function () {
+    const btn = document.getElementById('resendBtn');
+    const text = document.getElementById('resendText');
+    const form = document.getElementById('resendForm');
+    if (!btn) return;
+    let left = parseInt(btn.dataset.wait, 10) || 0;
+    function tick() {
+        if (left > 0) {
+            btn.disabled = true;
+            text.textContent = 'Resend link in ' + left + 's';
+            left--;
+            setTimeout(tick, 1000);
+        } else {
+            btn.disabled = false;
+            text.textContent = 'Resend activation link';
+        }
+    }
+    tick();
+    form.addEventListener('submit', function () {
+        btn.classList.add('loading');
+        text.textContent = 'Sending…';
+    });
+})();
+</script>
 <?php endif; ?>
 <script src="assets/js/ph-address.js"></script>
 <script src="assets/js/login-hero.js"></script>
