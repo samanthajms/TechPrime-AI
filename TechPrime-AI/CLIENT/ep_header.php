@@ -873,11 +873,6 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
         <span class="ep-hero-icon sm"><img src="../assets/mouse.png" alt="Mouse"></span>
     </div>
 </section>
-<section class="ep-feature-strip full-width">
-    <span><i class="fas fa-shipping-fast"></i> Free Shipping on Orders Over &#8369;2,500</span>
-    <span><i class="fas fa-undo"></i> 30-Day Money Back Guarantee</span>
-    <span><i class="fas fa-headset"></i> 24/7 Customer Support</span>
-</section>
 <?php elseif (!empty($categoryHeroTitle)): ?>
 <?php /* Category hero is rendered inside each category page main content for correct layout. */ ?>
 <?php endif; ?>

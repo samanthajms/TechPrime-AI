@@ -532,7 +532,7 @@ function primo_handle_intent(PDO $db, string $intent, string $message, float $co
 
         case 'return_refund':
             return [
-                'reply' => "EasyPC offers a 30-Day Money Back Guarantee on eligible orders. To start a return or refund, open My Orders from your profile or contact EasyFix Support via Messages with your order number. I can't process returns directly in chat.",
+                'reply' => "To ask about a return or refund, open My Orders from your profile or contact EasyFix Support via Messages with your order number. I can't process returns directly in chat.",
             ];
 
         case 'compatibility_question':
