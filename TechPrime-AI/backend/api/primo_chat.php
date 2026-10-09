@@ -72,8 +72,9 @@ echo json_encode([
  */
 function primo_call_svm(string $message): ?array
 {
-    // PRIMO_API_URL = base URL of the hosted service (e.g. https://primo-xxxx.onrender.com); local default otherwise.
-    $base = $_ENV['PRIMO_API_URL'] ?? getenv('PRIMO_API_URL');
+    // PRIMO_API_URL = base URL of the hosted service (e.g. https://primo-xxxx.onrender.com).
+    // Checked in $_ENV (phpdotenv), $_SERVER (Apache SetEnv), then getenv (process env).
+    $base = $_ENV['PRIMO_API_URL'] ?? $_SERVER['PRIMO_API_URL'] ?? getenv('PRIMO_API_URL');
     $base = is_string($base) && trim($base) !== '' ? rtrim(trim($base), '/') : 'http://127.0.0.1:5055';
     $url = $base . '/predict';
     $isLocal = str_starts_with($base, 'http://127.0.0.1') || str_starts_with($base, 'http://localhost');

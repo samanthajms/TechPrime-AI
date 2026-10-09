@@ -6,7 +6,7 @@ POST /predict
 
 → {"intent": "stock_inquiry", "confidence": 0.87, "ok": true}
 
-GET /health → status
+GET /health → {"ok", "model_loaded", ...} (200 if loaded, 503 if not)
 """
 from __future__ import annotations
 
@@ -50,15 +50,16 @@ def get_threshold() -> float:
 
 @app.get("/health")
 def health():
-    return jsonify(
-        {
-            "ok": True,
-            "service": "primo-svm-intent",
-            "model_loaded": _pipeline is not None,
-            "intents": _meta.get("intents", []),
-            "confidence_threshold": get_threshold(),
-        }
-    )
+    loaded = _pipeline is not None
+    body = {
+        "ok": loaded,
+        "service": "primo-svm-intent",
+        "model_loaded": loaded,
+        "intents": _meta.get("intents", []),
+        "confidence_threshold": get_threshold(),
+    }
+    # 200 only when the trained pipeline is ready (Render health check uses HTTP status).
+    return jsonify(body), (200 if loaded else 503)
 
 
 @app.post("/predict")
@@ -107,10 +108,13 @@ def predict():
 
 
 if __name__ == "__main__":
-    load_model()
-    # Local: 127.0.0.1:5055 (PHP proxies from the browser).
-    # Render sets RENDER and PORT; the service must listen on 0.0.0.0:$PORT there.
-    on_render = bool(os.environ.get("RENDER"))
-    host = os.environ.get("PRIMO_HOST", "0.0.0.0" if on_render else "127.0.0.1")
+    try:
+        load_model()
+    except Exception as exc:
+        # Keep /health reachable so Render can see model_loaded=false instead of a dead port.
+        app.logger.error("Primo model failed to load: %s", exc)
+    # Local default: 127.0.0.1:5055. Render sets PORT (and RENDER); listen on 0.0.0.0 there.
+    hosted = bool(os.environ.get("RENDER")) or "PORT" in os.environ
+    host = os.environ.get("PRIMO_HOST", "0.0.0.0" if hosted else "127.0.0.1")
     port = int(os.environ.get("PORT", "5055"))
-    app.run(host=host, port=port, debug=False)
+    app.run(host=host, port=port, debug=False, use_reloader=False)
