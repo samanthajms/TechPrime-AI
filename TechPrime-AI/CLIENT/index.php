@@ -11,8 +11,6 @@ $isLoggedIn = isset($_SESSION['user_id']);
 $userName = $isLoggedIn ? h($_SESSION['name']) : 'Guest';
 $activePage = 'home';
 $isHomePage = true;
-$epCsrf = generateCsrfToken(); // guests too: the Primo chat endpoint requires it
-$extraHead = '<link rel="stylesheet" href="primo.css?v=ux-4">';
 
 $categories = []; // unused on homepage render; avoid large unused array work
 
@@ -172,7 +170,7 @@ $returnTo = 'index.php';
 </main>
 
 <?php
-$extraScripts = '<script>window.EP_CSRF = ' . json_encode($epCsrf) . ';</script>' . <<<'SCRIPTS'
+$extraScripts = <<<'SCRIPTS'
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const urlParams = new URLSearchParams(window.location.search);
@@ -207,10 +205,8 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-<script src="primo.js?v=ux-3" defer></script>
 SCRIPTS;
 ?>
 
-<?php include __DIR__ . '/primo.php'; ?>
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>

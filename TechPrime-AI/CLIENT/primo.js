@@ -51,6 +51,8 @@
     var COUNT_FROM = Math.floor(MAX_LEN * 0.8);
     var STATUS_IDLE = 'AI Product Assistant';
     var WIDE_KEY = 'primo_wide';
+    /* Guests chat normally, but nothing is saved to Recent chats (history API is client-only). */
+    var IS_GUEST = root.getAttribute('data-guest') === '1';
 
     var GREETINGS = [
         'Hi! 👋 I&rsquo;m <strong>Primo</strong>, your EasyPC assistant!<br><br>How can I help you today? 💚',
@@ -652,6 +654,7 @@
     /* ---------- History persistence ---------- */
 
     function persistExchange(userMsg, botMsg) {
+        if (IS_GUEST) return;
         fetch(HISTORY_URL, {
             method: 'POST',
             credentials: 'same-origin',
@@ -753,8 +756,20 @@
         historyBody.innerHTML = html;
     }
 
+    function showSignedOutHistory() {
+        historyGroups = [];
+        setHistoryCount(0);
+        setHistorySearchVisible(false);
+        historyBody.innerHTML = historyStateHtml('fas fa-user-lock', 'Sign in to keep your chats',
+            'Log in to your EasyPC account and your Primo chats from the last 7 days are saved here.', false);
+    }
+
     function loadHistoryList() {
         if (!historyBody) return;
+        if (IS_GUEST) {
+            showSignedOutHistory();
+            return;
+        }
         if (!historyGroups.length) {
             historyBody.innerHTML = '<div class="primo-history-skeleton" aria-label="Loading recent chats"><span></span><span></span><span></span></div>';
         }
@@ -762,11 +777,7 @@
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 if (!data || !data.ok) {
-                    historyGroups = [];
-                    setHistoryCount(0);
-                    setHistorySearchVisible(false);
-                    historyBody.innerHTML = historyStateHtml('fas fa-user-lock', 'Sign in to keep your chats',
-                        'Log in to your EasyPC account and your Primo chats from the last 7 days are saved here.', false);
+                    showSignedOutHistory();
                     return;
                 }
                 historyGroups = data.grouped || [];

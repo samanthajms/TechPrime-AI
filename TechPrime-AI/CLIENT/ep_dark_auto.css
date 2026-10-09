@@ -960,6 +960,14 @@ html[data-theme="dark"] .primo-tm-btn:hover{background:var(--primo-green-dark, #
 html[data-theme="dark"] .primo-mini-head{background:#1e2126;border:1.5px solid #3e434c}
 html[data-theme="dark"] .primo-mini-eye{background:var(--primo-green);box-shadow:0 0 4px rgba(98, 178, 54, 0.8)}
 html[data-theme="dark"] .primo-mini-body{background:var(--primo-green);border:1.5px solid var(--primo-green-dark)}
+html[data-theme="dark"] .primo-root.is-compact .primo-mascot{background:var(--primo-green);box-shadow:0 8px 20px rgba(0, 0, 0, 0.396)}
+html[data-theme="dark"] .primo-root.is-compact .primo-mascot:hover{background:var(--primo-green-dark)}
+html[data-theme="dark"] .primo-launcher-antenna{background:#131518}
+html[data-theme="dark"] .primo-launcher-antenna::before{background:var(--primo-yellow)}
+html[data-theme="dark"] .primo-launcher-head{background:linear-gradient(180deg, #1a1d21 0%, #272a32 100%);border:2px solid #3e434c}
+html[data-theme="dark"] .primo-launcher-visor{background:#3f434a}
+html[data-theme="dark"] .primo-launcher-eye{background:var(--primo-green);box-shadow:0 0 5px rgba(98, 178, 54, 0.9)}
+html[data-theme="dark"] .primo-launcher-close{color:#fff}
 
 /* ---- tech_match.css ---- */
 html[data-theme="dark"] .bp-page{color:#d7d9dd}

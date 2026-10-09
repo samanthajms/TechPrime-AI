@@ -1,12 +1,34 @@
 <?php
 /**
- * Primo — AI Product Assistant (CLIENT dashboard).
+ * Primo — AI Product Assistant (CLIENT storefront).
  * CSS robot UI + SVM-backed chat via backend/api/primo_chat.php
+ *
+ * Included by ep_footer.php on the pages ep_header.php allows ($epShowPrimo).
+ * The homepage shows the full robot; every other page gets the compact round launcher.
  */
+require_once __DIR__ . '/../includes/security.php';
+$primoCompact = empty($isHomePage);
+$primoCsrf = generateCsrfToken(); // guests too: the Primo chat endpoint requires it
+// Chat history is saved for logged-in clients only (same check as primo_history_api.php).
+$primoGuest = empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'client';
 ?>
-<div id="primoRoot" class="primo-root is-collapsed">
+<div id="primoRoot" class="primo-root is-collapsed<?php echo $primoCompact ? ' is-compact' : ''; ?>"<?php echo $primoGuest ? ' data-guest="1"' : ''; ?>>
     <div class="primo-stage">
-        <button type="button" class="primo-mascot" id="primoMascot" aria-label="Chat with Primo, AI Product Assistant" aria-expanded="false" aria-controls="primoPanel">
+        <button type="button" class="primo-mascot" id="primoMascot" aria-label="Chat with Primo, AI Product Assistant" aria-expanded="false" aria-controls="primoPanel"<?php echo $primoCompact ? ' title="Chat with Primo"' : ''; ?>>
+            <?php if ($primoCompact): ?>
+            <span class="primo-launcher" aria-hidden="true">
+                <span class="primo-launcher-face">
+                    <span class="primo-launcher-antenna"></span>
+                    <span class="primo-launcher-head">
+                        <span class="primo-launcher-visor">
+                            <span class="primo-launcher-eye"></span>
+                            <span class="primo-launcher-eye"></span>
+                        </span>
+                    </span>
+                </span>
+                <i class="fas fa-times primo-launcher-close"></i>
+            </span>
+            <?php else: ?>
             <span class="primo-figure" id="primoFigure" aria-hidden="true">
                 <!-- Compact robot built from CSS shapes -->
                 <span class="primo-antenna"><span class="primo-antenna-tip"></span></span>
@@ -31,10 +53,13 @@
                 </span>
             </span>
             <span class="primo-label">Primo</span>
+            <?php endif; ?>
         </button>
+        <?php if (!$primoCompact): ?>
         <button type="button" class="primo-tuck" id="primoTuck" aria-label="Hide Primo" title="Hide Primo" hidden>
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
         </button>
+        <?php endif; ?>
     </div>
 
     <div class="primo-backdrop" id="primoBackdrop" hidden></div>
@@ -133,3 +158,5 @@
         </form>
     </section>
 </div>
+<script>window.EP_CSRF = window.EP_CSRF || <?php echo json_encode($primoCsrf); ?>;</script>
+<script src="primo.js?v=ux-4" defer></script>

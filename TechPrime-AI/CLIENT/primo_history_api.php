@@ -185,13 +185,6 @@ function ph_preview(string $content): string
 }
 
 checkSessionTimeout();
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'client') {
-    ph_json(['ok' => false, 'error' => 'auth_required', 'message' => 'Please log in to use chat history.'], 401);
-}
-
-$db = getDbConnection();
-ph_ensure_tables($db);
-$uid = (int)$_SESSION['user_id'];
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $payload = [];
 $action = '';
@@ -211,12 +204,20 @@ if ($method === 'GET') {
     }
 }
 
-ph_cleanup($db, $uid);
-
+/* New chat clears Primo's context, which lives only in the session — guests need it too. */
 if ($action === 'reset_context' && $method === 'POST') {
     unset($_SESSION['primo_ctx']);
     ph_json(['ok' => true]);
 }
+
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'client') {
+    ph_json(['ok' => false, 'error' => 'auth_required', 'message' => 'Please log in to use chat history.'], 401);
+}
+
+$db = getDbConnection();
+ph_ensure_tables($db);
+$uid = (int)$_SESSION['user_id'];
+ph_cleanup($db, $uid);
 
 if ($action === 'list') {
     $days = PRIMO_HISTORY_DAYS;

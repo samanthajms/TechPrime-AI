@@ -28,8 +28,8 @@
     left: auto;
     right: 0;
     top: auto;
-    /* Sit clearly above the EasyFix message float (bottom-right ~56px). */
-    bottom: 96px;
+    /* Bottom-right corner, where it covers the least page content. */
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     z-index: 45;
     pointer-events: none;
     font-family: 'Poppins', 'Inter', Arial, sans-serif;
@@ -1554,7 +1554,6 @@
 @media (max-width: 960px) {
     .primo-root {
         --primo-size: 92px;
-        bottom: 90px;
     }
     .primo-figure {
         width: 74px;
@@ -1576,7 +1575,6 @@
 @media (max-width: 640px) {
     .primo-root {
         --primo-size: 78px;
-        bottom: 120px;
     }
     .primo-root.is-chat-open {
         z-index: 1250;
@@ -1639,4 +1637,173 @@
         transition: none !important;
     }
     .primo-typing-dot { opacity: 0.7; }
+}
+
+/* ---- Compact launcher (every Primo page except the homepage) ----
+ * A round button in the bottom-right corner instead of the full robot, so Primo
+ * doesn't sit on top of product grids. The chat panel opens above it, and the
+ * button turns into a close (X) while the chat is open.
+ * --primo-lift raises both when a page has its own bar fixed to the bottom.
+ */
+.primo-root.is-compact {
+    --primo-size: 58px;
+    --primo-gap: 20px;
+    --primo-lift: 0px;
+    right: var(--primo-gap);
+    bottom: calc(var(--primo-gap) + var(--primo-lift) + env(safe-area-inset-bottom, 0px));
+}
+
+.primo-root.is-compact .primo-stage,
+.primo-root.is-compact.is-expanded .primo-stage {
+    transform: none;
+}
+
+.primo-root.is-compact .primo-mascot {
+    height: var(--primo-size);
+    border-radius: 50%;
+    background: var(--primo-green);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+    filter: none;
+    justify-content: center;
+    gap: 0;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.primo-root.is-compact .primo-mascot:hover {
+    background: var(--primo-green-dark);
+    transform: translateY(-2px);
+}
+
+.primo-root.is-compact .primo-mascot:focus-visible {
+    border-radius: 50%;
+}
+
+.primo-launcher {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+.primo-launcher-face {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 4px;
+    transition: opacity 0.2s ease, transform 0.25s ease;
+}
+
+.primo-launcher-antenna {
+    position: relative;
+    width: 2px;
+    height: 6px;
+    background: #fff;
+    border-radius: 2px;
+}
+
+.primo-launcher-antenna::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    width: 7px;
+    height: 7px;
+    margin-left: -3.5px;
+    border-radius: 50%;
+    background: var(--primo-yellow);
+}
+
+.primo-launcher-head {
+    width: 36px;
+    height: 27px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #f4f5f7 0%, #e1e3e8 100%);
+    border: 2px solid #cfd3da;
+    border-radius: 11px 11px 9px 9px;
+    box-sizing: border-box;
+}
+
+.primo-launcher-visor {
+    width: 26px;
+    height: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: var(--primo-soft);
+    border-radius: 7px;
+}
+
+.primo-launcher-eye {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--primo-green);
+    box-shadow: 0 0 5px rgba(98, 178, 54, 0.9);
+}
+
+.primo-launcher-close {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-size: 22px;
+    opacity: 0;
+    transform: rotate(-90deg);
+    transition: opacity 0.2s ease, transform 0.25s ease;
+}
+
+.primo-root.is-chat-open .primo-launcher-face {
+    opacity: 0;
+    transform: scale(0.6);
+}
+
+.primo-root.is-chat-open .primo-launcher-close {
+    opacity: 1;
+    transform: rotate(0);
+}
+
+.primo-root.is-compact .primo-panel {
+    right: var(--primo-gap);
+    bottom: calc(var(--primo-gap) + var(--primo-lift) + var(--primo-size) + 12px);
+    width: min(392px, calc(100vw - 2 * var(--primo-gap)));
+    height: min(620px, calc(100vh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 52px));
+    height: min(620px, calc(100dvh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 52px));
+}
+
+.primo-root.is-compact.is-wide .primo-panel {
+    width: min(620px, calc(100vw - 2 * var(--primo-gap)));
+    height: calc(100vh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 52px);
+    height: calc(100dvh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 52px);
+}
+
+/* Build a PC shows a fixed total bar along the bottom at this width. */
+@media (max-width: 1000px) {
+    body:has(.tm-mobile-bar) .primo-root.is-compact {
+        --primo-lift: 76px;
+    }
+}
+
+@media (max-width: 640px) {
+    .primo-root.is-compact {
+        --primo-size: 54px;
+        --primo-gap: 16px;
+    }
+    .primo-root.is-compact .primo-panel,
+    .primo-root.is-compact.is-wide .primo-panel {
+        inset: 0;
+        width: 100%;
+        height: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .primo-root.is-compact .primo-mascot,
+    .primo-launcher-face,
+    .primo-launcher-close {
+        transition: none !important;
+    }
 }

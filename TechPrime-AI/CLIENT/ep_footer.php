@@ -3,6 +3,7 @@
  * ep_footer.php — Shared EasyPC footer for all CLIENT pages.
  * Variables expected:
  *   $isLoggedIn  (bool)
+ *   $epShowPrimo (bool, set by ep_header.php) — adds the Primo chat widget
  */
 ?>
     <footer class="ep-footer full-width">
@@ -50,6 +51,7 @@
         <div class="ep-footer-bottom">&copy; 2026 EASYPC One Oasis. All Rights Reserved.</div>
     </footer>
 
+<?php if (!empty($epShowPrimo)) include __DIR__ . '/primo.php'; ?>
     <script src="../includes/ui_alerts.js"></script>
     <script src="ep_back.js"></script>
     <script>
