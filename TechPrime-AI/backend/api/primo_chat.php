@@ -8,6 +8,8 @@ require_once __DIR__ . '/../../includes/security.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../../includes/product_categories.php';
 
+$primoHttp = PHP_SAPI !== 'cli' || realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === realpath(__FILE__);
+if ($primoHttp) {
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -42,6 +44,23 @@ if (preg_match('/<\s*script|javascript:|onerror\s*=/i', $message)) {
     exit;
 }
 
+if (primo_is_explanation_request($message)) {
+    $db = getDbConnection();
+    $messageForLookup = primo_apply_context($message, 'brand_advice');
+    $result = primo_brand_advice($db, $messageForLookup);
+    primo_store_context('brand_advice', $messageForLookup, $result['products'] ?? []);
+    echo json_encode([
+        'ok' => true,
+        'intent' => 'brand_advice',
+        'confidence' => 1,
+        'raw_intent' => 'brand_advice',
+        'reply' => $result['reply'],
+        'products' => $result['products'] ?? [],
+        'show_tech_match' => false,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $svm = primo_call_svm($message);
 if ($svm === null) {
     echo json_encode([
@@ -59,7 +78,12 @@ $db = getDbConnection();
 
 /* Short follow-ups like "how much?" reuse the last product topic from this session. */
 $messageForLookup = primo_apply_context($message, $intent);
-$result = primo_handle_intent($db, $intent, $messageForLookup, $confidence, $message);
+if ($intent === 'brand_advice' || primo_is_explanation_request($message)) {
+    $result = primo_brand_advice($db, $messageForLookup);
+    $intent = 'brand_advice';
+} else {
+    $result = primo_handle_intent($db, $intent, $messageForLookup, $confidence, $message);
+}
 primo_store_context($intent, $messageForLookup, $result['products'] ?? []);
 
 echo json_encode([
@@ -71,6 +95,7 @@ echo json_encode([
     'products' => $result['products'] ?? [],
     'show_tech_match' => !empty($result['show_tech_match']),
 ], JSON_UNESCAPED_UNICODE);
+}
 
 /**
  * Call local Flask SVM service.
@@ -137,10 +162,10 @@ function primo_apply_context(string $message, string $intent): string
     }
 
     $vague = (bool) preg_match(
-        '/^(how\s+much(\s+is\s+this)?|what.?s\s+the\s+price|price\s+please|is\s+(this|it)\s+(available|in\s+stock)|do\s+you\s+have\s+(this|it)|any\s+left|specs?\s*(please)?|tell\s+me\s+more|more\s+info)$/i',
+        '/^(how\s+much(\s+is\s+this)?|what.?s\s+the\s+price|price\s+please|is\s+(this|it)\s+(available|in\s+stock)|do\s+you\s+have\s+(this|it)|any\s+left|specs?\s*(please)?|tell\s+me\s+more|more\s+info|why(\s+that)?|explain(\s+more)?|more\s+details|details(\s+please)?|and\s+why)$/i',
         trim($message)
     );
-    $productIntents = ['product_price', 'stock_inquiry', 'product_search', 'product_category', 'product_recommendation'];
+    $productIntents = ['product_price', 'stock_inquiry', 'product_search', 'product_category', 'product_recommendation', 'brand_advice'];
     if ($vague || (in_array($intent, $productIntents, true) && mb_strlen(trim($message)) < 18)) {
         $topic = trim((string) $ctx['topic']);
         if ($topic !== '' && stripos($message, $topic) === false) {
@@ -158,7 +183,7 @@ function primo_store_context(string $intent, string $message, array $products): 
 {
     $keep = [
         'product_search', 'product_category', 'product_price', 'stock_inquiry',
-        'product_recommendation', 'compatibility_question', 'saved_build',
+        'product_recommendation', 'compatibility_question', 'saved_build', 'brand_advice',
     ];
     if (!in_array($intent, $keep, true)) {
         return;
@@ -185,6 +210,279 @@ function primo_store_context(string $intent, string $message, array $products): 
         'topic' => $topic,
         'at' => time(),
     ];
+}
+
+function primo_is_explanation_request(string $message): bool
+{
+    $trim = trim($message);
+    if (preg_match('/^(why|explain|details|tell me more|and why)[.!?\s]*$/i', $trim)) {
+        return true;
+    }
+    return (bool) preg_match(
+        '/\b(best\s+brands?|which\s+brands?|what\s+brands?|brand\s+and\s+why|explain|explanation|give\s+me\s+details|more\s+details|tell\s+me\s+why|why\s+that|why\s+is\s+that|compare\s+brands?|which\s+is\s+better|what\s+makes)\b/i',
+        $message
+    );
+}
+
+function primo_match_category(string $message): ?string
+{
+    $categoryMap = [
+        'laptop' => 'Laptops',
+        'laptops' => 'Laptops',
+        'desktop' => 'Desktop',
+        'desktops' => 'Desktop',
+        'audio' => 'Audio',
+        'headset' => 'Audio',
+        'headsets' => 'Audio',
+        'speaker' => 'Speaker',
+        'cooling' => 'Cooling',
+        'accessories' => 'Accessories',
+        'accessory' => 'Accessories',
+        'keyboard' => 'Keyboard',
+        'mouse' => 'Mouse',
+        'printer' => 'Printers and Scanners',
+        'scanner' => 'Printers and Scanners',
+        'gpu' => 'GPU',
+        'graphics' => 'GPU',
+        'geforce' => 'GPU',
+        'radeon' => 'GPU',
+        'rtx' => 'GPU',
+        'gtx' => 'GPU',
+        'ram' => 'RAM',
+        'memory' => 'RAM',
+        'motherboard' => 'Motherboard',
+        'processor' => 'Processor',
+        'cpu' => 'Processor',
+        'ryzen' => 'Processor',
+        'ssd' => 'Storage',
+        'hdd' => 'Storage',
+        'storage' => 'Storage',
+        'psu' => 'PSU',
+        'power supply' => 'PSU',
+        'cooler' => 'Cooling',
+        'monitor' => 'Monitor',
+        'case' => 'Case',
+    ];
+    $matched = null;
+    $bestLen = 0;
+    foreach ($categoryMap as $needle => $cat) {
+        if (!preg_match('/\b' . preg_quote($needle, '/') . '\b/i', $message)) {
+            continue;
+        }
+        $len = mb_strlen($needle);
+        if ($len > $bestLen) {
+            $bestLen = $len;
+            $matched = $cat;
+        }
+    }
+    return $matched;
+}
+
+/**
+ * Explain a brand choice from the live catalog. "Best" means the brand with the most items in stock.
+ *
+ * @return array{reply:string,products:array}
+ */
+function primo_brand_advice(PDO $db, string $message): array
+{
+    $category = primo_match_category($message);
+    $focus = trim((string) preg_replace(
+        '/\b(give|me|details|detail|explain|explanation|best|brand|brands|why|because|the|a|an|or|to|and|please|about|you|your|our|shop|store|what|which|is|are|for|of|that|this|tell|more)\b/i',
+        ' ',
+        $message
+    ));
+    $focus = trim((string) preg_replace('/\s+/', ' ', $focus));
+    $categoryWords = $category !== null;
+    if ($categoryWords) {
+        $focus = trim((string) preg_replace('/\b(laptop|laptops|desktop|desktops|gpu|graphics|ram|memory|motherboard|processor|cpu|ryzen|ssd|hdd|storage|psu|power supply|cooler|cooling|monitor|keyboard|mouse|headset|headsets|case)\b/i', ' ', $focus));
+        $focus = trim((string) preg_replace('/\s+/', ' ', $focus));
+    }
+
+    $wantsBrand = (bool) preg_match('/\bbrands?\b/i', $message);
+    $products = [];
+    if (!$wantsBrand && $focus !== '' && mb_strlen($focus) >= 3) {
+        $products = primo_find_products($db, $focus, 'product_search', true);
+    }
+
+    if (empty($products) && !$wantsBrand && $focus !== '') {
+        $family = '';
+        if (preg_match('/\b(rtx|gtx|ryzen|radeon)\b/i', $focus, $familyMatch)) {
+            $family = $familyMatch[1];
+            $products = primo_products_named_like($db, $family);
+        }
+        if ($products !== []) {
+            usort($products, static function ($a, $b) {
+                $score = static function ($row) {
+                    $name = mb_strtolower((string) ($row['name'] ?? ''));
+                    return str_contains($name, 'videocard') || str_contains($name, 'video card') ? 1 : 0;
+                };
+                return $score($b) <=> $score($a);
+            });
+            $lines = [];
+            foreach (array_slice($products, 0, 3) as $p) {
+                $stock = (int) $p['stock'];
+                $avail = $stock > 0 ? "in stock ({$stock})" : 'out of stock';
+                $lines[] = '• ' . $p['name'] . ' — ₱' . number_format((float) $p['price'], 2) . ' — ' . $avail;
+            }
+            $reply = "I checked the EasyPC catalog and there is no exact match for \"{$focus}\". "
+                . "The closest {$family} items we actually sell are:\n"
+                . implode("\n", $lines)
+                . "\nAsk me for the price, the stock, or which of these fits a budget and I will narrow it down.";
+            return ['reply' => $reply, 'products' => array_slice($products, 0, 3)];
+        }
+        $where = $category !== null ? " for {$category}" : '';
+        return [
+            'reply' => "I checked the EasyPC catalog and could not find \"{$focus}\"{$where}. Tell me another model, or ask for the best brand in a category such as GPU, laptop, or RAM.",
+            'products' => [],
+        ];
+    }
+
+    if (!empty($products)) {
+        $top = $products[0];
+        $brand = primo_brand_from_name((string) $top['name']);
+        $stock = (int) $top['stock'];
+        $avail = $stock > 0 ? "in stock ({$stock} available)" : 'currently out of stock';
+        $price = number_format((float) $top['price'], 2);
+        $cat = $category ?? primo_match_category((string) $top['name']) ?? ($top['category'] !== '' ? $top['category'] : 'this category');
+        $stats = primo_brand_stats($db, $cat !== 'this category' ? $cat : null);
+        $why = '';
+        foreach ($stats as $row) {
+            if (strcasecmp($row['brand'], $brand) === 0) {
+                $why = " {$brand} is one of the brands we actually sell in {$cat}: {$row['stocked']} in stock, priced from ₱" . number_format($row['min'], 2) . " to ₱" . number_format($row['max'], 2) . ".";
+                break;
+            }
+        }
+        $reply = "{$top['name']} is a {$cat} from {$brand}. It is ₱{$price} and {$avail}.{$why} I use our catalog for this, not a guess from outside the store. Ask me to compare another brand, or name a budget and I will narrow it down.";
+        return ['reply' => $reply, 'products' => array_slice($products, 0, 3)];
+    }
+
+    $scope = $category ?? null;
+    $stats = primo_brand_stats($db, $scope);
+    if ($stats === []) {
+        return [
+            'reply' => "I can explain brands only from what EasyPC has in the catalog, and I could not find products for that yet. Name a category such as GPU, laptop, or RAM and I will compare the brands we sell.",
+            'products' => [],
+        ];
+    }
+
+    $lead = $stats[0];
+    $where = $scope !== null ? "in {$scope}" : 'across the EasyPC catalog';
+    $lines = [];
+    foreach (array_slice($stats, 0, 4) as $row) {
+        $lines[] = '• ' . $row['brand'] . ' — ' . $row['stocked'] . ' in stock (' . $row['count'] . ' listed), ₱' . number_format($row['min'], 2) . '–₱' . number_format($row['max'], 2);
+    }
+    $reply = "You asked for the best brand and why. In this store I do not invent a winner. I pick the brand you can actually buy today: the one with the most items in stock {$where}. That is {$lead['brand']}, with {$lead['stocked']} in stock"
+        . ($lead['count'] !== $lead['stocked'] ? " out of {$lead['count']} listed" : '')
+        . ', from ₱' . number_format($lead['min'], 2) . ' to ₱' . number_format($lead['max'], 2) . ".\n"
+        . implode("\n", $lines)
+        . "\nTell me a category, a budget, or a part name and I will explain that choice the same way.";
+
+    return ['reply' => $reply, 'products' => []];
+}
+
+function primo_category_name_pattern(string $category): ?string
+{
+    $patterns = [
+        'GPU' => 'videocard|video card|radeon rx|geforce',
+        'Processor' => 'ryzen|core i[3579]|processor',
+        'RAM' => 'ddr[345]|\\yram\\y|memory',
+        'Laptops' => 'laptop|vivobook|ideapad|notebook|chromebook',
+        'Monitor' => 'monitor',
+        'Storage' => 'ssd|nvme|hdd|hard disk',
+        'Motherboard' => 'motherboard',
+        'PSU' => 'power supply|\\ypsu\\y',
+        'Cooling' => 'cooler|cooling fan|chassis fan',
+        'Keyboard' => 'keyboard',
+        'Mouse' => '\\ymouse\\y',
+        'Audio' => 'headset|earphone|headphone',
+        'Case' => 'pc case|chassis',
+        'Desktop' => 'desktop computer|mini pc',
+        'Speaker' => 'speaker',
+    ];
+    return $patterns[$category] ?? null;
+}
+
+/**
+ * In-stock catalog rows whose name matches a word, without dropping a row for a missing image file.
+ * @return list<array{id:int,name:string,price:float,stock:int,category:string,image:string}>
+ */
+function primo_products_named_like(PDO $db, string $word): array
+{
+    $word = trim($word);
+    if ($word === '') {
+        return [];
+    }
+    $condition = ias_client_product_list_sql_condition('p');
+    $sql = "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url
+            FROM products p
+            WHERE {$condition} AND p.name ~* ?
+            ORDER BY p.id DESC
+            LIMIT 12";
+    $stmt = $db->prepare($sql);
+    $stmt->execute(['\\y' . preg_quote($word, '/') . '\\y']);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    return primo_map_product_rows($rows);
+}
+
+function primo_brand_from_name(string $name): string
+{
+    if (preg_match('/^([A-Za-z0-9][A-Za-z0-9&+.\-]*)/u', trim($name), $m)) {
+        return $m[1];
+    }
+    return 'That brand';
+}
+
+/**
+ * @return list<array{brand:string,count:int,stocked:int,min:float,max:float}>
+ */
+function primo_brand_stats(PDO $db, ?string $category): array
+{
+    $condition = ias_client_product_list_sql_condition('p');
+    $sql = "SELECT p.name, p.price, p.stock, p.category FROM products p WHERE {$condition}";
+    $params = [];
+    if ($category !== null && $category !== '') {
+        $sql .= ' AND (' . ias_category_in_sql('p.category', $category, $params);
+        $pattern = primo_category_name_pattern($category);
+        if ($pattern !== null) {
+            $sql .= ' OR p.name ~* ?';
+            $params[] = $pattern;
+        }
+        $sql .= ')';
+    }
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $stats = [];
+    foreach ($rows as $row) {
+        $brand = primo_brand_from_name((string) ($row['name'] ?? ''));
+        if ($brand === 'That brand') {
+            continue;
+        }
+        $key = mb_strtolower($brand);
+        if (!isset($stats[$key])) {
+            $stats[$key] = ['brand' => $brand, 'count' => 0, 'stocked' => 0, 'min' => (float) $row['price'], 'max' => (float) $row['price']];
+        }
+        $price = (float) $row['price'];
+        $stats[$key]['count']++;
+        if ((int) ($row['stock'] ?? 0) > 0) {
+            $stats[$key]['stocked']++;
+        }
+        $stats[$key]['min'] = min($stats[$key]['min'], $price);
+        $stats[$key]['max'] = max($stats[$key]['max'], $price);
+    }
+
+    $list = array_values($stats);
+    usort($list, function ($a, $b) {
+        if ($a['stocked'] !== $b['stocked']) {
+            return $b['stocked'] <=> $a['stocked'];
+        }
+        if ($a['count'] !== $b['count']) {
+            return $b['count'] <=> $a['count'];
+        }
+        return strcasecmp($a['brand'], $b['brand']);
+    });
+    return $list;
 }
 
 /**
@@ -423,57 +721,18 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
  * Search real products using existing client visibility rules.
  * @return list<array{id:int,name:string,price:float,stock:int,category:string}>
  */
-function primo_find_products(PDO $db, string $message, string $intent): array
+function primo_find_products(PDO $db, string $message, string $intent, bool $strict = false): array
 {
     $condition = ias_client_product_list_sql_condition('p');
     $lower = mb_strtolower($message);
 
-    $categoryMap = [
-        'laptop' => 'Laptops',
-        'laptops' => 'Laptops',
-        'desktop' => 'Desktop',
-        'desktops' => 'Desktop',
-        'audio' => 'Audio',
-        'headset' => 'Audio',
-        'headsets' => 'Audio',
-        'speaker' => 'Speaker',
-        'cooling' => 'Cooling',
-        'accessories' => 'Accessories',
-        'accessory' => 'Accessories',
-        'keyboard' => 'Keyboard',
-        'mouse' => 'Mouse',
-        'printer' => 'Printers and Scanners',
-        'scanner' => 'Printers and Scanners',
-        'gpu' => 'GPU',
-        'graphics' => 'GPU',
-        'ram' => 'RAM',
-        'memory' => 'RAM',
-        'motherboard' => 'Motherboard',
-        'processor' => 'Processor',
-        'cpu' => 'Processor',
-        'ryzen' => 'Processor',
-        'ssd' => 'Storage',
-        'hdd' => 'Storage',
-        'storage' => 'Storage',
-        'psu' => 'PSU',
-        'power supply' => 'PSU',
-        'cooler' => 'Cooling',
-        'monitor' => 'Monitor',
-        'case' => 'Case',
-    ];
-
-    $matchedCategory = null;
-    foreach ($categoryMap as $needle => $cat) {
-        if (preg_match('/\b' . preg_quote($needle, '/') . '\b/i', $message)) {
-            $matchedCategory = $cat;
-            break;
-        }
-    }
+    $matchedCategory = primo_match_category($message);
 
     $tokens = preg_split('/\s+/', preg_replace('/[^\p{L}\p{N}\-+#.]/u', ' ', $lower) ?? '') ?: [];
     $stop = [
         'a','an','the','is','are','do','you','have','this','that','for','my','me','i','to','of','in','on',
         'what','which','how','much','price','cost','stock','available','availability','recommend','recommendation',
+        'explain','explanation','details','detail','brand','brands','why','because','reason','reasons','better','compare','give',
         'looking','need','show','find','want','buy','good','best','should','would','please','can','about',
         'product','products','pc','computer','item','items','with','and','or','your','from','any','play',
         'get','suggest','advice','advise','help','choose','still','right','now','tell',
@@ -500,17 +759,27 @@ function primo_find_products(PDO $db, string $message, string $intent): array
         $preferCats = ['Desktop', 'Laptops', 'Audio', 'GPU', 'Accessories'];
     }
 
-    $attempts = [
-        ['category' => $matchedCategory, 'cats' => $preferCats, 'keywords' => $keywords],
-        ['category' => $matchedCategory, 'cats' => $preferCats, 'keywords' => []],
-        ['category' => $matchedCategory, 'cats' => null, 'keywords' => $keywords],
-        ['category' => null, 'cats' => $preferCats, 'keywords' => []],
-        ['category' => null, 'cats' => null, 'keywords' => $keywords],
-    ];
+    $attempts = [];
+    if (count($keywords) >= 2) {
+        $attempts[] = ['category' => $matchedCategory, 'cats' => $preferCats, 'keywords' => $keywords, 'match_all' => true];
+    }
+    $attempts = array_merge($attempts, [
+        ['category' => $matchedCategory, 'cats' => $preferCats, 'keywords' => $keywords, 'match_all' => false],
+        ['category' => $matchedCategory, 'cats' => $preferCats, 'keywords' => [], 'match_all' => false],
+        ['category' => $matchedCategory, 'cats' => null, 'keywords' => $keywords, 'match_all' => false],
+        ['category' => null, 'cats' => $preferCats, 'keywords' => [], 'match_all' => false],
+        ['category' => null, 'cats' => null, 'keywords' => $keywords, 'match_all' => false],
+    ]);
 
-    // Recommendations with no useful tokens: show newest catalog items
-    if (in_array($intent, ['product_recommendation', 'product_search', 'product_category'], true)) {
+    // Recommendations with no useful tokens: show newest catalog items.
+    // A strict lookup must not invent a product when the name does not match.
+    if (!$strict && in_array($intent, ['product_recommendation', 'product_search', 'product_category'], true)) {
         $attempts[] = ['category' => null, 'cats' => null, 'keywords' => []];
+    }
+    if ($strict) {
+        $attempts = array_values(array_filter($attempts, static function ($attempt) {
+            return !empty($attempt['keywords']);
+        }));
     }
 
     $seen = [];
@@ -521,7 +790,14 @@ function primo_find_products(PDO $db, string $message, string $intent): array
         }
         $seen[$key] = true;
 
-        $rows = primo_query_products($db, $condition, $attempt['category'], $attempt['cats'], $attempt['keywords']);
+        $rows = primo_query_products(
+            $db,
+            $condition,
+            $attempt['category'],
+            $attempt['cats'],
+            $attempt['keywords'],
+            !empty($attempt['match_all'])
+        );
         if (!empty($attempt['keywords']) && !empty($rows)) {
             $rows = primo_rank_products($rows, $attempt['keywords']);
         }
@@ -574,7 +850,7 @@ function primo_rank_products(array $rows, array $keywords): array
  * @param list<string> $keywords
  * @return list<array>
  */
-function primo_query_products(PDO $db, string $condition, ?string $category, ?array $cats, array $keywords): array
+function primo_query_products(PDO $db, string $condition, ?string $category, ?array $cats, array $keywords, bool $matchAll = false): array
 {
     $sql = "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url
             FROM products p
@@ -603,7 +879,7 @@ function primo_query_products(PDO $db, string $condition, ?string $category, ?ar
             $params[] = $like;
             $params[] = $like;
         }
-        $sql .= ' AND (' . implode(' OR ', $ors) . ')';
+        $sql .= ' AND (' . implode($matchAll ? ' AND ' : ' OR ', $ors) . ')';
     }
 
     $sql .= ' ORDER BY p.id DESC LIMIT 40';

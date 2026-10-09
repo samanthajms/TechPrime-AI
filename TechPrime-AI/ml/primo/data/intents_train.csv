@@ -548,3 +548,70 @@ ttyl,goodbye
 What can Primo do?,help
 how do i use this chat,help
 what can you do,help
+how much does the ryzen 5 cost,product_price
+magkano ang rtx 4060,product_price
+magkano po ito,product_price
+ilang piso ang monitor na ito,product_price
+price of the kingston ram,product_price
+whats the price of the 1tb ssd,product_price
+can you price the logitech mouse,product_price
+how much po for this headset,product_price
+hm is the gpu,product_price
+tell me the cost of that motherboard,product_price
+meron ba kayong rtx 4060,stock_inquiry
+available pa ba ang laptop na ito,stock_inquiry
+out of stock ba ang keyboard,stock_inquiry
+may stock pa ba ng ryzen 5,stock_inquiry
+is the 1tb nvme still in stock,stock_inquiry
+check if this monitor is available,stock_inquiry
+do you still carry this mouse,stock_inquiry
+in stock po ba ang headset,stock_inquiry
+show everything under monitors,product_category
+browse the processor category,product_category
+list all items in storage,product_category
+open the keyboard category,product_category
+what is in the psu category,product_category
+show the whole laptop category,product_category
+browse all graphics cards,product_category
+list the ram category,product_category
+search for asus tuf,product_search
+find kingston fury,product_search
+look for samsung 980,product_search
+find the rtx 4060 ti,product_search
+search ryzen 7 7700,product_search
+do you carry the logitech g502,product_search
+look up the b550 motherboard,product_search
+find a 650w power supply,product_search
+suggest a gpu for 1080p,product_recommendation
+recommend a laptop for school,product_recommendation
+what should I buy for video editing,product_recommendation
+suggest a budget gaming pc,product_recommendation
+which cpu should I get,product_recommendation
+tell me a joke,fallback
+what is the weather today,fallback
+who won the game last night,fallback
+write me a poem,fallback
+what is 2 plus 2,fallback
+sing a song,fallback
+saan ang branch ninyo,store_information
+where is the one oasis branch,store_information
+anong oras kayo bukas,store_information
+store location please,store_information
+how do I contact the shop,store_information
+where is your store,store_information
+give me details or explain to me the best brand and why,brand_advice
+explain the best brand and why,brand_advice
+what brand is best and why,brand_advice
+which brand should I buy and why,brand_advice
+why is that brand the best,brand_advice
+compare brands for me,brand_advice
+explain why this brand is better,brand_advice
+tell me why that brand,brand_advice
+give me details about the best gpu brand,brand_advice
+explain the best laptop brand,brand_advice
+which brand is better for ram,brand_advice
+what makes a brand the best here,brand_advice
+more details on the best brand,brand_advice
+explain brands in your store,brand_advice
+why should I pick that brand,brand_advice
+compare the brands you sell,brand_advice

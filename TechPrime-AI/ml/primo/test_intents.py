@@ -44,6 +44,19 @@ CASES = [
     ("where are my saved builds?", "saved_build"),
     ("open my saved build", "saved_build"),
     ("Tell me a joke about quantum physics", "fallback"),
+    ("magkano ang rtx 4060", "product_price"),
+    ("how much does the ryzen 5 cost", "product_price"),
+    ("meron ba kayong rtx 4060", "stock_inquiry"),
+    ("is the 1tb nvme still in stock", "stock_inquiry"),
+    ("show the whole laptop category", "product_category"),
+    ("find the rtx 4060 ti", "product_search"),
+    ("search for asus tuf", "product_search"),
+    ("suggest a gpu for 1080p", "product_recommendation"),
+    ("where is the one oasis branch", "store_information"),
+    ("what is the weather today", "fallback"),
+    ("give me details or explain to me the best brand and why?", "brand_advice"),
+    ("which brand should I buy and why", "brand_advice"),
+    ("explain the best laptop brand", "brand_advice"),
 ]
 
 

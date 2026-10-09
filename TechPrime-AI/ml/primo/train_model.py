@@ -136,8 +136,13 @@ def main() -> None:
     print(cm)
     print()
 
+    # Hold-out scores stay on the split above. The file the API serves is fit on
+    # every labeled row so live replies use the full training set.
+    production = build_pipeline()
+    production.fit(X, y)
+
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    joblib.dump(pipe, PIPELINE_PATH)
+    joblib.dump(production, PIPELINE_PATH)
 
     per_intent = {}
     for i, lab in enumerate(labels):
@@ -158,6 +163,8 @@ def main() -> None:
         "n_samples": len(df),
         "n_train": len(X_train),
         "n_test": len(X_test),
+        "production_fit": "all_labeled_examples",
+        "n_production": len(df),
         "accuracy": float(acc),
         "macro_precision": float(precision.mean()) if len(precision) else 0.0,
         "macro_recall": float(recall.mean()) if len(recall) else 0.0,
