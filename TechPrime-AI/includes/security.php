@@ -1,9 +1,9 @@
 <?php
-// Idle session timeout switch. TEMPORARILY DISABLED for local development — set back to true
-// before deployment. When false: no idle sign-out, no idle warning / signed-out dialog
+// Idle session timeout switch (15 min, IAS_SESSION_IDLE_TIMEOUT). Set to false only for local
+// development. When false: no idle sign-out, no idle warning / signed-out dialog
 // (includes/session_timeout.js is not loaded), and PHP keeps idle sessions for 8 hours
 // instead of php.ini's 24 minutes so they are not silently garbage-collected.
-const IAS_SESSION_TIMEOUT_ENABLED = false;
+const IAS_SESSION_TIMEOUT_ENABLED = true;
 
 if (session_status() === PHP_SESSION_NONE) {
     if (!IAS_SESSION_TIMEOUT_ENABLED) {
