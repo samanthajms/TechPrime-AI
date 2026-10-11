@@ -74,11 +74,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     $returnStatus = trim((string)($_POST['return_status'] ?? ''));
     $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
     if ($oid > 0 && in_array($status, $allowed, true)) {
-        $prev = $db->prepare('SELECT user_id, status FROM orders WHERE id = ? LIMIT 1');
+        $prev = $db->prepare('SELECT user_id, status, cancel_requested FROM orders WHERE id = ? LIMIT 1');
         $prev->execute([$oid]);
         $prevRow = $prev->fetch(PDO::FETCH_ASSOC) ?: [];
         $prevStatus = (string)($prevRow['status'] ?? '');
         $orderUserId = (int)($prevRow['user_id'] ?? 0);
+
+        // Completed / cancelled orders are final (stock already deducted, sale recorded).
+        if (!$prevRow || in_array($prevStatus, ['to_review', 'cancelled'], true) || !empty($prevRow['cancel_requested'])) {
+            header('Location: inventory_orders.php?alert=order_locked');
+            exit;
+        }
+
+        if ($status === 'to_review') {
+            // Completed: deduct stock, record the sale for the Retail Officer, notify everyone.
+            $done = ep_complete_order($db, $oid, 0, $uid);
+            $redirectParams = ['alert' => !empty($done['ok']) ? 'order_completed' : 'order_complete_failed', 'page' => $returnPage];
+            if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
+                $redirectParams['status'] = $returnStatus;
+            }
+            header('Location: inventory_orders.php?' . http_build_query($redirectParams));
+            exit;
+        }
 
         $up = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
         $up->execute([$status, $oid]);
@@ -452,6 +469,8 @@ EXTRA
                                                     <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
                                                     <button type="submit" class="btn btn-primary btn-sm">Accept</button>
                                                 </form>
+                                            <?php elseif (in_array($ost, ['to_review', 'cancelled'], true)): ?>
+                                                <span class="text-muted text-small" style="font-weight:700;"><?php echo $ost === 'to_review' ? 'Completed' : 'Cancelled'; ?></span>
                                             <?php else: ?>
                                             <form method="post" style="display:flex;gap:6px;margin:0;align-items:center;flex-wrap:wrap;">
                                                 <input type="hidden" name="action" value="update_status">
@@ -534,10 +553,13 @@ EXTRA
 <?php
 $flash = '';
 if ($__m = ias_alert_message_from_request()) {
-    $__t = ((!empty($_GET['alert']) && $_GET['alert'] === 'error') || !empty($_GET['error'])) ? 'error' : 'success';
+    $__a = (string)($_GET['alert'] ?? '');
+    $__t = (in_array($__a, ['error', 'order_locked', 'order_complete_failed'], true) || !empty($_GET['error'])) ? 'error' : 'success';
+    $__opts = $__a === 'order_completed' ? ['title' => 'Completed Order'] : new stdClass();
     $flash = '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof IAS_UI!=="undefined")IAS_UI.alert('
         . json_encode($__m, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ','
-        . json_encode($__t) . ',0);});</script>';
+        . json_encode($__t) . ',0,'
+        . json_encode($__opts) . ');});</script>';
 }
 
 $chartScript = <<<SCRIPT
