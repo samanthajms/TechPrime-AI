@@ -41,13 +41,13 @@ if (!in_array($category, $categoryTabs, true)) {
     $category = '';
 }
 $salesRows = ias_filter_delivery_rows_by_group(ias_fetch_delivery_rows($db, $retailId, $from, $to), $category);
-$byGroup = ias_delivered_units_by_group($db, $retailId, $salesRows);   // one pie per Client menu group
+$byGroup = ias_delivered_units_by_group($db, $retailId, $salesRows, $from, $to);   // one pie per Client menu group
 if ($category !== '') {
     $byGroup = array_intersect_key($byGroup, [$category => true]);
 }
 
 // Sales graph for the selected category ('' = all): units delivered per day, or per month for long ranges
-$unitsByDate = ias_delivered_units_by_date($db, $retailId, $salesRows, $category);
+$unitsByDate = ias_delivered_units_by_date($db, $retailId, $salesRows, $category, $from, $to);
 $byMonth = $from->diff($to)->days > 62;
 $trendLabels = [];
 $trendData = [];
@@ -232,7 +232,7 @@ $logoPath = staff_logo_href();
                         <tbody>
                         <?php foreach ($m['orders'] as $o): ?>
                             <tr>
-                                <td>#<?php echo (int)$o['order_id']; ?></td>
+                                <td><?php echo h($o['ref']); ?></td>
                                 <td><?php echo h($o['customer_name']); ?></td>
                                 <td><?php echo h(substr($o['created_at'], 0, 10)); ?></td>
                                 <td><?php echo (int)$o['units']; ?></td>
