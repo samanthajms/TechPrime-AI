@@ -47,8 +47,8 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
         && !$cancelRequested
         && $currentFilter === 'to_receive';
     // Remove: summary (to_pay / cancelled) or any history row — not active ship/receive.
-    $canRemove = $isHistory
-        || in_array($ostNorm, ['to_pay', 'to pay', 'cancelled', 'canceled'], true);
+    $canRemove = ($isHistory || in_array($ostNorm, ['to_pay', 'to pay', 'cancelled', 'canceled'], true))
+        && !($cancelRequested && !in_array($ostNorm, ['cancelled', 'canceled'], true));
 
     if ($cancelRequested && $ostNorm !== 'cancelled' && $ostNorm !== 'canceled') {
         $statusLabel = 'Cancellation Requested';
