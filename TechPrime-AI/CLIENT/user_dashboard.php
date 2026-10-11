@@ -153,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'cance
     $result = ep_request_order_cancel($db, $user_id, $oid, $reason);
     $redir = 'user_dashboard.php?status=to_pay&';
     if (!empty($result['ok'])) {
-        $redir = 'user_dashboard.php?alert=cancel_requested#order-history';
+        $redir .= 'alert=cancel_requested';
     } elseif (($result['error'] ?? '') === 'already_cancelled') {
         $redir .= 'alert=already_cancelled';
     } elseif (($result['error'] ?? '') === 'not_cancellable') {
@@ -388,8 +388,6 @@ if ($search_query !== '') {
 
 // ---- Order Summary (active only) ----
 $summaryWhere = " AND LOWER(TRIM(o.status)) IN ('to_pay', 'to_ship', 'to_receive', 'to pay', 'to ship', 'to receive')";
-// Orders with a pending cancellation request are listed in Order History, not here.
-$summaryWhere .= ' AND COALESCE(o.cancel_requested, FALSE) = FALSE';
 $summaryParams = [$user_id];
 if ($current_filter === 'to_ship' || $current_filter === 'to_receive') {
     $summaryWhere .= " AND LOWER(TRIM(o.status)) IN ('to_ship', 'to_receive', 'to ship', 'to receive')";
@@ -417,7 +415,6 @@ $orders = $stOrders->fetchAll(PDO::FETCH_ASSOC);
 // ---- Order History (received / cancelled) ----
 $historyWhere = " AND (
     LOWER(TRIM(o.status)) IN ('to_review', 'to review', 'cancelled', 'canceled')
-    OR COALESCE(o.cancel_requested, FALSE) = TRUE
 )";
 $historyWhere .= $searchSql;
 $historyParams = array_merge([$user_id], $searchParams);
@@ -796,7 +793,7 @@ if ($showSettings) {
                         <span class="pf-history-count"><?php echo (int)$historyTotal; ?> completed / cancelled</span>
                     <?php endif; ?>
                 </div>
-                <p class="pf-orders-sub">Completed orders, cancelled orders and pending cancellation requests appear here.</p>
+                <p class="pf-orders-sub">Orders you marked as received (and cancelled orders) appear here.</p>
 
                 <?php if (count($historyOrders) > 0): ?>
                     <ul class="pf-order-list">

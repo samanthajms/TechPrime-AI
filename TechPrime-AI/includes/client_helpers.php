@@ -721,8 +721,7 @@ function ep_accept_order_cancel(PDO $db, int $orderId, int $staffUserId = 0): ar
         $up = $db->prepare(
             "UPDATE orders
              SET status = 'cancelled',
-                 cancel_requested = FALSE,
-                 client_history_hidden = FALSE
+                 cancel_requested = FALSE
              WHERE id = ? AND COALESCE(cancel_requested, FALSE) = TRUE"
         );
         $up->execute([$orderId]);
