@@ -17,7 +17,7 @@ $bodyClass  = 'ep-success-layout';
     <div class="ep-panel ep-success-card">
         <div class="ep-success-icon"><i class="fas fa-check"></i></div>
         <h2 class="ep-page-title">Order Confirmed</h2>
-        <p class="ep-info-note" style="margin-bottom:20px;">Your items are now being prepared for shipment.</p>
+        <p class="ep-info-note" style="margin-bottom:20px;">Your order is waiting for payment under Order Summary → To Pay.</p>
 
         <div class="ep-panel" style="text-align:left;margin-bottom:0;">
             <div class="ep-order-line">
@@ -25,20 +25,21 @@ $bodyClass  = 'ep-success-layout';
                 <strong>#<?php echo $orderId; ?></strong>
             </div>
             <div class="ep-order-line">
-                <span>Payment Method</span>
-                <strong>Cash on Delivery</strong>
+                <span>Status</span>
+                <strong>To Pay</strong>
             </div>
             <div class="ep-order-total" style="border-top:1px solid var(--ep-border);">
-                <span>Total Paid</span>
+                <span>Amount due</span>
                 <strong>₱<?php echo $total; ?></strong>
             </div>
         </div>
 
         <div class="ep-success-actions">
-            <a href="user_dashboard.php?status=To Ship" class="ep-btn ep-btn-primary">Track My Order</a>
-            <a href="index.php" class="ep-btn ep-btn-yellow">Return to Homepage</a>
+            <a href="payment.php?order_id=<?php echo (int)$orderId; ?>" class="ep-btn ep-btn-primary">Pay now</a>
+            <a href="user_dashboard.php?status=to_pay" class="ep-btn ep-btn-yellow">Go to To Pay</a>
         </div>
     </div>
 </main>
 
 <?php include __DIR__ . '/ep_footer.php'; ?>
+<?php ias_alert_footer(); ?>

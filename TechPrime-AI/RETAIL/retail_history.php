@@ -19,7 +19,7 @@ $productFilter = trim($_GET['product'] ?? '');
 
 $filters = ['customer' => $customerFilter, 'product' => $productFilter];
 $rows = ias_fetch_delivery_rows($db, $retailId, $from, $to, $filters);
-$byCategory = ias_deliveries_by_category($rows);
+$byGroup = ias_delivered_units_by_group($db, $retailId, $rows);   // one pie per Client menu group
 $stats = ias_summarize_deliveries($db, $retailId, $from, $to, count($rows));
 
 $presets = ias_report_date_presets();
@@ -30,18 +30,22 @@ function ias_qs2(array $overrides = []): string
     return h(http_build_query($params));
 }
 
-logActivity($db, $retailId, 'view_history', 'Retail Officer viewed delivery history');
+logActivity($db, $retailId, 'view_history', 'Retail Officer viewed sales');
 
 staff_page_start([
     'role' => 'retail_officer',
-    'title' => 'History',
+    'title' => 'Sales',
     'active' => 'history',
-    'heading' => 'Delivery History',
+    'heading' => 'Sales',
     'subtitle' => 'Completed deliveries only',
     'extra_head' => <<<'EXTRA'
 <style>
 .report-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; margin-bottom: 4px; }
 .print-header { display: none; }
+.pie-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+.pie-card { border: 1px solid var(--ep-border, #e5e7e5); border-radius: 12px; padding: 14px; break-inside: avoid; }
+.pie-card h4 { margin: 0 0 2px; color: var(--ep-green-dark); font-size: 15px; }
+.pie-wrap { position: relative; height: 240px; margin-top: 8px; }
 @media print {
     .sidebar, .topbar, .no-print, .report-toolbar { display: none !important; }
     .main { margin: 0 !important; }
@@ -65,7 +69,7 @@ $logoPath = staff_logo_href();
 <div class="print-header">
     <img src="<?php echo h($logoPath); ?>" alt="EasyPC">
     <div>
-        <h1>Delivery History</h1>
+        <h1>Sales</h1>
         <p><?php echo h($range['label']); ?> &middot; <?php echo h($from->format('M d, Y') . ' - ' . $to->format('M d, Y')); ?></p>
         <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(date('M d, Y g:i A')); ?></p>
     </div>
@@ -147,13 +151,29 @@ $logoPath = staff_logo_href();
         <div class="card">
             <div class="card-header">
                 <div>
-                    <h3><span class="card-icon"><i class="fas fa-chart-bar"></i></span> Deliveries by Category</h3>
-                    <div class="card-subtitle">Completed deliveries in this range</div>
+                    <h3><span class="card-icon"><i class="fas fa-chart-pie"></i></span> Sales by Category</h3>
+                    <div class="card-subtitle">Units delivered per product, one chart per category group</div>
                 </div>
-                <button type="button" class="btn btn-outline btn-xs no-print" onclick="downloadChart('catChart','deliveries_by_category')"><i class="fas fa-download"></i> PNG</button>
             </div>
             <div class="card-body">
-                <div class="chart-wrap"><canvas id="catChart"></canvas></div>
+                <?php if (empty($byGroup)): ?>
+                <div class="empty-state">No completed deliveries in this range.</div>
+                <?php else: ?>
+                <div class="pie-grid">
+                    <?php $gi = 0; foreach ($byGroup as $group => $items): $total = array_sum(array_column($items, 'units')); ?>
+                    <div class="pie-card">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                            <div>
+                                <h4><?php echo h($group); ?></h4>
+                                <div class="text-muted text-small"><?php echo number_format($total); ?> unit<?php echo $total === 1 ? '' : 's'; ?> delivered</div>
+                            </div>
+                            <button type="button" class="btn btn-outline btn-xs no-print" onclick="downloadChart('pie-<?php echo $gi; ?>','sales_<?php echo h(preg_replace('/\W+/', '_', strtolower($group))); ?>')" title="Download PNG"><i class="fas fa-download"></i></button>
+                        </div>
+                        <div class="pie-wrap"><canvas id="pie-<?php echo $gi; ?>"></canvas></div>
+                    </div>
+                    <?php $gi++; endforeach; ?>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -196,7 +216,7 @@ $logoPath = staff_logo_href();
                                     <div style="padding:10px 16px;">
                                         <div class="text-small"><strong>Customer email:</strong> <?php echo h($r['customer_email']); ?></div>
                                         <div class="text-small"><strong>Products:</strong> <?php echo h($r['products']); ?></div>
-                                        <div class="text-small"><strong>Category:</strong> <?php echo h($r['categories']); ?></div>
+                                        <div class="text-small"><strong>Category:</strong> <?php echo h(implode(', ', ias_category_groups_in($r['categories'] ?? ''))); ?></div>
                                         <div class="text-small"><strong>Order placed:</strong> <?php echo h($r['order_created']); ?></div>
                                     </div>
                                 </td>
@@ -212,8 +232,7 @@ $logoPath = staff_logo_href();
         </div>
 
 <?php
-$catLabels = json_encode(array_column($byCategory, 'category'));
-$catData = json_encode(array_column($byCategory, 'deliveries'));
+$pieData = json_encode(array_map(fn($items) => $items, $byGroup), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 staff_page_end(<<<SCRIPTS
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -235,18 +254,28 @@ function downloadChart(canvasId, name) {
     link.href = canvas.toDataURL('image/png');
     link.click();
 }
-const catCtx = document.getElementById('catChart').getContext('2d');
-new Chart(catCtx, {
-    type: 'bar',
-    data: {
-        labels: {$catLabels},
-        datasets: [{ label: 'Deliveries', data: {$catData}, backgroundColor: '#61b337', borderRadius: 6 }]
-    },
-    options: {
-        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-        plugins: { legend: { display: false } },
-        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
-    }
+const PIE_DATA = {$pieData};
+const PIE_COLORS = ['#61b337', '#fed700', '#2f7d32', '#f59e0b', '#3d7422', '#a3d977', '#c9a800', '#6b7280'];
+const MAX_SLICES = 6;
+Object.keys(PIE_DATA).forEach(function (group, i) {
+    const items = PIE_DATA[group];
+    const top = items.slice(0, MAX_SLICES);
+    const rest = items.slice(MAX_SLICES).reduce(function (a, r) { return a + r.units; }, 0);
+    const labels = top.map(function (r) { return r.product; });
+    const data = top.map(function (r) { return r.units; });
+    if (rest > 0) { labels.push('Other products'); data.push(rest); }
+    new Chart(document.getElementById('pie-' + i).getContext('2d'), {
+        type: 'pie',
+        data: { labels: labels, datasets: [{ data: data, backgroundColor: PIE_COLORS, borderColor: '#fff', borderWidth: 2 }] },
+        options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 },
+                generateLabels: function (chart) {
+                    return Chart.defaults.plugins.legend.labels.generateLabels(chart).map(function (l) {
+                        if (l.text.length > 28) { l.text = l.text.slice(0, 27) + '…'; }
+                        return l;
+                    });
+                } } } } }
+    });
 });
 </script>
 SCRIPTS);

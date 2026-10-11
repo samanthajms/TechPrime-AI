@@ -3,12 +3,9 @@
  * ep_footer.php — Shared EasyPC footer for all CLIENT pages.
  * Variables expected:
  *   $isLoggedIn  (bool)
+ *   $epShowPrimo (bool, set by ep_header.php) — adds the Primo chat widget
  */
 ?>
-    <button class="messages-float-btn ep-chat-float" onclick="location.href='messages.php'">
-        <i class="fas fa-comment-dots"></i>
-    </button>
-
     <footer class="ep-footer full-width">
         <div class="ep-newsletter-bar">
             <div>
@@ -34,7 +31,7 @@
             </div>
             <div class="ep-footer-col">
                 <h5>Shop</h5>
-                <a href="category.php?type=Desktop">Desktop</a>
+                <a href="shop.php?section=desktop">Desktop</a>
                 <a href="category.php?type=Laptops">Laptop</a>
                 <a href="category.php?type=Accessories">Accessories</a>
                 <a href="shop.php">Shop Now</a>
@@ -43,20 +40,20 @@
                 <h5>Explore</h5>
                 <a href="index.php">Home</a>
                 <a href="cart.php">Cart</a>
-                <a href="user_dashboard.php">My Orders</a>
-                <a href="messages.php">EasyFix Support</a>
+                <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Orders</a>
             </div>
             <div class="ep-footer-col">
                 <h5>Resources</h5>
                 <a href="privacy_policy.php">Privacy Policy</a>
                 <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Account</a>
-                <a href="messages.php">Help Center</a>
             </div>
         </div>
         <div class="ep-footer-bottom">&copy; 2026 EASYPC One Oasis. All Rights Reserved.</div>
     </footer>
 
+<?php if (!empty($epShowPrimo)) include __DIR__ . '/primo.php'; ?>
     <script src="../includes/ui_alerts.js"></script>
+    <script src="ep_back.js"></script>
     <script>
         // ── Nav dropdown toggle ────────────────────────────────────────────
         function epToggleDropdown(btn) {

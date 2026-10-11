@@ -4,6 +4,7 @@ require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 
+checkSessionTimeout();
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'retail_officer') {
     header("Location: ../login.php"); exit;
 }
@@ -14,7 +15,10 @@ $message = "";
 $messageType = "success";
 
 // --- HANDLE UPDATES ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verifyCsrfToken((string)($_POST['csrf_token'] ?? ''))) {
+    $message = "Your session expired. Please reload the page and try again.";
+    $messageType = "error";
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['update_profile'])) {
         $newName = trim($_POST['shop_name'] ?? '');
 
@@ -23,22 +27,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = "error";
         } else {
             $stmt = $db->prepare("UPDATE users SET name = ? WHERE id = ?");
-            $stmt->bind_param("si", $newName, $retailId);
-            if ($stmt->execute()) {
+            if ($stmt->execute([$newName, $retailId])) {
             $_SESSION['name'] = $newName;
             $message = "Profile updated successfully!";
             } else {
             $message = "Could not update profile.";
             $messageType = "error";
             }
-            $stmt->close();
         }
     }
 
     if (isset($_POST['update_password'])) {
+        $currentPassword = (string)($_POST['current_password'] ?? '');
         $newPassword = (string)($_POST['new_password'] ?? '');
+        $pw = $db->prepare("SELECT password FROM users WHERE id = ?");
+        $pw->execute([$retailId]);
+        $currentHash = (string)$pw->fetchColumn();
 
-        if ($newPassword === '') {
+        if ($currentPassword === '' || !password_verify($currentPassword, $currentHash)) {
+            $message = "Current password is incorrect.";
+            $messageType = "error";
+        } elseif ($newPassword === '') {
             $message = "Please enter a new password.";
             $messageType = "error";
         } elseif (!isPasswordComplex($newPassword, $db)) {
@@ -47,25 +56,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
             $stmt = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
-            $stmt->bind_param("si", $passwordHash, $retailId);
-            if ($stmt->execute()) {
+            if ($stmt->execute([$passwordHash, $retailId])) {
                 $message = "Password updated successfully!";
             } else {
                 $message = "Could not update password.";
                 $messageType = "error";
             }
-            $stmt->close();
         }
     }
 }
 
 // --- FETCH CURRENT DATA ---
 $stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
-$stmt->bind_param("i", $retailId);
-$stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
-$stmt->close();
-
+$stmt->execute([$retailId]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 staff_page_start([
     'role' => 'retail_officer',
     'title' => 'Settings',
@@ -86,6 +90,7 @@ EXTRA
             <?php endif; ?>
 
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
                 <div class="card" style="margin-bottom:20px;">
                     <div class="card-header">
                         <div>
@@ -114,6 +119,10 @@ EXTRA
                         </div>
                     </div>
                     <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label">Current Password</label>
+                            <input type="password" name="current_password" class="form-control" autocomplete="current-password">
+                        </div>
                         <div class="form-group">
                             <label class="form-label">New Password</label>
                             <input type="password" name="new_password" class="form-control" placeholder="Leave blank to keep current password">

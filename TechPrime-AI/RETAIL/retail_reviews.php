@@ -4,6 +4,7 @@ require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 
+checkSessionTimeout();
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'retail_officer') {
     header('Location: ../login.php'); exit;
 }
@@ -12,16 +13,18 @@ $db = getDbConnection();
 $retailId = (int)$_SESSION['user_id'];
 
 // --- HANDLE RETAIL REPLY ---
+if (isset($_POST['submit_reply']) && !verifyCsrfToken((string)($_POST['csrf_token'] ?? ''))) {
+    header("Location: retail_reviews.php?error=csrf"); exit;
+}
 if (isset($_POST['submit_reply'])) {
     $reviewId = (int)$_POST['review_id'];
-    $replyText = $db->real_escape_string($_POST['reply_text']);
-    
-    $update = $db->prepare("UPDATE reviews r 
-                            JOIN products p ON r.product_id = p.id 
-                            SET r.seller_reply = ?, r.replied_at = NOW() 
-                            WHERE r.id = ? AND p.seller_id = ?");
-    $update->bind_param("sii", $replyText, $reviewId, $retailId);
-    $update->execute();
+    $replyText = $_POST['reply_text'];
+
+    $update = $db->prepare("UPDATE reviews r
+                            SET seller_reply = ?, replied_at = NOW()
+                            FROM products p
+                            WHERE r.product_id = p.id AND r.id = ? AND p.seller_id = ?");
+    $update->execute([$replyText, $reviewId, $retailId]);
     header("Location: retail_reviews.php?success=1"); exit;
 }
 
@@ -33,10 +36,8 @@ $query = "SELECT r.*, u.name as customer_name, p.name as product_name
           WHERE p.seller_id = ?
           ORDER BY r.created_at DESC";
 $stmt = $db->prepare($query);
-$stmt->bind_param("i", $retailId);
-$stmt->execute();
-$reviews = $stmt->get_result();
-
+$stmt->execute([$retailId]);
+$reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
 staff_page_start([
     'role' => 'retail_officer',
     'title' => 'Reviews',
@@ -77,9 +78,12 @@ EXTRA
 ]);
 ?>
 
-        <?php if($reviews->num_rows > 0): ?>
+        <?php if (($_GET['error'] ?? '') === 'csrf'): ?>
+            <div class="alert alert-error" style="margin-bottom:18px;">Your session expired. Please reload the page and send your reply again.</div>
+        <?php endif; ?>
+        <?php if (count($reviews) > 0): ?>
             <div class="review-list">
-            <?php while($rev = $reviews->fetch_assoc()): ?>
+            <?php foreach ($reviews as $rev): ?>
                 <div class="card review-card">
                     <div class="card-body">
                         <div class="review-header">
@@ -111,6 +115,7 @@ EXTRA
                         <?php else: ?>
                             <form method="POST" class="reply-section">
                                 <span class="reply-label">Write a Response</span>
+                                <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
                                 <input type="hidden" name="review_id" value="<?php echo $rev['id']; ?>">
                                 <div class="form-group" style="margin-bottom:10px;">
                                     <textarea name="reply_text" class="form-control" rows="2" placeholder="Thank the customer or address their concerns..." required></textarea>
@@ -120,7 +125,7 @@ EXTRA
                         <?php endif; ?>
                     </div>
                 </div>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
             </div>
         <?php else: ?>
             <div class="card">

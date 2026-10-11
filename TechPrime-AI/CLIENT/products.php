@@ -11,22 +11,44 @@ require_once __DIR__ . '/../includes/client_helpers.php';
 // ── Handle Add to Cart / Buy Now ───────────────────────────────────────────
 if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        if (isset($_POST['ajax']) && (string)$_POST['ajax'] === '1') {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'csrf']);
+            exit;
+        }
         die('Invalid CSRF token.');
     }
 
     $product_id = (int)($_POST['product_id'] ?? 0);
     $returnTo = $_POST['return_to'] ?? 'index.php';
-    if (!preg_match('#^[a-zA-Z0-9_\-./?=&%]+$#', $returnTo)) {
+    if (!preg_match('#^[a-zA-Z0-9_\-./?=&%+]+$#', $returnTo)) {
         $returnTo = 'index.php';
     }
 
-    if (!ep_add_product_to_cart($db, $product_id, 1)) {
-        header('Location: products.php?alert=error');
+    $quantity = max(1, min(99, (int)($_POST['quantity'] ?? 1)));
+
+    // Buy Now: stage for checkout only — do NOT add to cart.
+    if (isset($_POST['buy_now'])) {
+        if (!ep_set_buy_now($db, $product_id, $quantity)) {
+            header('Location: products.php?alert=error');
+            exit;
+        }
+        header('Location: checkout.php');
         exit;
     }
 
-    if (isset($_POST['buy_now'])) {
-        header('Location: checkout.php');
+    $added = ep_add_product_to_cart($db, $product_id, $quantity);
+    if (isset($_POST['ajax']) && (string)$_POST['ajax'] === '1') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => $added,
+            'cart' => $added ? ep_get_cart_preview($db) : null,
+        ]);
+        exit;
+    }
+
+    if (!$added) {
+        header('Location: products.php?alert=error');
         exit;
     }
 
@@ -34,7 +56,13 @@ if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
     exit;
 }
 
-// ── Fetch all products ────────────────────────────────────────────────────
+$viewId = (int)($_GET['id'] ?? 0);
+if ($viewId > 0) {
+    require __DIR__ . '/product_detail.php';
+    exit;
+}
+
+$displayProducts = [];
 $productResult = $db->query(
     "SELECT p.*, u.name AS seller_name FROM products p
      INNER JOIN users u ON p.seller_id = u.id
@@ -42,7 +70,7 @@ $productResult = $db->query(
      ORDER BY p.id DESC"
 );
 $displayProducts = ias_client_filter_products_for_display(
-    $productResult ? $productResult->fetch_all(MYSQLI_ASSOC) : []
+    $productResult ? $productResult->fetchAll(PDO::FETCH_ASSOC) : []
 );
 
 $isLoggedIn           = isset($_SESSION['user_id']);
@@ -66,9 +94,11 @@ $peripheralCategories = ['Mobile', 'Cameras', 'Accessories'];
                 <div class="ep-products-grid">
                     <?php foreach ($displayProducts as $p): ?>
                         <div class="ep-product-card ep-grid-card">
-                            <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                 class="ep-product-img" alt="<?php echo h($p['name']); ?>">
-                            <div class="ep-product-name"><?php echo h($p['name']); ?></div>
+                            <a href="products.php?id=<?php echo (int)$p['id']; ?>">
+                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
+                                     class="ep-product-img" alt="<?php echo h($p['name']); ?>">
+                            </a>
+                            <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
                             <div class="ep-product-cat">By: <?php echo h($p['seller_name']); ?></div>
                             <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
                             <div class="ep-card-actions">
