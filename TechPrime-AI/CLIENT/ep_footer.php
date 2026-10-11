@@ -7,26 +7,17 @@
  */
 ?>
     <footer class="ep-footer full-width">
-        <div class="ep-newsletter-bar">
-            <div>
-                <h4>Join Our Newsletter</h4>
-                <p>Get the latest deals &amp; updates</p>
-            </div>
-            <form class="ep-newsletter-form" action="#" method="POST" onsubmit="return false;">
-                <input type="email" name="newsletter_email" placeholder="Enter your email" required>
-                <button type="submit">Subscribe</button>
-            </form>
-        </div>
         <div class="ep-footer-grid">
             <div class="ep-footer-brand">
                 <div class="ep-footer-logo">
                     <img src="../assets/logo.png" alt="EasyPC" class="ep-footer-logo-img">
                 </div>
                 <div class="ep-social-row">
-                    <a href="#" aria-label="X"><i class="fab fa-twitter"></i></a>
-                    <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
-                    <a href="#" aria-label="YouTube"><i class="fab fa-youtube"></i></a>
-                    <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                    <a href="https://www.facebook.com/EASYPCOneOasisPasigBranch" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                </div>
+                <div class="ep-social-row">
+                    <h5>Contact</h5>
+                    <p>0917 625 5078</p>
                 </div>
             </div>
             <div class="ep-footer-col">

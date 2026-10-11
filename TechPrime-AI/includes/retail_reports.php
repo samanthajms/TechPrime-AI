@@ -112,6 +112,7 @@ function ias_fetch_sales_rows(PDO $db, int $sellerId, DateTime $from, DateTime $
             INNER JOIN orders o ON o.id = oi.order_id
             INNER JOIN users u ON u.id = o.user_id
             WHERE p.seller_id = ?
+              AND o.status = 'to_review'
               AND o.created_at >= ? AND o.created_at < ?";
     $types = 'iss';
     $bind = [$sellerId, $from->format('Y-m-d 00:00:00'), (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00')];
@@ -552,7 +553,8 @@ function ias_fetch_all_sales_rows(PDO $db, DateTime $from, DateTime $to, array $
             INNER JOIN products p ON p.id = oi.product_id
             INNER JOIN orders o ON o.id = oi.order_id
             INNER JOIN users u ON u.id = o.user_id
-            WHERE o.created_at >= ? AND o.created_at < ?";
+            WHERE o.status = 'to_review'
+              AND o.created_at >= ? AND o.created_at < ?";
     $types = 'ss';
     $bind = [$from->format('Y-m-d 00:00:00'), (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00')];
 

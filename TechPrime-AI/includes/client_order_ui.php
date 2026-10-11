@@ -39,7 +39,7 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
     $idPrefix = $isHistory ? 'h' : 's';
 
     $canPay = !$isHistory && ($ost === 'to_pay' && !$isPaid && !$cancelRequested);
-    $canCancel = !$isHistory && ($ost === 'to_pay' && !$cancelRequested && empty($o['stock_deducted']));
+    $canCancel = !$isHistory && ($ost === 'to_pay' && !$isPaid && !$cancelRequested && empty($o['stock_deducted']));
     $canReceive = !$isHistory
         && ($currentFilter === 'to_receive' || $currentFilter === 'All' || $currentFilter === 'to_ship')
         && in_array($ost, ['to_ship', 'to_receive'], true)
