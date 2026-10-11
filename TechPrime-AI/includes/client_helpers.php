@@ -213,6 +213,25 @@ function ep_place_cod_order(PDO $db, int $userId, array $items, float $total, st
     return ep_place_unpaid_order($db, $userId, $items, $total, $address, $phone, 'delivery');
 }
 
+/** True when the order is a store-pickup order (no shipping step). */
+function ep_order_is_pickup(array $order): bool
+{
+    return strtolower(trim((string)($order['fulfillment_type'] ?? ''))) === 'pickup';
+}
+
+/** Make sure a pickup order has a shipment row in 'processing' (no carrier). Runs inside the caller's transaction. */
+function ep_set_pickup_shipment(PDO $db, int $orderId): void
+{
+    $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
+    $chk->execute([$orderId]);
+    $ship = $chk->fetch(PDO::FETCH_ASSOC);
+    if ($ship) {
+        $db->prepare("UPDATE shipments SET shipment_status = 'processing' WHERE id = ?")->execute([(int)$ship['id']]);
+    } else {
+        $db->prepare("INSERT INTO shipments (order_id, shipment_status) VALUES (?, 'processing')")->execute([$orderId]);
+    }
+}
+
 /**
  * Mark an existing to_pay order as paid (placeholder payment). Does not create a new order.
  * @return array{ok:bool,error?:string}
@@ -238,7 +257,7 @@ function ep_mark_order_paid(PDO $db, int $userId, int $orderId, string $paymentR
         }
 
         $st = $db->prepare(
-            'SELECT id, status, payment_status FROM orders WHERE id = ? AND user_id = ? FOR UPDATE'
+            'SELECT id, status, payment_status, fulfillment_type FROM orders WHERE id = ? AND user_id = ? FOR UPDATE'
         );
         $st->execute([$orderId, $userId]);
         $order = $st->fetch(PDO::FETCH_ASSOC);
@@ -250,6 +269,7 @@ function ep_mark_order_paid(PDO $db, int $userId, int $orderId, string $paymentR
             $db->rollBack();
             return ['ok' => false, 'error' => 'not_payable'];
         }
+        $isPickup = ep_order_is_pickup($order);
         if (strtolower((string)($order['payment_status'] ?? '')) === 'paid') {
             $db->commit();
             return ['ok' => true];
@@ -260,14 +280,19 @@ function ep_mark_order_paid(PDO $db, int $userId, int $orderId, string $paymentR
              SET payment_status = 'paid',
                  payment_method = 'online',
                  payment_ref = ?,
-                 paid_at = CURRENT_TIMESTAMP
+                 paid_at = CURRENT_TIMESTAMP,
+                 status = ?
              WHERE id = ? AND user_id = ? AND status = 'to_pay'
                AND COALESCE(payment_status, 'unpaid') <> 'paid'"
         );
-        $up->execute([$paymentRef, $orderId, $userId]);
+        // Pickup orders skip To Ship: ready for pickup right after payment.
+        $up->execute([$paymentRef, $isPickup ? 'to_receive' : 'to_pay', $orderId, $userId]);
         if ($up->rowCount() < 1) {
             $db->rollBack();
             return ['ok' => false, 'error' => 'already_paid'];
+        }
+        if ($isPickup) {
+            ep_set_pickup_shipment($db, $orderId);
         }
         $db->commit();
     } catch (Throwable $e) {
@@ -277,6 +302,23 @@ function ep_mark_order_paid(PDO $db, int $userId, int $orderId, string $paymentR
         return ['ok' => false, 'error' => 'exception'];
     }
 
+    if ($isPickup) {
+        inv_notify_user(
+            $db,
+            $userId,
+            "Payment successful for order #ORD-{$orderId}. It is now To Receive — pick it up at the store.",
+            'order_paid',
+            'user_dashboard.php?status=to_receive'
+        );
+        inv_notify_role(
+            $db,
+            'inventory_custodian',
+            "Paid pickup order #ORD-{$orderId} — prepare it for store pickup.",
+            'new_order',
+            'inventory_orders.php?status=to_receive'
+        );
+        return ['ok' => true];
+    }
     inv_notify_user(
         $db,
         $userId,
@@ -329,11 +371,12 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
             return ['ok' => false, 'error' => 'not_paid'];
         }
 
+        $nextStatus = ep_order_is_pickup($order) ? 'to_receive' : 'to_ship';
         $up = $db->prepare(
-            "UPDATE orders SET status = 'to_ship'
+            "UPDATE orders SET status = ?
              WHERE id = ? AND status = 'to_pay' AND COALESCE(cancel_requested, FALSE) = FALSE"
         );
-        $up->execute([$orderId]);
+        $up->execute([$nextStatus, $orderId]);
         if ($up->rowCount() < 1) {
             $db->rollBack();
             return ['ok' => false, 'error' => 'not_acceptable'];

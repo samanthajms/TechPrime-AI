@@ -52,6 +52,8 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
 
     if ($cancelRequested && $ostNorm !== 'cancelled' && $ostNorm !== 'canceled') {
         $statusLabel = 'Cancellation Requested';
+    } elseif (!$isHistory && ep_order_is_pickup($o) && in_array($ost, ['to_ship', 'to_receive'], true)) {
+        $statusLabel = 'To Receive';
     } elseif (!$isHistory && $currentFilter === 'to_receive' && in_array($ost, ['to_ship', 'to_receive'], true)) {
         $statusLabel = 'To Receive';
     } elseif (!$isHistory && $currentFilter === 'to_ship' && in_array($ost, ['to_ship', 'to_receive'], true)) {

@@ -447,6 +447,7 @@ function ias_alert_message_from_request(): ?string
         'order_updated' => 'Order status updated successfully.',
         'order_completed' => 'This order is now Completed. It has been sent to the Retail Officer and recorded for sales, and the purchased items were removed from inventory.',
         'order_complete_failed' => 'Could not complete this order. It must be paid and To Ship / To Receive, with enough stock on hand.',
+        'pickup_no_ship' => 'Pickup orders have no To Ship step. Use To Receive (ready for pickup) or Completed.',
         'order_locked' => 'This order is already Completed, Cancelled or has a pending cancellation, so its status can no longer be changed.',
         'cart_added'  => 'Added to cart successfully.',
         'cancel_accepted' => 'Cancellation accepted.',
