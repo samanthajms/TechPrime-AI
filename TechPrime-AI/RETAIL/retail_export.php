@@ -58,7 +58,7 @@ $headers = ['Order #', 'Date', 'Customer', 'Email', 'Product', 'Category', 'Qty'
 $out = [];
 foreach ($rows as $r) {
     $out[] = [
-        $r['order_id'],
+        $r['ref'],
         $r['created_at'],
         trim($r['customer_name'] . ' ' . $r['customer_surname']),
         $r['customer_email'],

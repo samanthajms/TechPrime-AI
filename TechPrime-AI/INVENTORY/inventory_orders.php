@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     $returnStatus = trim((string)($_POST['return_status'] ?? ''));
     $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
     if ($oid > 0 && in_array($status, $allowed, true)) {
-        $prev = $db->prepare('SELECT user_id, status, cancel_requested FROM orders WHERE id = ? LIMIT 1');
+        $prev = $db->prepare('SELECT user_id, status, cancel_requested, fulfillment_type FROM orders WHERE id = ? LIMIT 1');
         $prev->execute([$oid]);
         $prevRow = $prev->fetch(PDO::FETCH_ASSOC) ?: [];
         $prevStatus = (string)($prevRow['status'] ?? '');
@@ -83,6 +83,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
         // Completed / cancelled orders are final (stock already deducted, sale recorded).
         if (!$prevRow || in_array($prevStatus, ['to_review', 'cancelled'], true) || !empty($prevRow['cancel_requested'])) {
             header('Location: inventory_orders.php?alert=order_locked');
+            exit;
+        }
+
+        // Pickup orders have no shipping step: they go straight from payment to To Receive.
+        if (ep_order_is_pickup($prevRow) && in_array($status, ['to_pay', 'to_ship'], true)) {
+            header('Location: inventory_orders.php?alert=pickup_no_ship');
             exit;
         }
 
@@ -111,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
             $shipMap = [
                 'to_pay' => 'pending',
                 'to_ship' => 'processing',
-                'to_receive' => 'out_for_delivery',
+                'to_receive' => ep_order_is_pickup($prevRow) ? 'processing' : 'out_for_delivery',
                 'to_review' => 'delivered',
             ];
             $shipStatus = $shipMap[$status] ?? 'pending';
@@ -144,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
 }
 
 $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.customer_phone,
-               o.payment_status, o.payment_method, o.cancel_requested, o.cancel_reason,
+               o.payment_status, o.payment_method, o.cancel_requested, o.cancel_reason, o.fulfillment_type,
                u.name, u.surname, u.email, u.address AS user_address,
                (SELECT STRING_AGG(pr.name || ' x' || oi.quantity::text, ', ')
                 FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
@@ -486,6 +492,10 @@ EXTRA
                                                         'to_receive' => 'To Receive',
                                                         'to_review' => 'Completed',
                                                     ];
+                                                    if (ep_order_is_pickup($r)) {
+                                                        // Store pickup: no shipping step.
+                                                        unset($opts['to_pay'], $opts['to_ship']);
+                                                    }
                                                     foreach ($opts as $val => $lbl):
                                                     ?>
                                                     <option value="<?php echo h($val); ?>"<?php echo $ost === $val ? ' selected' : ''; ?>><?php echo h($lbl); ?></option>
@@ -554,7 +564,7 @@ EXTRA
 $flash = '';
 if ($__m = ias_alert_message_from_request()) {
     $__a = (string)($_GET['alert'] ?? '');
-    $__t = (in_array($__a, ['error', 'order_locked', 'order_complete_failed'], true) || !empty($_GET['error'])) ? 'error' : 'success';
+    $__t = (in_array($__a, ['error', 'order_locked', 'order_complete_failed', 'pickup_no_ship'], true) || !empty($_GET['error'])) ? 'error' : 'success';
     $__opts = $__a === 'order_completed' ? ['title' => 'Completed Order'] : new stdClass();
     $flash = '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof IAS_UI!=="undefined")IAS_UI.alert('
         . json_encode($__m, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ','
