@@ -11,7 +11,10 @@ if (!function_exists('staff_nav_for_role')) {
             case 'admin':
                 return [
                     ['key' => 'dashboard', 'href' => 'admin_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'forecast', 'href' => 'admin_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line'],
+                    ['key' => 'forecast', 'href' => 'admin_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'children' => [
+                        ['slug' => 'demand', 'href' => 'admin_forecast.php?view=demand', 'label' => 'Product Demand'],
+                        ['slug' => 'sales', 'href' => 'admin_forecast.php?view=sales', 'label' => 'Sales'],
+                    ]],
                     ['key' => 'messages', 'href' => 'admin_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
                     ['key' => 'users', 'href' => 'manage_users.php', 'label' => 'Manage Users', 'icon' => 'fa-users'],
                     ['key' => 'logs', 'href' => 'view_logs.php', 'label' => 'Activity Logs', 'icon' => 'fa-clipboard-list'],
@@ -21,15 +24,18 @@ if (!function_exists('staff_nav_for_role')) {
             case 'retail_officer':
                 return [
                     ['key' => 'dashboard', 'href' => 'retail_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'History', 'icon' => 'fa-history'],
+                    ['key' => 'forecast', 'href' => 'retail_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line'],
+                    ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'Sales', 'icon' => 'fa-chart-pie'],
                     ['key' => 'messages', 'href' => 'retail_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
                     ['key' => 'profile', 'href' => 'retail_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
             case 'inventory_custodian':
                 return [
                     ['key' => 'dashboard', 'href' => 'inventory_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes'],
-                    ['key' => 'stockin', 'href' => 'inventory_stock_in.php', 'label' => 'Stock In', 'icon' => 'fa-dolly'],
+                    ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes', 'children' => [
+                        ['slug' => 'inventory', 'href' => 'inventory_stocks.php', 'label' => 'Inventory'],
+                        ['slug' => 'add_product', 'href' => 'inventory_stock_in.php', 'label' => 'New Product Deliveries'],
+                    ]],
                     ['key' => 'orders', 'href' => 'inventory_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart'],
                     ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list'],
                     ['key' => 'messages', 'href' => 'inventory_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
@@ -357,10 +363,6 @@ if (!function_exists('staff_page_start')) {
 <div class="sidebar" id="staffSidebar">
     <div class="sidebar-brand">
         <img src="<?php echo h($logo); ?>" alt="EasyPC" class="ep-logo-img brand-logo">
-        <div class="brand-copy">
-            <div class="brand-text">EasyPC</div>
-            <div class="brand-sub"><?php echo h($roleLabel); ?></div>
-        </div>
         <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseToggle"
                 aria-label="Collapse navigation" aria-expanded="true" title="Collapse navigation">
             <i class="fas fa-chevron-left" aria-hidden="true"></i>

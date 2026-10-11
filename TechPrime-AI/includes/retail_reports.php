@@ -358,6 +358,37 @@ function ias_deliveries_by_category(array $rows): array
     return array_values($out);
 }
 
+/**
+ * Units delivered per product, grouped by Client menu group, for the delivered shipments in $rows
+ * (already filtered by date/customer/product). Returns [group => [['product' => name, 'units' => n], ...]],
+ * groups in Client menu order, products by units descending.
+ */
+function ias_delivered_units_by_group(PDO $db, int $sellerId, array $rows): array
+{
+    $orderIds = array_values(array_unique(array_map(fn($r) => (int)$r['order_id'], $rows)));
+    if (!$orderIds) {
+        return [];
+    }
+    $in = implode(',', array_fill(0, count($orderIds), '?'));
+    $stmt = $db->prepare("SELECT pr.name, pr.category, SUM(oi.quantity) AS units
+                          FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
+                          WHERE pr.seller_id = ? AND oi.order_id IN ($in)
+                          GROUP BY pr.id, pr.name, pr.category");
+    $stmt->execute(array_merge([$sellerId], $orderIds));
+    $byGroup = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $byGroup[ias_category_group_of((string)$r['category'])][] = ['product' => (string)$r['name'], 'units' => (int)$r['units']];
+    }
+    $out = [];
+    foreach (ias_category_groups() as $g) {
+        if (!empty($byGroup[$g])) {
+            usort($byGroup[$g], fn($a, $b) => $b['units'] <=> $a['units']);
+            $out[$g] = $byGroup[$g];
+        }
+    }
+    return $out;
+}
+
 /** Percentage change helper; returns null when base is 0 (undefined change) */
 function ias_pct_change(float $current, float $previous): ?float
 {

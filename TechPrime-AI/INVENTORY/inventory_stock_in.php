@@ -14,9 +14,10 @@ $supplierCatalog = pos_supplier_catalog($db);
 
 staff_page_start([
     'role' => 'inventory_custodian',
-    'title' => 'Stock In',
-    'active' => 'stockin',
-    'heading' => 'Stock In',
+    'title' => 'Stock-In',
+    'active' => 'stocks',
+    'active_child' => 'add_product',
+    'heading' => 'Stock-In',
     'subtitle' => 'Receive deliveries by scanning each item',
     'extra_head' => <<<'EXTRA'
 <style>

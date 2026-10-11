@@ -81,10 +81,14 @@ function ias_forecast_months_field(string $name, int $selected): void
     <?php
 }
 
-function ias_forecast_cards_render(array $fc, array $categories): void
+/** $which: 'both' (default), 'demand' or 'sales' - render only that card (and its filter modal). */
+function ias_forecast_cards_render(array $fc, array $categories, string $which = 'both'): void
 {
     $df = $fc['df'];
     $sf = $fc['sf'];
+    $showDemand = $which !== 'sales';
+    $showSales = $which !== 'demand';
+    if ($showDemand):
     ?>
 <div class="card">
     <div class="card-header">
@@ -114,7 +118,10 @@ function ias_forecast_cards_render(array $fc, array $categories): void
         </div>
     </div>
 </div>
-
+    <?php
+    endif;
+    if ($showSales):
+    ?>
 <div class="card">
     <div class="card-header">
         <div>
@@ -138,7 +145,10 @@ function ias_forecast_cards_render(array $fc, array $categories): void
         </div>
     </div>
 </div>
-
+    <?php
+    endif;
+    if ($showDemand):
+    ?>
 <div id="dfModal" class="filter-modal no-print" onclick="if(event.target===this)closeFilterModal('dfModal')">
     <div class="filter-modal-card">
         <h4><i class="fas fa-filter"></i> Demand Forecast Filters</h4>
@@ -160,7 +170,10 @@ function ias_forecast_cards_render(array $fc, array $categories): void
         </form>
     </div>
 </div>
-
+    <?php
+    endif;
+    if ($showSales):
+    ?>
 <div id="sfModal" class="filter-modal no-print" onclick="if(event.target===this)closeFilterModal('sfModal')">
     <div class="filter-modal-card">
         <h4><i class="fas fa-filter"></i> Sales Forecast Filters</h4>
@@ -174,10 +187,11 @@ function ias_forecast_cards_render(array $fc, array $categories): void
     </div>
 </div>
     <?php
+    endif;
 }
 
 /** <script> that loads both cards from forecast_api.php (path is relative to the page's role folder, e.g. ADMIN/). */
-function ias_forecast_cards_script(array $fc): string
+function ias_forecast_cards_script(array $fc, string $which = 'both'): string
 {
     $cfg = [
         'demand' => [
@@ -191,6 +205,7 @@ function ias_forecast_cards_script(array $fc): string
             'label' => $fc['sf']['range']['label'],
         ],
     ];
+    $cfg['which'] = $which;
     $json = json_encode($cfg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     return '<script>window.IAS_FORECAST_CFG = ' . $json . ';</script>' . <<<'HTML'
 <script>
@@ -287,11 +302,11 @@ function ias_forecast_cards_script(array $fc): string
         });
     }
 
-    get('demand', cfg.demand).then(function (d) { renderDemand(d, cfg.demand); }).catch(function (e) {
+    if (cfg.which !== 'sales') get('demand', cfg.demand).then(function (d) { renderDemand(d, cfg.demand); }).catch(function (e) {
         emptyRow(document.getElementById('fcDemandTop'), 8, 'Forecast unavailable: ' + e.message);
         document.getElementById('fcDemandSub').textContent = cfg.demand.label;
     });
-    get('revenue', cfg.sales).then(function (d) { renderSales(d, cfg.sales); }).catch(function (e) {
+    if (cfg.which !== 'demand') get('revenue', cfg.sales).then(function (d) { renderSales(d, cfg.sales); }).catch(function (e) {
         document.getElementById('fcRevSub').textContent = 'Forecast unavailable: ' + e.message;
     });
 })();

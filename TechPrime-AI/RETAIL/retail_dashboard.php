@@ -5,7 +5,6 @@ require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 require_once __DIR__ . '/../includes/product_categories.php';
 require_once __DIR__ . '/../includes/retail_reports.php';
-require_once __DIR__ . '/../includes/forecast_cards.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -13,7 +12,6 @@ checkRole('retail_officer');
 
 $retailId = (int)$_SESSION['user_id'];
 $presets = ias_report_date_presets();
-$categories = ias_category_groups();   // 8 Client menu groups (shared with the forecast service filter)
 
 function retail_dashboard_preserve_hidden(array $ownKeys): void
 {
@@ -31,8 +29,6 @@ $cardSummary = ias_summarize_sales($cardRows);
 
 $msMonths = max(1, min(24, (int)($_GET['ms_months'] ?? 12)));
 $monthlySales = ias_monthly_sales_report($db, $retailId, $msMonths);
-
-$fc = ias_forecast_selection($categories);
 
 logActivity($db, $retailId, 'view_dashboard', 'Retail Officer viewed dashboard');
 
@@ -61,7 +57,7 @@ staff_page_start([
     'title' => 'Retail Dashboard',
     'active' => 'dashboard',
     'heading' => 'Retail Dashboard',
-    'subtitle' => 'Real-time sales analytics and forecasting',
+    'subtitle' => 'Real-time sales analytics',
     'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><style>' . $dashboardCss . '</style>',
 ]);
 
@@ -165,8 +161,6 @@ $logoPath = staff_logo_href();
     </div>
 </div>
 
-<?php ias_forecast_cards_render($fc, $categories); ?>
-
 <div id="msModal" class="filter-modal no-print" onclick="if(event.target===this)closeFilterModal('msModal')">
     <div class="filter-modal-card">
         <h4><i class="fas fa-filter"></i> Monthly Sales Filters</h4>
@@ -187,7 +181,7 @@ $logoPath = staff_logo_href();
 </div>
 
 <?php
-staff_page_end(ias_forecast_cards_script($fc) . <<<'SCRIPTS'
+staff_page_end(<<<'SCRIPTS'
 <script>
 function openFilterModal(id){ document.getElementById(id).classList.add('open'); }
 function closeFilterModal(id){ document.getElementById(id).classList.remove('open'); }

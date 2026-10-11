@@ -60,12 +60,9 @@ staff_page_start([
 ]);
 ?>
 
+<p class="text-muted text-small" style="margin:-6px 0 18px;">System overview and statistics</p>
+
         <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Orders</div>
-                <div class="stat-num"><?php echo (int)$cnt['orders']; ?></div>
-                <div class="stat-icon"><i class="fas fa-shopping-bag"></i></div>
-            </div>
             <div class="stat-card">
                 <div class="stat-label">Clients</div>
                 <div class="stat-num"><?php echo (int)$cnt['clients']; ?></div>
@@ -88,6 +85,11 @@ staff_page_start([
                 <div class="stat-label">Revenue (this month)</div>
                 <div class="stat-num">₱<?php echo number_format($statSales['total_sales'], 2); ?></div>
                 <div class="stat-icon"><i class="fas fa-peso-sign"></i></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Orders</div>
+                <div class="stat-num"><?php echo (int)$cnt['orders']; ?></div>
+                <div class="stat-icon"><i class="fas fa-shopping-bag"></i></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Deliveries (this month)</div>

@@ -361,9 +361,10 @@ if ($products) {
 
 staff_page_start([
     'role' => 'inventory_custodian',
-    'title' => 'Stocks',
+    'title' => 'Inventory',
     'active' => 'stocks',
-    'heading' => 'Stocks',
+    'active_child' => 'inventory',
+    'heading' => 'Inventory',
     'subtitle' => 'Manage product inventory',
     'extra_head' => <<<'EXTRA'
 <style>
