@@ -35,7 +35,7 @@ if (!function_exists('staff_nav_for_role')) {
                     ['key' => 'orders', 'href' => 'inventory_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart'],
                     ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes', 'children' => [
                         ['slug' => 'inventory', 'href' => 'inventory_stocks.php', 'label' => 'Inventory'],
-                        ['slug' => 'add_product', 'href' => 'inventory_stock_in.php', 'label' => 'Add New Product'],
+                        ['slug' => 'add_product', 'href' => 'inventory_stock_in.php', 'label' => 'Add Stock'],
                     ]],
                     ['key' => 'forecast', 'href' => 'inventory_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line'],
                     ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list'],

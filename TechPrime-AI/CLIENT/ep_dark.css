@@ -126,6 +126,28 @@ html[data-theme="dark"] .ep-account.is-guest:hover { background: var(--ep-yellow
     }
 }
 
+/* ---- Primo robot stays the light-mode white shell; the chat panel stays dark ---- */
+html[data-theme="dark"] .primo-antenna { background: #c5c8ce; }
+html[data-theme="dark"] .primo-head {
+    background: linear-gradient(180deg, #f4f5f7 0%, #e1e3e8 100%);
+    border-color: #cfd3da;
+}
+html[data-theme="dark"] .primo-visor { background: #1e1f26; }
+html[data-theme="dark"] .primo-eye { box-shadow: 0 0 8px rgba(98, 178, 54, 0.95), 0 0 2px #fff; }
+html[data-theme="dark"] .primo-neck { background: #b8bcc4; }
+html[data-theme="dark"] .primo-arm { background: #e8eaee; border-color: #cfd3da; }
+html[data-theme="dark"] .primo-hand { background: #dfe2e8; border-color: #cfd3da; }
+html[data-theme="dark"] .primo-foot { background: #171717; }
+html[data-theme="dark"] .primo-mini-head { background: #eef0f3; border-color: #cfd3da; }
+html[data-theme="dark"] .primo-mini-eye { box-shadow: 0 0 4px rgba(98, 178, 54, 0.8); }
+html[data-theme="dark"] .primo-launcher-antenna { background: #fff; }
+html[data-theme="dark"] .primo-launcher-head {
+    background: linear-gradient(180deg, #f4f5f7 0%, #e1e3e8 100%);
+    border-color: #cfd3da;
+}
+html[data-theme="dark"] .primo-launcher-visor { background: #1e1f26; }
+html[data-theme="dark"] .primo-launcher-eye { box-shadow: 0 0 5px rgba(98, 178, 54, 0.9); }
+
 /* ---- Primo chat (primo.css): things the generator does not map ---- */
 html[data-theme="dark"] .primo-panel-body,
 html[data-theme="dark"] .primo-history-body { scrollbar-color: #3a4136 transparent; }

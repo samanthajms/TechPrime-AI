@@ -1,6 +1,9 @@
 <?php
 /**
  * Primo chat bridge: PHP → SVM intent API → real TechPrime data handlers.
+ * An optional LLM on the same Python service may rewrite the sentence.
+ * Prices and stock still come from the database. If the LLM is down, the
+ * handler reply below is what the customer sees.
  * Browser never talks to Python or the DB directly for this flow.
  */
 session_start();
@@ -48,6 +51,7 @@ if (primo_is_explanation_request($message)) {
     $db = getDbConnection();
     $messageForLookup = primo_apply_context($message, 'brand_advice');
     $result = primo_brand_advice($db, $messageForLookup);
+    $result = primo_maybe_llm($db, $message, 'brand_advice', $result);
     primo_store_context('brand_advice', $messageForLookup, $result['products'] ?? []);
     echo json_encode([
         'ok' => true,
@@ -84,6 +88,7 @@ if ($intent === 'brand_advice' || primo_is_explanation_request($message)) {
 } else {
     $result = primo_handle_intent($db, $intent, $messageForLookup, $confidence, $message);
 }
+$result = primo_maybe_llm($db, $message, $intent, $result);
 primo_store_context($intent, $messageForLookup, $result['products'] ?? []);
 
 echo json_encode([
@@ -105,8 +110,7 @@ function primo_call_svm(string $message): ?array
 {
     // PRIMO_API_URL = base URL of the hosted service (e.g. https://primo-xxxx.onrender.com).
     // Checked in $_ENV (phpdotenv), $_SERVER (Apache SetEnv), then getenv (process env).
-    $base = $_ENV['PRIMO_API_URL'] ?? $_SERVER['PRIMO_API_URL'] ?? getenv('PRIMO_API_URL');
-    $base = is_string($base) && trim($base) !== '' ? rtrim(trim($base), '/') : 'http://127.0.0.1:5055';
+    $base = primo_api_base();
     $url = $base . '/predict';
     $isLocal = str_starts_with($base, 'http://127.0.0.1') || str_starts_with($base, 'http://localhost');
     // A sleeping Render free instance takes up to ~1 min to wake up.
@@ -149,6 +153,279 @@ function primo_call_svm(string $message): ?array
     }
     $data = json_decode($resp, true);
     return is_array($data) && !empty($data['ok']) ? $data : null;
+}
+
+/**
+ * Base URL of the Primo Python service (SVM + optional LLM).
+ */
+function primo_api_base(): string
+{
+    $base = $_ENV['PRIMO_API_URL'] ?? $_SERVER['PRIMO_API_URL'] ?? getenv('PRIMO_API_URL');
+    $base = is_string($base) && trim($base) !== '' ? rtrim(trim($base), '/') : 'http://127.0.0.1:5055';
+    return $base;
+}
+
+/**
+ * Rewrite a handler reply with the LLM when the service has a key.
+ * Order status stays in PHP so order rows are never sent out.
+ *
+ * @param array{reply?:string,products?:array} $result
+ * @return array{reply?:string,products?:array}
+ */
+function primo_maybe_llm(PDO $db, string $message, string $intent, array $result): array
+{
+    if ($intent === 'order_status') {
+        return $result;
+    }
+    $facts = primo_catalog_facts($db, $result['products'] ?? []);
+    $reply = primo_call_llm($message, $intent, $facts, primo_llm_notes($intent), primo_recent_history());
+    if ($reply !== null && primo_reply_grounded($reply, $facts)) {
+        $result['reply'] = $reply;
+    }
+    primo_remember_turn($message, (string) ($result['reply'] ?? ''));
+    return $result;
+}
+
+/**
+ * @param list<array> $products
+ * @return list<array{name:string,price:float,stock:int,category:string,description:string}>
+ */
+function primo_catalog_facts(PDO $db, array $products): array
+{
+    $ids = [];
+    foreach ($products as $product) {
+        $id = (int) ($product['id'] ?? 0);
+        if ($id > 0) {
+            $ids[] = $id;
+        }
+    }
+    $descriptions = [];
+    if ($ids !== []) {
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $db->prepare("SELECT id, description FROM products WHERE id IN ($placeholders)");
+        $stmt->execute($ids);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $descriptions[(int) $row['id']] = mb_substr(trim((string) ($row['description'] ?? '')), 0, 280);
+        }
+    }
+
+    $facts = [];
+    foreach (array_slice($products, 0, 5) as $product) {
+        $name = trim((string) ($product['name'] ?? ''));
+        if ($name === '') {
+            continue;
+        }
+        $id = (int) ($product['id'] ?? 0);
+        $facts[] = [
+            'name' => $name,
+            'price' => round((float) ($product['price'] ?? 0), 2),
+            'stock' => (int) ($product['stock'] ?? 0),
+            'category' => (string) ($product['category'] ?? ''),
+            'description' => $descriptions[$id] ?? '',
+        ];
+    }
+    return $facts;
+}
+
+/**
+ * Store rules the model may repeat. These are not product facts.
+ * @return list<string>
+ */
+function primo_llm_notes(string $intent): array
+{
+    $store = 'EasyPC One Oasis Branch, Rosario, Pasig. This website is the online shop.';
+    switch ($intent) {
+        case 'greeting':
+            return [$store, 'Greet the customer in one or two sentences and ask what they want to find. Do not list products.'];
+        case 'goodbye':
+            return [$store, 'Say a short goodbye. Do not list products.'];
+        case 'gratitude':
+            return [$store, 'Say you are welcome and offer more help with the shop. Do not list products.'];
+        case 'help':
+            return [$store, 'You can help with product search, prices, stock, compatibility, orders, and Build a PC. Ask what they need.'];
+        case 'store_information':
+            return [$store, 'Walk-in hours and phone number are not in the system. Point them to Messages or EasyFix Support.'];
+        case 'return_refund':
+            return [$store, 'You cannot process a return in chat. They should open My Orders or contact EasyFix Support through Messages with the order number.'];
+        case 'compatibility_question':
+            return [$store, 'Compatibility advice may mention CPU socket, RAM type, and PSU wattage only when FACTS include those words. Otherwise tell them to open Build a PC.'];
+        case 'saved_build':
+            return [$store, 'Saved builds are under Build a PC, then View Saved Build. A guest must log in first.'];
+        case 'fallback':
+            return [$store, 'If the question is not about this store, say you only help with EasyPC products, prices, stock, orders, and PC builds.'];
+        default:
+            return [$store, 'If FACTS is empty, say that item is not in the EasyPC catalog and ask for a product name or category. If they asked for one best item, name only the single best match from FACTS and say why using its category, price, and stock.'];
+    }
+}
+
+/**
+ * @return list<array{role:string,content:string}>
+ */
+function primo_recent_history(): array
+{
+    $turns = $_SESSION['primo_turns'] ?? [];
+    if (!is_array($turns)) {
+        return [];
+    }
+    $out = [];
+    foreach (array_slice($turns, -6) as $turn) {
+        if (!is_array($turn)) {
+            continue;
+        }
+        $user = trim((string) ($turn['user'] ?? ''));
+        $assistant = trim((string) ($turn['assistant'] ?? ''));
+        if ($user !== '') {
+            $out[] = ['role' => 'user', 'content' => mb_substr($user, 0, 400)];
+        }
+        if ($assistant !== '') {
+            $out[] = ['role' => 'assistant', 'content' => mb_substr($assistant, 0, 500)];
+        }
+    }
+    return $out;
+}
+
+function primo_remember_turn(string $user, string $assistant): void
+{
+    $user = trim($user);
+    $assistant = trim($assistant);
+    if ($user === '' || $assistant === '') {
+        return;
+    }
+    if (!isset($_SESSION['primo_turns']) || !is_array($_SESSION['primo_turns'])) {
+        $_SESSION['primo_turns'] = [];
+    }
+    $_SESSION['primo_turns'][] = [
+        'user' => mb_substr($user, 0, 400),
+        'assistant' => mb_substr($assistant, 0, 500),
+    ];
+    if (count($_SESSION['primo_turns']) > 6) {
+        $_SESSION['primo_turns'] = array_slice($_SESSION['primo_turns'], -6);
+    }
+}
+
+/**
+ * Reject a reply that cites a price, stock count, or model number absent from the database rows.
+ * @param list<array{name?:string,price?:float,stock?:int,description?:string}> $facts
+ */
+function primo_reply_grounded(string $reply, array $facts): bool
+{
+    $reply = trim($reply);
+    if ($reply === '' || mb_strlen($reply) > 1600) {
+        return false;
+    }
+    if (preg_match('/<\s*script|javascript:|onerror\s*=/i', $reply)) {
+        return false;
+    }
+
+    $prices = [];
+    $stocks = [];
+    $blob = '';
+    foreach ($facts as $fact) {
+        $prices[] = round((float) ($fact['price'] ?? 0), 2);
+        $stocks[] = (int) ($fact['stock'] ?? 0);
+        $blob .= ' ' . ($fact['name'] ?? '') . ' ' . ($fact['description'] ?? '');
+    }
+    $blob = mb_strtolower((string) preg_replace('/\s+/', '', $blob));
+
+    if (preg_match_all('/(?:₱|PHP)\s*([0-9][0-9,]*(?:\.\d{1,2})?)/iu', $reply, $found)) {
+        foreach ($found[1] as $raw) {
+            $amount = round((float) str_replace(',', '', $raw), 2);
+            $ok = false;
+            foreach ($prices as $price) {
+                if (abs($price - $amount) < 0.02) {
+                    $ok = true;
+                    break;
+                }
+            }
+            if (!$ok) {
+                return false;
+            }
+        }
+    } elseif ($facts === [] && preg_match('/₱/u', $reply)) {
+        return false;
+    }
+
+    if (preg_match_all('/\b(\d+)\s+(?:in stock|available|left)\b/i', $reply, $stockHits)) {
+        foreach ($stockHits[1] as $raw) {
+            if (!in_array((int) $raw, $stocks, true)) {
+                return false;
+            }
+        }
+    }
+
+    if (preg_match_all('/\b((?:rtx|gtx|rx|ryzen)\s*\d{3,5}(?:\s*ti)?|i[3579]\s*-?\s*\d{4,5}\w*)\b/i', $reply, $models)) {
+        foreach ($models[1] as $model) {
+            $token = mb_strtolower((string) preg_replace('/\s+/', '', $model));
+            if ($token !== '' && !str_contains($blob, $token)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Ask the Python service to phrase a reply. Null means "keep the PHP reply".
+ * @param list<array> $facts
+ * @param list<string> $notes
+ * @param list<array{role:string,content:string}> $history
+ */
+function primo_call_llm(string $message, string $intent, array $facts, array $notes, array $history): ?string
+{
+    $base = primo_api_base();
+    $url = $base . '/reply';
+    $isLocal = str_starts_with($base, 'http://127.0.0.1') || str_starts_with($base, 'http://localhost');
+    $body = json_encode([
+        'message' => $message,
+        'intent' => $intent,
+        'facts' => $facts,
+        'notes' => $notes,
+        'history' => $history,
+    ], JSON_UNESCAPED_UNICODE);
+    if ($body === false) {
+        return null;
+    }
+
+    $timeout = $isLocal ? 25 : 30;
+    $resp = false;
+    $code = 0;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => $isLocal ? 2 : 10,
+            CURLOPT_TIMEOUT => $timeout,
+        ]);
+        $resp = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+    } else {
+        $ctx = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => "Content-Type: application/json\r\n",
+                'content' => $body,
+                'timeout' => $timeout,
+                'ignore_errors' => true,
+            ],
+        ]);
+        $resp = @file_get_contents($url, false, $ctx);
+        $code = 200;
+    }
+
+    if ($resp === false || $code < 200 || $code >= 300) {
+        return null;
+    }
+    $data = json_decode($resp, true);
+    if (!is_array($data) || empty($data['llm']) || !is_string($data['reply'] ?? null)) {
+        return null;
+    }
+    $reply = trim($data['reply']);
+    return $reply === '' ? null : $reply;
 }
 
 /**
@@ -234,6 +511,10 @@ function primo_match_category(string $message): ?string
         'audio' => 'Audio',
         'headset' => 'Audio',
         'headsets' => 'Audio',
+        'headphone' => 'Audio',
+        'headphones' => 'Audio',
+        'earphone' => 'Audio',
+        'earphones' => 'Audio',
         'speaker' => 'Speaker',
         'cooling' => 'Cooling',
         'accessories' => 'Accessories',

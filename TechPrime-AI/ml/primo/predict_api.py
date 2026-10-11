@@ -17,6 +17,7 @@ from pathlib import Path
 import joblib
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from llm_reply import generate_reply, llm_settings
 from preprocess import preprocess_text
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -51,12 +52,15 @@ def get_threshold() -> float:
 @app.get("/health")
 def health():
     loaded = _pipeline is not None
+    llm = llm_settings()
     body = {
         "ok": loaded,
         "service": "primo-svm-intent",
         "model_loaded": loaded,
         "intents": _meta.get("intents", []),
         "confidence_threshold": get_threshold(),
+        "llm_configured": llm["configured"],
+        "llm_model": llm["model"],
     }
     # 200 only when the trained pipeline is ready (Render health check uses HTTP status).
     return jsonify(body), (200 if loaded else 503)
@@ -105,6 +109,29 @@ def predict():
             "threshold": threshold,
         }
     )
+
+
+@app.post("/reply")
+def reply():
+    """Write a reply from database facts. SVM /predict is unchanged."""
+    data = request.get_json(silent=True) or {}
+    message = data.get("message", "")
+    if not isinstance(message, str):
+        return jsonify({"ok": False, "error": "invalid_message"}), 400
+    message = message.strip()
+    if message == "" or len(message) > 500:
+        return jsonify({"ok": False, "error": "invalid_message"}), 400
+
+    text, err = generate_reply(
+        message,
+        data.get("history"),
+        data.get("facts"),
+        data.get("notes"),
+        data.get("intent") if isinstance(data.get("intent"), str) else "",
+    )
+    if text is None:
+        return jsonify({"ok": True, "reply": None, "llm": False, "error": err or "llm_unavailable"})
+    return jsonify({"ok": True, "reply": text, "llm": True})
 
 
 if __name__ == "__main__":
