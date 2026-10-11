@@ -265,10 +265,6 @@ EXTRA
         <div class="inv-audit">
             <section class="inv-audit-shell" aria-label="Inventory activity log">
                 <div class="inv-audit-head">
-                    <div>
-                        <h3><span class="card-icon"><i class="fas fa-clipboard-list"></i></span> Inventory Activity</h3>
-                        <div class="inv-audit-sub">Track inventory changes and custodian actions</div>
-                    </div>
                     <span class="inv-audit-count"><i class="fas fa-stream"></i> <?php echo number_format($totalRows); ?> record<?php echo $totalRows === 1 ? '' : 's'; ?></span>
                 </div>
 

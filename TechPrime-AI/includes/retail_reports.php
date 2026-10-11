@@ -389,6 +389,66 @@ function ias_delivered_units_by_group(PDO $db, int $sellerId, array $rows): arra
     return $out;
 }
 
+/**
+ * Period keys of the Inventory dashboard's "Products Stocked Per Month" filter (month | last | 3m | year).
+ * Unknown keys fall back to 'year'. @return array{key:string,label:string,from:DateTime,to:DateTime}
+ */
+function ias_sales_period_range(string $key): array
+{
+    $today = new DateTime('today');
+    switch ($key) {
+        case 'month':
+            return ['key' => 'month', 'label' => 'This Month', 'from' => (clone $today)->modify('first day of this month'), 'to' => $today];
+        case 'last':
+            return ['key' => 'last', 'label' => 'Last Month', 'from' => (clone $today)->modify('first day of last month'), 'to' => (clone $today)->modify('last day of last month')];
+        case '3m':
+            return ['key' => '3m', 'label' => 'Last 3 Months', 'from' => (clone $today)->modify('first day of this month')->modify('-2 months'), 'to' => $today];
+        default:
+            return ['key' => 'year', 'label' => 'This Year', 'from' => (clone $today)->modify('first day of january this year'), 'to' => $today];
+    }
+}
+
+/** Keep only delivery rows whose order contains a product in the given Client menu group ('' = all rows). */
+function ias_filter_delivery_rows_by_group(array $rows, string $group): array
+{
+    if ($group === '') {
+        return $rows;
+    }
+    return array_values(array_filter($rows, fn($r) => in_array($group, ias_category_groups_in($r['categories'] ?? ''), true)));
+}
+
+/**
+ * Units delivered per day for the delivered shipments in $rows (dated by shipment updated_at).
+ * $group ('' = all) restricts the count to products of that Client menu group. Returns ['Y-m-d' => units].
+ */
+function ias_delivered_units_by_date(PDO $db, int $sellerId, array $rows, string $group = ''): array
+{
+    $dateByOrder = [];
+    foreach ($rows as $r) {
+        $dateByOrder[(int)$r['order_id']] = substr((string)$r['updated_at'], 0, 10);
+    }
+    if (!$dateByOrder) {
+        return [];
+    }
+    $orderIds = array_keys($dateByOrder);
+    $in = implode(',', array_fill(0, count($orderIds), '?'));
+    $stmt = $db->prepare("SELECT oi.order_id, pr.category, SUM(oi.quantity) AS units
+                          FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
+                          WHERE pr.seller_id = ? AND oi.order_id IN ($in)
+                          GROUP BY oi.order_id, pr.category");
+    $stmt->execute(array_merge([$sellerId], $orderIds));
+    $out = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        if ($group !== '' && ias_category_group_of((string)$r['category']) !== $group) {
+            continue;
+        }
+        $d = $dateByOrder[(int)$r['order_id']];
+        $out[$d] = ($out[$d] ?? 0) + (int)$r['units'];
+    }
+    ksort($out);
+    return $out;
+}
+
 /** Percentage change helper; returns null when base is 0 (undefined change) */
 function ias_pct_change(float $current, float $previous): ?float
 {

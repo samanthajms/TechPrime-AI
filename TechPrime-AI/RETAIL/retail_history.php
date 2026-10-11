@@ -11,43 +11,55 @@ checkRole('retail_officer');
 
 $retailId = (int)$_SESSION['user_id'];
 
-$range = ias_resolve_report_range($_GET);
-$from = $range['from'];
-$to = $range['to'];
-$customerFilter = trim($_GET['customer'] ?? '');
-$productFilter = trim($_GET['product'] ?? '');
+// Completed Deliveries has its own time filter (dperiod)
+$periods = ['month' => 'This Month', 'last' => 'Last Month', '3m' => 'Last 3 Months', 'year' => 'This Year'];
+$dRange = ias_sales_period_range((string)($_GET['dperiod'] ?? 'year'));
+$rows = ias_fetch_delivery_rows($db, $retailId, $dRange['from'], $dRange['to']);
+$stats = ias_summarize_deliveries($db, $retailId, $dRange['from'], $dRange['to'], count($rows));
 
-$filters = ['customer' => $customerFilter, 'product' => $productFilter];
-$rows = ias_fetch_delivery_rows($db, $retailId, $from, $to, $filters);
-$byGroup = ias_delivered_units_by_group($db, $retailId, $rows);   // one pie per Client menu group
-$stats = ias_summarize_deliveries($db, $retailId, $from, $to, count($rows));
-
-$presets = ias_report_date_presets();
-
-function ias_qs2(array $overrides = []): string
+/** Export links carry the resolved dates so retail_export.php needs no knowledge of the period keys. */
+function ias_sales_export_qs(array $range, string $format): string
 {
-    $params = array_merge($_GET, $overrides);
-    return h(http_build_query($params));
+    return h(http_build_query([
+        'type' => 'delivery', 'format' => $format, 'preset' => 'custom',
+        'date_from' => $range['from']->format('Y-m-d'), 'date_to' => $range['to']->format('Y-m-d'),
+    ]));
 }
 
 logActivity($db, $retailId, 'view_history', 'Retail Officer viewed sales');
 
 staff_page_start([
     'role' => 'retail_officer',
-    'title' => 'Sales',
+    'title' => 'Sales History',
     'active' => 'history',
-    'heading' => 'Sales',
+    'heading' => 'Sales History',
     'subtitle' => 'Completed deliveries only',
     'extra_head' => <<<'EXTRA'
 <style>
 .report-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; margin-bottom: 4px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.inv-stockin-panel { background: linear-gradient(180deg, #ffffff 0%, #f4f9f0 100%); border: 1px solid var(--teal-light, #c6e6b3); border-radius: 18px; box-shadow: 0 10px 28px rgba(75, 139, 42, 0.1); overflow: hidden; margin-bottom: 18px; }
+.inv-stockin-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 22px 24px 16px; background: linear-gradient(135deg, #eef8e6 0%, #ffffff 70%); border-bottom: 1px solid rgba(75, 139, 42, 0.12); }
+.inv-stockin-header h3 { margin: 0; font-size: 17px; font-weight: 800; color: var(--ep-green-dark); display: flex; align-items: center; gap: 12px; }
+.inv-stockin-header .card-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--ep-green); color: #fff; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 6px 14px rgba(75, 139, 42, 0.28); }
+.inv-stockin-meta { margin-top: 4px; font-size: 12.5px; color: var(--text-muted); font-weight: 500; }
+.inv-stockin-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.inv-stockin-badge { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: #fff; border: 1px solid var(--teal-light, #c6e6b3); color: var(--ep-green-dark); font-size: 12px; font-weight: 700; }
+.inv-period-select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--teal-light, #c6e6b3); background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--ep-green-dark); outline: none; cursor: pointer; box-shadow: 0 2px 8px rgba(75, 139, 42, 0.06); }
+.inv-period-select:focus { border-color: var(--ep-green); box-shadow: 0 0 0 3px rgba(97, 179, 55, 0.15); }
+.inv-stockin-panel .card-body { padding: 18px 20px 22px; }
+.deliv-wrap { border: 1px solid var(--ep-border, #e5e7e5); border-radius: 12px; background: #fff; overflow-x: auto; }
+.deliv-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+.deliv-table th { padding: 12px 14px; text-align: left; font-size: 11.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--ep-green-dark); background: #f4f9f0; border-bottom: 1px solid rgba(75, 139, 42, 0.18); white-space: nowrap; }
+.deliv-table td { padding: 12px 14px; border-bottom: 1px solid #eef1ee; vertical-align: middle; font-size: 13.5px; }
+.deliv-table tr.drill-toggle:hover td { background: #f8fbf6; }
+.deliv-table .col-caret { width: 36px; padding-right: 0; text-align: center; }
+.deliv-table .col-num { text-align: right; white-space: nowrap; }
+.deliv-table .col-nowrap { white-space: nowrap; }
+.deliv-table tbody tr:last-child td { border-bottom: 0; }
 .print-header { display: none; }
-.pie-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
-.pie-card { border: 1px solid var(--ep-border, #e5e7e5); border-radius: 12px; padding: 14px; break-inside: avoid; }
-.pie-card h4 { margin: 0 0 2px; color: var(--ep-green-dark); font-size: 15px; }
-.pie-wrap { position: relative; height: 240px; margin-top: 8px; }
 @media print {
-    .sidebar, .topbar, .no-print, .report-toolbar { display: none !important; }
+    .sidebar, .topbar, .no-print, .report-toolbar, .inv-stockin-tools { display: none !important; }
     .main { margin: 0 !important; }
     .page-content { padding: 0 !important; }
     .print-header {
@@ -70,63 +82,15 @@ $logoPath = staff_logo_href();
     <img src="<?php echo h($logoPath); ?>" alt="EasyPC">
     <div>
         <h1>Sales</h1>
-        <p><?php echo h($range['label']); ?> &middot; <?php echo h($from->format('M d, Y') . ' - ' . $to->format('M d, Y')); ?></p>
+        <p><?php echo h($dRange['label']); ?> &middot; <?php echo h($dRange['from']->format('M d, Y') . ' - ' . $dRange['to']->format('M d, Y')); ?></p>
         <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(date('M d, Y g:i A')); ?></p>
     </div>
 </div>
 
-        <div class="card no-print">
-            <div class="card-header">
-                <div>
-                    <h3><span class="card-icon"><i class="fas fa-filter"></i></span> Filters</h3>
-                    <div class="card-subtitle">Choose a date range and refine the list</div>
-                </div>
-            </div>
-            <div class="card-body">
-                <form method="get" id="filterForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Date Range</label>
-                            <select name="preset" class="staff-select" id="presetSelect" onchange="toggleCustomDates(this.value)">
-                                <?php foreach ($presets as $key => $p): ?>
-                                <option value="<?php echo h($key); ?>" <?php echo $range['preset'] === $key ? 'selected' : ''; ?>><?php echo h($p['label']); ?></option>
-                                <?php endforeach; ?>
-                                <option value="custom" <?php echo $range['preset'] === 'custom' ? 'selected' : ''; ?>>Custom Range</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Product</label>
-                            <input type="text" name="product" class="staff-input" placeholder="Search product..." value="<?php echo h($productFilter); ?>">
-                        </div>
-                    </div>
-                    <div class="form-row" id="customDateRow" style="<?php echo $range['preset'] === 'custom' ? '' : 'display:none;'; ?>">
-                        <div class="form-group">
-                            <label class="form-label">From</label>
-                            <input type="date" name="date_from" class="staff-input" value="<?php echo h($from->format('Y-m-d')); ?>">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">To</label>
-                            <input type="date" name="date_to" class="staff-input" value="<?php echo h($to->format('Y-m-d')); ?>">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Customer (name or email)</label>
-                            <input type="text" name="customer" class="staff-input" placeholder="Search customer..." value="<?php echo h($customerFilter); ?>">
-                        </div>
-                        <div class="form-group" style="display:flex; align-items:flex-end; gap:10px;">
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Apply Filters</button>
-                            <a href="retail_history.php" class="btn btn-outline">Reset</a>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <div class="report-toolbar no-print">
             <button type="button" class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
-            <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_qs2(['type' => 'delivery', 'format' => 'csv']); ?>"><i class="fas fa-file-csv"></i> Export CSV</a>
-            <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_qs2(['type' => 'delivery', 'format' => 'excel']); ?>"><i class="fas fa-file-excel"></i> Export Excel</a>
+            <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_sales_export_qs($dRange, 'csv'); ?>"><i class="fas fa-file-csv"></i> Export CSV</a>
+            <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_sales_export_qs($dRange, 'excel'); ?>"><i class="fas fa-file-excel"></i> Export Excel</a>
             <button type="button" class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-file-pdf"></i> Export PDF</button>
         </div>
 
@@ -148,53 +112,33 @@ $logoPath = staff_logo_href();
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header">
+        <section class="inv-stockin-panel" aria-label="Completed deliveries">
+            <div class="inv-stockin-header">
                 <div>
-                    <h3><span class="card-icon"><i class="fas fa-chart-pie"></i></span> Sales by Category</h3>
-                    <div class="card-subtitle">Units delivered per product, one chart per category group</div>
+                    <h3> Completed Deliveries</h3>
+                    <div class="inv-stockin-meta">Finished shipments for your products &mdash; click a row for details · <?php echo h($dRange['from']->format('M d, Y') . ' – ' . $dRange['to']->format('M d, Y')); ?></div>
+                </div>
+                <div class="inv-stockin-tools">
+                    <form method="get" id="deliveryPeriodForm">
+                        <label class="sr-only" for="invDeliveryPeriodSelect">Time period</label>
+                        <select id="invDeliveryPeriodSelect" name="dperiod" class="inv-period-select" aria-label="Completed deliveries time period" onchange="this.form.submit()">
+                            <?php foreach ($periods as $k => $label): ?>
+                            <option value="<?php echo h($k); ?>" <?php echo $dRange['key'] === $k ? 'selected' : ''; ?>><?php echo h($label); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
                 </div>
             </div>
             <div class="card-body">
-                <?php if (empty($byGroup)): ?>
-                <div class="empty-state">No completed deliveries in this range.</div>
-                <?php else: ?>
-                <div class="pie-grid">
-                    <?php $gi = 0; foreach ($byGroup as $group => $items): $total = array_sum(array_column($items, 'units')); ?>
-                    <div class="pie-card">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                            <div>
-                                <h4><?php echo h($group); ?></h4>
-                                <div class="text-muted text-small"><?php echo number_format($total); ?> unit<?php echo $total === 1 ? '' : 's'; ?> delivered</div>
-                            </div>
-                            <button type="button" class="btn btn-outline btn-xs no-print" onclick="downloadChart('pie-<?php echo $gi; ?>','sales_<?php echo h(preg_replace('/\W+/', '_', strtolower($group))); ?>')" title="Download PNG"><i class="fas fa-download"></i></button>
-                        </div>
-                        <div class="pie-wrap"><canvas id="pie-<?php echo $gi; ?>"></canvas></div>
-                    </div>
-                    <?php $gi++; endforeach; ?>
-                </div>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <div>
-                    <h3><span class="card-icon"><i class="fas fa-history"></i></span> Completed Deliveries</h3>
-                    <div class="card-subtitle">Finished shipments for your products &mdash; click a row for details</div>
-                </div>
-            </div>
-            <div class="card-body" style="padding-top:0;">
-                <div class="table-wrap">
-                    <table class="ias-table">
+                    <table class="deliv-table">
                         <thead>
                             <tr>
-                                <th></th>
+                                <th class="col-caret"></th>
                                 <th>Shipment</th>
                                 <th>Order</th>
                                 <th>Customer</th>
                                 <th>Carrier</th>
-                                <th>Total</th>
+                                <th class="col-num">Total</th>
                                 <th>Delivered</th>
                                 <th>Status</th>
                             </tr>
@@ -202,13 +146,13 @@ $logoPath = staff_logo_href();
                         <tbody>
                             <?php foreach ($rows as $i => $r): ?>
                             <tr class="drill-toggle" onclick="toggleDrill(<?php echo (int)$i; ?>)" style="cursor:pointer;">
-                                <td><i class="fas fa-caret-right" id="caret-<?php echo (int)$i; ?>"></i></td>
-                                <td><strong>#<?php echo (int)$r['shipment_id']; ?></strong></td>
-                                <td>#<?php echo (int)$r['order_id']; ?></td>
+                                <td class="col-caret"><i class="fas fa-caret-right" id="caret-<?php echo (int)$i; ?>"></i></td>
+                                <td class="col-nowrap"><strong>#<?php echo (int)$r['shipment_id']; ?></strong></td>
+                                <td class="col-nowrap">#<?php echo (int)$r['order_id']; ?></td>
                                 <td><?php echo h(trim($r['customer_name'] . ' ' . $r['customer_surname'])); ?></td>
                                 <td><?php echo h($r['carrier']); ?></td>
-                                <td>PHP <?php echo number_format((float)$r['total'], 2); ?></td>
-                                <td class="text-muted text-small"><?php echo h($r['updated_at']); ?></td>
+                                <td class="col-num">PHP <?php echo number_format((float)$r['total'], 2); ?></td>
+                                <td class="text-muted text-small col-nowrap"><?php echo h($r['updated_at']); ?></td>
                                 <td><span class="badge badge-active">Delivered</span></td>
                             </tr>
                             <tr id="drill-<?php echo (int)$i; ?>" style="display:none;">
@@ -227,18 +171,13 @@ $logoPath = staff_logo_href();
                             <?php endif; ?>
                         </tbody>
                     </table>
-                </div>
             </div>
-        </div>
+        </section>
+
 
 <?php
-$pieData = json_encode(array_map(fn($items) => $items, $byGroup), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-staff_page_end(<<<SCRIPTS
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+staff_page_end(<<<'SCRIPTS'
 <script>
-function toggleCustomDates(val) {
-    document.getElementById('customDateRow').style.display = (val === 'custom') ? '' : 'none';
-}
 function toggleDrill(i) {
     const row = document.getElementById('drill-' + i);
     const caret = document.getElementById('caret-' + i);
@@ -247,36 +186,5 @@ function toggleDrill(i) {
     caret.classList.toggle('fa-caret-right', open);
     caret.classList.toggle('fa-caret-down', !open);
 }
-function downloadChart(canvasId, name) {
-    const canvas = document.getElementById(canvasId);
-    const link = document.createElement('a');
-    link.download = name + '.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-}
-const PIE_DATA = {$pieData};
-const PIE_COLORS = ['#61b337', '#fed700', '#2f7d32', '#f59e0b', '#3d7422', '#a3d977', '#c9a800', '#6b7280'];
-const MAX_SLICES = 6;
-Object.keys(PIE_DATA).forEach(function (group, i) {
-    const items = PIE_DATA[group];
-    const top = items.slice(0, MAX_SLICES);
-    const rest = items.slice(MAX_SLICES).reduce(function (a, r) { return a + r.units; }, 0);
-    const labels = top.map(function (r) { return r.product; });
-    const data = top.map(function (r) { return r.units; });
-    if (rest > 0) { labels.push('Other products'); data.push(rest); }
-    new Chart(document.getElementById('pie-' + i).getContext('2d'), {
-        type: 'pie',
-        data: { labels: labels, datasets: [{ data: data, backgroundColor: PIE_COLORS, borderColor: '#fff', borderWidth: 2 }] },
-        options: { responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 },
-                generateLabels: function (chart) {
-                    return Chart.defaults.plugins.legend.labels.generateLabels(chart).map(function (l) {
-                        if (l.text.length > 28) { l.text = l.text.slice(0, 27) + '…'; }
-                        return l;
-                    });
-                } } } } }
-    });
-});
 </script>
 SCRIPTS);
-?>
