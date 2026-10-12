@@ -65,6 +65,7 @@ def health():
         "intents": _meta.get("intents", []),
         "confidence_threshold": get_threshold(),
     }
+    body.update(_llm_public_status())
     # 200 only when the trained pipeline is ready (Render health check uses HTTP status).
     return jsonify(body), (200 if loaded else 503)
 
@@ -115,10 +116,22 @@ def predict():
 
 
 def _llm_settings() -> tuple[str, str, str]:
-    key = os.environ.get("PRIMO_LLM_API_KEY", "").strip()
-    base = os.environ.get("PRIMO_LLM_BASE_URL", "https://api.groq.com/openai/v1").strip().rstrip("/")
-    model = os.environ.get("PRIMO_LLM_MODEL", "openai/gpt-oss-20b").strip()
+    key = os.environ.get("PRIMO_LLM_API_KEY", "").strip().strip('"').strip("'")
+    base = os.environ.get("PRIMO_LLM_BASE_URL", "https://api.groq.com/openai/v1").strip().strip('"').strip("'").rstrip("/")
+    model = os.environ.get("PRIMO_LLM_MODEL", "openai/gpt-oss-20b").strip().strip('"').strip("'")
     return key, base, model
+
+
+def _llm_public_status() -> dict:
+    """Says whether the running app can see a key. Never includes the secret."""
+    key, base, model = _llm_settings()
+    return {
+        "llm_key_set": key != "",
+        "llm_key_length": len(key),
+        "llm_key_prefix_ok": key.startswith("gsk_"),
+        "llm_base_set": base != "",
+        "llm_model_set": model != "",
+    }
 
 
 def phrase_facts(facts: str) -> tuple[str, bool]:
@@ -178,11 +191,11 @@ def chat_reply(history: list) -> str | None:
     messages = [{
         "role": "system",
         "content": (
-            "You are Primo, a friendly assistant on the EasyPC shop site. "
-            "Answer general questions in a natural short conversation. "
+            "You are Primo. Answer the user's question directly in a natural short conversation. "
+            "General questions such as homework, advice, jokes, and everyday topics should be answered on their own. "
+            "Do not turn those into an EasyPC product pitch. "
             "Do not invent EasyPC product names, prices, or stock. "
-            "If the user asks which product to buy, ask them to name a category such as GPU, laptop, or RAM. "
-            "No markdown."
+            "Mention the shop only when the user asks about a computer product. No markdown."
         ),
     }]
     for turn in history[-8:]:
@@ -252,7 +265,9 @@ def chat():
         return jsonify({"ok": False, "error": "invalid_messages"}), 400
     reply = chat_reply(history)
     if reply is None:
-        return jsonify({"ok": False, "error": "chat_unavailable"})
+        body = {"ok": False, "error": "chat_unavailable"}
+        body.update(_llm_public_status())
+        return jsonify(body)
     return jsonify({"ok": True, "reply": reply})
 
 
