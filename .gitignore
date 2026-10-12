@@ -1,0 +1,7 @@
+# Agent skills installed locally with `npx skills add ...` (e.g. usestrix/strix).
+# Personal tooling, not part of the app — each developer installs their own.
+# .agents/skills is the shared folder the CLI writes for the "universal" agents
+# (Cursor, Codex, Copilot, Gemini CLI, Cline, ...); .claude/skills is Claude Code's.
+# .claude/settings.json stays tracked.
+/.agents/
+/.claude/skills/
