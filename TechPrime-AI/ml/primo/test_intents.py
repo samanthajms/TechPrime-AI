@@ -57,6 +57,14 @@ CASES = [
     ("give me details or explain to me the best brand and why?", "brand_advice"),
     ("which brand should I buy and why", "brand_advice"),
     ("explain the best laptop brand", "brand_advice"),
+    ("what is the best product in each category", "product_category"),
+    ("what is the best gpu", "product_recommendation"),
+    ("what is the best gaming laptop", "product_recommendation"),
+    ("what is the best ram", "product_recommendation"),
+    ("what is the best headphone", "product_recommendation"),
+    ("what are the specs of the best gpu", "product_search"),
+    ("product description of the best laptop", "product_search"),
+    ("what is the quality of the best ram", "product_recommendation"),
 ]
 
 

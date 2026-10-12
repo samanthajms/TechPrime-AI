@@ -615,3 +615,55 @@ more details on the best brand,brand_advice
 explain brands in your store,brand_advice
 why should I pick that brand,brand_advice
 compare the brands you sell,brand_advice
+what is the best product in each category,product_category
+best product in every category,product_category
+show the best item in all categories,product_category
+what is the top product for each category,product_category
+best product in each categories,product_category
+what is the best gpu,product_recommendation
+what is the best graphics card,product_recommendation
+best laptop in the item list,product_recommendation
+what is the best gaming laptop,product_recommendation
+what is the best ram,product_recommendation
+what is the best memory,product_recommendation
+what is the best processor,product_recommendation
+what is the best motherboard,product_recommendation
+what is the best ssd,product_recommendation
+what is the best hard disk,product_recommendation
+what is the best power supply,product_recommendation
+what is the best cooling,product_recommendation
+what is the best pc case,product_recommendation
+what is the best monitor,product_recommendation
+what is the best headset,product_recommendation
+what is the best headphone,product_recommendation
+what is the best keyboard,product_recommendation
+what is the best mouse,product_recommendation
+what is the best speaker,product_recommendation
+what is the best printer,product_recommendation
+what is the best mini pc,product_recommendation
+which gpu should I buy,product_recommendation
+which gaming laptop should I buy,product_recommendation
+which ram should I buy,product_recommendation
+recommend the best laptop,product_recommendation
+recommend the best graphics card,product_recommendation
+what is the quality of the best gpu,product_recommendation
+what is the quality of the best laptop,product_recommendation
+what is the quality of the best ram,product_recommendation
+what is the quality of the best gaming laptop,product_recommendation
+what is the quality of easypc products,product_recommendation
+what are the specs of the best gpu,product_search
+what are the specs of the best laptop,product_search
+what are the specs of the best gaming laptop,product_search
+what are the specs of the best ram,product_search
+what are the specs of the best processor,product_search
+what are the specs of the best motherboard,product_search
+what are the specs of the best ssd,product_search
+what are the specs of the best headset,product_search
+product description of the best gpu,product_search
+product description of the best laptop,product_search
+product description of the best ram,product_search
+describe the best gaming laptop,product_search
+tell me the specs and description of the best graphics card,product_search
+what are the specs of the best cooling,product_search
+what are the specs of the best monitor,product_search
+what are the specs of the best power supply,product_search

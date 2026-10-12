@@ -49,6 +49,9 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
     // Remove: summary (to_pay / cancelled) or any history row — not active ship/receive.
     $canRemove = $isHistory
         || in_array($ostNorm, ['to_pay', 'to pay', 'cancelled', 'canceled'], true);
+    $canReview = $isHistory && in_array($ostNorm, ['to_review', 'to review'], true);
+    $reviewRows = is_array($ctx['reviews'] ?? null) ? $ctx['reviews'] : [];
+    $existingReview = $canReview ? ($reviewRows[$oid] ?? null) : null;
 
     if ($cancelRequested && $ostNorm !== 'cancelled' && $ostNorm !== 'canceled') {
         $statusLabel = 'Cancellation Requested';
@@ -85,7 +88,7 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
     $phone = trim((string)($o['customer_phone'] ?? ''));
     $cancelReasonText = trim((string)($o['cancel_reason'] ?? ''));
     $hasDetails = $shipTo !== '' || $phone !== '' || $payLabel !== '' || $fulfil !== '' || ($cancelRequested && $cancelReasonText !== '');
-    $hasActions = $hasDetails || $canCancel || $canPay || $canReceive || $cancelRequested;
+    $hasActions = $hasDetails || $canCancel || $canPay || $canReceive || $cancelRequested || $canReview;
     ?>
     <li class="pf-order <?php echo $orderStatusTone($statusLabel); ?>">
         <div class="pf-order-head">
@@ -169,6 +172,12 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
                     <button type="button" class="pf-order-btn" aria-expanded="false"
                             aria-controls="pfOrderDetails<?php echo h($idPrefix . $oid); ?>" data-order-details>
                         Order details <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                    </button>
+                <?php endif; ?>
+                <?php if ($canReview): ?>
+                    <button type="button" class="pf-order-btn is-review" data-open-review="<?php echo $oid; ?>">
+                        <i class="fas fa-star" aria-hidden="true"></i>
+                        <?php echo $existingReview ? 'Your review' : 'Review'; ?>
                     </button>
                 <?php endif; ?>
                 <?php if ($canPay): ?>

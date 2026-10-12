@@ -138,3 +138,21 @@ html[data-theme="dark"] .primo-history-del:focus-visible,
 html[data-theme="dark"] .primo-retry:focus-visible,
 html[data-theme="dark"] .primo-jump:focus-visible,
 html[data-theme="dark"] .primo-send-btn:focus-visible { outline-color: #8fd166; }
+
+html[data-theme="dark"] .ep-review-modal { background: #16181c; border-color: #2d3138; color: #e4e6ea; }
+html[data-theme="dark"] .ep-review-modal h3,
+html[data-theme="dark"] .ep-review-label,
+html[data-theme="dark"] .pf-order-btn.is-review { color: #d7ecc4; }
+html[data-theme="dark"] .ep-review-order,
+html[data-theme="dark"] .ep-review-hint { color: #a3a9b3; }
+html[data-theme="dark"] .ep-review-close,
+html[data-theme="dark"] .ep-review-star,
+html[data-theme="dark"] .ep-review-chip span,
+html[data-theme="dark"] .ep-review-modal textarea,
+html[data-theme="dark"] .ep-review-modal input[type="file"] {
+    background: #1b1e23; color: #e4e6ea; border-color: #343840;
+}
+html[data-theme="dark"] .ep-review-star.is-on { color: #f5c451; background: #2a2618; border-color: #6b5420; }
+html[data-theme="dark"] .ep-review-chip input:checked + span { background: #1f2e18; border-color: #62b236; color: #d7ecc4; }
+html[data-theme="dark"] .ep-review-reply { background: #1a2416; border-color: #314628; }
+html[data-theme="dark"] .ep-review-reply-tags span { background: #16181c; border-color: #314628; color: #d7ecc4; }
