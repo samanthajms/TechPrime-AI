@@ -130,8 +130,48 @@ def _llm_public_status() -> dict:
         "llm_key_length": len(key),
         "llm_key_prefix_ok": key.startswith("gsk_"),
         "llm_base_set": base != "",
+        "llm_base": base,
+        "llm_model": model,
         "llm_model_set": model != "",
     }
+
+
+def _llm_error_text(exc: BaseException, key: str) -> str:
+    text = f"{type(exc).__name__}: {exc}"
+    if isinstance(exc, urllib.error.HTTPError):
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")[:240]
+        except Exception:
+            detail = ""
+        text = f"http_{exc.code}: {detail or exc.reason}"
+    if key:
+        text = text.replace(key, "[key]")
+    return text[:300]
+
+
+def _groq_post(payload: dict, timeout: int) -> tuple[dict | None, str]:
+    """POST a chat completion. A browser-like user agent is required; Cloudflare rejects Python-urllib."""
+    key, base, _model = _llm_settings()
+    if key == "" or base == "" or payload.get("model", "") == "":
+        return None, "missing_setting"
+    req = urllib.request.Request(
+        base + "/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+            "User-Agent": "Primo/1.0",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+        return None, _llm_error_text(exc, key)
+    if not isinstance(body, dict):
+        return None, "empty_reply"
+    return body, ""
 
 
 def _message_text(body: dict) -> str:
@@ -171,19 +211,8 @@ def phrase_facts(facts: str) -> tuple[str, bool]:
             {"role": "user", "content": facts},
         ],
     }
-    req = urllib.request.Request(
-        base + "/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+    body, _llm_error = _groq_post(payload, 12)
+    if body is None:
         return facts, False
 
     text = _message_text(body)
@@ -192,12 +221,11 @@ def phrase_facts(facts: str) -> tuple[str, bool]:
     return text, True
 
 
-def chat_reply(history: list) -> str | None:
+def chat_reply(history: list) -> tuple[str | None, str]:
     """Answer a general question. Returns None when Groq is off or fails."""
     key, base, model = _llm_settings()
     if key == "" or base == "" or model == "":
-        return None
-
+        return None, "missing_setting"
     messages = [{
         "role": "system",
         "content": (
@@ -220,7 +248,7 @@ def chat_reply(history: list) -> str | None:
             continue
         messages.append({"role": role, "content": content[:800]})
     if len(messages) < 2:
-        return None
+        return None, "no_messages"
 
     payload = {
         "model": model,
@@ -230,25 +258,14 @@ def chat_reply(history: list) -> str | None:
         "include_reasoning": False,
         "messages": messages,
     }
-    req = urllib.request.Request(
-        base + "/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
-        return None
+    body, llm_error = _groq_post(payload, 20)
+    if body is None:
+        return None, llm_error
 
     text = _message_text(body)
     if text == "" or len(text) > 1200:
-        return None
-    return text
+        return None, "empty_reply"
+    return text, ""
 
 
 @app.post("/phrase")
@@ -270,9 +287,9 @@ def chat():
     history = data.get("messages")
     if not isinstance(history, list) or history == []:
         return jsonify({"ok": False, "error": "invalid_messages"}), 400
-    reply = chat_reply(history)
+    reply, llm_error = chat_reply(history)
     if reply is None:
-        body = {"ok": False, "error": "chat_unavailable"}
+        body = {"ok": False, "error": "chat_unavailable", "llm_error": llm_error}
         body.update(_llm_public_status())
         return jsonify(body)
     return jsonify({"ok": True, "reply": reply})
