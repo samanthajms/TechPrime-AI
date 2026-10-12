@@ -391,6 +391,8 @@ if (!function_exists('inv_action_label')) {
             'delete_product' => 'Product Removed',
             'generate_barcode' => 'Barcode Generated',
             'update_order_status' => 'Order Updated',
+            'complete_order' => 'Order Completed',
+            'accept_order' => 'Order Accepted',
             'view_dashboard' => 'Viewed Dashboard',
             'profile_update' => 'Profile Updated',
             'password_change' => 'Password Changed',

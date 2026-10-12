@@ -213,6 +213,60 @@ function ep_place_cod_order(PDO $db, int $userId, array $items, float $total, st
     return ep_place_unpaid_order($db, $userId, $items, $total, $address, $phone, 'delivery');
 }
 
+/** True when the order is a store-pickup order (no shipping step). */
+function ep_order_is_pickup(array $order): bool
+{
+    return strtolower(trim((string)($order['fulfillment_type'] ?? ''))) === 'pickup';
+}
+
+/** Make sure a pickup order has a shipment row in 'processing' (no carrier). Runs inside the caller's transaction. */
+function ep_set_pickup_shipment(PDO $db, int $orderId): void
+{
+    $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
+    $chk->execute([$orderId]);
+    $ship = $chk->fetch(PDO::FETCH_ASSOC);
+    if ($ship) {
+        $db->prepare("UPDATE shipments SET shipment_status = 'processing' WHERE id = ?")->execute([(int)$ship['id']]);
+    } else {
+        $db->prepare("INSERT INTO shipments (order_id, shipment_status) VALUES (?, 'processing')")->execute([$orderId]);
+    }
+}
+
+/**
+ * Create/update the order's shipment row as 'processing'. Delivery orders get carrier LALAMOVE;
+ * if the shipments.carrier column rejects that value (older enum) the carrier is left unset instead
+ * of failing the whole accept. Runs inside the caller's transaction (SAVEPOINT).
+ */
+function ep_set_order_shipment(PDO $db, int $orderId, bool $isDelivery): void
+{
+    $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
+    $chk->execute([$orderId]);
+    $shipId = (int)$chk->fetchColumn();
+
+    if ($isDelivery) {
+        $db->exec('SAVEPOINT ep_ship_carrier');
+        try {
+            if ($shipId > 0) {
+                $db->prepare("UPDATE shipments SET shipment_status = 'processing', carrier = 'LALAMOVE' WHERE id = ?")
+                    ->execute([$shipId]);
+            } else {
+                $db->prepare("INSERT INTO shipments (order_id, shipment_status, carrier) VALUES (?, 'processing', 'LALAMOVE')")
+                    ->execute([$orderId]);
+            }
+            $db->exec('RELEASE SAVEPOINT ep_ship_carrier');
+            return;
+        } catch (Throwable $e) {
+            $db->exec('ROLLBACK TO SAVEPOINT ep_ship_carrier');
+            error_log('ep_set_order_shipment #' . $orderId . ' (carrier rejected): ' . $e->getMessage());
+        }
+    }
+    if ($shipId > 0) {
+        $db->prepare("UPDATE shipments SET shipment_status = 'processing' WHERE id = ?")->execute([$shipId]);
+    } else {
+        $db->prepare("INSERT INTO shipments (order_id, shipment_status) VALUES (?, 'processing')")->execute([$orderId]);
+    }
+}
+
 /**
  * Mark an existing to_pay order as paid (placeholder payment). Does not create a new order.
  * @return array{ok:bool,error?:string}
@@ -238,7 +292,7 @@ function ep_mark_order_paid(PDO $db, int $userId, int $orderId, string $paymentR
         }
 
         $st = $db->prepare(
-            'SELECT id, status, payment_status FROM orders WHERE id = ? AND user_id = ? FOR UPDATE'
+            'SELECT id, status, payment_status, fulfillment_type FROM orders WHERE id = ? AND user_id = ? FOR UPDATE'
         );
         $st->execute([$orderId, $userId]);
         $order = $st->fetch(PDO::FETCH_ASSOC);
@@ -250,6 +304,7 @@ function ep_mark_order_paid(PDO $db, int $userId, int $orderId, string $paymentR
             $db->rollBack();
             return ['ok' => false, 'error' => 'not_payable'];
         }
+        $isPickup = ep_order_is_pickup($order);
         if (strtolower((string)($order['payment_status'] ?? '')) === 'paid') {
             $db->commit();
             return ['ok' => true];
@@ -260,14 +315,19 @@ function ep_mark_order_paid(PDO $db, int $userId, int $orderId, string $paymentR
              SET payment_status = 'paid',
                  payment_method = 'online',
                  payment_ref = ?,
-                 paid_at = CURRENT_TIMESTAMP
+                 paid_at = CURRENT_TIMESTAMP,
+                 status = ?
              WHERE id = ? AND user_id = ? AND status = 'to_pay'
                AND COALESCE(payment_status, 'unpaid') <> 'paid'"
         );
-        $up->execute([$paymentRef, $orderId, $userId]);
+        // Pickup orders skip To Ship: ready for pickup right after payment.
+        $up->execute([$paymentRef, $isPickup ? 'to_receive' : 'to_pay', $orderId, $userId]);
         if ($up->rowCount() < 1) {
             $db->rollBack();
             return ['ok' => false, 'error' => 'already_paid'];
+        }
+        if ($isPickup) {
+            ep_set_pickup_shipment($db, $orderId);
         }
         $db->commit();
     } catch (Throwable $e) {
@@ -277,6 +337,23 @@ function ep_mark_order_paid(PDO $db, int $userId, int $orderId, string $paymentR
         return ['ok' => false, 'error' => 'exception'];
     }
 
+    if ($isPickup) {
+        inv_notify_user(
+            $db,
+            $userId,
+            "Payment successful for order #ORD-{$orderId}. It is now To Receive — pick it up at the store.",
+            'order_paid',
+            'user_dashboard.php?status=to_receive'
+        );
+        inv_notify_role(
+            $db,
+            'inventory_custodian',
+            "Paid pickup order #ORD-{$orderId} — prepare it for store pickup.",
+            'new_order',
+            'inventory_orders.php?status=to_receive'
+        );
+        return ['ok' => true];
+    }
     inv_notify_user(
         $db,
         $userId,
@@ -304,6 +381,7 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
 
     $clientId = 0;
     $isDelivery = false;
+    $nextStatus = 'to_ship';
     try {
         $db->beginTransaction();
         $st = $db->prepare(
@@ -329,39 +407,19 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
             return ['ok' => false, 'error' => 'not_paid'];
         }
 
+        $nextStatus = ep_order_is_pickup($order) ? 'to_receive' : 'to_ship';
         $up = $db->prepare(
-            "UPDATE orders SET status = 'to_ship'
+            "UPDATE orders SET status = ?
              WHERE id = ? AND status = 'to_pay' AND COALESCE(cancel_requested, FALSE) = FALSE"
         );
-        $up->execute([$orderId]);
+        $up->execute([$nextStatus, $orderId]);
         if ($up->rowCount() < 1) {
             $db->rollBack();
             return ['ok' => false, 'error' => 'not_acceptable'];
         }
 
         $isDelivery = strtolower(trim((string)($order['fulfillment_type'] ?? ''))) === 'delivery';
-        $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
-        $chk->execute([$orderId]);
-        $ship = $chk->fetch(PDO::FETCH_ASSOC);
-        if (!$ship) {
-            if ($isDelivery) {
-                $db->prepare(
-                    "INSERT INTO shipments (order_id, shipment_status, carrier) VALUES (?, 'processing', 'LALAMOVE')"
-                )->execute([$orderId]);
-            } else {
-                $db->prepare("INSERT INTO shipments (order_id, shipment_status) VALUES (?, 'processing')")
-                    ->execute([$orderId]);
-            }
-        } else {
-            if ($isDelivery) {
-                $db->prepare(
-                    "UPDATE shipments SET shipment_status = 'processing', carrier = 'LALAMOVE' WHERE id = ?"
-                )->execute([(int)$ship['id']]);
-            } else {
-                $db->prepare("UPDATE shipments SET shipment_status = 'processing' WHERE id = ?")
-                    ->execute([(int)$ship['id']]);
-            }
-        }
+        ep_set_order_shipment($db, $orderId, $isDelivery);
 
         $clientId = (int)$order['user_id'];
         $db->commit();
@@ -369,6 +427,7 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
         if ($db->inTransaction()) {
             $db->rollBack();
         }
+        error_log('ep_accept_order #' . $orderId . ': ' . $e->getMessage());
         return ['ok' => false, 'error' => 'exception'];
     }
 
@@ -378,13 +437,13 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
             $clientId,
             "Your order #ORD-{$orderId} was accepted.",
             'order_status',
-            'user_dashboard.php?status=to_ship'
+            'user_dashboard.php?status=' . $nextStatus
         );
     }
     if ($staffUserId > 0 && function_exists('logActivity')) {
-        logActivity($db, $staffUserId, 'accept_order', "Order #$orderId accepted → to_ship");
+        logActivity($db, $staffUserId, 'accept_order', "Order #$orderId accepted → " . $nextStatus);
     }
-    return ['ok' => true];
+    return ['ok' => true, 'status' => $nextStatus];
 }
 
 /**
@@ -428,34 +487,68 @@ function ep_hide_client_order(PDO $db, int $userId, int $orderId): array
 /** Client Item Received — mark successful and deduct stock once. */
 function ep_confirm_order_received(PDO $db, int $userId, int $orderId): array
 {
-    if ($userId <= 0 || $orderId <= 0) {
+    if ($userId <= 0) {
+        return ['ok' => false, 'error' => 'invalid'];
+    }
+    return ep_complete_order($db, $orderId, $userId, 0);
+}
+
+/**
+ * Mark an order Completed (to_review): deduct stock once, mark the shipment delivered and
+ * notify the customer, inventory custodians and retail officers (sales are read live from
+ * completed orders). Used by the client "Item Received" and the custodian status dropdown.
+ *
+ * @param int $ownerUserId Restrict to this customer's order (client flow); 0 = staff flow, any order
+ * @param int $staffUserId Staff user doing the update (0 for the client flow)
+ * @return array{ok:bool,error?:string,already?:bool}
+ */
+function ep_complete_order(PDO $db, int $orderId, int $ownerUserId = 0, int $staffUserId = 0): array
+{
+    if ($orderId <= 0) {
         return ['ok' => false, 'error' => 'invalid'];
     }
 
+    $userId = $ownerUserId;
+    $alreadyCompleted = false;
     try {
         $db->beginTransaction();
-        $st = $db->prepare(
-            'SELECT id, status, payment_status, stock_deducted
-             FROM orders WHERE id = ? AND user_id = ? FOR UPDATE'
-        );
-        $st->execute([$orderId, $userId]);
+        if ($ownerUserId > 0) {
+            $st = $db->prepare(
+                'SELECT id, user_id, status, payment_status, stock_deducted, cancel_requested
+                 FROM orders WHERE id = ? AND user_id = ? FOR UPDATE'
+            );
+            $st->execute([$orderId, $ownerUserId]);
+        } else {
+            $st = $db->prepare(
+                'SELECT id, user_id, status, payment_status, stock_deducted, cancel_requested
+                 FROM orders WHERE id = ? FOR UPDATE'
+            );
+            $st->execute([$orderId]);
+        }
         $order = $st->fetch(PDO::FETCH_ASSOC);
         if (!$order) {
             $db->rollBack();
             return ['ok' => false, 'error' => 'not_found'];
         }
 
+        $userId = (int)$order['user_id'];
         $status = (string)($order['status'] ?? '');
         $alreadyDeducted = !empty($order['stock_deducted']);
 
         if ($status === 'to_review' && $alreadyDeducted) {
             $db->commit();
-            return ['ok' => true];
+            return ['ok' => true, 'already' => true];
         }
 
-        if (!in_array($status, ['to_ship', 'to_receive'], true)) {
+        // The customer can only confirm receipt once the order is To Receive; staff may complete from To Ship too.
+        $completableFrom = $ownerUserId > 0 ? ['to_receive'] : ['to_ship', 'to_receive'];
+        if (!in_array($status, $completableFrom, true)) {
             $db->rollBack();
             return ['ok' => false, 'error' => 'not_receivable'];
+        }
+        if (!empty($order['cancel_requested'])) {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'cancel_pending'];
         }
 
         if (!$alreadyDeducted) {
@@ -531,6 +624,16 @@ function ep_confirm_order_received(PDO $db, int $userId, int $orderId): array
         'order_received',
         'inventory_orders.php'
     );
+    inv_notify_role(
+        $db,
+        'retail_officer',
+        "Order #ORD-{$orderId} completed — recorded as a sale in your reports.",
+        'order_completed',
+        'retail_dashboard.php'
+    );
+    if ($staffUserId > 0 && function_exists('logActivity')) {
+        logActivity($db, $staffUserId, 'complete_order', "Order #$orderId completed — stock deducted, sale recorded");
+    }
 
     return ['ok' => true];
 }
@@ -548,7 +651,7 @@ function ep_order_cancel_reasons(): array
 }
 
 /**
- * Client requests cancellation (To Pay). Needs Inventory Custodian Accept Cancel.
+ * Client requests cancellation (To Pay and still unpaid only). Needs Inventory Custodian Accept Cancel.
  * Does not deduct or restore stock (stock is never deducted until Item Received).
  * @return array{ok:bool,error?:string}
  */
@@ -566,7 +669,7 @@ function ep_request_order_cancel(PDO $db, int $userId, int $orderId, string $rea
     try {
         $db->beginTransaction();
         $st = $db->prepare(
-            'SELECT id, status, cancel_requested, stock_deducted
+            'SELECT id, status, payment_status, cancel_requested, stock_deducted
              FROM orders WHERE id = ? AND user_id = ? FOR UPDATE'
         );
         $st->execute([$orderId, $userId]);
@@ -584,6 +687,11 @@ function ep_request_order_cancel(PDO $db, int $userId, int $orderId, string $rea
             $db->commit();
             return ['ok' => true];
         }
+        // Once paid (or To Ship / To Receive / Completed) the customer can no longer cancel.
+        if (strtolower((string)($order['payment_status'] ?? '')) === 'paid') {
+            $db->rollBack();
+            return ['ok' => false, 'error' => 'not_cancellable'];
+        }
         if ($status !== 'to_pay') {
             $db->rollBack();
             return ['ok' => false, 'error' => 'not_cancellable'];
@@ -599,6 +707,7 @@ function ep_request_order_cancel(PDO $db, int $userId, int $orderId, string $rea
                  cancel_reason = ?,
                  cancel_requested_at = CURRENT_TIMESTAMP
              WHERE id = ? AND user_id = ? AND status = 'to_pay'
+               AND COALESCE(payment_status, 'unpaid') <> 'paid'
                AND COALESCE(cancel_requested, FALSE) = FALSE"
         );
         $up->execute([$reason, $orderId, $userId]);
@@ -664,7 +773,7 @@ function ep_accept_order_cancel(PDO $db, int $orderId, int $staffUserId = 0): ar
             $db->rollBack();
             return ['ok' => false, 'error' => 'no_request'];
         }
-        if (!empty($order['stock_deducted'])) {
+        if (!empty($order['stock_deducted']) || (string)$order['status'] !== 'to_pay') {
             $db->rollBack();
             return ['ok' => false, 'error' => 'stock_deducted'];
         }

@@ -39,10 +39,10 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
     $idPrefix = $isHistory ? 'h' : 's';
 
     $canPay = !$isHistory && ($ost === 'to_pay' && !$isPaid && !$cancelRequested);
-    $canCancel = !$isHistory && ($ost === 'to_pay' && !$cancelRequested && empty($o['stock_deducted']));
+    $canCancel = !$isHistory && ($ost === 'to_pay' && !$isPaid && !$cancelRequested && empty($o['stock_deducted']));
     $canReceive = !$isHistory
         && ($currentFilter === 'to_receive' || $currentFilter === 'All' || $currentFilter === 'to_ship')
-        && in_array($ost, ['to_ship', 'to_receive'], true)
+        && $ost === 'to_receive'
         && empty($o['stock_deducted'])
         && !$cancelRequested
         && $currentFilter === 'to_receive';
@@ -55,9 +55,9 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
 
     if ($cancelRequested && $ostNorm !== 'cancelled' && $ostNorm !== 'canceled') {
         $statusLabel = 'Cancellation Requested';
-    } elseif (!$isHistory && $currentFilter === 'to_receive' && in_array($ost, ['to_ship', 'to_receive'], true)) {
+    } elseif (!$isHistory && $ost === 'to_receive') {
         $statusLabel = 'To Receive';
-    } elseif (!$isHistory && $currentFilter === 'to_ship' && in_array($ost, ['to_ship', 'to_receive'], true)) {
+    } elseif (!$isHistory && $ost === 'to_ship') {
         $statusLabel = 'To Ship';
     } elseif ($ost === 'to_pay' && $isPaid) {
         $statusLabel = 'Paid — awaiting accept';

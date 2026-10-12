@@ -273,7 +273,6 @@ $csrf                 = generateCsrfToken();
                     <a href="shop.php" class="epc-btn epc-btn-ghost epc-btn-block">Continue Shopping</a>
 
                     <ul class="epc-perks">
-                        <li><i class="fas fa-money-bill-wave"></i> Cash on Delivery available</li>
                         <li><i class="fas fa-credit-card"></i> Secure online payment</li>
                         <li><i class="fas fa-store-alt"></i> EasyPC One Oasis, Rosario, Pasig</li>
                     </ul>

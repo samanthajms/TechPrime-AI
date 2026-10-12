@@ -19,13 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pass_to_courier'])) {
     }
     $orderId = (int)($_POST['order_id'] ?? 0);
     if ($orderId > 0) {
-        $verify = $db->prepare(
-            'SELECT o.id FROM orders o WHERE o.id = ? AND EXISTS (
-                SELECT 1 FROM order_items oi INNER JOIN products p ON p.id = oi.product_id
-                WHERE oi.order_id = o.id AND p.seller_id = ?
-            ) LIMIT 1'
-        );
-        $verify->execute([$orderId, $retailId]);
+        $verify = $db->prepare('SELECT o.id FROM orders o WHERE o.id = ? LIMIT 1');
+        $verify->execute([$orderId]);
         if ($verify->fetch(PDO::FETCH_ASSOC)) {
             $up = $db->prepare("UPDATE orders SET status = 'to_receive' WHERE id = ?");
             $up->execute([$orderId]);
@@ -46,18 +41,14 @@ $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.cust
                u.name, u.surname, u.email,
                (SELECT STRING_AGG(pr.name || ' x' || oi.quantity::text, ', ')
                 FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
-                WHERE oi.order_id = o.id AND pr.seller_id = ?) AS products,
+                WHERE oi.order_id = o.id) AS products,
                (SELECT shipment_status FROM shipments WHERE order_id = o.id ORDER BY id DESC LIMIT 1) AS shipment_status,
-               (SELECT carrier FROM shipments WHERE order_id = o.id ORDER BY id DESC LIMIT 1) AS carrier
+               (CASE WHEN LOWER(COALESCE(o.fulfillment_type, '')) = 'pickup' THEN 'Store Pickup' ELSE 'Lalamove' END) AS carrier
         FROM orders o
         INNER JOIN users u ON u.id = o.user_id
-        WHERE EXISTS (
-            SELECT 1 FROM order_items oix INNER JOIN products prx ON prx.id = oix.product_id
-            WHERE oix.order_id = o.id AND prx.seller_id = ?
-        )
         ORDER BY o.id DESC";
 $st = $db->prepare($sql);
-$st->execute([$retailId, $retailId]);
+$st->execute();
 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 staff_page_start([
     'role' => 'retail_officer',

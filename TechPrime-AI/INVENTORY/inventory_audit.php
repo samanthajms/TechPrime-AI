@@ -24,6 +24,8 @@ $allowedActions = [
     'delete_product' => 'Product Removed',
     'generate_barcode' => 'Barcode Generated',
     'update_order_status' => 'Order Updated',
+    'complete_order' => 'Order Completed',
+    'accept_order' => 'Order Accepted',
 ];
 if (!array_key_exists($actionFilter, $allowedActions)) {
     $actionFilter = '';
@@ -40,7 +42,7 @@ if (!array_key_exists($range, $allowedRanges)) {
     $range = 'all';
 }
 
-$inventoryActions = ['add_product', 'edit_product', 'pos_stock_in', 'delete_product', 'generate_barcode', 'update_order_status'];
+$inventoryActions = ['add_product', 'edit_product', 'pos_stock_in', 'delete_product', 'generate_barcode', 'update_order_status', 'complete_order', 'accept_order'];
 
 $where = [
     'l.action IN (' . implode(',', array_fill(0, count($inventoryActions), '?')) . ')',
@@ -106,6 +108,30 @@ $rows = [];
 if ($listStmt) {
     $listStmt->execute($params);
     $rows = $listStmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/* Order rows: product name(s) + customer name for the orders referenced in the log details ("Order #N ..."). */
+$orderInfo = [];
+$orderIds = [];
+foreach ($rows as $r) {
+    if (in_array((string)($r['action'] ?? ''), ['update_order_status', 'complete_order', 'accept_order'], true)
+        && preg_match('/Order\s*#\s*(\d+)/i', (string)($r['details'] ?? ''), $m)) {
+        $orderIds[(int)$m[1]] = true;
+    }
+}
+if ($orderIds) {
+    $ids = array_keys($orderIds);
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $ost = $db->prepare("SELECT o.id, TRIM(COALESCE(u.name, '') || ' ' || COALESCE(u.surname, '')) AS customer,
+                                (SELECT STRING_AGG(pr.name, ', ' ORDER BY oi.id)
+                                 FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
+                                 WHERE oi.order_id = o.id) AS products
+                         FROM orders o LEFT JOIN users u ON u.id = o.user_id
+                         WHERE o.id IN ($in)");
+    $ost->execute($ids);
+    foreach ($ost->fetchAll(PDO::FETCH_ASSOC) as $oRow) {
+        $orderInfo[(int)$oRow['id']] = $oRow;
+    }
 }
 
 function inv_audit_url(int $page, string $q, string $action, string $range): string
@@ -200,7 +226,8 @@ staff_page_start([
 .inv-audit-when span { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text-muted); font-weight: 500; }
 .inv-audit-user { font-weight: 700; }
 .inv-audit-user span { display: block; font-size: 11.5px; font-weight: 500; color: var(--text-muted); margin-top: 2px; }
-.inv-audit-product { font-weight: 600; max-width: 220px; }
+.inv-audit-product { font-weight: 600; max-width: 260px; }
+.inv-audit-product .inv-audit-customer { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 500; color: var(--text-muted); }
 .inv-action-badge {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 5px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
@@ -320,7 +347,13 @@ EXTRA
                             elseif ($action === 'edit_product' || $action === 'generate_barcode') $actClass = 'act-edit';
                             elseif ($action === 'delete_product') $actClass = 'act-del';
                             elseif ($action === 'update_order_status') $actClass = 'act-order';
+                            elseif ($action === 'complete_order' || $action === 'accept_order') $actClass = 'act-order';
                             $statusClass = ($parsed['status'] === 'Adjusted') ? 'adj' : '';
+                            $oInfo = null;
+                            if (in_array($action, ['update_order_status', 'complete_order', 'accept_order'], true)
+                                && preg_match('/Order\s*#\s*(\d+)/i', $details, $om)) {
+                                $oInfo = $orderInfo[(int)$om[1]] ?? null;
+                            }
                             ?>
                             <tr>
                                 <td class="inv-audit-when">
@@ -342,7 +375,16 @@ EXTRA
                                         <?php echo h(inv_action_label($action)); ?>
                                     </span>
                                 </td>
-                                <td class="inv-audit-product" title="<?php echo h($details); ?>"><?php echo h($parsed['product']); ?></td>
+                                <td class="inv-audit-product" title="<?php echo h($details); ?>">
+                                    <?php if ($oInfo): ?>
+                                        <?php echo h((string)($oInfo['products'] ?? '') !== '' ? $oInfo['products'] : $parsed['product']); ?>
+                                        <?php if (trim((string)($oInfo['customer'] ?? '')) !== ''): ?>
+                                        <span class="inv-audit-customer"><i class="fas fa-user" aria-hidden="true"></i> <?php echo h($oInfo['customer']); ?></span>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <?php echo h($parsed['product']); ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <span class="inv-chg <?php echo h($parsed['change_class']); ?>"><?php echo h($parsed['change']); ?></span>
                                 </td>

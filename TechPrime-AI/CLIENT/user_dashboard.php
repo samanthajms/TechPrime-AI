@@ -408,8 +408,10 @@ if ($search_query !== '') {
 // ---- Order Summary (active only) ----
 $summaryWhere = " AND LOWER(TRIM(o.status)) IN ('to_pay', 'to_ship', 'to_receive', 'to pay', 'to ship', 'to receive')";
 $summaryParams = [$user_id];
-if ($current_filter === 'to_ship' || $current_filter === 'to_receive') {
-    $summaryWhere .= " AND LOWER(TRIM(o.status)) IN ('to_ship', 'to_receive', 'to ship', 'to receive')";
+if ($current_filter === 'to_ship') {
+    $summaryWhere .= " AND LOWER(TRIM(o.status)) IN ('to_ship', 'to ship')";
+} elseif ($current_filter === 'to_receive') {
+    $summaryWhere .= " AND LOWER(TRIM(o.status)) IN ('to_receive', 'to receive')";
 } elseif ($current_filter === 'to_pay') {
     $summaryWhere .= ' AND (o.status = ? OR o.status = ?)';
     $summaryParams[] = 'to_pay';
@@ -486,10 +488,7 @@ $stCounts->execute([$user_id]);
 foreach ($stCounts->fetchAll(PDO::FETCH_ASSOC) as $cRow) {
     $statusCounts['All'] += (int)$cRow['n'];
     $cKey = ias_normalize_order_status_filter((string)$cRow['status']);
-    if ($cKey === 'to_ship' || $cKey === 'to_receive') {
-        $statusCounts['to_ship'] += (int)$cRow['n'];
-        $statusCounts['to_receive'] += (int)$cRow['n'];
-    } elseif ($cKey !== 'All' && isset($statusCounts[$cKey])) {
+    if ($cKey !== 'All' && isset($statusCounts[$cKey])) {
         $statusCounts[$cKey] += (int)$cRow['n'];
     }
 }

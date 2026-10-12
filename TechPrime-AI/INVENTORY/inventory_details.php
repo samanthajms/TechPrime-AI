@@ -15,7 +15,7 @@ if ($oid <= 0) {
 
 $st = $db->prepare(
     "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.customer_phone,
-            u.name, u.surname, u.email, u.address AS user_address
+            o.fulfillment_type, u.name, u.surname, u.email, u.address AS user_address
      FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = ? LIMIT 1"
 );
 $st->execute([$oid]);
@@ -34,6 +34,7 @@ $shipStmt = $db->prepare('SELECT * FROM shipments WHERE order_id = ? LIMIT 1');
 $shipStmt->execute([$oid]);
 $ship = $shipStmt->fetch(PDO::FETCH_ASSOC);
 $addr = $order['shipping_address'] ?: $order['user_address'];
+$isPickup = strtolower(trim((string)($order['fulfillment_type'] ?? ''))) === 'pickup';
 
 staff_page_start([
     'role' => 'inventory_custodian',
@@ -65,14 +66,14 @@ staff_page_start([
             <div class="card">
                 <div class="card-header">
                     <div>
-                        <h3><span class="card-icon"><i class="fas fa-map-marker-alt"></i></span> Shipping</h3>
+                        <h3><span class="card-icon"><i class="fas fa-map-marker-alt"></i></span> <?php echo $isPickup ? 'Pickup' : 'Shipping'; ?></h3>
                     </div>
                 </div>
                 <div class="card-body">
                     <p><?php echo nl2br(h($addr)); ?></p>
                 </div>
             </div>
-            <?php if ($ship): ?>
+            <?php if ($ship && !$isPickup): ?>
             <div class="card">
                 <div class="card-header">
                     <div>
