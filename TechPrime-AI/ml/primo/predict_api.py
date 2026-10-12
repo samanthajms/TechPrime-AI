@@ -169,6 +169,68 @@ def phrase_facts(facts: str) -> tuple[str, bool]:
     return text, True
 
 
+def chat_reply(history: list) -> str | None:
+    """Answer a general question. Returns None when Groq is off or fails."""
+    key, base, model = _llm_settings()
+    if key == "" or base == "" or model == "":
+        return None
+
+    messages = [{
+        "role": "system",
+        "content": (
+            "You are Primo, a friendly assistant on the EasyPC shop site. "
+            "Answer general questions in a natural short conversation. "
+            "Do not invent EasyPC product names, prices, or stock. "
+            "If the user asks which product to buy, ask them to name a category such as GPU, laptop, or RAM. "
+            "No markdown."
+        ),
+    }]
+    for turn in history[-8:]:
+        if not isinstance(turn, dict):
+            continue
+        role = turn.get("role")
+        content = turn.get("content")
+        if role not in ("user", "assistant") or not isinstance(content, str):
+            continue
+        content = content.strip()
+        if content == "":
+            continue
+        messages.append({"role": role, "content": content[:800]})
+    if len(messages) < 2:
+        return None
+
+    payload = {
+        "model": model,
+        "temperature": 0.6,
+        "max_tokens": 400,
+        "messages": messages,
+    }
+    req = urllib.request.Request(
+        base + "/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return None
+
+    content = (((body.get("choices") or [{}])[0].get("message") or {}).get("content"))
+    if isinstance(content, list):
+        content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+    if not isinstance(content, str):
+        return None
+    text = content.strip()
+    if text == "" or len(text) > 1200:
+        return None
+    return text
+
+
 @app.post("/phrase")
 def phrase():
     data = request.get_json(silent=True) or {}
@@ -180,6 +242,18 @@ def phrase():
         return jsonify({"ok": False, "error": "invalid_facts"}), 400
     reply, phrased = phrase_facts(facts)
     return jsonify({"ok": True, "reply": reply, "phrased": phrased})
+
+
+@app.post("/chat")
+def chat():
+    data = request.get_json(silent=True) or {}
+    history = data.get("messages")
+    if not isinstance(history, list) or history == []:
+        return jsonify({"ok": False, "error": "invalid_messages"}), 400
+    reply = chat_reply(history)
+    if reply is None:
+        return jsonify({"ok": False, "error": "chat_unavailable"})
+    return jsonify({"ok": True, "reply": reply})
 
 
 if __name__ == "__main__":

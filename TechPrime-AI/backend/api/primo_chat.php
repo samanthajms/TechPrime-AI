@@ -96,6 +96,23 @@ if ($svm === null) {
 $intent = (string) ($svm['intent'] ?? 'fallback');
 $confidence = (float) ($svm['confidence'] ?? 0);
 $rawIntent = (string) ($svm['raw_intent'] ?? $intent);
+
+if (in_array($intent, ['greeting', 'goodbye', 'gratitude', 'help', 'fallback'], true)) {
+    $general = primo_general_reply($message);
+    if ($general !== null) {
+        echo json_encode([
+            'ok' => true,
+            'intent' => $intent,
+            'confidence' => round($confidence, 4),
+            'raw_intent' => $rawIntent,
+            'reply' => $general,
+            'products' => [],
+            'show_tech_match' => false,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 $db = getDbConnection();
 
 /* Short follow-ups like "how much?" reuse the last product topic from this session. */
@@ -265,6 +282,67 @@ function primo_phrase_keeps_facts(string $facts, string $phrased): bool
         }
     }
     return true;
+}
+
+/**
+ * General questions go to Groq. Product lookups stay on the item list.
+ * Returns null when Groq is unavailable so the existing reply is used.
+ */
+function primo_general_reply(string $message): ?string
+{
+    if (preg_match('/\b(order|refund|password|tracking)\b/i', $message)) {
+        return null;
+    }
+    $turns = $_SESSION['primo_chat'] ?? [];
+    if (!is_array($turns)) {
+        $turns = [];
+    }
+    $messages = [];
+    foreach (array_slice($turns, -6) as $turn) {
+        if (!is_array($turn)) {
+            continue;
+        }
+        $role = (string) ($turn['role'] ?? '');
+        $content = trim((string) ($turn['content'] ?? ''));
+        if (($role === 'user' || $role === 'assistant') && $content !== '') {
+            $messages[] = ['role' => $role, 'content' => mb_substr($content, 0, 500)];
+        }
+    }
+    $messages[] = ['role' => 'user', 'content' => $message];
+
+    $base = $_ENV['PRIMO_API_URL'] ?? $_SERVER['PRIMO_API_URL'] ?? getenv('PRIMO_API_URL');
+    $base = is_string($base) && trim($base) !== '' ? rtrim(trim($base), '/') : 'http://127.0.0.1:5055';
+    $isLocal = str_starts_with($base, 'http://127.0.0.1') || str_starts_with($base, 'http://localhost');
+    if (!function_exists('curl_init')) {
+        return null;
+    }
+    $ch = curl_init($base . '/chat');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode(['messages' => $messages], JSON_UNESCAPED_UNICODE),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => $isLocal ? 2 : 8,
+        CURLOPT_TIMEOUT => $isLocal ? 12 : 25,
+    ]);
+    $resp = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($resp === false || $code < 200 || $code >= 300) {
+        return null;
+    }
+    $data = json_decode($resp, true);
+    if (!is_array($data) || empty($data['ok'])) {
+        return null;
+    }
+    $reply = trim((string) ($data['reply'] ?? ''));
+    if ($reply === '') {
+        return null;
+    }
+    $turns[] = ['role' => 'user', 'content' => mb_substr($message, 0, 500)];
+    $turns[] = ['role' => 'assistant', 'content' => mb_substr($reply, 0, 500)];
+    $_SESSION['primo_chat'] = array_slice($turns, -8);
+    return $reply;
 }
 
 /**
