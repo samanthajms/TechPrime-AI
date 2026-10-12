@@ -12,25 +12,26 @@
                 <div class="ep-footer-logo">
                     <img src="../assets/logo.png" alt="EasyPC" class="ep-footer-logo-img">
                 </div>
+                <p class="ep-footer-tagline">PCs, laptops, parts and accessories from the One Oasis branch.</p>
+                <ul class="ep-footer-contact">
+                    <li><i class="fas fa-phone-alt" aria-hidden="true"></i><a href="tel:+639176255078">0917 625 5078</a></li>
+                    <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>One Oasis, Rosario, Pasig City</span></li>
+                </ul>
                 <div class="ep-social-row">
-                    <a href="https://www.facebook.com/EASYPCOneOasisPasigBranch" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
-                </div>
-                <div class="ep-social-row">
-                    <h5>Contact</h5>
-                    <p>0917 625 5078</p>
+                    <a href="https://www.facebook.com/EASYPCOneOasisPasigBranch" target="_blank" rel="noopener" aria-label="EasyPC One Oasis on Facebook"><i class="fab fa-facebook-f" aria-hidden="true"></i></a>
                 </div>
             </div>
-            <div class="ep-footer-col">
+            <nav class="ep-footer-col" aria-label="Explore">
                 <h5>Explore</h5>
                 <a href="index.php">Home</a>
                 <a href="cart.php">Cart</a>
                 <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Orders</a>
-            </div>
-            <div class="ep-footer-col">
+            </nav>
+            <nav class="ep-footer-col" aria-label="Resources">
                 <h5>Resources</h5>
                 <a href="privacy_policy.php">Privacy Policy</a>
                 <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Account</a>
-            </div>
+            </nav>
         </div>
         <div class="ep-footer-bottom">&copy; 2026 EASYPC One Oasis. All Rights Reserved.</div>
     </footer>
