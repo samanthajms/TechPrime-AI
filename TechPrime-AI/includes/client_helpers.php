@@ -213,6 +213,41 @@ function ep_place_cod_order(PDO $db, int $userId, array $items, float $total, st
     return ep_place_unpaid_order($db, $userId, $items, $total, $address, $phone, 'delivery');
 }
 
+/**
+ * Create/update the order's shipment row as 'processing'. Delivery orders get carrier LALAMOVE;
+ * if the shipments.carrier column rejects that value (older enum) the carrier is left unset instead
+ * of failing the whole accept. Runs inside the caller's transaction (SAVEPOINT).
+ */
+function ep_set_order_shipment(PDO $db, int $orderId, bool $isDelivery): void
+{
+    $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
+    $chk->execute([$orderId]);
+    $shipId = (int)$chk->fetchColumn();
+
+    if ($isDelivery) {
+        $db->exec('SAVEPOINT ep_ship_carrier');
+        try {
+            if ($shipId > 0) {
+                $db->prepare("UPDATE shipments SET shipment_status = 'processing', carrier = 'LALAMOVE' WHERE id = ?")
+                    ->execute([$shipId]);
+            } else {
+                $db->prepare("INSERT INTO shipments (order_id, shipment_status, carrier) VALUES (?, 'processing', 'LALAMOVE')")
+                    ->execute([$orderId]);
+            }
+            $db->exec('RELEASE SAVEPOINT ep_ship_carrier');
+            return;
+        } catch (Throwable $e) {
+            $db->exec('ROLLBACK TO SAVEPOINT ep_ship_carrier');
+            error_log('ep_set_order_shipment #' . $orderId . ' (carrier rejected): ' . $e->getMessage());
+        }
+    }
+    if ($shipId > 0) {
+        $db->prepare("UPDATE shipments SET shipment_status = 'processing' WHERE id = ?")->execute([$shipId]);
+    } else {
+        $db->prepare("INSERT INTO shipments (order_id, shipment_status) VALUES (?, 'processing')")->execute([$orderId]);
+    }
+}
+
 /** True when the order is a store-pickup order (no shipping step). */
 function ep_order_is_pickup(array $order): bool
 {
@@ -346,6 +381,7 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
 
     $clientId = 0;
     $isDelivery = false;
+    $nextStatus = 'to_ship';
     try {
         $db->beginTransaction();
         $st = $db->prepare(
@@ -383,28 +419,7 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
         }
 
         $isDelivery = strtolower(trim((string)($order['fulfillment_type'] ?? ''))) === 'delivery';
-        $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
-        $chk->execute([$orderId]);
-        $ship = $chk->fetch(PDO::FETCH_ASSOC);
-        if (!$ship) {
-            if ($isDelivery) {
-                $db->prepare(
-                    "INSERT INTO shipments (order_id, shipment_status, carrier) VALUES (?, 'processing', 'LALAMOVE')"
-                )->execute([$orderId]);
-            } else {
-                $db->prepare("INSERT INTO shipments (order_id, shipment_status) VALUES (?, 'processing')")
-                    ->execute([$orderId]);
-            }
-        } else {
-            if ($isDelivery) {
-                $db->prepare(
-                    "UPDATE shipments SET shipment_status = 'processing', carrier = 'LALAMOVE' WHERE id = ?"
-                )->execute([(int)$ship['id']]);
-            } else {
-                $db->prepare("UPDATE shipments SET shipment_status = 'processing' WHERE id = ?")
-                    ->execute([(int)$ship['id']]);
-            }
-        }
+        ep_set_order_shipment($db, $orderId, $isDelivery);
 
         $clientId = (int)$order['user_id'];
         $db->commit();
@@ -412,6 +427,7 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
         if ($db->inTransaction()) {
             $db->rollBack();
         }
+        error_log('ep_accept_order #' . $orderId . ': ' . $e->getMessage());
         return ['ok' => false, 'error' => 'exception'];
     }
 
@@ -425,7 +441,7 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
         );
     }
     if ($staffUserId > 0 && function_exists('logActivity')) {
-        logActivity($db, $staffUserId, 'accept_order', "Order #$orderId accepted → to_ship");
+        logActivity($db, $staffUserId, 'accept_order', "Order #$orderId accepted → " . $nextStatus);
     }
     return ['ok' => true];
 }
