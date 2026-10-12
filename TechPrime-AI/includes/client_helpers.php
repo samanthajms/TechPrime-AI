@@ -267,25 +267,6 @@ function ep_set_order_shipment(PDO $db, int $orderId, bool $isDelivery): void
     }
 }
 
-/** True when the order is a store-pickup order (no shipping step). */
-function ep_order_is_pickup(array $order): bool
-{
-    return strtolower(trim((string)($order['fulfillment_type'] ?? ''))) === 'pickup';
-}
-
-/** Make sure a pickup order has a shipment row in 'processing' (no carrier). Runs inside the caller's transaction. */
-function ep_set_pickup_shipment(PDO $db, int $orderId): void
-{
-    $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
-    $chk->execute([$orderId]);
-    $ship = $chk->fetch(PDO::FETCH_ASSOC);
-    if ($ship) {
-        $db->prepare("UPDATE shipments SET shipment_status = 'processing' WHERE id = ?")->execute([(int)$ship['id']]);
-    } else {
-        $db->prepare("INSERT INTO shipments (order_id, shipment_status) VALUES (?, 'processing')")->execute([$orderId]);
-    }
-}
-
 /**
  * Mark an existing to_pay order as paid (placeholder payment). Does not create a new order.
  * @return array{ok:bool,error?:string}
@@ -447,7 +428,7 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
             $db->rollBack();
         }
         error_log('ep_accept_order #' . $orderId . ': ' . $e->getMessage());
-        return ['ok' => false, 'error' => 'exception'];
+        return ['ok' => false, 'error' => 'exception', 'detail' => $e->getMessage()];
     }
 
     if ($clientId > 0) {
@@ -456,13 +437,13 @@ function ep_accept_order(PDO $db, int $orderId, int $staffUserId = 0): array
             $clientId,
             "Your order #ORD-{$orderId} was accepted.",
             'order_status',
-            'user_dashboard.php?status=to_ship'
+            'user_dashboard.php?status=' . $nextStatus
         );
     }
     if ($staffUserId > 0 && function_exists('logActivity')) {
         logActivity($db, $staffUserId, 'accept_order', "Order #$orderId accepted → " . $nextStatus);
     }
-    return ['ok' => true];
+    return ['ok' => true, 'status' => $nextStatus];
 }
 
 /**

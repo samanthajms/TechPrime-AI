@@ -34,10 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'accep
         'page' => $returnPage,
         'alert' => !empty($result['ok']) ? 'accepted' : 'error',
     ];
+    if (empty($result['ok'])) {
+        // Show why it failed (error code, or the database message) in the alert.
+        $params['detail'] = substr((string)($result['detail'] ?? $result['error'] ?? 'unknown'), 0, 300);
+    }
     if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
         $params['status'] = $returnStatus;
     } elseif (!empty($result['ok'])) {
-        $params['status'] = 'to_ship';
+        $params['status'] = $result['status'] ?? 'to_ship';   // pickup orders land in To Receive
     }
     header('Location: inventory_orders.php?' . http_build_query($params));
     exit;
@@ -565,6 +569,9 @@ $flash = '';
 if ($__m = ias_alert_message_from_request()) {
     $__a = (string)($_GET['alert'] ?? '');
     $__t = (in_array($__a, ['error', 'order_locked', 'order_complete_failed', 'pickup_no_ship'], true) || !empty($_GET['error'])) ? 'error' : 'success';
+    if ($__a === 'error' && !empty($_GET['detail'])) {
+        $__m .= ' (' . (string)$_GET['detail'] . ')';
+    }
     $__opts = $__a === 'order_completed' ? ['title' => 'Completed Order'] : new stdClass();
     $flash = '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof IAS_UI!=="undefined")IAS_UI.alert('
         . json_encode($__m, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ','
