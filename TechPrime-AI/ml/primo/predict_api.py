@@ -134,6 +134,19 @@ def _llm_public_status() -> dict:
     }
 
 
+def _message_text(body: dict) -> str:
+    message = ((body.get("choices") or [{}])[0].get("message") or {})
+    content = message.get("content")
+    if isinstance(content, list):
+        content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    reasoning = message.get("reasoning")
+    if isinstance(reasoning, str):
+        return reasoning.strip()
+    return ""
+
+
 def phrase_facts(facts: str) -> tuple[str, bool]:
     """Rewrite catalog facts with Groq. The original sentence stays when Groq is off or fails."""
     key, base, model = _llm_settings()
@@ -143,7 +156,9 @@ def phrase_facts(facts: str) -> tuple[str, bool]:
     payload = {
         "model": model,
         "temperature": 0.2,
-        "max_tokens": 220,
+        "max_completion_tokens": 220,
+        "reasoning_effort": "low",
+        "include_reasoning": False,
         "messages": [
             {
                 "role": "system",
@@ -171,12 +186,7 @@ def phrase_facts(facts: str) -> tuple[str, bool]:
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
         return facts, False
 
-    content = (((body.get("choices") or [{}])[0].get("message") or {}).get("content"))
-    if isinstance(content, list):
-        content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
-    if not isinstance(content, str):
-        return facts, False
-    text = content.strip()
+    text = _message_text(body)
     if text == "" or len(text) > 700:
         return facts, False
     return text, True
@@ -215,7 +225,9 @@ def chat_reply(history: list) -> str | None:
     payload = {
         "model": model,
         "temperature": 0.6,
-        "max_tokens": 400,
+        "max_completion_tokens": 400,
+        "reasoning_effort": "low",
+        "include_reasoning": False,
         "messages": messages,
     }
     req = urllib.request.Request(
@@ -233,12 +245,7 @@ def chat_reply(history: list) -> str | None:
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
         return None
 
-    content = (((body.get("choices") or [{}])[0].get("message") or {}).get("content"))
-    if isinstance(content, list):
-        content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
-    if not isinstance(content, str):
-        return None
-    text = content.strip()
+    text = _message_text(body)
     if text == "" or len(text) > 1200:
         return None
     return text
