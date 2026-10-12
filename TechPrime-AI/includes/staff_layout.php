@@ -33,14 +33,14 @@ if (!function_exists('staff_nav_for_role')) {
                 return [
                     ['key' => 'dashboard', 'href' => 'inventory_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
                     ['key' => 'orders', 'href' => 'inventory_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart'],
-                    ['key' => 'reviews', 'href' => 'inventory_reviews.php', 'label' => 'Reviews', 'icon' => 'fa-star'],
                     ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes', 'children' => [
                         ['slug' => 'inventory', 'href' => 'inventory_stocks.php', 'label' => 'Inventory'],
                         ['slug' => 'add_product', 'href' => 'inventory_stock_in.php', 'label' => 'Add New Product'],
                     ]],
                     ['key' => 'forecast', 'href' => 'inventory_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line'],
-                    ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list'],
+                    ['key' => 'reviews', 'href' => 'inventory_reviews.php', 'label' => 'Reviews', 'icon' => 'fa-star'],
                     ['key' => 'messages', 'href' => 'inventory_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
+                    ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list'],
                     ['key' => 'profile', 'href' => 'inventory_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
                 ];
             case 'cashier':

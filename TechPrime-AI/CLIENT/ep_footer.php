@@ -21,13 +21,6 @@
                 </div>
             </div>
             <div class="ep-footer-col">
-                <h5>Shop</h5>
-                <a href="shop.php?section=desktop">Desktop</a>
-                <a href="category.php?type=Laptops">Laptop</a>
-                <a href="category.php?type=Accessories">Accessories</a>
-                <a href="shop.php">Shop Now</a>
-            </div>
-            <div class="ep-footer-col">
                 <h5>Explore</h5>
                 <a href="index.php">Home</a>
                 <a href="cart.php">Cart</a>
