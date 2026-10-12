@@ -44,6 +44,28 @@ if (preg_match('/<\s*script|javascript:|onerror\s*=/i', $message)) {
     exit;
 }
 
+if (primo_is_itemlist_question($message)) {
+    $result = primo_itemlist_answer($message);
+    try {
+        $db = getDbConnection();
+        $result['products'] = primo_itemlist_cards($db, $result['picks'] ?? []);
+    } catch (Throwable $e) {
+        $result['products'] = [];
+    }
+    unset($result['picks']);
+    primo_store_context('product_recommendation', $message, $result['products'] ?? []);
+    echo json_encode([
+        'ok' => true,
+        'intent' => 'product_recommendation',
+        'confidence' => 1,
+        'raw_intent' => 'product_recommendation',
+        'reply' => $result['reply'],
+        'products' => $result['products'] ?? [],
+        'show_tech_match' => false,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (primo_is_explanation_request($message)) {
     $db = getDbConnection();
     $messageForLookup = primo_apply_context($message, 'brand_advice');
@@ -654,6 +676,14 @@ function primo_format_order_line(array $row): string
  */
 function primo_product_intent(PDO $db, string $intent, string $message, ?string $displayMessage = null): array
 {
+    $asked = primo_is_itemlist_question($message) ? $message : (string) $displayMessage;
+    if ($asked !== '' && primo_is_itemlist_question($asked)) {
+        $result = primo_itemlist_answer($asked);
+        $result['products'] = primo_itemlist_cards($db, $result['picks'] ?? []);
+        unset($result['picks']);
+        return $result;
+    }
+
     $products = primo_find_products($db, $message, $intent);
     $wantsBuild = (bool) preg_match('/\b(build|components?|tech\s*&?\s*match|customize|parts?\s+to\s+choose)\b/i', $message . ' ' . (string) $displayMessage);
 
@@ -917,4 +947,344 @@ function primo_map_product_rows(array $filtered): array
         ];
     }
     return $out;
+}
+
+/**
+ * Best-product, spec, description, and quality questions are answered from Oasis-Itemlist.csv.
+ * "Best" means the highest item-list price that still has quantity on hand, in that category.
+ */
+function primo_is_itemlist_question(string $message): bool
+{
+    if (preg_match('/\bbrands?\b/i', $message)) {
+        return false;
+    }
+    if (preg_match('/\b(order|refund|tracking|password)\b/i', $message)) {
+        return false;
+    }
+    $asks = (bool) preg_match(
+        '/\b(best|top|specs?|specifications?|description|quality|recommend)\b/i',
+        $message
+    );
+    $about = (bool) preg_match(
+        '/\b(products?|items?|categor\w*|easypc|gpu|gpus|graphics|laptop|laptops|ram|memory|cpu|processor|ssd|hdd|monitor|keyboard|mouse|headset|headphone|earphones?|cooling|cooler|psu|motherboard|case|desktop|gaming)\b/i',
+        $message
+    );
+    return $asks && $about;
+}
+
+/**
+ * @return list<array{category:string,sku:string,name:string,description:string,warranty:string,price:float,qty:int}>
+ */
+function primo_itemlist_rows(): array
+{
+    static $rows = null;
+    if ($rows !== null) {
+        return $rows;
+    }
+    $rows = [];
+    $path = dirname(__DIR__, 2) . '/Oasis-Itemlist.csv';
+    $handle = fopen($path, 'rb');
+    if ($handle === false) {
+        return $rows;
+    }
+    $header = fgetcsv($handle);
+    if (!is_array($header)) {
+        fclose($handle);
+        return $rows;
+    }
+    $header = array_map(static fn ($col) => trim((string) $col), $header);
+    if (isset($header[0])) {
+        $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', $header[0]) ?? $header[0];
+    }
+    while (($data = fgetcsv($handle)) !== false) {
+        if (!is_array($data) || count($data) < count($header)) {
+            continue;
+        }
+        $row = array_combine($header, array_slice($data, 0, count($header)));
+        if (!is_array($row)) {
+            continue;
+        }
+        $name = trim(preg_replace('/\s+/', ' ', (string) ($row['Name'] ?? '')) ?? '');
+        if ($name === '') {
+            continue;
+        }
+        $price = (float) str_replace(',', '', (string) ($row['Product/Sales Price'] ?? '0'));
+        $qty = (int) str_replace(',', '', (string) ($row['Quantity On Hand'] ?? '0'));
+        $rows[] = [
+            'category' => trim((string) ($row['Product Category'] ?? '')),
+            'sku' => trim((string) ($row['MSKU'] ?? '')),
+            'name' => $name,
+            'description' => trim(preg_replace('/\s+/', ' ', (string) ($row['Product Description'] ?? '')) ?? ''),
+            'warranty' => trim((string) ($row['Product/Warranty Type'] ?? '')),
+            'price' => $price,
+            'qty' => $qty,
+        ];
+    }
+    fclose($handle);
+    return $rows;
+}
+
+function primo_itemlist_topic(string $message): string
+{
+    if (preg_match('/\b(each|every|all)\b.{0,24}\bcategor/i', $message)) {
+        return 'each';
+    }
+    $groups = [
+        'gaming laptop' => 'gaming_laptop',
+        'gaming laptops' => 'gaming_laptop',
+        'graphics card' => 'gpu',
+        'graphic card' => 'gpu',
+        'power supply' => 'psu',
+        'hard disk' => 'hdd',
+        'headphones' => 'headset',
+        'headphone' => 'headset',
+        'earphones' => 'headset',
+        'earphone' => 'headset',
+        'headset' => 'headset',
+        'headsets' => 'headset',
+        'motherboard' => 'motherboard',
+        'motherboards' => 'motherboard',
+        'processor' => 'cpu',
+        'processors' => 'cpu',
+        'laptops' => 'laptop',
+        'laptop' => 'laptop',
+        'cooling' => 'cooling',
+        'cooler' => 'cooling',
+        'memory' => 'ram',
+        'monitor' => 'monitor',
+        'display' => 'monitor',
+        'keyboard' => 'keyboard',
+        'speaker' => 'speaker',
+        'printer' => 'printer',
+        'mini pc' => 'mini_pc',
+        'desktop' => 'mini_pc',
+        'graphics' => 'gpu',
+        'gpu' => 'gpu',
+        'gpus' => 'gpu',
+        'rtx' => 'gpu',
+        'gtx' => 'gpu',
+        'ram' => 'ram',
+        'cpu' => 'cpu',
+        'ryzen' => 'cpu',
+        'ssd' => 'ssd',
+        'nvme' => 'ssd',
+        'hdd' => 'hdd',
+        'psu' => 'psu',
+        'mouse' => 'mouse',
+        'case' => 'case',
+        'ups' => 'ups',
+        'fan' => 'cooling',
+    ];
+    $found = 'catalog';
+    $bestLen = 0;
+    foreach ($groups as $needle => $topic) {
+        if (!preg_match('/\b' . preg_quote($needle, '/') . '\b/i', $message)) {
+            continue;
+        }
+        $len = strlen($needle);
+        if ($len > $bestLen) {
+            $bestLen = $len;
+            $found = $topic;
+        }
+    }
+    return $found;
+}
+
+/**
+ * @param list<array{category:string,sku:string,name:string,description:string,warranty:string,price:float,qty:int}> $rows
+ * @return list<array{category:string,sku:string,name:string,description:string,warranty:string,price:float,qty:int}>
+ */
+function primo_itemlist_filter(array $rows, string $topic): array
+{
+    $want = [
+        'gpu' => ['GRAPHIC CARD'],
+        'ram' => ['MEMORY'],
+        'cpu' => ['PROCESSOR'],
+        'motherboard' => ['MOTHERBOARD'],
+        'ssd' => ['SOLID STATE DRIVE'],
+        'hdd' => ['HARD DISK'],
+        'psu' => ['POWER SUPPLY'],
+        'cooling' => ['COOLING'],
+        'case' => ['PC CASE'],
+        'monitor' => ['DISPLAY'],
+        'keyboard' => ['KEYBOARD'],
+        'mouse' => ['MOUSE'],
+        'speaker' => ['SPEAKER'],
+        'printer' => ['PRINTER AND SCANNER'],
+        'mini_pc' => ['MINI PC'],
+        'ups' => ['UPS & AVR'],
+        'headset' => ['AUDIO'],
+    ];
+    if ($topic === 'laptop' || $topic === 'gaming_laptop') {
+        $rows = array_values(array_filter($rows, static fn ($row) => str_starts_with($row['category'], 'LAPTOP')));
+        if ($topic === 'gaming_laptop') {
+            $gaming = array_values(array_filter($rows, static function ($row) {
+                $text = mb_strtolower($row['name'] . ' ' . $row['description']);
+                return (bool) preg_match('/gaming|rtx|gtx|geforce/i', $text);
+            }));
+            return $gaming !== [] ? $gaming : $rows;
+        }
+        return $rows;
+    }
+    if ($topic === 'headset') {
+        return array_values(array_filter($rows, static function ($row) {
+            if ($row['category'] !== 'AUDIO') {
+                return false;
+            }
+            return (bool) preg_match('/headset|headphone|earphone|earbud/i', $row['name']);
+        }));
+    }
+    if (!isset($want[$topic])) {
+        return [];
+    }
+    $cats = $want[$topic];
+    return array_values(array_filter($rows, static fn ($row) => in_array($row['category'], $cats, true)));
+}
+
+/**
+ * @param list<array{price:float,qty:int}> $rows
+ * @return array{price:float,qty:int}|null
+ */
+function primo_itemlist_best(array $rows): ?array
+{
+    if ($rows === []) {
+        return null;
+    }
+    $inStock = array_values(array_filter($rows, static fn ($row) => (int) $row['qty'] > 0));
+    $pool = $inStock !== [] ? $inStock : $rows;
+    usort($pool, static function ($a, $b) {
+        if ((float) $a['price'] !== (float) $b['price']) {
+            return (float) $b['price'] <=> (float) $a['price'];
+        }
+        return (int) $b['qty'] <=> (int) $a['qty'];
+    });
+    return $pool[0];
+}
+
+function primo_itemlist_blurb(array $row): string
+{
+    $price = number_format((float) $row['price'], 2);
+    $qty = (int) $row['qty'];
+    $stock = $qty > 0 ? "{$qty} on hand" : 'none on hand';
+    $warranty = trim((string) ($row['warranty'] ?? ''));
+    $warranty = $warranty !== '' ? $warranty : 'warranty not listed';
+    $desc = trim((string) ($row['description'] ?? ''));
+    if (mb_strlen($desc) > 160) {
+        $desc = rtrim(mb_substr($desc, 0, 157)) . '...';
+    }
+    $text = "{$row['name']} — ₱{$price} — {$stock} — {$warranty}.";
+    if ($desc !== '') {
+        $text .= ' ' . $desc;
+    }
+    return $text;
+}
+
+/**
+ * @return array{reply:string,picks:list<array>}
+ */
+function primo_itemlist_answer(string $message): array
+{
+    $rows = primo_itemlist_rows();
+    if ($rows === []) {
+        return [
+            'reply' => 'I could not read the EasyPC item list, so I cannot name a best product right now.',
+            'picks' => [],
+        ];
+    }
+    $topic = primo_itemlist_topic($message);
+    $labels = [
+        'gpu' => 'graphics card',
+        'ram' => 'RAM',
+        'cpu' => 'processor',
+        'motherboard' => 'motherboard',
+        'ssd' => 'SSD',
+        'hdd' => 'hard disk',
+        'psu' => 'power supply',
+        'cooling' => 'cooling',
+        'case' => 'PC case',
+        'monitor' => 'monitor',
+        'keyboard' => 'keyboard',
+        'mouse' => 'mouse',
+        'speaker' => 'speaker',
+        'printer' => 'printer',
+        'mini_pc' => 'mini PC',
+        'ups' => 'UPS',
+        'headset' => 'headset',
+        'laptop' => 'laptop',
+        'gaming_laptop' => 'gaming laptop',
+    ];
+
+    if ($topic === 'each' || $topic === 'catalog') {
+        $byCat = [];
+        foreach ($rows as $row) {
+            if ($row['category'] === '' || strcasecmp($row['category'], 'SERVICES') === 0) {
+                continue;
+            }
+            $byCat[$row['category']][] = $row;
+        }
+        ksort($byCat);
+        $lines = [];
+        foreach ($byCat as $category => $group) {
+            $best = primo_itemlist_best($group);
+            if ($best === null || (int) $best['qty'] <= 0) {
+                continue;
+            }
+            $lines[] = '• ' . $category . ' — ' . $best['name'] . ' — ₱' . number_format((float) $best['price'], 2) . ' — ' . (int) $best['qty'] . ' on hand';
+        }
+        $reply = "From the EasyPC item list, this is the highest-priced in-stock product in each category:\n"
+            . implode("\n", $lines)
+            . "\nAsk for one category, such as GPU, laptop, or RAM, if you want its description and specs.";
+        return ['reply' => $reply, 'picks' => []];
+    }
+
+    $filtered = primo_itemlist_filter($rows, $topic);
+    $best = primo_itemlist_best($filtered);
+    $label = $labels[$topic] ?? 'product';
+    if ($best === null) {
+        return [
+            'reply' => "The EasyPC item list has no {$label}. Ask for another category, such as GPU, laptop, or RAM.",
+            'picks' => [],
+        ];
+    }
+    $lead = (int) $best['qty'] > 0
+        ? "From the EasyPC item list, the best in-stock {$label} is the highest-priced one still on hand."
+        : "The EasyPC item list has a {$label}, but none are on hand. This is the highest-priced listing.";
+    $extra = '';
+    if (preg_match('/\bquality\b/i', $message)) {
+        $extra = ' The item list does not give a quality score. It gives the description, warranty, price, and quantity. ';
+    }
+    return [
+        'reply' => $lead . $extra . ' ' . primo_itemlist_blurb($best),
+        'picks' => [$best],
+    ];
+}
+
+/**
+ * Attach a shop card only when the item-list MSKU exists on a real product row.
+ * The card price and stock stay the item-list figures.
+ *
+ * @param list<array{sku:string,name:string,price:float,qty:int,category:string}> $picks
+ * @return list<array{id:int,name:string,price:float,stock:int,category:string,image:string}>
+ */
+function primo_itemlist_cards(PDO $db, array $picks): array
+{
+    if (count($picks) !== 1) {
+        return [];
+    }
+    $pick = $picks[0];
+    $sku = trim((string) ($pick['sku'] ?? ''));
+    if ($sku === '') {
+        return [];
+    }
+    $stmt = $db->prepare('SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, p.sku FROM products p WHERE p.sku = ? LIMIT 1');
+    $stmt->execute([$sku]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row || (int) ($row['id'] ?? 0) <= 0) {
+        return [];
+    }
+    $row['name'] = (string) $pick['name'];
+    $row['price'] = (float) $pick['price'];
+    $row['stock'] = (int) $pick['qty'];
+    $row['category'] = (string) $pick['category'];
+    return primo_map_product_rows([$row]);
 }

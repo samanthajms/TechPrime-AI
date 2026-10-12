@@ -5,6 +5,7 @@ require_once __DIR__ . '/../includes/client_helpers.php';
 require_once __DIR__ . '/../includes/client_order_ui.php';
 require_once __DIR__ . '/../includes/inventory_alerts.php';
 require_once __DIR__ . '/../includes/address_helpers.php';
+require_once __DIR__ . '/../includes/order_reviews.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -17,6 +18,24 @@ $initial = strtoupper(substr($rawName !== '' ? $rawName : 'C', 0, 1));
 
 ep_profile_image_ensure_schema($db);
 ep_ensure_session_cart($db);
+ep_review_ensure_schema($db);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'submit_review') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        header('Location: user_dashboard.php?alert=error#pfHistoryTitle');
+        exit;
+    }
+    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $rating = (int) ($_POST['rating'] ?? 0);
+    $comment = trim((string) ($_POST['comment'] ?? ''));
+    $tags = ep_review_tags_from_request((array) ($_POST['tags'] ?? []), ep_review_client_tags());
+    $anonymous = !empty($_POST['anonymous']);
+    [$fileError, $uploads] = ep_review_collect_uploads($_FILES['media'] ?? []);
+    $code = $fileError !== '' ? $fileError : ep_review_submit($db, $user_id, $orderId, $rating, $comment, $tags, $uploads, $anonymous);
+    $alert = $code === '' ? 'reviewed' : 'review_' . $code;
+    header('Location: user_dashboard.php?alert=' . rawurlencode($alert) . '#pfHistoryTitle');
+    exit;
+}
 
 $profileFlash = '';
 $profileFlashErr = '';
@@ -449,6 +468,12 @@ if ($allListed) {
     }
 }
 
+$reviewMap = ep_review_map_for_user(
+    $db,
+    $user_id,
+    array_map(static fn($o) => (int) $o['id'], $allListed)
+);
+
 // Summary tab counts (active, not hidden).
 $statusCounts = array_fill_keys($allowed_filters, 0);
 $stCounts = $db->prepare(
@@ -520,6 +545,15 @@ if (!empty($_GET['alert']) && !$showPaidSuccess) {
         'not_removable' => 'This order cannot be removed yet.',
         'error' => 'Could not complete the action. Please try again.',
         'profile_saved' => 'Profile settings saved.',
+        'reviewed' => 'Review submitted. Thank you.',
+        'review_already_reviewed' => 'This order already has a review.',
+        'review_not_reviewable' => 'Only a completed order can be reviewed.',
+        'review_bad_rating' => 'Choose a star rating from 1 to 5.',
+        'review_bad_comment' => 'The review comment is too long.',
+        'review_bad_type' => 'Only PNG and JPG images are allowed.',
+        'review_too_large' => 'Each image must be 5 MB or smaller.',
+        'review_too_many' => 'You can attach up to 5 files.',
+        'review_upload_failed' => 'The file could not be saved. Please try again.',
     ];
     $alertMsg = $alertMap[$_GET['alert']] ?? '';
 }
@@ -734,6 +768,7 @@ if ($showSettings) {
                     'orderStatusNote' => $orderStatusNote,
                     'paymentLabel' => $paymentLabel,
                     'fulfillmentLabels' => $fulfillmentLabels,
+                    'reviews' => $reviewMap,
                 ];
                 ?>
                 <nav class="pf-tabs" aria-label="Filter Order Summary by status">
@@ -821,6 +856,64 @@ if ($showSettings) {
                     </div>
                 <?php endif; ?>
             </section>
+            <div class="ep-review-backdrop" id="epReviewBackdrop" hidden></div>
+            <div class="ep-review-modal" id="epReviewModal" hidden role="dialog" aria-modal="true" aria-labelledby="epReviewTitle">
+                <button type="button" class="ep-review-close" id="epReviewClose" aria-label="Close">&times;</button>
+                <h3 id="epReviewTitle">Review your order</h3>
+                <p class="ep-review-order" id="epReviewOrderLabel"></p>
+                <form method="post" enctype="multipart/form-data" id="epReviewForm" action="user_dashboard.php#pfHistoryTitle">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                    <input type="hidden" name="action" value="submit_review">
+                    <input type="hidden" name="order_id" id="epReviewOrderId" value="">
+                    <input type="hidden" name="rating" id="epReviewRating" value="5">
+                    <fieldset class="ep-review-stars" id="epReviewStars">
+                        <legend>Rating</legend>
+                        <?php for ($star = 1; $star <= 5; $star++): ?>
+                            <button type="button" class="ep-review-star is-on" data-star="<?php echo $star; ?>" aria-label="<?php echo $star; ?> star<?php echo $star === 1 ? '' : 's'; ?>">
+                                <i class="fas fa-star" aria-hidden="true"></i>
+                            </button>
+                        <?php endfor; ?>
+                    </fieldset>
+                    <p class="ep-review-label" id="epReviewChipLabel">Quick comments</p>
+                    <div class="ep-review-chips" id="epReviewChips">
+                        <?php foreach (ep_review_client_tags() as $tag): ?>
+                            <label class="ep-review-chip">
+                                <input type="checkbox" name="tags[]" value="<?php echo h($tag); ?>">
+                                <span><?php echo h($tag); ?></span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <label class="ep-review-anon">
+                        <input type="checkbox" name="anonymous" id="epReviewAnon" value="1">
+                        <span>Post without my name</span>
+                    </label>
+                    <label class="ep-review-label" for="epReviewComment">Comment</label>
+                    <textarea id="epReviewComment" name="comment" maxlength="1000" rows="3" placeholder="Share more about the product, delivery, or packaging."></textarea>
+                    <div id="epReviewFileBlock">
+                        <label class="ep-review-label" for="epReviewFiles">Photos</label>
+                        <input id="epReviewFiles" type="file" name="media[]" accept=".png,.jpg,.jpeg,image/png,image/jpeg" multiple>
+                        <p class="ep-review-hint">PNG or JPG only. Up to 5 photos.</p>
+                    </div>
+                    <div class="ep-review-existing" id="epReviewExisting" hidden></div>
+                    <div class="ep-review-reply" id="epReviewReply" hidden></div>
+                    <button type="submit" class="ep-btn ep-btn-primary" id="epReviewSubmit">Submit review</button>
+                </form>
+            </div>
+            <script type="application/json" id="epReviewData"><?php
+                $reviewJson = [];
+                foreach ($reviewMap as $orderId => $rev) {
+                    $reviewJson[(string) $orderId] = [
+                        'rating' => (int) $rev['rating'],
+                        'comment' => (string) $rev['comment'],
+                        'tags' => $rev['tag_list'],
+                        'media' => $rev['media'],
+                        'reply' => (string) $rev['reply_text'],
+                        'reply_tags' => $rev['reply_tag_list'],
+                        'anonymous' => !empty($rev['is_anonymous']),
+                    ];
+                }
+                echo json_encode($reviewJson, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+            ?></script>
             </div>
 
             <aside class="pf-side">
@@ -942,6 +1035,7 @@ document.addEventListener('click', function (e) {
 })();
 </script>
 JS;
+    $extraScripts .= '<script src="order_review.js?v=reviews-3"></script>';
 }
 include __DIR__ . '/ep_footer.php';
 ?>

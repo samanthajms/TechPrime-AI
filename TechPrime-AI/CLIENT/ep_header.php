@@ -71,7 +71,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         /* Apply the saved theme before the stylesheets load so dark mode never flashes white. */
         try { if (localStorage.getItem('ep_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
     </script>
-    <link rel="stylesheet" href="styles.css?v=click-panels-1">
+    <link rel="stylesheet" href="styles.css?v=reviews-3">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -80,7 +80,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <?php if (!empty($extraHead)) echo $extraHead; ?>
     <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
     <link rel="stylesheet" href="ep_dark_auto.css?v=dark-14">
-    <link rel="stylesheet" href="ep_dark.css?v=dark-4">
+    <link rel="stylesheet" href="ep_dark.css?v=dark-reviews-1">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">
