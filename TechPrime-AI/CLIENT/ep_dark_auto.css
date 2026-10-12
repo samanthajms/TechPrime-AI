@@ -842,6 +842,53 @@ html[data-theme="dark"] .pf-new-thumb{border:1px solid #343840;background:#13151
 html[data-theme="dark"] .pf-new-name{color:#dee0e3}
 html[data-theme="dark"] .pf-new-price{color:#b0e097}
 html[data-theme="dark"] .pf-page .profile-settings-panel{border:1px solid #343840;box-shadow:none}
+html[data-theme="dark"] .pf-order-btn.is-review{border-color:#466029;color:#b0e097}
+html[data-theme="dark"] .pf-order-btn.is-review:hover{background:#253419}
+html[data-theme="dark"] .ep-review-backdrop{background:rgba(17, 24, 39, 0.45)}
+html[data-theme="dark"] .ep-review-modal{background:#131518;border:1px solid #343840;box-shadow:0 18px 50px rgba(17, 24, 39, 0.18)}
+html[data-theme="dark"] .ep-review-modal h3{color:#b0e097}
+html[data-theme="dark"] .ep-review-order{color:#a1a6b0}
+html[data-theme="dark"] .ep-review-close{border:0;background:#253419;color:#b0e097}
+html[data-theme="dark"] .ep-review-stars{border:0}
+html[data-theme="dark"] .ep-review-star{border:1px solid #343840;background:#131518;color:#d1d5db}
+html[data-theme="dark"] .ep-review-star.is-on{color:#e5c06c;border-color:#f3d48a;background:#322a18}
+html[data-theme="dark"] .ep-review-label{color:#dee0e3}
+html[data-theme="dark"] .ep-review-chip span{border:1px solid #343840;background:#131518}
+html[data-theme="dark"] .ep-review-chip input:checked + span{border-color:var(--ep-green);background:#253419;color:#b0e097}
+html[data-theme="dark"] .ep-review-modal textarea,html[data-theme="dark"] .ep-review-modal input[type="file"]{border:1px solid #343840;background:#131518}
+html[data-theme="dark"] .ep-review-hint{color:#a1a6b0}
+html[data-theme="dark"] .ep-review-existing img,html[data-theme="dark"] .ep-review-existing video{background:#1b1d22;border:1px solid #343840}
+html[data-theme="dark"] .ep-review-reply{background:#1b1d22;border:1px solid #466029}
+html[data-theme="dark"] .ep-review-reply strong{color:#b0e097}
+html[data-theme="dark"] .ep-review-reply-tags span{background:#131518;border:1px solid #466029}
+html[data-theme="dark"] .ep-legal-updated{background:#131518;border:1px solid #343840;color:#b5bcc7}
+html[data-theme="dark"] .ep-legal-updated i{color:#b0e097}
+html[data-theme="dark"] .ep-legal-toc-label{color:#989da7}
+html[data-theme="dark"] .ep-legal-toc a{color:#b5bcc7}
+html[data-theme="dark"] .ep-legal-toc-num{background:#1d1f25;color:#a1a6b0}
+html[data-theme="dark"] .ep-legal-toc a.is-active{background:#253419;color:#b0e097}
+html[data-theme="dark"] .ep-legal-toc a.is-active .ep-legal-toc-num{background:var(--ep-green);color:#fff}
+html[data-theme="dark"] .ep-legal-toc a:focus-visible,html[data-theme="dark"] .ep-legal-contact-btn:focus-visible{outline:2px solid var(--ep-green);outline-offset:2px}
+@media (hover: hover) and (pointer: fine){
+  html[data-theme="dark"] .ep-legal-toc a:hover:not(.is-active){background:#1a1d21;color:#dee0e3}
+}
+html[data-theme="dark"] .ep-legal-section{background:#131518;border:1px solid #343840;box-shadow:0 4px 14px rgba(0, 0, 0, 0.054)}
+html[data-theme="dark"] .ep-legal-section-icon{background:#253419;color:#b0e097}
+html[data-theme="dark"] .ep-legal-section h2,html[data-theme="dark"] .ep-legal-contact h2{color:#dee0e3}
+html[data-theme="dark"] .ep-legal-section-num{color:#b0e097}
+html[data-theme="dark"] .ep-legal-section p{color:#b5bcc7}
+html[data-theme="dark"] .ep-legal-contact{background:linear-gradient(135deg, #253419 0%, #131518 70%);border:1px solid rgba(98, 178, 54, 0.25)}
+html[data-theme="dark"] .ep-legal-contact p{color:#b5bcc7}
+html[data-theme="dark"] .ep-legal-contact-btn{background:var(--ep-green);border:1px solid var(--ep-green);color:#fff}
+html[data-theme="dark"] .ep-legal-contact-btn.is-ghost{background:#131518;border-color:#343840;color:#dee0e3}
+@media (hover: hover) and (pointer: fine){
+  html[data-theme="dark"] .ep-legal-contact-btn:hover{background:var(--ep-green-dark);border-color:var(--ep-green-dark)}
+  html[data-theme="dark"] .ep-legal-contact-btn.is-ghost:hover{background:#131518;border-color:var(--ep-green);color:#b0e097}
+}
+@media (max-width: 900px){
+  html[data-theme="dark"] .ep-legal-toc a{border:1px solid #343840;background:#131518}
+  html[data-theme="dark"] .ep-legal-toc a.is-active{border-color:rgba(98, 178, 54, 0.35)}
+}
 
 /* ---- primo.css ---- */
 html[data-theme="dark"] .primo-root .sr-only,html[data-theme="dark"] .primo-panel .sr-only{border:0}
