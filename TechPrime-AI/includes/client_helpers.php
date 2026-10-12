@@ -213,6 +213,25 @@ function ep_place_cod_order(PDO $db, int $userId, array $items, float $total, st
     return ep_place_unpaid_order($db, $userId, $items, $total, $address, $phone, 'delivery');
 }
 
+/** True when the order is a store-pickup order (no shipping step). */
+function ep_order_is_pickup(array $order): bool
+{
+    return strtolower(trim((string)($order['fulfillment_type'] ?? ''))) === 'pickup';
+}
+
+/** Make sure a pickup order has a shipment row in 'processing' (no carrier). Runs inside the caller's transaction. */
+function ep_set_pickup_shipment(PDO $db, int $orderId): void
+{
+    $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
+    $chk->execute([$orderId]);
+    $ship = $chk->fetch(PDO::FETCH_ASSOC);
+    if ($ship) {
+        $db->prepare("UPDATE shipments SET shipment_status = 'processing' WHERE id = ?")->execute([(int)$ship['id']]);
+    } else {
+        $db->prepare("INSERT INTO shipments (order_id, shipment_status) VALUES (?, 'processing')")->execute([$orderId]);
+    }
+}
+
 /**
  * Create/update the order's shipment row as 'processing'. Delivery orders get carrier LALAMOVE;
  * if the shipments.carrier column rejects that value (older enum) the carrier is left unset instead
