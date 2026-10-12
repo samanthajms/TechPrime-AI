@@ -59,7 +59,7 @@ if (primo_is_itemlist_question($message)) {
         'intent' => 'product_recommendation',
         'confidence' => 1,
         'raw_intent' => 'product_recommendation',
-        'reply' => $result['reply'],
+        'reply' => primo_phrase_catalog_reply((string) $result['reply']),
         'products' => $result['products'] ?? [],
         'show_tech_match' => false,
     ], JSON_UNESCAPED_UNICODE);
@@ -76,7 +76,7 @@ if (primo_is_explanation_request($message)) {
         'intent' => 'brand_advice',
         'confidence' => 1,
         'raw_intent' => 'brand_advice',
-        'reply' => $result['reply'],
+        'reply' => primo_phrase_catalog_reply((string) $result['reply']),
         'products' => $result['products'] ?? [],
         'show_tech_match' => false,
     ], JSON_UNESCAPED_UNICODE);
@@ -108,12 +108,17 @@ if ($intent === 'brand_advice' || primo_is_explanation_request($message)) {
 }
 primo_store_context($intent, $messageForLookup, $result['products'] ?? []);
 
+$reply = (string) ($result['reply'] ?? '');
+if (in_array($intent, ['product_search', 'product_category', 'product_price', 'stock_inquiry', 'product_recommendation', 'brand_advice'], true)) {
+    $reply = primo_phrase_catalog_reply($reply);
+}
+
 echo json_encode([
     'ok' => true,
     'intent' => $intent,
     'confidence' => round($confidence, 4),
     'raw_intent' => $rawIntent,
-    'reply' => $result['reply'],
+    'reply' => $reply,
     'products' => $result['products'] ?? [],
     'show_tech_match' => !empty($result['show_tech_match']),
 ], JSON_UNESCAPED_UNICODE);
@@ -171,6 +176,95 @@ function primo_call_svm(string $message): ?array
     }
     $data = json_decode($resp, true);
     return is_array($data) && !empty($data['ok']) ? $data : null;
+}
+
+/**
+ * Ask the existing Render service to rephrase one catalog sentence.
+ * The PHP sentence stays when the service or Groq cannot keep the facts.
+ */
+function primo_phrase_catalog_reply(string $reply): string
+{
+    $reply = trim($reply);
+    if ($reply === '' || mb_strlen($reply) > 900) {
+        return $reply;
+    }
+    if (str_starts_with($reply, 'From the EasyPC item list, this is the highest-priced')) {
+        return $reply;
+    }
+    if (substr_count($reply, "\n") > 2) {
+        return $reply;
+    }
+    if (!preg_match('/₱[\d,]+(?:\.\d+)?/u', $reply)) {
+        return $reply;
+    }
+
+    $base = $_ENV['PRIMO_API_URL'] ?? $_SERVER['PRIMO_API_URL'] ?? getenv('PRIMO_API_URL');
+    $base = is_string($base) && trim($base) !== '' ? rtrim(trim($base), '/') : 'http://127.0.0.1:5055';
+    $url = $base . '/phrase';
+    $isLocal = str_starts_with($base, 'http://127.0.0.1') || str_starts_with($base, 'http://localhost');
+    $body = json_encode(['facts' => $reply], JSON_UNESCAPED_UNICODE);
+    $timeout = $isLocal ? 8 : 15;
+
+    $resp = false;
+    $code = 0;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => $isLocal ? 2 : 8,
+            CURLOPT_TIMEOUT => $timeout,
+        ]);
+        $resp = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+    }
+    if ($resp === false || $code < 200 || $code >= 300) {
+        return $reply;
+    }
+    $data = json_decode($resp, true);
+    if (!is_array($data) || empty($data['ok']) || empty($data['phrased'])) {
+        return $reply;
+    }
+    $phrased = trim((string) ($data['reply'] ?? ''));
+    return primo_phrase_keeps_facts($reply, $phrased) ? $phrased : $reply;
+}
+
+function primo_phrase_keeps_facts(string $facts, string $phrased): bool
+{
+    if ($phrased === '' || mb_strlen($phrased) > 700) {
+        return false;
+    }
+    preg_match_all('/₱[\d,]+(?:\.\d+)?/u', $facts, $needed);
+    preg_match_all('/₱[\d,]+(?:\.\d+)?/u', $phrased, $got);
+    $needed = $needed[0] ?? [];
+    $got = $got[0] ?? [];
+    foreach ($needed as $amount) {
+        if (!in_array($amount, $got, true)) {
+            return false;
+        }
+    }
+    foreach ($got as $amount) {
+        if (!in_array($amount, $needed, true)) {
+            return false;
+        }
+    }
+    if (preg_match_all('/([^.\n]{2,160}?) — ₱/u', $facts, $names) && !empty($names[1])) {
+        $name = trim((string) end($names[1]));
+        if ($name !== '' && mb_stripos($phrased, $name) === false) {
+            return false;
+        }
+    }
+    if (preg_match_all('/\d+ on hand/i', $facts, $qty)) {
+        foreach ($qty[0] as $bit) {
+            if (mb_stripos($phrased, $bit) === false) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 /**

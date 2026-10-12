@@ -6,12 +6,19 @@ POST /predict
 
 → {"intent": "stock_inquiry", "confidence": 0.87, "ok": true}
 
+POST /phrase
+{"facts": "MSI RTX 5070 Ti — ₱65950.00 — 2 on hand"}
+
+→ {"ok": true, "reply": "...", "phrased": true}
+
 GET /health → {"ok", "model_loaded", ...} (200 if loaded, 503 if not)
 """
 from __future__ import annotations
 
 import json
 import os
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import joblib
@@ -105,6 +112,74 @@ def predict():
             "threshold": threshold,
         }
     )
+
+
+def _llm_settings() -> tuple[str, str, str]:
+    key = os.environ.get("PRIMO_LLM_API_KEY", "").strip()
+    base = os.environ.get("PRIMO_LLM_BASE_URL", "https://api.groq.com/openai/v1").strip().rstrip("/")
+    model = os.environ.get("PRIMO_LLM_MODEL", "openai/gpt-oss-20b").strip()
+    return key, base, model
+
+
+def phrase_facts(facts: str) -> tuple[str, bool]:
+    """Rewrite catalog facts with Groq. The original sentence stays when Groq is off or fails."""
+    key, base, model = _llm_settings()
+    if key == "" or base == "" or model == "":
+        return facts, False
+
+    payload = {
+        "model": model,
+        "temperature": 0.2,
+        "max_tokens": 220,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are Primo, the EasyPC shop assistant. Rewrite FACTS as one short friendly reply. "
+                    "Use only FACTS. Keep every product name, peso amount, and quantity exactly as written. "
+                    "Do not add products, prices, stock, or warranties. No markdown."
+                ),
+            },
+            {"role": "user", "content": facts},
+        ],
+    }
+    req = urllib.request.Request(
+        base + "/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return facts, False
+
+    content = (((body.get("choices") or [{}])[0].get("message") or {}).get("content"))
+    if isinstance(content, list):
+        content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+    if not isinstance(content, str):
+        return facts, False
+    text = content.strip()
+    if text == "" or len(text) > 700:
+        return facts, False
+    return text, True
+
+
+@app.post("/phrase")
+def phrase():
+    data = request.get_json(silent=True) or {}
+    facts = data.get("facts", "")
+    if not isinstance(facts, str):
+        return jsonify({"ok": False, "error": "invalid_facts"}), 400
+    facts = facts.strip()
+    if facts == "" or len(facts) > 1200:
+        return jsonify({"ok": False, "error": "invalid_facts"}), 400
+    reply, phrased = phrase_facts(facts)
+    return jsonify({"ok": True, "reply": reply, "phrased": phrased})
 
 
 if __name__ == "__main__":
