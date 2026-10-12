@@ -13,6 +13,10 @@ function sendActivationEmail($userEmail, $userName, $activationLink) {
     $smtpUser = (string)($_ENV['SMTP_USER'] ?? getenv('SMTP_USER') ?: '');
     $smtpPass = (string)($_ENV['SMTP_PASS'] ?? getenv('SMTP_PASS') ?: '');
     $smtpFrom = (string)($_ENV['SMTP_FROM'] ?? getenv('SMTP_FROM') ?: $smtpUser);
+    // Host/port are overridable: Render's free tier blocks outbound 25/465/587, so there a relay
+    // that listens on 2525 (e.g. smtp-relay.brevo.com) is used instead of Gmail.
+    $smtpHost = (string)($_ENV['SMTP_HOST'] ?? getenv('SMTP_HOST') ?: 'smtp.gmail.com');
+    $smtpPort = (int)($_ENV['SMTP_PORT'] ?? getenv('SMTP_PORT') ?: 587);
     if ($smtpUser === '' || $smtpPass === '') {
         error_log('sendActivationEmail: SMTP_USER / SMTP_PASS are not set in .env');
         return false;
@@ -21,12 +25,13 @@ function sendActivationEmail($userEmail, $userName, $activationLink) {
     $mail = new PHPMailer(true);
     try {
         $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
+        $mail->Host       = $smtpHost;
         $mail->SMTPAuth   = true;
         $mail->Username   = $smtpUser;
-        $mail->Password   = $smtpPass; // Gmail App Password
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = 587;
+        $mail->Password   = $smtpPass; // Gmail App Password (or the relay's SMTP key)
+        $mail->SMTPSecure = $smtpPort === 465 ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = $smtpPort;
+        $mail->Timeout    = 15; // PHPMailer's default is 300 s: a blocked port would hang the register page
 
         $mail->CharSet = PHPMailer::CHARSET_UTF8;
         $mail->setFrom($smtpFrom, 'EasyPC One Oasis');
