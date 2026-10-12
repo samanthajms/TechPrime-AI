@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'accep
     if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
         $params['status'] = $returnStatus;
     } elseif (!empty($result['ok'])) {
-        $params['status'] = 'to_ship';
+        $params['status'] = $result['status'] ?? 'to_ship';   // pickup orders land in To Receive
     }
     header('Location: inventory_orders.php?' . http_build_query($params));
     exit;
@@ -83,6 +83,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
         // Completed / cancelled orders are final (stock already deducted, sale recorded).
         if (!$prevRow || in_array($prevStatus, ['to_review', 'cancelled'], true) || !empty($prevRow['cancel_requested'])) {
             header('Location: inventory_orders.php?alert=order_locked');
+            exit;
+        }
+
+        // Status only moves forward: To Pay -> To Ship -> To Receive -> Completed.
+        $statusRank = ['to_pay' => 0, 'to_ship' => 1, 'to_receive' => 2, 'to_review' => 3];
+        if (($statusRank[$status] ?? 0) < ($statusRank[$prevStatus] ?? 0)) {
+            header('Location: inventory_orders.php?alert=status_backward');
             exit;
         }
 
@@ -496,6 +503,13 @@ EXTRA
                                                         // Store pickup: no shipping step.
                                                         unset($opts['to_pay'], $opts['to_ship']);
                                                     }
+                                                    // Forward only: hide statuses before the current one.
+                                                    $rankMap = ['to_pay' => 0, 'to_ship' => 1, 'to_receive' => 2, 'to_review' => 3];
+                                                    foreach (array_keys($opts) as $k) {
+                                                        if (($rankMap[$k] ?? 0) < ($rankMap[$ost] ?? 0)) {
+                                                            unset($opts[$k]);
+                                                        }
+                                                    }
                                                     foreach ($opts as $val => $lbl):
                                                     ?>
                                                     <option value="<?php echo h($val); ?>"<?php echo $ost === $val ? ' selected' : ''; ?>><?php echo h($lbl); ?></option>
@@ -564,7 +578,7 @@ EXTRA
 $flash = '';
 if ($__m = ias_alert_message_from_request()) {
     $__a = (string)($_GET['alert'] ?? '');
-    $__t = (in_array($__a, ['error', 'order_locked', 'order_complete_failed', 'pickup_no_ship'], true) || !empty($_GET['error'])) ? 'error' : 'success';
+    $__t = (in_array($__a, ['error', 'order_locked', 'order_complete_failed', 'pickup_no_ship', 'status_backward'], true) || !empty($_GET['error'])) ? 'error' : 'success';
     $__opts = $__a === 'order_completed' ? ['title' => 'Completed Order'] : new stdClass();
     $flash = '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof IAS_UI!=="undefined")IAS_UI.alert('
         . json_encode($__m, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ','

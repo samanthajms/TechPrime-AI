@@ -389,12 +389,10 @@ if ($search_query !== '') {
 // ---- Order Summary (active only) ----
 $summaryWhere = " AND LOWER(TRIM(o.status)) IN ('to_pay', 'to_ship', 'to_receive', 'to pay', 'to ship', 'to receive')";
 $summaryParams = [$user_id];
-if ($current_filter === 'to_ship' || $current_filter === 'to_receive') {
-    $summaryWhere .= " AND LOWER(TRIM(o.status)) IN ('to_ship', 'to_receive', 'to ship', 'to receive')";
-    if ($current_filter === 'to_ship') {
-        // Store-pickup orders skip To Ship; they appear under To Receive only.
-        $summaryWhere .= " AND LOWER(COALESCE(o.fulfillment_type, '')) <> 'pickup'";
-    }
+if ($current_filter === 'to_ship') {
+    $summaryWhere .= " AND LOWER(TRIM(o.status)) IN ('to_ship', 'to ship')";
+} elseif ($current_filter === 'to_receive') {
+    $summaryWhere .= " AND LOWER(TRIM(o.status)) IN ('to_receive', 'to receive')";
 } elseif ($current_filter === 'to_pay') {
     $summaryWhere .= ' AND (o.status = ? OR o.status = ?)';
     $summaryParams[] = 'to_pay';
@@ -456,21 +454,16 @@ if ($allListed) {
 // Summary tab counts (active, not hidden).
 $statusCounts = array_fill_keys($allowed_filters, 0);
 $stCounts = $db->prepare(
-    "SELECT status, (LOWER(COALESCE(fulfillment_type, '')) = 'pickup') AS is_pickup, COUNT(*) AS n FROM orders
+    "SELECT status, COUNT(*) AS n FROM orders
      WHERE user_id = ? AND COALESCE(client_history_hidden, FALSE) = FALSE
        AND LOWER(TRIM(status)) IN ('to_pay', 'to_ship', 'to_receive', 'to pay', 'to ship', 'to receive')
-     GROUP BY status, is_pickup"
+     GROUP BY status"
 );
 $stCounts->execute([$user_id]);
 foreach ($stCounts->fetchAll(PDO::FETCH_ASSOC) as $cRow) {
     $statusCounts['All'] += (int)$cRow['n'];
     $cKey = ias_normalize_order_status_filter((string)$cRow['status']);
-    if ($cKey === 'to_ship' || $cKey === 'to_receive') {
-        if (!filter_var($cRow['is_pickup'], FILTER_VALIDATE_BOOLEAN)) {
-            $statusCounts['to_ship'] += (int)$cRow['n'];
-        }
-        $statusCounts['to_receive'] += (int)$cRow['n'];
-    } elseif ($cKey !== 'All' && isset($statusCounts[$cKey])) {
+    if ($cKey !== 'All' && isset($statusCounts[$cKey])) {
         $statusCounts[$cKey] += (int)$cRow['n'];
     }
 }
