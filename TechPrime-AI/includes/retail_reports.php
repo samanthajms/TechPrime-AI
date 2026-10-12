@@ -239,7 +239,9 @@ function ias_sales_daily_trend(array $rows, DateTime $from, DateTime $to): array
  */
 function ias_fetch_delivery_rows(PDO $db, int $sellerId, DateTime $from, DateTime $to, array $filters = []): array
 {
-    $sql = "SELECT s.id AS shipment_id, s.carrier, s.shipment_status, s.updated_at, s.created_at AS shipment_created,
+    $sql = "SELECT s.id AS shipment_id,
+                   (CASE WHEN LOWER(COALESCE(o.fulfillment_type, '')) = 'pickup' THEN 'Store Pickup' ELSE 'Lalamove' END) AS carrier,
+                   s.shipment_status, s.updated_at, s.created_at AS shipment_created,
                    o.id AS order_id, o.total, o.created_at AS order_created,
                    u.name AS customer_name, u.surname AS customer_surname, u.email AS customer_email,
                    (SELECT STRING_AGG(pr.name || ' x' || oi.quantity::text, ', ')

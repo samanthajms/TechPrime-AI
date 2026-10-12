@@ -185,7 +185,7 @@ $logoPath = staff_logo_href();
         <div class="card-actions no-print">
             <button type="button" class="btn btn-outline btn-xs" onclick="openFilterModal('msModal')" title="Filter"><i class="fas fa-filter"></i></button>
             <span class="view-toggle" role="group" aria-label="Monthly sales view" style="display:inline-flex; gap:6px;">
-                <button type="button" class="btn btn-outline btn-xs active" id="msBtnDetail" onclick="setMsView('detail')" aria-pressed="true"><i class="fas fa-table"></i> Detailed View</button>
+                <button type="button" class="btn btn-outline btn-xs active" id="msBtnDetail" onclick="setMsView('detail')" aria-pressed="true"><i class="fas fa-table"></i> Table View</button>
                 <button type="button" class="btn btn-outline btn-xs" id="msBtnGraph" onclick="setMsView('graph')" aria-pressed="false"><i class="fas fa-chart-column"></i> Graph View</button>
             </span>
         </div>
@@ -219,31 +219,6 @@ $logoPath = staff_logo_href();
                     <?php endif; ?>
                 </tbody>
             </table>
-        </div>
-        <div id="msDetail">
-            <h4 style="margin:16px 0 10px;">Detailed Orders by Month</h4>
-            <?php foreach ($monthlySales as $m): ?>
-                <?php if (empty($m['orders'])) continue; ?>
-                <details class="ms-order-group">
-                <summary><strong><?php echo h($m['month']); ?></strong> · <?php echo count($m['orders']); ?> order<?php echo count($m['orders']) === 1 ? '' : 's'; ?></summary>
-                <div class="table-wrap" style="margin-bottom:16px;">
-                    <table class="ias-table">
-                        <thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Units</th><th>Total</th></tr></thead>
-                        <tbody>
-                        <?php foreach ($m['orders'] as $o): ?>
-                            <tr>
-                                <td><?php echo h($o['ref']); ?></td>
-                                <td><?php echo h($o['customer_name']); ?></td>
-                                <td><?php echo h(substr($o['created_at'], 0, 10)); ?></td>
-                                <td><?php echo (int)$o['units']; ?></td>
-                                <td>₱<?php echo number_format($o['total'], 2); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                </details>
-            <?php endforeach; ?>
         </div>
         </div>
     </div>
@@ -286,24 +261,6 @@ $logoPath = staff_logo_href();
         <div class="trend-card">
             <div class="trend-wrap"><canvas id="trendChart"></canvas></div>
         </div>
-        <?php if (empty($byGroup)): ?>
-        <div class="empty-state">No completed deliveries in this range.</div>
-        <?php else: ?>
-        <div class="pie-grid">
-            <?php $gi = 0; foreach ($byGroup as $group => $items): $total = array_sum(array_column($items, 'units')); ?>
-            <div class="pie-card">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                    <div>
-                        <h4><?php echo h($group); ?></h4>
-                        <div class="text-muted text-small"><?php echo number_format($total); ?> unit<?php echo $total === 1 ? '' : 's'; ?> delivered</div>
-                    </div>
-                    <button type="button" class="btn btn-outline btn-xs no-print" onclick="downloadChart('pie-<?php echo $gi; ?>','sales_<?php echo h(preg_replace('/\W+/', '_', strtolower($group))); ?>')" title="Download PNG"><i class="fas fa-download"></i></button>
-                </div>
-                <div class="pie-wrap"><canvas id="pie-<?php echo $gi; ?>"></canvas></div>
-            </div>
-            <?php $gi++; endforeach; ?>
-        </div>
-        <?php endif; ?>
     </div>
 </section>
 

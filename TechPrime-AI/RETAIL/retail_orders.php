@@ -43,7 +43,7 @@ $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.cust
                 FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
                 WHERE oi.order_id = o.id) AS products,
                (SELECT shipment_status FROM shipments WHERE order_id = o.id ORDER BY id DESC LIMIT 1) AS shipment_status,
-               (SELECT carrier FROM shipments WHERE order_id = o.id ORDER BY id DESC LIMIT 1) AS carrier
+               (CASE WHEN LOWER(COALESCE(o.fulfillment_type, '')) = 'pickup' THEN 'Store Pickup' ELSE 'Lalamove' END) AS carrier
         FROM orders o
         INNER JOIN users u ON u.id = o.user_id
         ORDER BY o.id DESC";

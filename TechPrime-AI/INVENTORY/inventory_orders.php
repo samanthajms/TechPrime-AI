@@ -22,6 +22,68 @@ $orderStatusFilters = $orderStatusOptions + [
     'cancel_requested' => 'Cancel Requests',
 ];
 
+/**
+ * Move one order to a new status (forward only). Shared by the single and bulk update.
+ * @return string ok | completed | complete_failed | locked | backward | pickup_no_ship | invalid
+ */
+function inv_orders_change_status(PDO $db, int $oid, string $status, int $uid, array $statusLabels): string
+{
+    $statusRank = ['to_pay' => 0, 'to_ship' => 1, 'to_receive' => 2, 'to_review' => 3];
+    if ($oid <= 0 || !isset($statusRank[$status])) {
+        return 'invalid';
+    }
+    $prev = $db->prepare('SELECT user_id, status, cancel_requested, fulfillment_type FROM orders WHERE id = ? LIMIT 1');
+    $prev->execute([$oid]);
+    $prevRow = $prev->fetch(PDO::FETCH_ASSOC) ?: [];
+    $prevStatus = (string)($prevRow['status'] ?? '');
+    $orderUserId = (int)($prevRow['user_id'] ?? 0);
+
+    // Completed / cancelled orders are final (stock already deducted, sale recorded).
+    if (!$prevRow || in_array($prevStatus, ['to_review', 'cancelled'], true) || !empty($prevRow['cancel_requested'])) {
+        return 'locked';
+    }
+    // Status only moves forward: To Pay -> To Ship -> To Receive -> Completed.
+    if ($statusRank[$status] < ($statusRank[$prevStatus] ?? 0)) {
+        return 'backward';
+    }
+    // Pickup orders have no shipping step: they go straight from payment to To Receive.
+    if (ep_order_is_pickup($prevRow) && in_array($status, ['to_pay', 'to_ship'], true)) {
+        return 'pickup_no_ship';
+    }
+    if ($status === 'to_review') {
+        // Completed: deduct stock, record the sale for the Retail Officer, notify everyone.
+        $done = ep_complete_order($db, $oid, 0, $uid);
+        return !empty($done['ok']) ? 'completed' : 'complete_failed';
+    }
+
+    $up = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
+    $up->execute([$status, $oid]);
+    // Ensure a shipment row exists for fulfillment tracking (no courier assignment)
+    $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
+    $chk->execute([$oid]);
+    $ship = $chk->fetch(PDO::FETCH_ASSOC);
+    if (!$ship) {
+        $ins = $db->prepare('INSERT INTO shipments (order_id, shipment_status) VALUES (?, ?)');
+        $ins->execute([$oid, 'pending']);
+    } else {
+        $shipMap = [
+            'to_pay' => 'pending',
+            'to_ship' => 'processing',
+            'to_receive' => ep_order_is_pickup($prevRow) ? 'processing' : 'out_for_delivery',
+            'to_review' => 'delivered',
+        ];
+        $su = $db->prepare('UPDATE shipments SET shipment_status = ? WHERE id = ?');
+        $su->execute([$shipMap[$status] ?? 'pending', (int)$ship['id']]);
+    }
+
+    if ($orderUserId > 0 && $prevStatus !== $status) {
+        $label = $statusLabels[$status] ?? $status;
+        inv_notify_user($db, $orderUserId, "Order #ORD-{$oid}: {$label}.", 'order_status', 'user_dashboard.php');
+    }
+    logActivity($db, $uid, 'update_order_status', "Order #$oid -> $status");
+    return 'ok';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'accept_order') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
         die('Invalid CSRF token.');
@@ -74,78 +136,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     $returnStatus = trim((string)($_POST['return_status'] ?? ''));
     $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
     if ($oid > 0 && in_array($status, $allowed, true)) {
-        $prev = $db->prepare('SELECT user_id, status, cancel_requested, fulfillment_type FROM orders WHERE id = ? LIMIT 1');
-        $prev->execute([$oid]);
-        $prevRow = $prev->fetch(PDO::FETCH_ASSOC) ?: [];
-        $prevStatus = (string)($prevRow['status'] ?? '');
-        $orderUserId = (int)($prevRow['user_id'] ?? 0);
-
-        // Completed / cancelled orders are final (stock already deducted, sale recorded).
-        if (!$prevRow || in_array($prevStatus, ['to_review', 'cancelled'], true) || !empty($prevRow['cancel_requested'])) {
-            header('Location: inventory_orders.php?alert=order_locked');
+        $code = inv_orders_change_status($db, $oid, $status, $uid, $orderStatusOptions);
+        $alertByCode = [
+            'ok' => 'order_updated',
+            'completed' => 'order_completed',
+            'complete_failed' => 'order_complete_failed',
+            'locked' => 'order_locked',
+            'backward' => 'status_backward',
+            'pickup_no_ship' => 'pickup_no_ship',
+        ];
+        if (!isset($alertByCode[$code])) {
+            header('Location: inventory_orders.php?alert=error');
             exit;
         }
-
-        // Status only moves forward: To Pay -> To Ship -> To Receive -> Completed.
-        $statusRank = ['to_pay' => 0, 'to_ship' => 1, 'to_receive' => 2, 'to_review' => 3];
-        if (($statusRank[$status] ?? 0) < ($statusRank[$prevStatus] ?? 0)) {
-            header('Location: inventory_orders.php?alert=status_backward');
-            exit;
-        }
-
-        // Pickup orders have no shipping step: they go straight from payment to To Receive.
-        if (ep_order_is_pickup($prevRow) && in_array($status, ['to_pay', 'to_ship'], true)) {
-            header('Location: inventory_orders.php?alert=pickup_no_ship');
-            exit;
-        }
-
-        if ($status === 'to_review') {
-            // Completed: deduct stock, record the sale for the Retail Officer, notify everyone.
-            $done = ep_complete_order($db, $oid, 0, $uid);
-            $redirectParams = ['alert' => !empty($done['ok']) ? 'order_completed' : 'order_complete_failed', 'page' => $returnPage];
-            if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
-                $redirectParams['status'] = $returnStatus;
-            }
-            header('Location: inventory_orders.php?' . http_build_query($redirectParams));
-            exit;
-        }
-
-        $up = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
-        $up->execute([$status, $oid]);
-        // Ensure a shipment row exists for fulfillment tracking (no courier assignment)
-        $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
-        $chk->execute([$oid]);
-        $ship = $chk->fetch(PDO::FETCH_ASSOC);
-        if (!$ship) {
-            $shipStatus = $status === 'to_review' ? 'delivered' : 'pending';
-            $ins = $db->prepare('INSERT INTO shipments (order_id, shipment_status) VALUES (?, ?)');
-            $ins->execute([$oid, $shipStatus]);
-        } else {
-            $shipMap = [
-                'to_pay' => 'pending',
-                'to_ship' => 'processing',
-                'to_receive' => ep_order_is_pickup($prevRow) ? 'processing' : 'out_for_delivery',
-                'to_review' => 'delivered',
-            ];
-            $shipStatus = $shipMap[$status] ?? 'pending';
-            $sid = (int)$ship['id'];
-            $su = $db->prepare('UPDATE shipments SET shipment_status = ? WHERE id = ?');
-            $su->execute([$shipStatus, $sid]);
-        }
-
-        if ($orderUserId > 0 && $prevStatus !== $status) {
-            $label = $orderStatusOptions[$status] ?? $status;
-            inv_notify_user(
-                $db,
-                $orderUserId,
-                "Order #ORD-{$oid}: {$label}.",
-                'order_status',
-                'user_dashboard.php'
-            );
-        }
-
-        logActivity($db, $uid, 'update_order_status', "Order #$oid -> $status");
-        $redirectParams = ['alert' => 'order_updated', 'page' => $returnPage];
+        $redirectParams = ['alert' => $alertByCode[$code], 'page' => $returnPage];
         if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
             $redirectParams['status'] = $returnStatus;
         }
@@ -153,6 +157,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
         exit;
     }
     header('Location: inventory_orders.php?alert=error');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_update') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['order_ids'] ?? [])), static fn($v) => $v > 0)));
+    $ids = array_slice($ids, 0, 100);
+    $target = (string)($_POST['bulk_target'] ?? '');
+    $returnStatus = trim((string)($_POST['return_status'] ?? ''));
+    $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
+    $redirectParams = ['page' => $returnPage];
+    if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
+        $redirectParams['status'] = $returnStatus;
+    }
+    if (!$ids || ($target !== 'accept' && !isset($orderStatusOptions[$target]))) {
+        header('Location: inventory_orders.php?' . http_build_query($redirectParams + ['alert' => 'error']));
+        exit;
+    }
+    // Bulk updates are per status: every selected order must currently have the same status.
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $stSel = $db->prepare("SELECT DISTINCT status FROM orders WHERE id IN ($in)");
+    $stSel->execute($ids);
+    if (count($stSel->fetchAll(PDO::FETCH_COLUMN)) !== 1) {
+        header('Location: inventory_orders.php?' . http_build_query($redirectParams + ['alert' => 'bulk_mixed']));
+        exit;
+    }
+    $okCount = 0;
+    $skipCount = 0;
+    foreach ($ids as $bid) {
+        if ($target === 'accept') {
+            $res = ep_accept_order($db, $bid, $uid);
+            $good = !empty($res['ok']);
+        } else {
+            $code = inv_orders_change_status($db, $bid, $target, $uid, $orderStatusOptions);
+            $good = in_array($code, ['ok', 'completed'], true);
+        }
+        if ($good) {
+            $okCount++;
+        } else {
+            $skipCount++;
+        }
+    }
+    $redirectParams += ['alert' => 'bulk_updated', 'n' => $okCount, 'skipped' => $skipCount];
+    if ($target === 'to_review' && $okCount > 0) {
+        $redirectParams['completed'] = 1;
+    }
+    header('Location: inventory_orders.php?' . http_build_query($redirectParams));
     exit;
 }
 
@@ -307,6 +360,17 @@ staff_page_start([
     background: #fff;
 }
 .price-tag { color: var(--ep-green-dark); font-weight: 800; }
+.bulk-col { width: 34px; text-align: center; }
+.bulk-check { width: 17px; height: 17px; accent-color: var(--ep-green); cursor: pointer; }
+.bulk-check:disabled { cursor: not-allowed; opacity: .35; }
+.bulk-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 0 4px; }
+.bulk-tools-label { font-size: 12.5px; font-weight: 700; color: var(--ep-muted, var(--text-muted)); }
+.bulk-chip { border: 1px solid var(--ep-border, var(--border)); background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--ep-text, var(--text-main)); }
+.bulk-chip span { margin-left: 4px; background: var(--ep-green-light); color: var(--ep-green-dark); border-radius: 999px; padding: 1px 7px; font-size: 11.5px; }
+.bulk-chip:hover { border-color: var(--ep-green); background: var(--ep-green-light); }
+.bulk-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 4px; padding: 10px 14px; border-radius: 12px; background: var(--ep-green-light); border: 1px solid var(--teal-light, #c6e6b3); }
+.bulk-bar[hidden] { display: none !important; }
+.bulk-bar-count { font-size: 13px; font-weight: 600; }
 .customer-cell div { line-height: 1.35; }
 .action-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .orders-table th, .orders-table td { vertical-align: middle; }
@@ -417,10 +481,46 @@ EXTRA
                     </div>
                 </div>
                 <div class="card-body" style="padding-top:0;">
+                    <?php
+                    $bulkCounts = ['to_pay' => 0, 'to_ship' => 0, 'to_receive' => 0];
+                    foreach ($pagedRows as $br) {
+                        $bs = (string)($br['status'] ?? '');
+                        $bCancel = !empty($br['cancel_requested']) && $bs !== 'cancelled';
+                        $bPaid = strtolower((string)($br['payment_status'] ?? 'unpaid')) === 'paid';
+                        if ($bCancel) {
+                            continue;
+                        }
+                        if ($bs === 'to_pay' && $bPaid) {
+                            $bulkCounts['to_pay']++;
+                        } elseif (isset($bulkCounts[$bs]) && $bs !== 'to_pay') {
+                            $bulkCounts[$bs]++;
+                        }
+                    }
+                    ?>
+                    <div class="bulk-tools" id="bulkTools">
+                        <?php foreach (['to_pay' => 'To Pay (Accept)', 'to_ship' => 'To Ship', 'to_receive' => 'To Receive'] as $bk => $bl): ?>
+                            <?php if ($bulkCounts[$bk] > 0): ?>
+                            <button type="button" class="bulk-chip" data-select-status="<?php echo h($bk); ?>"><?php echo h($bl); ?> <span><?php echo (int)$bulkCounts[$bk]; ?></span></button>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                        <span class="text-muted text-small">Bulk updates per order status.</span>
+                    </div>
+                    <form method="post" id="bulkForm" class="bulk-bar" hidden>
+                        <input type="hidden" name="action" value="bulk_update">
+                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                        <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
+                        <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
+                        <span class="bulk-bar-count"><strong id="bulkCount">0</strong> selected</span>
+                        <label class="sr-only" for="bulkTarget" style="position:absolute;left:-9999px;">Update selected to</label>
+                        <select name="bulk_target" id="bulkTarget" class="form-control" style="width:auto;min-width:160px;"></select>
+                        <button type="submit" class="btn btn-primary btn-sm" id="bulkApply">Update selected</button>
+                        <button type="button" class="btn btn-outline btn-sm" id="bulkClear">Clear</button>
+                    </form>
                     <div class="table-wrap">
                         <table class="ias-table orders-table">
                             <thead>
                                 <tr>
+                                    <th class="bulk-col" aria-label="Select"></th>
                                     <th>Order ID</th>
                                     <th>Customer</th>
                                     <th>Product</th>
@@ -440,8 +540,17 @@ EXTRA
                                     $awaitingPayment = ($ost === 'to_pay' && !$isPaid && !$cancelRequested);
                                     $addr = $r['shipping_address'] ?: ($r['user_address'] ?? '');
                                     $cancelReason = trim((string)($r['cancel_reason'] ?? ''));
+                                    // Bulk-selectable: waiting for Accept, or To Ship / To Receive.
+                                    $bulkEligible = !$cancelRequested && ($canAccept || in_array($ost, ['to_ship', 'to_receive'], true));
                                 ?>
                                 <tr>
+                                    <td class="bulk-col">
+                                        <?php if ($bulkEligible): ?>
+                                        <input type="checkbox" class="bulk-check" value="<?php echo (int)$r['id']; ?>"
+                                               data-status="<?php echo h($ost); ?>"
+                                               aria-label="Select order #<?php echo (int)$r['id']; ?>">
+                                        <?php endif; ?>
+                                    </td>
                                     <td><strong>#<?php echo (int)$r['id']; ?></strong></td>
                                     <td class="customer-cell">
                                         <div style="font-weight:700;"><?php echo h($r['name'] . ' ' . $r['surname']); ?></div>
@@ -523,7 +632,7 @@ EXTRA
                                 </tr>
                                 <?php endforeach; ?>
                                 <?php if (empty($pagedRows)): ?>
-                                <tr><td colspan="6" class="orders-empty">No orders found<?php echo $selectedStatus !== '' ? ' for this status' : ' yet'; ?>.</td></tr>
+                                <tr><td colspan="7" class="orders-empty">No orders found<?php echo $selectedStatus !== '' ? ' for this status' : ' yet'; ?>.</td></tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
@@ -578,8 +687,24 @@ EXTRA
 $flash = '';
 if ($__m = ias_alert_message_from_request()) {
     $__a = (string)($_GET['alert'] ?? '');
-    $__t = (in_array($__a, ['error', 'order_locked', 'order_complete_failed', 'pickup_no_ship', 'status_backward'], true) || !empty($_GET['error'])) ? 'error' : 'success';
+    $__t = (in_array($__a, ['error', 'order_locked', 'order_complete_failed', 'pickup_no_ship', 'status_backward', 'bulk_mixed'], true) || !empty($_GET['error'])) ? 'error' : 'success';
     $__opts = $__a === 'order_completed' ? ['title' => 'Completed Order'] : new stdClass();
+    if ($__a === 'bulk_updated') {
+        $__n = (int)($_GET['n'] ?? 0);
+        $__sk = (int)($_GET['skipped'] ?? 0);
+        $__m = $__n . ' order' . ($__n === 1 ? '' : 's') . ' updated.';
+        if (!empty($_GET['completed'])) {
+            $__m = $__n . ' order' . ($__n === 1 ? ' is' : 's are') . ' now Completed. '
+                . ($__n === 1 ? 'It has' : 'They have') . ' been sent to the Retail Officer and recorded for sales, and the purchased items were removed from inventory.';
+            $__opts = ['title' => 'Completed Order'];
+        }
+        if ($__sk > 0) {
+            $__m .= ' ' . $__sk . ' could not be updated (already completed, cancelled, or not eligible).';
+        }
+        if ($__n === 0) {
+            $__t = 'error';
+        }
+    }
     $flash = '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof IAS_UI!=="undefined")IAS_UI.alert('
         . json_encode($__m, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ','
         . json_encode($__t) . ',0,'
@@ -641,5 +766,80 @@ $chartScript = <<<SCRIPT
 </script>
 SCRIPT;
 
-staff_page_end($flash . $chartScript);
+$bulkScript = <<<'BULK'
+<script>
+(function () {
+    var form = document.getElementById('bulkForm');
+    if (!form) return;
+    var checks = Array.prototype.slice.call(document.querySelectorAll('.bulk-check'));
+    var countEl = document.getElementById('bulkCount');
+    var target = document.getElementById('bulkTarget');
+    var NEXT = {
+        to_pay: [['accept', 'Accept']],
+        to_ship: [['to_receive', 'To Receive'], ['to_review', 'Completed']],
+        to_receive: [['to_review', 'Completed']]
+    };
+    function checked() { return checks.filter(function (c) { return c.checked; }); }
+    function refresh() {
+        var on = checked();
+        var status = on.length ? on[0].getAttribute('data-status') : '';
+        checks.forEach(function (c) {
+            // one status at a time
+            c.disabled = !!status && c.getAttribute('data-status') !== status;
+        });
+        countEl.textContent = on.length;
+        form.hidden = on.length === 0;
+        if (status && target.getAttribute('data-for') !== status) {
+            target.innerHTML = '';
+            NEXT[status].forEach(function (o) {
+                var opt = document.createElement('option');
+                opt.value = o[0];
+                opt.textContent = o[1];
+                target.appendChild(opt);
+            });
+            target.setAttribute('data-for', status);
+        }
+    }
+    checks.forEach(function (c) { c.addEventListener('change', refresh); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-select-status]'), function (btn) {
+        btn.addEventListener('click', function () {
+            var st = btn.getAttribute('data-select-status');
+            checks.forEach(function (c) { c.checked = false; c.disabled = false; });
+            checks.forEach(function (c) { if (c.getAttribute('data-status') === st) c.checked = true; });
+            refresh();
+        });
+    });
+    document.getElementById('bulkClear').addEventListener('click', function () {
+        checks.forEach(function (c) { c.checked = false; });
+        refresh();
+    });
+    form.addEventListener('submit', function (e) {
+        if (form.getAttribute('data-confirmed') === '1') return;
+        e.preventDefault();
+        var on = checked();
+        if (!on.length) return;
+        var label = target.options[target.selectedIndex].textContent;
+        var msg = 'Update ' + on.length + ' selected order' + (on.length === 1 ? '' : 's') + ' to "' + label + '"?';
+        var go = function () {
+            Array.prototype.forEach.call(form.querySelectorAll('input[name="order_ids[]"]'), function (n) { n.remove(); });
+            on.forEach(function (c) {
+                var h = document.createElement('input');
+                h.type = 'hidden'; h.name = 'order_ids[]'; h.value = c.value;
+                form.appendChild(h);
+            });
+            form.setAttribute('data-confirmed', '1');
+            form.submit();
+        };
+        if (typeof IAS_UI !== 'undefined' && IAS_UI.confirm) {
+            IAS_UI.confirm(msg, { title: 'Update orders?', confirmLabel: 'Update' }).then(function (ok) { if (ok) go(); });
+        } else {
+            go();
+        }
+    });
+    refresh();
+})();
+</script>
+BULK;
+
+staff_page_end($flash . $chartScript . $bulkScript);
 ?>
