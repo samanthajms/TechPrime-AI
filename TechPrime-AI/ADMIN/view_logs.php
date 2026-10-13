@@ -73,6 +73,11 @@ function admin_logs_page_list(int $page, int $totalPages): array
     return $pages;
 }
 
+$roleLabels = ['client' => 'Client'];
+foreach (['admin', 'retail_officer', 'inventory_custodian', 'cashier'] as $r) {
+    $roleLabels[$r] = staff_role_label($r);
+}
+
 $firstShown = $totalRows ? $offset + 1 : 0;
 $lastShown = $offset + count($logs);
 
@@ -88,7 +93,9 @@ staff_page_start([
         .log-select {
             height: 40px; padding: 0 12px; border: 1.5px solid var(--border); border-radius: 10px;
             background: #fff; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-main);
+            outline: none; transition: border-color .15s ease, box-shadow .15s ease;
         }
+        .log-select:focus { border-color: var(--ep-green); box-shadow: 0 0 0 3px rgba(97,179,55,.15); }
         .log-pagination {
             display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
             margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
@@ -99,9 +106,13 @@ staff_page_start([
             display: inline-flex; align-items: center; justify-content: center; gap: 6px;
             min-width: 36px; height: 36px; padding: 0 12px; border-radius: 10px;
             border: 1px solid var(--border); background: #fff; color: var(--text-main);
-            font-size: 13px; font-weight: 600; text-decoration: none;
+            font-size: 13px; font-weight: 600; text-decoration: none; font-variant-numeric: tabular-nums;
+            transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform 160ms cubic-bezier(.23,1,.32,1);
         }
         a.log-page:hover { background: var(--ep-green-light); border-color: var(--ep-green); color: var(--ep-green-dark); }
+        a.log-page:active { transform: scale(.95); }
+        a.log-page:focus-visible { outline: 2px solid var(--ep-green); outline-offset: 2px; }
+        @media (prefers-reduced-motion: reduce) { a.log-page:active { transform: none; } }
         .log-page.active { background: var(--ep-green); border-color: var(--ep-green); color: #fff; }
         .log-page.disabled { opacity: .4; pointer-events: none; }
         .log-page.gap { border: none; background: none; min-width: 0; padding: 0 2px; }
@@ -157,7 +168,7 @@ staff_page_start([
                                 </td>
                                 <td>
                                     <?php if (!empty($l['role'])): ?>
-                                        <span class="badge badge-info"><?php echo h($l['role']); ?></span>
+                                        <span class="badge badge-info"><?php echo h($roleLabels[$l['role']] ?? ucfirst((string)$l['role'])); ?></span>
                                     <?php else: ?>
                                         <span class="text-muted text-small">—</span>
                                     <?php endif; ?>

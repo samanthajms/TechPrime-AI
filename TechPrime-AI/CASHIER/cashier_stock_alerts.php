@@ -16,7 +16,7 @@ staff_page_start([
     'active' => 'alerts',
     'heading' => 'Stock Alerts',
     'subtitle' => 'Low, critical and out-of-stock products · read-only · restocking is handled by the Inventory Custodian',
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=5">',
+    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=6">',
 ]);
 ?>
         <div class="cash-page">

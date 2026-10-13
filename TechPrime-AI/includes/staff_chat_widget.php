@@ -25,9 +25,11 @@ $_cw_openStaff = (int)($_GET['staff_id'] ?? $_GET['chat_seller'] ?? 0);
     display: flex; align-items: center; gap: 9px; padding: 10px 14px 10px 16px;
     background: var(--ep-green, #62b236); color: #fff; border: none; border-radius: 999px;
     cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 700;
-    box-shadow: 0 4px 18px rgba(98,178,54,.38); transition: transform .2s, box-shadow .2s, background .2s; user-select: none;
+    box-shadow: 0 4px 18px rgba(98,178,54,.38); user-select: none;
+    transition: transform 160ms cubic-bezier(.23,1,.32,1), box-shadow .15s ease, background-color .15s ease;
 }
-#cwFab:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(98,178,54,.45); }
+#cwFab:hover { box-shadow: 0 8px 24px rgba(98,178,54,.45); }
+#cwFab:active { transform: scale(0.97); }
 #cwFab:focus-visible { outline: 3px solid var(--ep-yellow, #f3c400); outline-offset: 2px; }
 #cwFab[aria-expanded="true"] { background: var(--ep-green-dark, #4b8b2a); }
 #cwFab .cw-fab-icon { font-size: 16px; color: var(--ep-yellow, #f3c400); line-height: 1; }
@@ -58,8 +60,15 @@ $_cw_openStaff = (int)($_GET['staff_id'] ?? $_GET['chat_seller'] ?? 0);
     box-shadow: 0 16px 48px rgba(15,23,42,.22); display: none; flex-direction: column; overflow: hidden;
     font-family: inherit; transform-origin: bottom right;
 }
-#cwPanel.open { display: flex; animation: cwSlideIn .22s cubic-bezier(.34,1.3,.64,1); }
-@keyframes cwSlideIn { from { opacity: 0; transform: scale(.94) translateY(10px); } to { opacity: 1; transform: none; } }
+#cwPanel { transition: opacity 220ms cubic-bezier(.23,1,.32,1), transform 220ms cubic-bezier(.23,1,.32,1); }
+#cwPanel.open { display: flex; }
+/* Grows out of the button (bottom right); no overshoot */
+@starting-style { #cwPanel.open { opacity: 0; transform: scale(.96) translateY(8px); } }
+@media (prefers-reduced-motion: reduce) {
+    #cwFab:active { transform: none; }
+    #cwPanel { transition: opacity 150ms ease; }
+    @starting-style { #cwPanel.open { transform: none; } }
+}
 #cwHeader {
     background: var(--ep-green, #62b236); color: #fff; padding: 10px 10px 10px 16px;
     display: flex; align-items: center; gap: 8px; flex-shrink: 0;

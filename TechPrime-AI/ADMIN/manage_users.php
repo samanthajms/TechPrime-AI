@@ -139,6 +139,7 @@ $user_rows = [
     
 ];
 $users = $user_rows[$active_tab];
+$roleLabels = ['client' => 'Client', 'admin' => 'Admin'] + $staffRoles;
 
 $usersCss = <<<'CSS'
         /* ── Tab Navigation ── */
@@ -161,10 +162,12 @@ $usersCss = <<<'CSS'
             cursor: pointer;
             color: var(--text-muted);
             text-decoration: none;
-            transition: all .15s;
+            transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform 160ms cubic-bezier(.23,1,.32,1);
             font-family: var(--font-base);
         }
         .tab-btn:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-pale); }
+        .tab-btn:active { transform: scale(.97); }
+        .tab-btn:focus-visible { outline: 2px solid var(--ep-green); outline-offset: 2px; }
         .tab-btn.active { background: var(--ep-green); color: #fff; border-color: var(--ep-green); }
         .tab-btn .tab-count {
             background: rgba(255,255,255,.22);
@@ -172,6 +175,7 @@ $usersCss = <<<'CSS'
             border-radius: 100px;
             font-size: 11px;
             font-weight: 700;
+            font-variant-numeric: tabular-nums;
         }
         .tab-btn:not(.active) .tab-count { background: var(--slate-100); color: var(--slate-600); }
 
@@ -179,7 +183,7 @@ $usersCss = <<<'CSS'
         .staff-create-grid .full-width { grid-column: 1 / -1; }
         .staff-create-grid label { display: block; margin-bottom: 5px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
         .staff-create-grid input, .staff-create-grid select { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1.5px solid var(--border); border-radius: 8px; font: inherit; }
-        .staff-create-grid input:focus, .staff-create-grid select:focus { outline: none; border-color: var(--teal); }
+        .staff-create-grid input:focus, .staff-create-grid select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(97,179,55,.15); }
         .staff-create-actions { display: flex; align-items: center; gap: 8px; }
         .filter-modal-card.staff-create-card { width: min(560px, 100%); }
         @media (max-width: 650px) { .staff-create-grid { grid-template-columns: 1fr; } .staff-create-grid .full-width { grid-column: auto; } }
@@ -447,7 +451,10 @@ $usersCss = <<<'CSS'
         .users-summary .stat-num { font-size: 24px; }
         .user-name { display: flex; flex-direction: column; gap: 2px; }
         .actions-cell form { margin: 0; }
-        .status-text { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+        .status-text { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12.5px; }
+        .status-text.is-active { color: #15803d; }
+        .status-text.is-locked { color: #dc2626; }
+        .badge i { margin-right: 5px; font-size: 9.5px; }
         .tabs-card { padding: 18px 22px 0; }
 CSS;
 
@@ -465,22 +472,22 @@ staff_page_start([
             <div class="stat-card">
                 <div class="stat-label">All Users</div>
                 <div class="stat-num"><?php echo (int)$count_all; ?></div>
-                <div class="stat-icon">A</div>
+                <div class="stat-icon"><i class="fas fa-users"></i></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Clients</div>
                 <div class="stat-num"><?php echo (int)$count_client; ?></div>
-                <div class="stat-icon">C</div>
+                <div class="stat-icon"><i class="fas fa-user"></i></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Retail Officers</div>
                 <div class="stat-num"><?php echo (int)$count_officer; ?></div>
-                <div class="stat-icon">D</div>
+                <div class="stat-icon"><i class="fas fa-store"></i></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Inventory Custodian</div>
                 <div class="stat-num"><?php echo (int)$count_custodian; ?></div>
-                <div class="stat-icon">D</div>
+                <div class="stat-icon"><i class="fas fa-warehouse"></i></div>
             </div>
         </div>
 
@@ -497,7 +504,7 @@ staff_page_start([
         <div class="card">
             <div class="card-header">
                 <div>
-                    <h3><span class="card-icon">U</span> User Accounts</h3>
+                    <h3><span class="card-icon"><i class="fas fa-user-cog"></i></span> User Accounts</h3>
                     <div class="card-subtitle">Showing <?php echo count($users); ?> account<?php echo count($users) === 1 ? '' : 's'; ?> for the selected role</div>
                 </div>
                 <button type="button" class="btn btn-primary no-print" onclick="openFilterModal('createStaffModal')"><i class="fas fa-user-plus"></i> Create Staff Account</button>
@@ -524,19 +531,19 @@ staff_page_start([
                             </div>
                         </td>
                         <td class="text-muted"><?php echo h($u['email']); ?></td>
-                        <td><span class="badge badge-<?php echo h($u['role']); ?>"><?php echo h($u['role']); ?></span></td>
+                        <td><span class="badge badge-info"><?php echo h($roleLabels[$u['role']] ?? ucfirst((string)$u['role'])); ?></span></td>
                         <td>
                             <?php if($u['is_verified']): ?>
-                                <span style="color: #27ae60;">✔ Verified</span>
+                                <span class="badge badge-active"><i class="fas fa-check"></i>Verified</span>
                             <?php else: ?>
-                                <span style="color: #e74c3c;">✘ Pending</span>
+                                <span class="badge badge-unverified"><i class="fas fa-clock"></i>Pending</span>
                             <?php endif; ?>
                         </td>
                         <td>
                             <?php if($u['is_locked']): ?>
-                                <span style="color: #e74c3c; font-weight: bold;">LOCKED</span>
+                                <span class="status-text is-locked"><span class="status-dot locked"></span>Locked</span>
                             <?php else: ?>
-                                <span style="color: #27ae60; font-weight: bold;">ACTIVE</span>
+                                <span class="status-text is-active"><span class="status-dot active"></span>Active</span>
                             <?php endif; ?>
                         </td>
                         <td>

@@ -254,7 +254,7 @@ if (!function_exists('staff_page_start')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo h($title); ?> — EasyPC</title>
-    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-responsive-3">
+    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-motion-1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if ($useInvPageTitle): ?>
     <style>

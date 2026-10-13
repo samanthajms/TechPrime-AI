@@ -271,9 +271,11 @@ staff_page_start([
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     min-width: 36px; height: 36px; padding: 0 12px; border-radius: 10px;
     border: 1px solid var(--border); background: #fff; color: var(--text-main);
-    font-size: 13px; font-weight: 700; text-decoration: none;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    font-size: 13px; font-weight: 700; text-decoration: none; font-variant-numeric: tabular-nums;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 160ms var(--ease-out);
 }
+.inv-audit-page:active { transform: scale(0.95); }
+@media (prefers-reduced-motion: reduce) { .inv-audit-page:active { transform: none; } }
 .inv-audit-page:hover { background: var(--ep-green-light); border-color: var(--ep-green); color: var(--ep-green-dark); }
 .inv-audit-page.active {
     background: var(--ep-green); border-color: var(--ep-green); color: #fff;

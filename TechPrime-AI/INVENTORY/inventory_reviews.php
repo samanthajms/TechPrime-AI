@@ -179,9 +179,11 @@ staff_page_start([
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     min-width: 36px; height: 36px; padding: 0 12px; border-radius: 10px;
     border: 1px solid var(--ep-border, #e5e7eb); background: #fff; color: var(--ep-text, #1f2937);
-    font-size: 13px; font-weight: 600; text-decoration: none;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    font-size: 13px; font-weight: 600; text-decoration: none; font-variant-numeric: tabular-nums;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 160ms var(--ease-out);
 }
+.orders-page-link:active:not(.disabled) { transform: scale(0.95); }
+@media (prefers-reduced-motion: reduce) { .orders-page-link:active:not(.disabled) { transform: none; } }
 .orders-page-link:hover:not(.disabled):not(.active) {
     border-color: var(--ep-green); color: var(--ep-green-dark); background: var(--ep-green-light);
 }

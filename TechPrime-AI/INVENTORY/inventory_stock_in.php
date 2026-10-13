@@ -98,7 +98,8 @@ staff_page_start([
 .pos-scan-status > i { font-size: 20px; margin-top: 1px; }
 .pos-scan-status strong { display: block; font-size: 14px; }
 .pos-scan-status span { display: block; font-weight: 500; margin-top: 2px; }
-.pos-flash { animation: pos-flash 0.45s ease; }
+.pos-flash { animation: pos-flash 200ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .pos-flash { animation: none; } }
 @keyframes pos-flash { from { transform: scale(0.98); opacity: 0.55; } to { transform: none; opacity: 1; } }
 .pos-line-flash { animation: pos-line-flash 0.9s ease; }
 @keyframes pos-line-flash { from { background: #d4efc4; } to { background: transparent; } }

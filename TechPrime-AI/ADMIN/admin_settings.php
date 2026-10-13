@@ -106,9 +106,14 @@ $settingsCss = <<<'CSS'
             font-size: 18px; font-weight: 700; line-height: 1;
             display: flex; align-items: center; justify-content: center;
             color: var(--text-main);
-            transition: all .15s;
+            font-family: var(--font-base);
+            transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform 120ms cubic-bezier(.23,1,.32,1);
         }
         .stepper-btn:hover { background: var(--ep-green-light); border-color: var(--ep-green); color: var(--teal-deeper); }
+        .stepper-btn:active { transform: scale(.92); }
+        .stepper-btn:focus-visible { outline: 2px solid var(--ep-green); outline-offset: 2px; }
+        .alert > i { margin-top: 2px; }
+        @media (prefers-reduced-motion: reduce) { .stepper-btn:active { transform: none; } }
         .stepper-input {
             width: 68px; padding: 7px 10px;
             border: 1.5px solid var(--border);
@@ -116,6 +121,7 @@ $settingsCss = <<<'CSS'
             font-weight: 700; text-align: center;
             outline: none; transition: border-color .18s;
             font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
             color: var(--text-main);
         }
         .stepper-input:focus { border-color: var(--ep-green); box-shadow: 0 0 0 3px rgba(97,179,55,.15); }
@@ -157,14 +163,15 @@ staff_page_start([
 ?>
 
         <?php if ($success): ?>
-            <div class="alert alert-success">✔ <?php echo h($success); ?></div>
+            <div class="alert alert-success"><i class="fas fa-check-circle"></i><span><?php echo h($success); ?></span></div>
         <?php endif; ?>
         <?php if ($error): ?>
-            <div class="alert alert-error">✘ <?php echo h($error); ?></div>
+            <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i><span><?php echo h($error); ?></span></div>
         <?php endif; ?>
 
         <div class="alert alert-info">
-            ℹ️ Password complexity changes apply to <strong>new registrations only</strong>. The failed login attempts limit applies <strong>immediately</strong> for all users.
+            <i class="fas fa-info-circle"></i>
+            <span>Password complexity changes apply to <strong>new registrations only</strong>. The failed login attempts limit applies <strong>immediately</strong> for all users.</span>
         </div>
 
         <form method="post" id="settingsForm">

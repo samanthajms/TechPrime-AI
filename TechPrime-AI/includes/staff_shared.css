@@ -59,6 +59,12 @@
 
   --font-base: 'Poppins', 'Inter', Arial, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
+
+  /* Motion: strong ease-out for UI, ease-in-out for on-screen morphs, iOS drawer curve */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --focus-ring: 0 0 0 3px rgba(97, 179, 55, 0.25);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -86,7 +92,6 @@ body {
   z-index: 100;
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.12);
   overflow-x: hidden;
-  transition: width 0.25s ease;
 }
 
 .sidebar-brand {
@@ -144,8 +149,9 @@ body {
   justify-content: center;
   font-size: 14px;
   font-family: inherit;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--ease-out);
 }
+.sidebar-collapse-btn:active { transform: scale(0.94); }
 .sidebar-collapse-btn:hover,
 .sidebar-collapse-btn:focus-visible {
   background: rgba(0, 0, 0, 0.18);
@@ -179,7 +185,16 @@ body {
   text-align: left;
   cursor: pointer;
   font-family: inherit;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--ease-out);
+}
+.sidebar nav a:active,
+.sidebar .nav-link:active,
+.sidebar-footer a:active { transform: scale(0.98); }
+.sidebar nav a:focus-visible,
+.sidebar .nav-link:focus-visible,
+.sidebar-footer a:focus-visible {
+  outline: 2px solid var(--ep-yellow);
+  outline-offset: -2px;
 }
 
 .sidebar nav a i:not(.sidebar-drop-caret),
@@ -225,7 +240,7 @@ body {
   height: auto !important;
   font-size: 12px;
   opacity: 0.8;
-  transition: transform 0.18s ease;
+  transition: transform 200ms var(--ease-out);
 }
 .sidebar-drop[open] > summary .sidebar-drop-caret {
   transform: rotate(180deg);
@@ -257,7 +272,7 @@ body {
   font-size: 14.5px;
   font-weight: 600;
   border-radius: 10px;
-  transition: background 0.15s, color 0.15s;
+  transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--ease-out);
 }
 
 .sidebar-footer a:hover {
@@ -281,7 +296,12 @@ body {
 .main {
   margin-left: var(--sidebar-width);
   min-height: 100vh;
-  transition: margin-left 0.25s ease;
+}
+
+@media (min-width: 901px) {
+  /* Icon-rail collapse is one on-screen morph: ease-in-out */
+  .sidebar { transition: width 220ms var(--ease-in-out); }
+  .main { transition: margin-left 220ms var(--ease-in-out); }
 }
 
 .topbar {
@@ -523,12 +543,6 @@ body.inv-title-mode .topbar-left-spacer {
   box-shadow: var(--card-shadow);
   position: relative;
   overflow: hidden;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
 }
 
 .stat-card::after {
@@ -555,6 +569,8 @@ body.inv-title-mode .topbar-left-spacer {
   font-weight: 800;
   color: var(--ep-green-dark);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .stat-icon {
@@ -599,6 +615,7 @@ table.staff-table th {
 
 table.ias-table td,
 table.staff-table td {
+  font-variant-numeric: tabular-nums;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
@@ -650,12 +667,18 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease,
+              box-shadow 150ms ease, transform 160ms var(--ease-out);
   font-family: var(--font-base);
   white-space: nowrap;
 }
 
-.btn:hover { transform: translateY(-1px); }
+/* Press feedback instead of a hover lift */
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:focus-visible {
+  outline: 2px solid var(--ep-green);
+  outline-offset: 2px;
+}
 
 .btn-primary {
   background: var(--ep-green);
@@ -759,7 +782,7 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   background: var(--slate-300);
   border-radius: 26px;
   cursor: pointer;
-  transition: 0.25s;
+  transition: background-color 200ms ease, box-shadow 150ms ease;
 }
 .toggle-slider:before {
   content: '';
@@ -770,11 +793,12 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   bottom: 3px;
   background: #fff;
   border-radius: 50%;
-  transition: 0.25s;
+  transition: transform 200ms var(--ease-out);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 .toggle input:checked + .toggle-slider { background: var(--ep-green); }
 .toggle input:checked + .toggle-slider:before { transform: translateX(20px); }
+.toggle input:focus-visible + .toggle-slider { box-shadow: var(--focus-ring); }
 
 /* ================================================================
    FILTER / FORM MODALS
@@ -783,21 +807,29 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(15, 23, 42, 0.5);
   z-index: 3000;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  transition: opacity 200ms var(--ease-out);
 }
 .filter-modal.open { display: flex; }
 .filter-modal-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 22px;
   width: min(460px, 100%);
   max-height: 90vh;
   overflow-y: auto;
-  border: 2px solid var(--ep-green);
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+/* Enter: scrim fades, card scales up from 0.96 (centred: modals are not anchored) */
+@starting-style {
+  .filter-modal.open { opacity: 0; }
+  .filter-modal.open .filter-modal-card { opacity: 0; transform: scale(0.96) translateY(6px); }
 }
 .filter-modal-card h4 {
   margin: 0 0 14px;
@@ -988,13 +1020,14 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
     transform: translateX(-100%);
     visibility: hidden;
     box-shadow: none;
-    transition: transform 0.3s ease, visibility 0s linear 0.3s;
+    /* Closing is a little faster than opening */
+    transition: transform 240ms var(--ease-drawer), visibility 0s linear 240ms;
   }
   .sidebar.open {
     transform: translateX(0);
     visibility: visible;
     box-shadow: 8px 0 32px rgba(0, 0, 0, 0.25);
-    transition: transform 0.3s ease, visibility 0s;
+    transition: transform 300ms var(--ease-drawer), visibility 0s;
   }
   body.sidebar-open { overflow: hidden; }
   .main { margin-left: 0; }
@@ -1013,8 +1046,10 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
     border-radius: 10px;
     font-size: 17px;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--ease-out);
   }
+  .sidebar-open-btn:active,
+  .sidebar-close-btn:active { transform: scale(0.94); }
   .sidebar-open-btn {
     border: 1px solid var(--border);
     background: #fff;
@@ -1078,8 +1113,9 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   align-items: center;
   justify-content: center;
   font-size: 16px;
-  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 160ms var(--ease-out);
 }
+.staff-notif-btn:active { transform: scale(0.95); }
 .staff-notif-btn:hover,
 .staff-notif-wrap.open .staff-notif-btn {
   background: var(--ep-green-light);
@@ -1112,6 +1148,8 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
   overflow: hidden;
   z-index: 1500;
+  transform-origin: top right;
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
 }
 .staff-notif-panel[hidden] { display: none !important; }
 .staff-notif-panel-head {
@@ -1306,8 +1344,9 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   max-width: 260px;
   line-height: 1.2;
   text-align: left;
-  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 160ms var(--ease-out);
 }
+.staff-user-btn:active { transform: scale(0.98); }
 .staff-user-btn .avatar {
   width: 34px;
   height: 34px;
@@ -1349,7 +1388,7 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   font-size: 10px;
   color: var(--ep-green-dark);
   margin-left: 2px;
-  transition: transform 0.18s ease;
+  transition: transform 200ms var(--ease-out);
 }
 .staff-user-wrap.open .staff-user-caret { transform: rotate(180deg); }
 
@@ -1364,8 +1403,15 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
   overflow: hidden;
   z-index: 1500;
+  transform-origin: top right;
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
 }
 .staff-user-menu[hidden] { display: none !important; }
+/* Topbar dropdowns scale in from their trigger (top right) */
+@starting-style {
+  .staff-user-menu,
+  .staff-notif-panel { opacity: 0; transform: scale(0.96) translateY(-4px); }
+}
 .staff-user-menu-head {
   display: flex;
   align-items: center;
@@ -1481,4 +1527,30 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
 @media (max-width: 640px) {
   .staff-user-btn { padding: 3px 8px 3px 3px; }
   .staff-user-text { display: none; }
+}
+
+/* ================================================================
+   REDUCED MOTION: keep fades, drop movement
+   ================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .btn:active:not(:disabled),
+  .sidebar nav a:active,
+  .sidebar .nav-link:active,
+  .sidebar-footer a:active,
+  .sidebar-collapse-btn:active,
+  .sidebar-open-btn:active,
+  .sidebar-close-btn:active,
+  .staff-notif-btn:active,
+  .staff-user-btn:active { transform: none; }
+  .sidebar,
+  .sidebar.open,
+  .main { transition: none; }
+  .staff-user-menu,
+  .staff-notif-panel,
+  .filter-modal-card { transition: opacity 150ms ease; }
+  @starting-style {
+    .staff-user-menu,
+    .staff-notif-panel,
+    .filter-modal.open .filter-modal-card { transform: none; }
+  }
 }

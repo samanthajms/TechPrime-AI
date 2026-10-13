@@ -404,8 +404,13 @@ staff_page_start([
     display: none; position: absolute; right: 0; left: auto; top: calc(100% + 8px); z-index: 90;
     width: min(360px, calc(100vw - 48px)); background: #fff; border: 1px solid var(--ep-border);
     border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,0.12); padding: 16px;
+    transform-origin: top right;
+    transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
 }
 .stocks-filter-panel.open { display: flex; flex-direction: column; gap: 14px; }
+@starting-style {
+    .stocks-filter-panel.open { opacity: 0; transform: scale(0.96) translateY(-4px); }
+}
 .stocks-filter-panel-title {
     margin: 0 0 2px; font-size: 14px; font-weight: 800; color: var(--ep-green-dark);
 }
@@ -418,9 +423,10 @@ staff_page_start([
     display: flex; justify-content: space-between; align-items: center;
     padding: 8px 12px; border-radius: 8px; border: 1px solid var(--ep-border);
     background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ep-text);
-    transition: all .15s ease;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform 160ms var(--ease-out);
 }
 .status-btn:hover { border-color: var(--ep-green); }
+.status-btn:active { transform: scale(0.98); }
 .status-btn.active { background: var(--ep-green); border-color: var(--ep-green); color: #fff; }
 .status-btn .cnt { font-weight: 700; opacity: .85; }
 .price-range { display: flex; align-items: center; gap: 8px; }
@@ -657,8 +663,10 @@ staff_page_start([
 .pagination-bar button {
     border: 1px solid var(--ep-border); background: #fff; border-radius: 10px; min-width: 36px; height: 36px;
     padding: 0 12px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ep-text);
-    transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+    font-variant-numeric: tabular-nums;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform 160ms var(--ease-out);
 }
+.pagination-bar button:active:not(:disabled) { transform: scale(0.95); }
 .pagination-bar button:hover:not(:disabled):not(.active) {
     border-color: var(--ep-green); color: var(--ep-green-dark); background: var(--ep-green-light);
 }
@@ -669,14 +677,20 @@ staff_page_start([
 .pagination-bar button:disabled { opacity: .4; cursor: not-allowed; }
 
 .modal {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5);
     z-index: 2000; align-items: center; justify-content: center;
+    transition: opacity 200ms var(--ease-out);
 }
 .modal.open { display: flex; }
 .modal-content {
-    background: #fff; padding: 28px; border-radius: 12px; width: 460px;
+    background: #fff; padding: 28px; border-radius: 16px; width: 460px;
     max-width: 92%; max-height: 90vh; overflow-y: auto; position: relative;
-    border: 2px solid var(--ep-green);
+    border: 1px solid var(--ep-border); box-shadow: 0 24px 60px rgba(15,23,42,0.22);
+    transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+@starting-style {
+    .modal.open { opacity: 0; }
+    .modal.open .modal-content { opacity: 0; transform: scale(0.96) translateY(6px); }
 }
 .modal-content.wide { width: 560px; }
 .modal .close {
@@ -688,6 +702,14 @@ staff_page_start([
 .details-grid dt { color: var(--ep-muted); font-weight: 600; }
 .details-grid dd { margin: 0; color: var(--ep-text); font-weight: 600; }
 .details-img { width: 100%; max-height: 220px; object-fit: contain; background: var(--ep-green-light); border-radius: 10px; margin-bottom: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .status-btn:active, .pagination-bar button:active:not(:disabled) { transform: none; }
+    .stocks-filter-panel, .modal-content { transition: opacity 150ms ease; }
+    @starting-style {
+        .stocks-filter-panel.open, .modal.open .modal-content { transform: none; }
+    }
+}
 
 @media (max-width: 640px) {
     .stocks-shell > .card-body { padding: 14px 14px 18px; }
