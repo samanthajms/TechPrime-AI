@@ -1,6 +1,6 @@
 <?php
 // Proxy: browser/PHP pages -> Render forecast service. Keeps the API key server-side.
-// Usage: forecast_api.php?type=demand|revenue|metrics|categories&horizon=1|2|3&category=Memory&top=50&from=2026-01-01&to=2026-08-31
+// Usage: forecast_api.php?type=demand|revenue|actions|metrics|categories&horizon=1|2|3&category=Memory&top=50&from=2026-01-01&to=2026-08-31
 // from/to (optional, Y-m-d) choose which ACTUAL sales months are shown next to the forecast; they never change the forecast.
 // `category` = a Client/Custodian label (Memory, Monitor, CPU Cooling ...) or a Client group (Component, Peripherals ...).
 // .env (TechPrime-AI/.env, never committed):  FORECAST_URL=https://techprime-forecast.onrender.com   FORECAST_API_KEY=<same value as on Render>
@@ -22,11 +22,13 @@ function forecast_fail(int $code, string $error): never
 // Who may see which forecast (matches the screens):
 //   Product Demand Forecast  -> Inventory Custodian, Retail Officer + Admin
 //   Sales / Revenue Forecast -> Retail Officer + Admin
+//   Inventory actions (reorder point, safety stock, days of inventory, order qty) -> Inventory Custodian + Admin
 //   Category list + model accuracy -> all three
 $role = (string)($_SESSION['role'] ?? '');
 $allowed = [
     'demand'     => ['admin', 'inventory_custodian', 'retail_officer'],
     'revenue'    => ['admin', 'retail_officer'],
+    'actions'    => ['admin', 'inventory_custodian'],
     'categories' => ['admin', 'retail_officer', 'inventory_custodian'],
     'metrics'    => ['admin', 'retail_officer', 'inventory_custodian'],
 ];
@@ -53,6 +55,7 @@ if (($baseParts['scheme'] ?? '') !== 'https' && !$isPrivate) {
 }
 
 $routes  = ['demand' => '/api/forecast/demand', 'revenue' => '/api/forecast/revenue', 'metrics' => '/api/metrics',
+            'actions' => '/api/inventory/actions',
             'categories' => '/api/categories'];   // categories = canonical Client/Custodian list for the filter dropdown
 
 // Forecast window: 1-3 months ahead only. Out-of-range values are rejected (the service enforces the same rule).
@@ -98,6 +101,9 @@ if ($response === false || $err) {
     error_log('forecast_api: upstream unreachable: ' . $err);
     forecast_fail(503, 'Forecast service unreachable (it may be waking up - retry in a minute)');
 }
+// The inventory-actions route answers 503 until a stock-on-hand snapshot exists on the forecast service. That is an
+// expected "not connected yet" state, not an outage, so the screen gets a clear message instead of a generic error.
+if ($type === 'actions' && $code === 503) { forecast_fail(503, 'Stock levels are not connected to the forecast service yet'); }
 if ($code === 401 || $code === 403 || $code >= 500 || $code === 0) {   // never relay upstream auth/internal details
     error_log('forecast_api: upstream returned HTTP ' . $code);
     forecast_fail(502, 'Forecast service error');
