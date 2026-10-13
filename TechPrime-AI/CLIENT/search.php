@@ -24,7 +24,7 @@ if (!empty($query)) {
         "SELECT p.*, u.name as seller_name
          FROM products p
          JOIN users u ON p.seller_id = u.id
-         WHERE (p.name LIKE ? OR p.description LIKE ?) AND {$vis}
+         WHERE (p.name ILIKE ? OR p.description ILIKE ?) AND {$vis}
          ORDER BY p.id DESC
          LIMIT 48"
     );

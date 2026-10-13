@@ -1094,6 +1094,16 @@
     var thanksAt = 0;
     var bubbleMode = 'greet';
     var thanksTimer = null;
+    var phoneHideTimer = null;
+    // Phones: the bubble sits over page content, so let it say its line and then step aside.
+    function hideBubbleSoonOnPhone() {
+        if (!mqPhone || !mqPhone.matches) return;
+        if (phoneHideTimer) window.clearTimeout(phoneHideTimer);
+        phoneHideTimer = window.setTimeout(function () {
+            phoneHideTimer = null;
+            if (!isChatOpen()) root.classList.add('is-greet-away');
+        }, 6000);
+    }
     function showGreet() {
         if (!greet || bubbleMode !== 'greet' || isChatOpen()) return;
         greet.textContent = greetLines[greetAt % greetLines.length];
@@ -1114,6 +1124,7 @@
         if (thanksTimer) window.clearTimeout(thanksTimer);
         greet.textContent = thanksLines[thanksAt % thanksLines.length];
         thanksAt += 1;
+        hideBubbleSoonOnPhone();
         thanksTimer = window.setTimeout(function () {
             thanksTimer = null;
             if (isChatOpen()) return;
@@ -1123,6 +1134,7 @@
     }
     if (greet) {
         showGreet();
+        hideBubbleSoonOnPhone();
         window.setInterval(function () {
             if (!greet || bubbleMode !== 'greet' || isChatOpen()) return;
             if (reduceMotion) {

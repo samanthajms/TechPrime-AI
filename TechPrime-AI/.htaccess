@@ -25,6 +25,9 @@ Options -Indexes
     Header set X-Content-Type-Options "nosniff"
     # Don't leak full page URLs (with ?id=, ?token=) to other sites
     Header set Referrer-Policy "strict-origin-when-cross-origin"
+    # CSP: no <base> hijacking, no plugins, framing only by this site. Scripts are not
+    # restricted yet because the pages rely on inline <script> blocks.
+    Header set Content-Security-Policy "base-uri 'self'; object-src 'none'; frame-ancestors 'self'"
 </IfModule>
 
 # PHP settings (mod_php — XAMPP and the php:apache Docker image)

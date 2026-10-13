@@ -57,7 +57,8 @@ if (isset($_POST['add_to_cart']) || isset($_POST['buy_now'])) {
 }
 
 $viewId = (int)($_GET['id'] ?? 0);
-if ($viewId > 0) {
+// Any ?id= shows the detail page; an invalid id (abc, -1) gets its 404 "not available" view.
+if (isset($_GET['id'])) {
     require __DIR__ . '/product_detail.php';
     exit;
 }
