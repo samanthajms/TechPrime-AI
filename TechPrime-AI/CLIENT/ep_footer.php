@@ -37,7 +37,9 @@
     </footer>
 
 <?php if (!empty($epShowPrimo)) include __DIR__ . '/primo.php'; ?>
+<?php if (empty($GLOBALS['ias_ui_alerts_loaded'])): $GLOBALS['ias_ui_alerts_loaded'] = true; // shared with ias_alert_footer() ?>
     <script src="../includes/ui_alerts.js"></script>
+<?php endif; ?>
     <script src="ep_back.js"></script>
     <script>
         // ── Nav dropdown toggle ────────────────────────────────────────────

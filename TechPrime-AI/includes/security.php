@@ -501,7 +501,11 @@ function ias_alert_footer(): void
         || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/RETAIL/') !== false
         || strpos($_SERVER['SCRIPT_NAME'] ?? '', '/INVENTORY/') !== false)
         ? '../includes/ui_alerts.js' : 'includes/ui_alerts.js';
-    echo '<script src="' . h($root) . '"></script>';
+    // ui_alerts.js declares `const IAS_UI`; a second copy (e.g. from CLIENT/ep_footer.php) throws.
+    if (empty($GLOBALS['ias_ui_alerts_loaded'])) {
+        $GLOBALS['ias_ui_alerts_loaded'] = true;
+        echo '<script src="' . h($root) . '"></script>';
+    }
     if ($msg) {
         $type = ((!empty($_GET['alert']) && $_GET['alert'] === 'error') || !empty($_GET['error'])) ? 'error' : 'success';
         echo '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof IAS_UI!=="undefined")IAS_UI.alert('
