@@ -48,7 +48,10 @@ $dashboardCss = <<<'CSS'
 .stock-status-pill.low { background:#fffbeb; color:#b45309; border-color:#fde68a; }
 .stock-status-pill.critical { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
 .stock-status-pill.out { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+.report-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin:-6px 0 18px; }
+.report-toolbar p { margin:0; }
 CSS;
+$dashboardCss .= ias_retail_print_css();
 
 staff_page_start([
     'role' => 'admin',
@@ -60,7 +63,19 @@ staff_page_start([
 ]);
 ?>
 
-<p class="text-muted text-small" style="margin:-6px 0 18px;">System overview and statistics</p>
+<div class="print-header">
+    <img src="<?php echo h(staff_logo_href()); ?>" alt="EasyPC">
+    <div>
+        <h1>Admin Dashboard</h1>
+        <p>Revenue &amp; deliveries: <?php echo h($statRange['label'] . ' (' . $statRange['from']->format('M d, Y') . ' – ' . $statRange['to']->format('M d, Y') . ')'); ?> &middot; Users and orders: all-time totals</p>
+        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Administrator'); ?> on <?php echo h(ias_report_datetime(gmdate('Y-m-d H:i:s'))); ?></p>
+    </div>
+</div>
+
+<div class="report-toolbar no-print">
+    <p class="text-muted text-small">System overview and statistics</p>
+    <button type="button" class="btn btn-outline btn-sm" onclick="window.print()" title="Print the dashboard"><i class="fas fa-print"></i> Print</button>
+</div>
 
         <div class="stats-grid">
             <div class="stat-card">

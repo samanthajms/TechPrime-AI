@@ -31,7 +31,8 @@ $roleList = staff_chat_allowed_roles();
 $roleIn = implode(',', array_fill(0, count($roleList), '?'));
 
 const STAFF_CHAT_MAX_TEXT = 4000;
-const STAFF_CHAT_HISTORY_LIMIT = 100;
+const STAFF_CHAT_HISTORY_LIMIT = 100; // max rows per fetch (polls, reaction/unsend sync window)
+const STAFF_CHAT_PAGE_SIZE = 10;      // messages per history page (opening a chat, scrolling up)
 
 function staff_chat_json(array $payload): never
 {
@@ -73,9 +74,9 @@ function staff_chat_snippet(?string $text, int $len = 80): string
 /**
  * Messages of one conversation that the user hasn't removed for themselves (oldest first).
  * $afterId: only newer messages (poll). $beforeId: the page just before that message ("load earlier").
- * $hasMore is set to true when older messages exist beyond the returned page.
+ * $hasMore is set to true when older messages exist beyond the returned page; $limit caps the page size.
  */
-function staff_chat_fetch(PDO $db, int $userId, int $peerId, int $afterId = 0, int $beforeId = 0, ?bool &$hasMore = null): array
+function staff_chat_fetch(PDO $db, int $userId, int $peerId, int $afterId = 0, int $beforeId = 0, ?bool &$hasMore = null, int $limit = STAFF_CHAT_HISTORY_LIMIT): array
 {
     $sql = "SELECT m.id, m.sender_id, m.message, m.created_at, m.reply_to_id, m.is_forwarded, m.deleted_for_all,
                    m.attachment_path, m.attachment_name, m.attachment_mime, m.attachment_size,
@@ -88,12 +89,12 @@ function staff_chat_fetch(PDO $db, int $userId, int $peerId, int $afterId = 0, i
               AND (? = 0 OR m.id < ?)
               AND NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.message_id = m.id AND h.user_id = ?)
             ORDER BY m.id DESC
-            LIMIT " . (STAFF_CHAT_HISTORY_LIMIT + 1);
+            LIMIT " . ($limit + 1);
     $stmt = $db->prepare($sql);
     $stmt->execute([$userId, $peerId, $peerId, $userId, $afterId, $beforeId, $beforeId, $userId]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    $hasMore = count($rows) > STAFF_CHAT_HISTORY_LIMIT;
-    $rows = array_reverse(array_slice($rows, 0, STAFF_CHAT_HISTORY_LIMIT));
+    $hasMore = count($rows) > $limit;
+    $rows = array_reverse(array_slice($rows, 0, $limit));
 
     $reactions = staff_chat_reactions($db, $userId, array_map(fn($r) => (int)$r['id'], $rows));
     return array_map(fn($r) => staff_chat_format($r, $userId, $reactions[(int)$r['id']] ?? []), $rows);
@@ -304,14 +305,16 @@ if ($action === 'get_history') {
         staff_chat_json(['messages' => []]);
     }
     $beforeId = max(0, (int)($_GET['before_id'] ?? 0));
+    // Pages are small by default; jumping to an old message may ask for bigger ones.
+    $limit = min(STAFF_CHAT_HISTORY_LIMIT, max(1, (int)($_GET['limit'] ?? STAFF_CHAT_PAGE_SIZE)));
     if ($beforeId) {
         // "Load earlier messages": just the older page.
-        $page = staff_chat_fetch($db, $userId, $peerId, 0, $beforeId, $hasMore);
+        $page = staff_chat_fetch($db, $userId, $peerId, 0, $beforeId, $hasMore, $limit);
         staff_chat_json(['messages' => $page, 'has_more' => $hasMore]);
     }
     staff_chat_mark_read($db, $peerId, $userId);
     $state = staff_chat_state($db, $userId, $peerId);
-    $page = staff_chat_fetch($db, $userId, $peerId, 0, 0, $hasMore);
+    $page = staff_chat_fetch($db, $userId, $peerId, 0, 0, $hasMore, $limit);
     staff_chat_json([
         'messages' => $page,
         'has_more' => $hasMore,

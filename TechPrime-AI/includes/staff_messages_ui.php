@@ -1019,6 +1019,7 @@ if (!function_exists('staff_messages_render')) {
                     if (msgs.length) lastId = msgs[msgs.length - 1].id;
                     renderPins();
                     renderMessages(true);
+                    fillOlder();
                 } catch (e) {
                     win.innerHTML = '<p class="contacts-note" style="margin:auto;">Could not load this conversation.</p>';
                 }
@@ -1155,6 +1156,8 @@ if (!function_exists('staff_messages_render')) {
             win.addEventListener('scroll', () => {
                 stickBottom = win.scrollHeight - win.scrollTop - win.clientHeight < 80;
                 if (popMode && popMode.kind !== 'insert') closePop();
+                // Scrolling up near the top pulls in the previous page.
+                if (win.scrollTop < 120 && hasOlder && !loadingOlder) loadOlder();
             });
             // Images change the height after they load; keep the view pinned to the newest message.
             win.addEventListener('load', (e) => {
@@ -1162,7 +1165,7 @@ if (!function_exists('staff_messages_render')) {
             }, true);
 
             /** Prepend the previous page of history, keeping the reader's position. Returns true if anything was added. */
-            async function loadOlder() {
+            async function loadOlder(limit) {
                 if (!active || loadingOlder || !hasOlder) return false;
                 const oldest = msgs.find(m => typeof m.id === 'number');
                 if (!oldest) return false;
@@ -1171,7 +1174,7 @@ if (!function_exists('staff_messages_render')) {
                 if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
                 const id = active.id;
                 try {
-                    const r = await fetch(ENDPOINT + `?action=get_history&staff_id=${id}&before_id=${oldest.id}`);
+                    const r = await fetch(ENDPOINT + `?action=get_history&staff_id=${id}&before_id=${oldest.id}` + (limit ? `&limit=${limit}` : ''));
                     const data = await r.json();
                     if (!active || active.id !== id) return false;
                     const older = (data.messages || []).filter(m => !msgById(m.id));
@@ -1191,11 +1194,20 @@ if (!function_exists('staff_messages_render')) {
                 }
             }
 
+            /** A short first page may not overflow the window, so no scroll-up is possible: keep loading until it does. */
+            async function fillOlder() {
+                const id = active ? active.id : 0;
+                for (let i = 0; i < 20 && active && active.id === id && hasOlder
+                        && win.clientHeight > 0 && win.scrollHeight <= win.clientHeight + 120; i++) {
+                    if (!await loadOlder()) break;
+                }
+            }
+
             async function jumpTo(id) {
                 const sel = `.msg-row[data-id="${CSS.escape(String(id))}"]`;
-                // Older than the loaded window (e.g. from search or media): page back until it's there.
+                // Older than the loaded window (e.g. from search or media): page back in big steps until it's there.
                 for (let i = 0; i < 60 && !win.querySelector(sel) && hasOlder; i++) {
-                    if (!await loadOlder()) break;
+                    if (!await loadOlder(100)) break;
                 }
                 const row = win.querySelector(sel);
                 if (!row) { toast('That message is no longer available.', 'info'); return; }

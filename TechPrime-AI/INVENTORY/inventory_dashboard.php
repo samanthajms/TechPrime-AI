@@ -4,6 +4,7 @@ require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 require_once __DIR__ . '/../includes/product_categories.php';
 require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
+require_once __DIR__ . '/../includes/retail_reports.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -310,10 +311,36 @@ staff_page_start([
     .inv-stockin-canvas-wrap { height: 260px; }
     .inv-cat-tab { padding: 8px 14px; font-size: 12.5px; }
 }
+.report-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+@media print {
+    .main > .inv-page-banner, .inv-hero, .inv-category-nav, .inv-stockin-tools { display: none !important; }
+    .inv-dash { gap: 14px; }
+    .inv-chart-panel, .inv-panel, .inv-stat-card, .inv-overview-chip, .inv-stockin-panel { box-shadow: none !important; break-inside: avoid; }
+    .inv-stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    .inv-overview { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    .inv-overview-chip { min-height: 0; }
+    .inv-chart-body { grid-template-columns: minmax(0, 1fr) 200px !important; }
+    .inv-chart-canvas-wrap { height: 220px !important; }
+    .inv-stockin-canvas-wrap { height: 300px !important; }
+}
 </style>
 EXTRA
+    . '<style>' . ias_retail_print_css() . '</style>',
 ]);
 ?>
+
+<div class="print-header">
+    <img src="<?php echo h(staff_logo_href()); ?>" alt="EasyPC">
+    <div>
+        <h1>Inventory Dashboard</h1>
+        <p>Deliveries and stock: current totals &middot; Products Stocked Per Month: <span id="invPrintScope">This Year &middot; All categories</span></p>
+        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Inventory Custodian'); ?> on <?php echo h(ias_report_datetime(gmdate('Y-m-d H:i:s'))); ?></p>
+    </div>
+</div>
+
+<div class="report-toolbar no-print">
+    <button type="button" class="btn btn-outline btn-sm" onclick="window.print()" title="Print the dashboard"><i class="fas fa-print"></i> Print</button>
+</div>
 
         <div class="inv-dash">
 
@@ -581,6 +608,11 @@ $chartScript = <<<SCRIPT
         var el = document.getElementById('invStockinBadge');
         if (!el) return;
         el.innerHTML = '<i class="fas fa-layer-group"></i> ' + (selectedCategory ? selectedCategory : 'All categories');
+        var scope = document.getElementById('invPrintScope');
+        var sel = document.getElementById('invPeriodSelect');
+        if (scope && sel) {
+            scope.textContent = sel.options[sel.selectedIndex].text + ' · ' + (selectedCategory || 'All categories');
+        }
     }
 
     function renderStockinChart() {
