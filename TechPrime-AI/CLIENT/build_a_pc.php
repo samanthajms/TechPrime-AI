@@ -11,15 +11,17 @@ require_once __DIR__ . '/../includes/client_helpers.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
-checkRole('client');
 
-$isLoggedIn = true;
+// Open to guests too: they can build and compare; saving or buying a build needs a customer login.
+$isLoggedIn = isset($_SESSION['user_id']);
+$canSaveBuilds = $isLoggedIn && ($_SESSION['role'] ?? '') === 'client';
+$buildLoginUrl = '../login.php?next=' . urlencode('CLIENT/build_a_pc.php');
 $activePage = 'build_a_pc';
 $isHomePage = false;
 $pageTitle = 'Build a PC';
 $csrf = generateCsrfToken();
 
-$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-10">';
+$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-11">';
 
 include __DIR__ . '/ep_header.php';
 ?>
@@ -154,6 +156,14 @@ include __DIR__ . '/ep_header.php';
                 <div class="tm-compat" id="tmCompatStatus"></div>
                 <div class="tm-platform" id="tmPlatform" hidden></div>
             </div>
+            <div class="tm-buy-row">
+                <button type="button" class="tm-btn-outline" id="tmBuildToCart">
+                    <i class="fas fa-cart-plus" aria-hidden="true"></i> Add to Cart
+                </button>
+                <button type="button" class="tm-btn-primary tm-btn-buy" id="tmBuildBuyNow">
+                    <i class="fas fa-bolt" aria-hidden="true"></i> Buy Now
+                </button>
+            </div>
             <button type="button" class="tm-btn-primary" id="tmAddMissing">
                 <i class="fas fa-cog" aria-hidden="true"></i> Add Missing Components
             </button>
@@ -163,7 +173,7 @@ include __DIR__ . '/ep_header.php';
             <button type="button" class="tm-btn-outline" id="tmShareBuild">
                 <i class="fas fa-share-alt" aria-hidden="true"></i> Share
             </button>
-            <a class="tm-btn-outline" href="saved_builds.php">
+            <a class="tm-btn-outline" href="<?php echo $canSaveBuilds ? 'saved_builds.php' : h($buildLoginUrl); ?>">
                 <i class="fas fa-folder-open" aria-hidden="true"></i> My Saved Builds
             </a>
             <div class="tm-btn-row">
@@ -215,14 +225,19 @@ include __DIR__ . '/ep_header.php';
         <strong id="tmMobileTotal">₱0</strong>
         <span id="tmMobileCount">0 / 11 components</span>
     </div>
-    <button type="button" class="tm-btn-primary" id="tmMobileSave"><i class="far fa-save" aria-hidden="true"></i> Save</button>
+    <div class="tm-mobile-actions">
+        <button type="button" class="tm-btn-outline" id="tmMobileSave" aria-label="Save build"><i class="far fa-save" aria-hidden="true"></i> Save</button>
+        <button type="button" class="tm-btn-primary" id="tmMobileCart"><i class="fas fa-cart-plus" aria-hidden="true"></i> Add to Cart</button>
+    </div>
 </div>
 
 <script>
 window.EP_CSRF = <?php echo json_encode($csrf); ?>;
 window.EP_TM_USER = <?php echo (int)($_SESSION['user_id'] ?? 0); ?>;
+window.EP_TM_CAN_SAVE = <?php echo $canSaveBuilds ? 'true' : 'false'; ?>;
+window.EP_TM_LOGIN_URL = <?php echo json_encode($buildLoginUrl); ?>;
 </script>
-<script src="tech_match.js?v=pcx-10" defer></script>
+<script src="tech_match.js?v=pcx-13" defer></script>
 
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>

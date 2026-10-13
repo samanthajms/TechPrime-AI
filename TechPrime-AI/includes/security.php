@@ -88,6 +88,15 @@ function ias_login_url(array $query = []): string {
     return ias_app_base_url() . '/login.php' . ($query ? '?' . http_build_query($query) : '');
 }
 
+/**
+ * Where a customer returns after logging in (login.php?next=...). Only a storefront page
+ * like "CLIENT/checkout.php" is accepted — anything else (other folders, URLs, queries) gives ''.
+ */
+function ias_safe_next($next): string {
+    $next = is_string($next) ? trim($next) : '';
+    return preg_match('#^CLIENT/[A-Za-z0-9_]+\.php$#', $next) ? $next : '';
+}
+
 // Idle session timeout. Keep it below session.gc_maxlifetime (1440 s in XAMPP's php.ini):
 // past that PHP may garbage-collect the session file first and the user loses the notice.
 const IAS_SESSION_IDLE_TIMEOUT = 900; // 15 minutes

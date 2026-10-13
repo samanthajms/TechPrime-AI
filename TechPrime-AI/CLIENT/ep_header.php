@@ -79,8 +79,8 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <?php if ($epShowPrimo): ?><link rel="stylesheet" href="primo.css?v=ux-10"><?php endif; ?>
     <?php if (!empty($extraHead)) echo $extraHead; ?>
     <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
-    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-17">
-    <link rel="stylesheet" href="ep_dark.css?v=dark-17">
+    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-18">
+    <link rel="stylesheet" href="ep_dark.css?v=dark-18">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">
@@ -109,7 +109,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
 $epPrimaryLinks = [
     ['href' => 'index.php', 'icon' => 'fa-home', 'label' => 'Home', 'active' => $epActive === 'home'],
     ['href' => 'shop.php', 'icon' => 'fa-store', 'label' => 'Shop Now', 'active' => $epActive === 'shop'],
-    ['href' => !empty($isLoggedIn) ? 'build_a_pc.php' : '../login.php', 'icon' => 'fa-desktop', 'label' => 'Build a PC',
+    ['href' => 'build_a_pc.php', 'icon' => 'fa-desktop', 'label' => 'Build a PC',
      'active' => $epActive === 'build_a_pc' || $epActive === 'saved_builds'],
 ];
 ?>
@@ -256,7 +256,7 @@ $epDrawerLinks = [
     ['href' => 'index.php', 'icon' => 'fa-home', 'label' => 'Home', 'active' => $epActive === 'home'],
     ['href' => 'shop.php', 'icon' => 'fa-store', 'label' => 'Shop Now', 'active' => $epActive === 'shop'],
     ['categories' => true],
-    ['href' => !empty($isLoggedIn) ? 'build_a_pc.php' : '../login.php', 'icon' => 'fa-desktop', 'label' => 'Build a PC', 'active' => $epActive === 'build_a_pc'],
+    ['href' => 'build_a_pc.php', 'icon' => 'fa-desktop', 'label' => 'Build a PC', 'active' => $epActive === 'build_a_pc'],
 ];
 if (!empty($isLoggedIn)) {
     $epDrawerLinks[] = ['href' => 'saved_builds.php', 'icon' => 'fa-folder-open', 'label' => 'Saved Builds', 'active' => $epActive === 'saved_builds'];

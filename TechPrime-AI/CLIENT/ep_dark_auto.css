@@ -974,6 +974,7 @@ html[data-theme="dark"] .tm-chip.is-type{color:#b0e097;background:#253419;border
 html[data-theme="dark"] .tm-btn-primary{border:0;background:var(--ep-yellow, #fed700);color:#1f2328}
 html[data-theme="dark"] .tm-btn-outline{border:1px solid #3a3e47;background:#131518;color:#d7d9dd}
 html[data-theme="dark"] .tm-btn-outline:hover{border-color:var(--tm-green);color:#b0e097}
+html[data-theme="dark"] .tm-btn-primary.tm-btn-buy{background:var(--ep-green, #62b236);color:#fff}
 html[data-theme="dark"] .tm-btn-danger{color:#dc2626;border-color:#652b2b}
 html[data-theme="dark"] .tm-btn-danger:hover{color:#e77777;border-color:#dc2626;background:#181b1f}
 html[data-theme="dark"] .tm-compare-slot{border:1px dashed #3a3e47;background:#181a1e;color:var(--tm-muted)}

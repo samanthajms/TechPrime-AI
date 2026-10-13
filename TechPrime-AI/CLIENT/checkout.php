@@ -9,7 +9,7 @@ $db = getDbConnection();
 checkSessionTimeout();
 
 if (empty($_SESSION['user_id'])) {
-    header('Location: ../login.php');
+    header('Location: ../login.php?next=' . urlencode('CLIENT/checkout.php'));
     exit;
 }
 

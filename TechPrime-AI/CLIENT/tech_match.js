@@ -94,6 +94,12 @@
         try {
             localStorage.removeItem(LEGACY_DRAFT_KEY);
             var raw = localStorage.getItem(draftKey());
+            /* A build started as a guest (user 0) carries over once the shopper logs in. */
+            var guestKey = LEGACY_DRAFT_KEY + '_0';
+            if (!raw && Number(window.EP_TM_USER) > 0) {
+                raw = localStorage.getItem(guestKey);
+                if (raw) localStorage.removeItem(guestKey);
+            }
             if (!raw) return;
             var d = JSON.parse(raw);
             if (!d || typeof d !== 'object') return;
@@ -1093,11 +1099,27 @@
         );
     }
 
+    /* Guests (and staff accounts) can build freely; saving and buying need a customer account. */
+    function needsAccount(title, lead) {
+        if (window.EP_TM_CAN_SAVE !== false) return false;
+        var loginUrl = window.EP_TM_LOGIN_URL || '../login.php';
+        openDialog(
+            '<h3 id="tmDialogTitle">' + escapeHtml(title) + '</h3>' +
+            '<p class="tm-save-lead">' + escapeHtml(lead) + ' Your current parts stay in the builder while you log in.</p>' +
+            '<div class="tm-save-actions">' +
+            '<a class="tm-save-cancel" href="../register.php">Create account</a>' +
+            '<a class="tm-save-confirm" href="' + escapeHtml(loginUrl) + '"><i class="fas fa-sign-in-alt" aria-hidden="true"></i> Log in</a>' +
+            '</div>'
+        );
+        return true;
+    }
+
     function openSaveNameModal() {
         if (filledCount() <= 0) {
             alertUi('Select at least one component before saving.', 'info');
             return;
         }
+        if (needsAccount('Log in to save your build', 'Saving a build needs a customer account.')) return;
         var issues = validateCurrentBuild();
         if (issues.length) {
             alertUi('This build has incompatible components:\n• ' + issues.slice(0, 5).join('\n• '), 'error');
@@ -1209,11 +1231,99 @@
             });
     }
 
+    /* ---------- Add to Cart / Buy Now (whole build, no saving needed) ---------- */
+
+    var buying = false;
+
+    function purchaseBuild(action) {
+        if (buying) return;
+        if (filledCount() <= 0) {
+            alertUi('Select at least one component first.', 'info');
+            return;
+        }
+        if (action === 'buy_now'
+            ? needsAccount('Log in to buy this build', 'Buying a build needs a customer account. After logging in, click Buy Now again.')
+            : needsAccount('Log in to add this build to your cart', 'Adding a build to your cart needs a customer account. After logging in, click Add to Cart again.')) {
+            return;
+        }
+        var issues = validateCurrentBuild();
+        if (issues.length) {
+            alertUi('This build has incompatible components:\n• ' + issues.slice(0, 5).join('\n• '), 'error');
+            return;
+        }
+        var label = action === 'buy_now' ? 'Buy Now' : 'Add to Cart';
+        var missing = missingNames();
+        if (!missing.length) {
+            sendBuildPurchase(action);
+            return;
+        }
+        openDialog(
+            '<h3 id="tmDialogTitle">Your build is not complete</h3>' +
+            '<p class="tm-save-lead">Still missing: ' + escapeHtml(missing.join(', ')) +
+            '. You can still continue with the ' + filledCount() + ' part' + (filledCount() === 1 ? '' : 's') + ' you picked.</p>' +
+            '<div class="tm-save-actions">' +
+            '<button type="button" class="tm-save-cancel" data-dialog-cancel>Keep building</button>' +
+            '<button type="button" class="tm-save-confirm" data-dialog-ok>' + escapeHtml(label) + ' anyway</button>' +
+            '</div>',
+            function (overlay, close) {
+                var ok = overlay.querySelector('[data-dialog-ok]');
+                ok.focus();
+                ok.onclick = function () { close(); sendBuildPurchase(action); };
+            }
+        );
+    }
+
+    function sendBuildPurchase(action) {
+        var btns = [$('tmBuildToCart'), $('tmBuildBuyNow'), $('tmMobileCart')].filter(Boolean);
+        var components = {};
+        Object.keys(build).forEach(function (slot) {
+            if (build[slot] && build[slot].id) components[slot] = Number(build[slot].id);
+        });
+        buying = true;
+        btns.forEach(function (b) { b.disabled = true; });
+        var done = function () {
+            buying = false;
+            btns.forEach(function (b) { b.disabled = false; });
+        };
+        fetch('build_cart_api.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ action: action, components: components, csrf_token: window.EP_CSRF || '' })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data || !data.ok) {
+                    done();
+                    alertUi((data && data.message) || 'Something went wrong. Please try again.', 'error');
+                    return;
+                }
+                if (action === 'buy_now') {
+                    window.location.href = data.redirect || 'checkout.php';
+                    return;
+                }
+                done();
+                if (data.cart && typeof window.epUpdateCartPreview === 'function') window.epUpdateCartPreview(data.cart);
+                alertUi(data.message || 'Added to cart.', 'success', {
+                    title: 'Build added to cart',
+                    actions: [
+                        { label: 'Keep Building' },
+                        { label: 'View Cart', href: 'cart.php', primary: true }
+                    ]
+                });
+            })
+            .catch(function () {
+                done();
+                alertUi('Something went wrong. Please try again.', 'error');
+            });
+    }
+
     /* ---------- Saved builds (Load / Compare) ---------- */
 
     var savedCache = null;
 
     function fetchSavedBuilds() {
+        if (window.EP_TM_CAN_SAVE === false) return Promise.resolve([]);
         if (savedCache) return Promise.resolve(savedCache);
         return fetch('saved_builds_api.php?action=list', { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
@@ -1241,6 +1351,7 @@
     }
 
     function openLoadDialog() {
+        if (needsAccount('Log in to load saved builds', 'Saved builds are kept in your customer account.')) return;
         fetchSavedBuilds()
             .then(function (builds) {
                 openDialog(
@@ -1629,6 +1740,10 @@
         [$('tmSaveBuild'), $('tmMobileSave')].forEach(function (btn) {
             if (btn) btn.addEventListener('click', openSaveNameModal);
         });
+        [$('tmBuildToCart'), $('tmMobileCart')].forEach(function (btn) {
+            if (btn) btn.addEventListener('click', function () { purchaseBuild('add_to_cart'); });
+        });
+        if ($('tmBuildBuyNow')) $('tmBuildBuyNow').addEventListener('click', function () { purchaseBuild('buy_now'); });
         if ($('tmShareBuild')) $('tmShareBuild').addEventListener('click', shareBuild);
         if ($('tmLoadBuild')) $('tmLoadBuild').addEventListener('click', openLoadDialog);
         if ($('tmReportBuild')) $('tmReportBuild').addEventListener('click', reportBuild);

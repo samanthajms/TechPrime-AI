@@ -8,6 +8,9 @@ $connection = getDbConnection();
 
 $error   = $_GET['error']   ?? '';
 $success = $_GET['success'] ?? '';
+// Storefront page to return to after a customer logs in (e.g. checkout, Build a PC).
+$next    = ias_safe_next($_POST['next'] ?? $_GET['next'] ?? '');
+$nextQs  = $next !== '' ? '&next=' . urlencode($next) : '';
 
 // One-shot details left by checkSessionTimeout(); shown on its ?expired=1 redirect.
 $sessionExpired = $_SESSION['session_expired'] ?? [];
@@ -22,12 +25,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = $q->fetch(PDO::FETCH_ASSOC);
 
     if (!$user) {
-        header("Location: login.php?error=" . urlencode("Invalid email or password."));
+        header("Location: login.php?error=" . urlencode("Invalid email or password.") . $nextQs);
         exit;
     }
 
     if ((int)$user['is_locked'] === 1) {
-        header("Location: login.php?error=" . urlencode("Account locked. Contact support."));
+        header("Location: login.php?error=" . urlencode("Account locked. Contact support.") . $nextQs);
         exit;
     }
 
@@ -43,10 +46,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $s = $connection->prepare("INSERT INTO locked_accounts (user_id, reason) VALUES (?, '3 failed login attempts')");
             $s->execute([$user['id']]);
             logActivity($connection, $user['id'], 'account_locked', 'Account locked after 3 failed attempts');
-            header("Location: login.php?error=" . urlencode("Account locked after 3 failed attempts. Contact support."));
+            header("Location: login.php?error=" . urlencode("Account locked after 3 failed attempts. Contact support.") . $nextQs);
         } else {
             $remaining = 3 - $failed;
-            header("Location: login.php?error=" . urlencode("Invalid email or password."));
+            header("Location: login.php?error=" . urlencode("Invalid email or password.") . $nextQs);
         }
         exit;
     }
@@ -57,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ((int)$user['is_verified'] === 0) {
         // Right password, not activated yet: let this browser resend the activation email (register.php?activate=1).
         $_SESSION['activation_pending'] = ['user_id' => (int)$user['id'], 'email' => (string)$user['email']];
-        header("Location: login.php?error=" . urlencode("Account not activated. Please check your Gmail."));
+        header("Location: login.php?error=" . urlencode("Account not activated. Please check your Gmail.") . $nextQs);
         exit;
     }
 
@@ -79,10 +82,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     logActivity($connection, $user['id'], 'login_success', 'User logged in');
-    redirectByRole($user['role']);
+    redirectByRole($user['role'], $next);
 }
 
-function redirectByRole($role) {
+function redirectByRole($role, $next = '') {
     switch ($role) {
         case 'admin':
             header("Location: ADMIN/admin_dashboard.php");
@@ -106,7 +109,7 @@ function redirectByRole($role) {
             header("Location: login.php?error=" . urlencode("The Technician role has been removed. Contact an administrator."));
             break;
         default:
-            header("Location: CLIENT/index.php");
+            header('Location: ' . ($next !== '' ? $next : 'CLIENT/index.php'));
             break;
     }
     exit;
@@ -326,7 +329,7 @@ function redirectByRole($role) {
         <div class="auth-form-inner">
             <p class="form-eyebrow reveal">Secure Access Portal</p>
             <h1 class="reveal" style="--d:1">Welcome!</h1>
-            <p class="subtitle reveal" style="--d:2">Enter your details below</p>
+            <p class="subtitle reveal" style="--d:2"><?php echo $next !== '' ? 'Log in to continue where you left off' : 'Enter your details below'; ?></p>
 
             <?php if ($error): ?>
                 <div class="error-box"><i class="fas fa-exclamation-triangle"></i><span><?php echo htmlspecialchars($error); ?><?php if (!empty($_SESSION['activation_pending']) && stripos($error, 'not activated') !== false): ?> <a href="register.php?activate=1" style="color:inherit;text-decoration:underline;white-space:nowrap">Resend activation email</a><?php endif; ?></span></div>
@@ -337,6 +340,7 @@ function redirectByRole($role) {
             <?php endif; ?>
 
             <form action="login.php" method="POST" id="loginForm">
+                <?php if ($next !== ''): ?><input type="hidden" name="next" value="<?php echo htmlspecialchars($next); ?>"><?php endif; ?>
                 <div class="field reveal" style="--d:3">
                     <label for="loginEmail">Email Address</label>
                     <div class="input-wrap">
@@ -361,6 +365,9 @@ function redirectByRole($role) {
 
             <div class="footer-link reveal" style="--d:6">
                 Need an account? <a href="register.php">Register here</a>
+            </div>
+            <div class="footer-link reveal" style="--d:7; margin-top: 10px;">
+                <a href="CLIENT/index.php"><i class="fas fa-arrow-left"></i> Back to shop</a>
             </div>
         </div>
     </div>
