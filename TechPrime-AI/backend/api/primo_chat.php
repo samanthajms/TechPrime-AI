@@ -285,7 +285,48 @@ function primo_phrase_keeps_facts(string $facts, string $phrased): bool
 }
 
 /**
- * General questions go to Groq. Product lookups stay on the item list.
+ * Shop talk and short greetings may go to Groq. Other topics get a fixed reply and are not sent.
+ */
+function primo_mentions_shop(string $message): bool
+{
+    return (bool) preg_match(
+        '/\b(easypc|easy\s*pc|oasis|pasig|rosario|techprime|pc|pcs|computer|laptop|desktop|monitor|keyboard|mouse|gpu|cpu|ram|memory|ssd|hdd|nvme|motherboard|mobo|psu|cooler|headset|headphone|webcam|printer|router|wifi|gaming|office|parts?|component|upgrade|specs?|specification|price|priced|cost|magkano|presyo|stock|stocks|warranty|build|socket|ddr4|ddr5|intel|amd|nvidia|ryzen|rtx|gtx|msi|asus|acer|lenovo|gigabyte|corsair|kingston|samsung|logitech)\b/i',
+        $message
+    );
+}
+
+function primo_is_off_topic(string $message): bool
+{
+    return (bool) preg_match(
+        '/\b(homework|assignment|essay|quiz|exam|algebra|calculus|photosynthesis|capital of|love advice|in love|crush|girlfriend|boyfriend|dating|relationship|joke|poem|movie|song|lyrics|weather|recipe|cook|cooking|president|celebrity|horoscope|translate)\b/i',
+        $message
+    );
+}
+
+function primo_is_shop_talk(string $message, array $turns): bool
+{
+    if (primo_is_off_topic($message)) {
+        return false;
+    }
+    if (primo_mentions_shop($message)) {
+        return true;
+    }
+    if (preg_match('/^(hi|hello|hey|yo|kamusta|good (morning|afternoon|evening)|thanks|thank you|salamat|bye|goodbye|paalam|see you|how are you|who are you|what can you (do|help(?: me)? with)|help)[\s!.?]*$/iu', trim($message))) {
+        return true;
+    }
+    if (mb_strlen(trim($message)) > 80) {
+        return false;
+    }
+    foreach (array_slice($turns, -4) as $turn) {
+        if (is_array($turn) && primo_mentions_shop((string) ($turn['content'] ?? ''))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Shop conversation goes to Groq. Product lookups stay on the item list.
  * Returns null when Groq is unavailable so the existing reply is used.
  */
 function primo_general_reply(string $message): ?string
@@ -296,6 +337,9 @@ function primo_general_reply(string $message): ?string
     $turns = $_SESSION['primo_chat'] ?? [];
     if (!is_array($turns)) {
         $turns = [];
+    }
+    if (!primo_is_shop_talk($message, $turns)) {
+        return "I'm only here for EasyPC and computer products. Ask me about a part, a PC, a price, or what's in stock.";
     }
     $messages = [];
     foreach (array_slice($turns, -6) as $turn) {

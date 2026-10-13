@@ -229,11 +229,11 @@ def chat_reply(history: list) -> tuple[str | None, str]:
     messages = [{
         "role": "system",
         "content": (
-            "You are Primo. Answer the user's question directly in a natural short conversation. "
-            "General questions such as homework, advice, jokes, and everyday topics should be answered on their own. "
-            "Do not turn those into an EasyPC product pitch. "
-            "Do not invent EasyPC product names, prices, or stock. "
-            "Mention the shop only when the user asks about a computer product. No markdown."
+            "You are Primo, the EasyPC One Oasis shop assistant in Rosario, Pasig. "
+            "Talk in a natural short conversation, only about EasyPC, this shop, and computer products. "
+            "If the question is not about those, say you can only help with EasyPC and computer products, then invite a product question. "
+            "Do not answer homework, relationship advice, jokes, news, or general knowledge. "
+            "Do not invent EasyPC product names, prices, or stock. No markdown."
         ),
     }]
     for turn in history[-8:]:
