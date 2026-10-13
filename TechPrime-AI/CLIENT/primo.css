@@ -155,7 +155,49 @@
     border-radius: 50%;
     background: var(--primo-green);
     box-shadow: 0 0 8px rgba(98, 178, 54, 0.95), 0 0 2px #fff;
-    transition: transform 0.18s ease, height 0.18s ease, opacity 0.18s ease;
+    transform-origin: center;
+    animation: primo-blink 4.6s ease-in-out infinite;
+    transition: height 0.18s ease, opacity 0.18s ease;
+}
+
+.primo-greet {
+    position: absolute;
+    right: calc(100% + 2px);
+    bottom: 118px;
+    width: max-content;
+    max-width: 168px;
+    margin: 0;
+    padding: 8px 12px;
+    background: #62b236;
+    color: #fff;
+    border: 1px solid #4b8b2a;
+    border-radius: 18px;
+    box-shadow: 0 8px 16px rgba(23, 33, 18, 0.14);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    pointer-events: auto;
+    z-index: 2;
+    transition: opacity 0.18s ease;
+}
+
+.primo-greet::after {
+    content: "";
+    position: absolute;
+    right: -5px;
+    bottom: 9px;
+    border-width: 5px 0 5px 6px;
+    border-style: solid;
+    border-color: transparent transparent transparent #62b236;
+}
+
+.primo-greet.is-swap {
+    opacity: 0;
+}
+
+.primo-root.is-chat-open .primo-greet,
+.primo-root.is-greet-away .primo-greet {
+    visibility: hidden;
 }
 
 .primo-mouth {
@@ -1526,6 +1568,11 @@
 }
 
 /* ---- Keyframes ---- */
+@keyframes primo-blink {
+    0%, 42%, 48%, 100% { transform: scaleY(1); }
+    45% { transform: scaleY(0.12); }
+}
+
 @keyframes primo-bob {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-6px); }
@@ -1627,6 +1674,9 @@
 
 @media (prefers-reduced-motion: reduce) {
     .primo-figure,
+    .primo-eye,
+    .primo-launcher-eye,
+    .primo-greet,
     .primo-antenna-tip,
     .primo-stage,
     .primo-panel,
@@ -1746,6 +1796,34 @@
     border-radius: 50%;
     background: var(--primo-green);
     box-shadow: 0 0 5px rgba(98, 178, 54, 0.9);
+    transform-origin: center;
+    animation: primo-blink 4.6s ease-in-out infinite;
+}
+
+.primo-root.is-compact .primo-greet {
+    right: 4px;
+    bottom: calc(var(--primo-size) + 6px);
+}
+
+.primo-root.is-compact .primo-greet::after {
+    right: 16px;
+    bottom: -6px;
+    border-width: 6px 5px 0 5px;
+    border-color: #62b236 transparent transparent transparent;
+}
+
+html[data-theme="dark"] .primo-greet {
+    background: #fff;
+    color: #171717;
+    border-color: #e4e8ea;
+}
+
+html[data-theme="dark"] .primo-greet::after {
+    border-color: transparent transparent transparent #fff;
+}
+
+html[data-theme="dark"] .primo-root.is-compact .primo-greet::after {
+    border-color: #fff transparent transparent transparent;
 }
 
 .primo-launcher-close {

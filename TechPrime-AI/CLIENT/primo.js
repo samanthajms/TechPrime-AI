@@ -590,6 +590,7 @@
     }
 
     function openChat() {
+        hideBubbleForChat();
         if (closeTimer) {
             window.clearTimeout(closeTimer);
             closeTimer = null;
@@ -626,6 +627,7 @@
             if (backdrop) backdrop.setAttribute('hidden', '');
         }, reduceMotion ? 0 : 380);
         if (mascot) mascot.focus({ preventScroll: true });
+        showThanksBubble();
     }
 
     function onMascotClick(e) {
@@ -1074,6 +1076,70 @@
     if (historyPanel) historyPanel.setAttribute('inert', '');
     setWide(readWidePref(), false);
     syncComposer();
+
+    var greet = document.getElementById('primoGreet');
+    var greetLines = [
+        "Hey, it's me Primo!",
+        "Can't find what you're looking for? Try me!",
+        "Need a price or what's in stock?",
+        "Building a PC? I can help.",
+        "Ask me about a laptop or a part."
+    ];
+    var thanksLines = [
+        "I hope you find what you're looking for!",
+        "Glad I could help. Come back anytime!",
+        "Thanks for stopping by. Happy building!"
+    ];
+    var greetAt = 0;
+    var thanksAt = 0;
+    var bubbleMode = 'greet';
+    var thanksTimer = null;
+    function showGreet() {
+        if (!greet || bubbleMode !== 'greet' || isChatOpen()) return;
+        greet.textContent = greetLines[greetAt % greetLines.length];
+        greetAt += 1;
+    }
+    function hideBubbleForChat() {
+        bubbleMode = 'hidden';
+        if (thanksTimer) {
+            window.clearTimeout(thanksTimer);
+            thanksTimer = null;
+        }
+        root.classList.add('is-greet-away');
+    }
+    function showThanksBubble() {
+        if (!greet) return;
+        root.classList.remove('is-greet-away');
+        bubbleMode = 'thanks';
+        if (thanksTimer) window.clearTimeout(thanksTimer);
+        greet.textContent = thanksLines[thanksAt % thanksLines.length];
+        thanksAt += 1;
+        thanksTimer = window.setTimeout(function () {
+            thanksTimer = null;
+            if (isChatOpen()) return;
+            bubbleMode = 'greet';
+            showGreet();
+        }, 30000);
+    }
+    if (greet) {
+        showGreet();
+        window.setInterval(function () {
+            if (!greet || bubbleMode !== 'greet' || isChatOpen()) return;
+            if (reduceMotion) {
+                showGreet();
+                return;
+            }
+            greet.classList.add('is-swap');
+            window.setTimeout(function () {
+                if (bubbleMode !== 'greet') {
+                    greet.classList.remove('is-swap');
+                    return;
+                }
+                showGreet();
+                greet.classList.remove('is-swap');
+            }, 180);
+        }, 30000);
+    }
 
     if (!reduceMotion) {
         function scheduleWink() {

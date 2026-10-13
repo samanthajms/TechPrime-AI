@@ -14,6 +14,7 @@ $primoGuest = empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'clie
 ?>
 <div id="primoRoot" class="primo-root is-collapsed<?php echo $primoCompact ? ' is-compact' : ''; ?>"<?php echo $primoGuest ? ' data-guest="1"' : ''; ?>>
     <div class="primo-stage">
+        <p class="primo-greet" id="primoGreet">Hey, it's me Primo!</p>
         <button type="button" class="primo-mascot" id="primoMascot" aria-label="Chat with Primo, AI Product Assistant" aria-expanded="false" aria-controls="primoPanel"<?php echo $primoCompact ? ' title="Chat with Primo"' : ''; ?>>
             <?php if ($primoCompact): ?>
             <span class="primo-launcher" aria-hidden="true">
@@ -159,4 +160,4 @@ $primoGuest = empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'clie
     </section>
 </div>
 <script>window.EP_CSRF = window.EP_CSRF || <?php echo json_encode($primoCsrf); ?>;</script>
-<script src="primo.js?v=ux-4" defer></script>
+<script src="primo.js?v=ux-6" defer></script>
