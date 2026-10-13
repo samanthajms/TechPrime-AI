@@ -76,11 +76,11 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <?php if ($epShowPrimo): ?><link rel="stylesheet" href="primo.css?v=ux-5"><?php endif; ?>
+    <?php if ($epShowPrimo): ?><link rel="stylesheet" href="primo.css?v=ux-6"><?php endif; ?>
     <?php if (!empty($extraHead)) echo $extraHead; ?>
     <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
-    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-16">
-    <link rel="stylesheet" href="ep_dark.css?v=dark-reviews-1">
+    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-17">
+    <link rel="stylesheet" href="ep_dark.css?v=dark-17">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">

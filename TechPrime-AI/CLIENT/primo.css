@@ -17,12 +17,16 @@
 }
 
 .primo-root {
-    --primo-green: var(--ep-green, #62b236);
-    --primo-green-dark: var(--ep-green-dark, #4b8b2a);
-    --primo-green-light: var(--ep-green-light, #eef8e6);
-    --primo-yellow: var(--ep-yellow, #fed700);
-    --primo-black: var(--ep-black, #171717);
-    --primo-soft: var(--ep-black-soft, #1e1f26);
+    color-scheme: light;
+    color: #171717;
+    --ep-border: #e4e8ea;
+    --ep-green-light: #eef8e6;
+    --primo-green: #62b236;
+    --primo-green-dark: #4b8b2a;
+    --primo-green-light: #eef8e6;
+    --primo-yellow: #fed700;
+    --primo-black: #171717;
+    --primo-soft: #1e1f26;
     --primo-size: 108px;
     position: fixed;
     left: auto;

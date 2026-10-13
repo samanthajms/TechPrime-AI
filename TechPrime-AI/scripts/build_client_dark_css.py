@@ -40,8 +40,8 @@ IDENTITY_SELECTORS = re.compile(
     r'|\.ep-theme-toggle|\.ep-pnav|\.ep-account'
 )
 
-# The Build a PC case preview (.pcx) is always dark, so it gets no dark twin at all.
-SKIP_SELECTORS = re.compile(r'^\s*(\.pcx|\[data-view)')
+# The Build a PC case preview (.pcx) stays dark. Primo stays on its own light colours.
+SKIP_SELECTORS = re.compile(r'^\s*(\.pcx|\[data-view|\.primo)')
 
 # --------------------------------------------------------------------------- CSS parsing
 
@@ -417,9 +417,12 @@ def main():
         '   Do not edit by hand: change the generator (or CLIENT/ep_dark.css for manual fixes) and re-run it. */',
     ]
     for name, nodes in parsed:
+        rules = convert(nodes)
+        if not rules:
+            continue
         out.append('')
         out.append('/* ---- ' + name + ' ---- */')
-        out.extend(convert(nodes))
+        out.extend(rules)
     with open(OUT, 'w', encoding='utf-8', newline='\n') as f:
         f.write('\n'.join(out) + '\n')
     print('wrote', OUT, os.path.getsize(OUT), 'bytes')
