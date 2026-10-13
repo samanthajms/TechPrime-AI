@@ -1672,6 +1672,10 @@ body {
     --ep-card-bg: #ffffff;
     --ep-border: #e4e8ea;
     --ep-footer-bg: #050505;
+    /* Motion: strong custom curves (the built-in ease/ease-out are too soft) */
+    --ep-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ep-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ep-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 html { height: 100%; }
@@ -1889,7 +1893,7 @@ html { height: 100%; }
     background: rgba(255, 255, 255, 0.55);
     transform: scaleY(0);
     transform-origin: bottom;
-    transition: transform 0.18s ease;
+    transition: transform 180ms var(--ep-ease-out);
 }
 .ep-pnav-link:hover::after { transform: scaleY(1); }
 .ep-pnav-link.active::after {
@@ -1924,7 +1928,7 @@ html { height: 100%; }
     display: grid;
     place-items: center;
     font-family: inherit;
-    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 160ms var(--ep-ease-out);
 }
 .ep-nav-item-icon {
     position: relative;
@@ -1977,7 +1981,7 @@ html { height: 100%; }
 .ep-theme-toggle .ep-theme-when-dark { display: none; }
 html[data-theme="dark"] .ep-theme-toggle .ep-theme-when-light { display: none; }
 html[data-theme="dark"] .ep-theme-toggle .ep-theme-when-dark { display: inline; }
-.ep-theme-toggle .ep-nav-item-icon i { transition: transform 0.35s ease; }
+.ep-theme-toggle .ep-nav-item-icon i { transition: transform 250ms var(--ep-ease-out); }
 .ep-theme-toggle:hover .ep-nav-item-icon i { transform: rotate(-20deg); }
 @media (prefers-reduced-motion: reduce) {
     .ep-theme-toggle .ep-nav-item-icon i { transition: none; }
@@ -2327,7 +2331,7 @@ html[data-theme="dark"] .ep-theme-toggle .ep-theme-when-dark { display: inline; 
     text-align: center;
     text-decoration: none;
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: transform 200ms var(--ep-ease-out), box-shadow 200ms ease, border-color 200ms ease;
 }
 .ep-catrail-tile-link:hover {
     transform: translateY(-4px);
@@ -2729,9 +2733,9 @@ html[data-theme="dark"] .ep-theme-toggle .ep-theme-when-dark { display: inline; 
     font-weight: 800;
     text-decoration: none;
     cursor: pointer;
-    transition: background .15s ease, transform .1s ease;
+    transition: background 150ms ease, transform 160ms var(--ep-ease-out);
 }
-.epc-btn:active { transform: translateY(1px); }
+.epc-btn:active { transform: scale(0.97); }
 .epc-btn-block { width: 100%; }
 .epc-btn-block + .epc-btn-block { margin-top: 10px; }
 .epc-btn-primary { background: var(--ep-green); color: #fff; }
@@ -2816,7 +2820,7 @@ html[data-theme="dark"] .ep-theme-toggle .ep-theme-when-dark { display: inline; 
     font-size: 16px;
     display: grid;
     place-items: center;
-    transition: all 0.2s ease;
+    transition: background 150ms ease, color 150ms ease, border-color 150ms ease, transform 160ms var(--ep-ease-out);
 }
 .ep-arrow:hover { background: var(--ep-green); color: #fff; border-color: var(--ep-green); }
 
@@ -2826,7 +2830,7 @@ html[data-theme="dark"] .ep-theme-toggle .ep-theme-when-dark { display: inline; 
     border: 1px solid var(--ep-border);
     border-radius: 14px;
     padding: 14px;
-    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    transition: transform 220ms var(--ep-ease-out), box-shadow 220ms ease, border-color 200ms ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 .ep-product-card:hover {
@@ -2841,7 +2845,7 @@ html[data-theme="dark"] .ep-theme-toggle .ep-theme-when-dark { display: inline; 
     border-radius: 10px;
     background: #e9ebec;
     margin-bottom: 10px;
-    transition: transform 0.3s ease;
+    transition: transform 300ms var(--ep-ease-out);
 }
 .ep-product-card:hover .ep-product-img { transform: scale(1.02); }
 .ep-product-name {
@@ -2908,7 +2912,7 @@ a.ep-product-name:hover { color: var(--ep-green-dark); }
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
+    transition: background 150ms ease, border-color 150ms ease, transform 160ms var(--ep-ease-out);
 }
 .ep-cart-icon:hover { background: var(--ep-yellow); border-color: var(--ep-yellow); transform: scale(1.05); }
 .ep-buy-btn,
@@ -2923,7 +2927,7 @@ a.ep-product-name:hover { color: var(--ep-green-dark); }
     padding: 10px 8px;
     border-radius: 10px;
     cursor: pointer;
-    transition: background 0.2s ease, transform 0.2s ease;
+    transition: background 150ms ease, transform 160ms var(--ep-ease-out);
 }
 .ep-buy-btn:hover,
 .ep-view-btn:hover { background: var(--ep-green-dark); transform: translateY(-1px); }
@@ -3685,10 +3689,10 @@ a.ep-product-name:hover { color: var(--ep-green-dark); }
     padding: 0;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(10px) scale(0.98);
+    transform: translateY(-6px) scale(0.97);
     transform-origin: top right;
-    /* Closing waits ~150ms so moving the mouse from the icon to the panel doesn't flicker it shut */
-    transition: opacity 0.18s ease 0.15s, transform 0.18s ease 0.15s, visibility 0s linear 0.33s;
+    /* Opens on click, so it closes at once; exit is quicker than the entrance */
+    transition: opacity 120ms ease, transform 120ms var(--ep-ease-out), visibility 0s linear 120ms;
     z-index: 1200;
 }
 /* Invisible bridge over the gap so the pointer can travel from icon to panel */
@@ -3719,7 +3723,7 @@ a.ep-product-name:hover { color: var(--ep-green-dark); }
     opacity: 1;
     visibility: visible;
     transform: none;
-    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s;
+    transition: opacity 160ms var(--ep-ease-out), transform 200ms var(--ep-ease-out), visibility 0s;
 }
 .ep-cart-wrap.is-open > .ep-nav-item:not(.active) {
     background: #fff;
@@ -3824,7 +3828,7 @@ a.ep-product-name:hover { color: var(--ep-green-dark); }
     font-size: 13.5px;
     font-weight: 700;
     text-decoration: none;
-    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    transition: background 150ms ease, color 150ms ease, transform 160ms var(--ep-ease-out), box-shadow 150ms ease;
 }
 .ep-cart-dd-btn:hover { background: var(--ep-green-light); transform: translateY(-1px); }
 .ep-cart-dd-btn.is-primary { background: var(--ep-green); color: #fff; }
@@ -3882,9 +3886,9 @@ a.ep-product-name:hover { color: var(--ep-green-dark); }
     box-shadow: 0 18px 44px rgba(15, 23, 42, 0.2);
     opacity: 0;
     visibility: hidden;
-    transform: translateY(10px) scale(0.98);
+    transform: translateY(-6px) scale(0.97);
     transform-origin: top right;
-    transition: opacity 0.18s ease 0.15s, transform 0.18s ease 0.15s, visibility 0s linear 0.33s;
+    transition: opacity 120ms ease, transform 120ms var(--ep-ease-out), visibility 0s linear 120ms;
     z-index: 1200;
 }
 .ep-notif-dropdown::before {
@@ -3913,7 +3917,7 @@ a.ep-product-name:hover { color: var(--ep-green-dark); }
     opacity: 1;
     visibility: visible;
     transform: none;
-    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s;
+    transition: opacity 160ms var(--ep-ease-out), transform 200ms var(--ep-ease-out), visibility 0s;
 }
 .ep-notif-wrap.is-open > .ep-nav-item:not(.active) {
     background: #fff;
@@ -4344,7 +4348,7 @@ a.ep-notif-main { cursor: pointer; }
     border-radius: 10px;
     padding: 13px 30px;
     text-decoration: none;
-    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    transition: background 150ms ease, transform 160ms var(--ep-ease-out), box-shadow 200ms ease;
 }
 .ep-btn-primary { background: var(--ep-green); color: #fff; }
 .ep-btn-primary:hover {
@@ -4706,8 +4710,8 @@ body.ep-tm-modal-open { overflow: hidden; }
     box-sizing: border-box;
     cursor: pointer;
     box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 2px 6px rgba(28, 43, 22, 0.04);
-    transition: background 0.22s ease, border-color 0.22s ease, color 0.22s ease,
-                box-shadow 0.22s ease, transform 0.18s ease;
+    transition: background 200ms ease, border-color 200ms ease, color 200ms ease,
+                box-shadow 200ms ease, transform 160ms var(--ep-ease-out);
 }
 .ep-shop-cat-btn:hover {
     border-color: rgba(97, 178, 54, 0.65);
@@ -5651,7 +5655,7 @@ body.ep-tm-modal-open { overflow: hidden; }
     border-radius: 18px;
     overflow: hidden;
     box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
-    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    transition: transform 220ms var(--ep-ease-out), box-shadow 220ms ease, border-color 200ms ease;
 }
 .ep-wish-card:hover {
     transform: translateY(-5px);
@@ -5670,7 +5674,7 @@ body.ep-tm-modal-open { overflow: hidden; }
     object-fit: contain;
     background: #f4f6f7;
     display: block;
-    transition: transform 0.35s ease;
+    transition: transform 300ms var(--ep-ease-out);
 }
 .ep-wish-card:hover .ep-wish-card-media img { transform: scale(1.04); }
 .ep-wish-card-heart {
@@ -5814,7 +5818,7 @@ body.ep-tm-modal-open { overflow: hidden; }
     height: 100%;
     object-fit: contain;
     padding: 24px;
-    transition: transform 0.25s ease;
+    transition: transform 280ms var(--ep-ease-out);
 }
 .ep-pd-stage.is-zoomed img { transform: scale(2); }
 .ep-pd-zoom-hint {
@@ -5987,7 +5991,7 @@ body.ep-tm-modal-open { overflow: hidden; }
     border-radius: 12px;
     font: 700 15px 'Poppins', sans-serif;
     cursor: pointer;
-    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    transition: background 150ms ease, transform 160ms var(--ep-ease-out), box-shadow 200ms ease;
 }
 .ep-pd-btn-cart { background: var(--ep-green); color: #fff; }
 .ep-pd-btn-cart:hover:not(:disabled) { background: var(--ep-green-dark); box-shadow: 0 6px 16px rgba(75, 139, 42, 0.28); transform: translateY(-1px); }
@@ -6587,6 +6591,7 @@ select.ep-form-control option { color: #171717; }
         animation: epDrawerFade 0.2s ease;
     }
     .ep-drawer-backdrop[hidden] { display: none; }
+    .ep-drawer-backdrop.is-closing { opacity: 0; pointer-events: none; transition: opacity 220ms ease; }
 
     .ep-drawer {
         display: flex;
@@ -6603,12 +6608,12 @@ select.ep-form-control option { color: #171717; }
         overscroll-behavior: contain;
         transform: translateX(-100%);
         visibility: hidden;
-        transition: transform 0.3s ease, visibility 0s linear 0.3s;
+        transition: transform 220ms var(--ep-ease-drawer), visibility 0s linear 220ms;
     }
     .ep-drawer.open {
         transform: translateX(0);
         visibility: visible;
-        transition: transform 0.3s ease, visibility 0s;
+        transition: transform 340ms var(--ep-ease-drawer), visibility 0s;
     }
 
     .ep-drawer-head {
@@ -7775,4 +7780,94 @@ a.pf-item-name:focus-visible {
     .ep-legal-contact { padding: 18px; }
     .ep-legal-contact-actions, .ep-legal-contact-btn { width: 100%; }
     .ep-legal-contact-btn { justify-content: center; }
+}
+/* =====================================================================
+   Motion polish (client storefront)
+   - Pressables scale to 0.97 on :active so every tap feels heard.
+   - Hover lifts only run on devices with a real pointer (no sticky
+     hover after a tap on phones).
+   - Reduced motion keeps colour feedback, drops movement.
+   ===================================================================== */
+
+/* Pressables that had no transform transition yet */
+.ep-sort-btn,
+.ep-page-link { transition: background 150ms ease, color 150ms ease, border-color 150ms ease, transform 160ms var(--ep-ease-out); }
+.ep-wish-btn,
+.ep-pd-wish,
+.ep-pd-qty button,
+.ep-notif-pager-btn,
+.ep-drawer-close,
+.ep-drawer-auth-btn,
+.ep-back-btn { transition: background 150ms ease, color 150ms ease, transform 160ms var(--ep-ease-out); }
+.ep-menu-btn { transition: background 0.2s ease, transform 160ms var(--ep-ease-out); }
+.pf-btn { transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 160ms var(--ep-ease-out); }
+
+/* Touch screens: a tap must not leave a card or button "lifted" */
+@media (hover: none) {
+    .ep-product-card:hover,
+    .ep-wish-card:hover,
+    .ep-catrail-tile-link:hover,
+    .ep-shop-cat-btn:hover,
+    .ep-shop-cat-btn.active:hover,
+    .ep-btn-primary:hover,
+    .ep-buy-btn:hover,
+    .ep-view-btn:hover,
+    .ep-cart-icon:hover,
+    .ep-cart-dd-btn:hover,
+    .ep-cat-rail-arrow:hover:not(:disabled),
+    .ep-theme-toggle:hover .ep-nav-item-icon i,
+    .ep-pd-btn-cart:hover:not(:disabled),
+    .ep-pd-btn-buy:hover:not(:disabled) { transform: none; }
+    .ep-shop-cat-btn.active { transform: none; }
+    .ep-product-card:hover .ep-product-img,
+    .ep-wish-card:hover .ep-wish-card-media img,
+    .ep-catrail-tile-link:hover .ep-catrail-tile-media img { transform: none; }
+}
+
+/* Press feedback (after the hover rules so it wins while the button is held) */
+.ep-btn:active,
+.ep-btn-primary:active,
+.ep-buy-btn:active,
+.ep-view-btn:active,
+.ep-cart-icon:active,
+.ep-cart-dd-btn:active,
+.ep-sort-btn:active,
+.ep-page-link:active,
+.ep-notif-pager-btn:active,
+.ep-arrow:active,
+.ep-wish-btn:active,
+.ep-pd-wish:active,
+.ep-back-btn:active,
+.ep-menu-btn:active,
+.ep-drawer-close:active,
+.ep-drawer-auth-btn:active,
+.pf-btn:active,
+.ep-shop-cat-btn:active,
+.ep-shop-cat-btn.active:active,
+.ep-nav-item:active,
+.ep-cart-wrap.is-open > .ep-nav-item:not(.active):active,
+.ep-notif-wrap.is-open > .ep-nav-item:not(.active):active { transform: scale(0.97); }
+.ep-pd-btn:active:not(:disabled),
+.ep-cat-rail-arrow:active:not(:disabled) { transform: scale(0.97); }
+.ep-pd-qty button:active { transform: scale(0.92); }   /* small target: a touch more travel */
+
+@media (prefers-reduced-motion: reduce) {
+    .ep-product-card:hover,
+    .ep-wish-card:hover,
+    .ep-catrail-tile-link:hover,
+    .ep-shop-cat-btn:hover,
+    .ep-shop-cat-btn.active,
+    .ep-shop-cat-btn.active:hover,
+    .ep-btn-primary:hover,
+    .ep-buy-btn:hover,
+    .ep-view-btn:hover,
+    .ep-cart-icon:hover,
+    .ep-cart-dd-btn:hover,
+    .ep-pd-btn-cart:hover:not(:disabled),
+    .ep-pd-btn-buy:hover:not(:disabled),
+    .ep-product-card:hover .ep-product-img,
+    .ep-wish-card:hover .ep-wish-card-media img { transform: none; }
+    /* Popovers and the drawer: fade only, no travel */
+    .ep-cart-dropdown,
+    .ep-notif-dropdown { transform: none; }
 }

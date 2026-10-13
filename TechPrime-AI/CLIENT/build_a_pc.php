@@ -21,7 +21,7 @@ $isHomePage = false;
 $pageTitle = 'Build a PC';
 $csrf = generateCsrfToken();
 
-$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-11">';
+$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-12">';
 
 include __DIR__ . '/ep_header.php';
 ?>

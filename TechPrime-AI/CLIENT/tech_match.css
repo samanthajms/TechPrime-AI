@@ -1101,8 +1101,10 @@
     align-items: center;
     justify-content: center;
     gap: 7px;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, filter 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, filter 0.15s ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
+.tm-btn-primary:active:not(:disabled),
+.tm-btn-outline:active:not(:disabled) { transform: scale(0.97); }
 .tm-btn-primary { border: 0; background: var(--ep-yellow, #fed700); color: #1f2328; }
 .tm-btn-primary:hover { filter: brightness(0.96); }
 .tm-btn-outline { border: 1px solid #d7dbe0; background: #fff; color: #1f2328; }
@@ -1172,11 +1174,11 @@ a.tm-btn-outline { box-sizing: border-box; text-decoration: none; }
     flex-direction: column;
     transform: translateX(100%);
     visibility: hidden;
-    transition: transform 0.25s ease, visibility 0s linear 0.25s;
+    transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 200ms;
     font-family: 'Poppins', 'Inter', Arial, sans-serif;
     color: #1f2328;
 }
-.tm-drawer.is-open { transform: none; visibility: visible; transition: transform 0.25s ease; }
+.tm-drawer.is-open { transform: none; visibility: visible; transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1); }
 .tm-drawer-head {
     display: flex;
     align-items: center;
@@ -1356,7 +1358,9 @@ a.tm-btn-outline { box-sizing: border-box; text-decoration: none; }
     padding: 7px 12px;
     cursor: pointer;
     white-space: nowrap;
+    transition: background 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
+.tm-select-btn:active:not(:disabled) { transform: scale(0.95); }
 .tm-select-btn:hover { background: var(--ep-green-dark, #4b8b2a); }
 .tm-select-btn:disabled { background: #d1d5db; cursor: not-allowed; }
 .tm-select-btn.is-current { background: #eef8e6; color: var(--ep-green-dark, #4b8b2a); }

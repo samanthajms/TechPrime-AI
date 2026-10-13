@@ -71,12 +71,12 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         /* Apply the saved theme before the stylesheets load so dark mode never flashes white. */
         try { if (localStorage.getItem('ep_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
     </script>
-    <link rel="stylesheet" href="styles.css?v=footer-2">
+    <link rel="stylesheet" href="styles.css?v=motion-1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <?php if ($epShowPrimo): ?><link rel="stylesheet" href="primo.css?v=ux-10"><?php endif; ?>
+    <?php if ($epShowPrimo): ?><link rel="stylesheet" href="primo.css?v=ux-11"><?php endif; ?>
     <?php if (!empty($extraHead)) echo $extraHead; ?>
     <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
     <link rel="stylesheet" href="ep_dark_auto.css?v=dark-18">
@@ -386,6 +386,7 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
                 function (el) { return el.offsetParent !== null; }
             );
         };
+        var backdropTimer = null;
         var openDrawer = function () {
             if (!drawerMq.matches) return;
             // Close header popups so they don't sit on top of the drawer.
@@ -396,7 +397,11 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
 
             drawer.classList.add('open');
             drawer.setAttribute('aria-hidden', 'false');
-            if (drawerBackdrop) drawerBackdrop.hidden = false;
+            if (drawerBackdrop) {
+                clearTimeout(backdropTimer);
+                drawerBackdrop.classList.remove('is-closing');
+                drawerBackdrop.hidden = false;
+            }
             document.documentElement.classList.add('ep-drawer-open');
             menuBtn.setAttribute('aria-expanded', 'true');
             if (drawerClose) drawerClose.focus({ preventScroll: true });
@@ -405,7 +410,15 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
             if (!drawer.classList.contains('open')) return;
             drawer.classList.remove('open');
             drawer.setAttribute('aria-hidden', 'true');
-            if (drawerBackdrop) drawerBackdrop.hidden = true;
+            if (drawerBackdrop) {
+                // Fade the backdrop out alongside the drawer instead of removing it at once.
+                drawerBackdrop.classList.add('is-closing');
+                clearTimeout(backdropTimer);
+                backdropTimer = setTimeout(function () {
+                    drawerBackdrop.hidden = true;
+                    drawerBackdrop.classList.remove('is-closing');
+                }, 220);
+            }
             document.documentElement.classList.remove('ep-drawer-open');
             menuBtn.setAttribute('aria-expanded', 'false');
             if (returnFocus) menuBtn.focus({ preventScroll: true });

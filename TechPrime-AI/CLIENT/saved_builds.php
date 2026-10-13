@@ -97,7 +97,9 @@ $extraHead = '<style>
   background: var(--ep-green, #62b236); color: #fff; text-decoration: none;
   border-radius: 12px; padding: 11px 18px; font-size: 13.5px; font-weight: 800;
   box-shadow: 0 6px 16px rgba(75,139,42,0.24); white-space: nowrap;
+  transition: background 0.15s ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
+.sb-new-btn:active { transform: scale(0.97); }
 .sb-new-btn:hover { background: var(--ep-green-dark, #4b8b2a); color: #fff; }
 
 .sb-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -148,8 +150,9 @@ $extraHead = '<style>
 .sb-btn {
   border: 0; border-radius: 10px; padding: 9px 13px; font-family: inherit; font-size: 12.5px; font-weight: 700;
   cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
+.sb-btn:active:not(:disabled) { transform: scale(0.97); }
 .sb-btn:disabled { opacity: 0.65; cursor: wait; }
 .sb-btn-cart { background: var(--ep-green, #62b236); color: #fff; flex: 1 1 auto; }
 .sb-btn-cart:hover { background: var(--ep-green-dark, #4b8b2a); }
