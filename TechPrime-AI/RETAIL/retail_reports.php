@@ -70,22 +70,9 @@ staff_page_start([
 .drill-row .drill-inner { padding: 12px 18px; }
 .drill-row table { width: 100%; font-size: 12.5px; }
 .drill-row table td, .drill-row table th { padding: 6px 8px; }
-.print-header { display: none; }
-@media print {
-    .sidebar, .topbar, .no-print, .report-toolbar { display: none !important; }
-    .main { margin: 0 !important; }
-    .page-content { padding: 0 !important; }
-    .print-header {
-        display: flex !important; align-items: center; gap: 14px;
-        border-bottom: 2px solid #171717; padding-bottom: 12px; margin-bottom: 18px;
-    }
-    .print-header img { height: 48px; }
-    .print-header h1 { font-size: 20px; margin: 0; }
-    .print-header p { margin: 2px 0 0; font-size: 12px; color: #555; }
-    .card { box-shadow: none !important; border: 1px solid #ddd !important; break-inside: avoid; }
-}
 </style>
 EXTRA
+    . '<style>' . ias_retail_print_css() . '</style>',
 ]);
 
 $logoPath = staff_logo_href();
@@ -96,7 +83,7 @@ $logoPath = staff_logo_href();
     <div>
         <h1>Sales Report</h1>
         <p><?php echo h($range['label']); ?> &middot; <?php echo h($from->format('M d, Y') . ' - ' . $to->format('M d, Y')); ?></p>
-        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(date('M d, Y g:i A')); ?></p>
+        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(ias_report_datetime(gmdate('Y-m-d H:i:s'))); ?></p>
     </div>
 </div>
 
@@ -163,7 +150,7 @@ $logoPath = staff_logo_href();
             <button type="button" class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
             <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_qs(['type' => 'sales', 'format' => 'csv']); ?>"><i class="fas fa-file-csv"></i> Export CSV</a>
             <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_qs(['type' => 'sales', 'format' => 'excel']); ?>"><i class="fas fa-file-excel"></i> Export Excel</a>
-            <button type="button" class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+            <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_qs(['type' => 'sales', 'format' => 'pdf']); ?>" title="Download this report as a PDF file"><i class="fas fa-file-pdf"></i> Export PDF</a>
         </div>
 
         <div class="stats-grid">

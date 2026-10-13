@@ -283,6 +283,26 @@ function ias_fetch_delivery_rows(PDO $db, int $sellerId, DateTime $from, DateTim
     return $rows;
 }
 
+/** Order line items for the given order ids: [order_id => [['product_name', 'category', 'quantity', 'price'], ...]] */
+function ias_fetch_order_items_by_order(PDO $db, array $orderIds): array
+{
+    $orderIds = array_values(array_unique(array_map('intval', $orderIds)));
+    if (!$orderIds) {
+        return [];
+    }
+    $in = implode(',', array_fill(0, count($orderIds), '?'));
+    $stmt = $db->prepare("SELECT oi.order_id, pr.name AS product_name, pr.category, oi.quantity, oi.price
+                          FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
+                          WHERE oi.order_id IN ($in)
+                          ORDER BY oi.order_id, oi.id");
+    $stmt->execute($orderIds);
+    $out = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $out[(int)$r['order_id']][] = $r;
+    }
+    return $out;
+}
+
 /** Summary metrics for the delivery history module (success rate needs all shipments, not just delivered ones) */
 function ias_summarize_deliveries(PDO $db, int $sellerId, DateTime $from, DateTime $to, int $deliveredCount): array
 {
@@ -646,6 +666,115 @@ function ias_dashboard_qs(array $overrides = []): string
     return h(http_build_query(array_merge($_GET, $overrides)));
 }
 
+/**
+ * Everything the Retail Dashboard shows, resolved from its GET params (card_*, ms_months, period, category).
+ * Shared by RETAIL/retail_dashboard.php and its CSV/PDF export so the files always match the screen.
+ */
+function ias_retail_dashboard_data(PDO $db, int $retailId, array $params): array
+{
+    $cardRange = ias_resolve_section_range($params, 'card', 'this_month');
+    $cardSummary = ias_summarize_sales(ias_fetch_sales_rows($db, $retailId, $cardRange['from'], $cardRange['to']));
+
+    $msMonths = max(1, min(24, (int)($params['ms_months'] ?? 12)));
+    $monthlySales = ias_monthly_sales_report($db, $retailId, $msMonths);
+
+    // Sales by Category: same period + category filter as the Inventory dashboard's "Products Stocked Per Month"
+    $range = ias_sales_period_range((string)($params['period'] ?? 'year'));
+    $from = $range['from'];
+    $to = $range['to'];
+    $category = trim((string)($params['category'] ?? ''));
+    if (!in_array($category, ias_category_groups(), true)) {
+        $category = '';
+    }
+    $salesRows = ias_filter_delivery_rows_by_group(ias_fetch_delivery_rows($db, $retailId, $from, $to), $category);
+    $byGroup = ias_delivered_units_by_group($db, $retailId, $salesRows, $from, $to);
+    if ($category !== '') {
+        $byGroup = array_intersect_key($byGroup, [$category => true]);
+    }
+
+    // Units delivered per day, or per month for long ranges
+    $unitsByDate = ias_delivered_units_by_date($db, $retailId, $salesRows, $category, $from, $to);
+    $byMonth = $from->diff($to)->days > 62;
+    $trendLabels = [];
+    $trendData = [];
+    $cursor = $byMonth ? (clone $from)->modify('first day of this month') : clone $from;
+    while ($cursor <= $to) {
+        $key = $cursor->format($byMonth ? 'Y-m' : 'Y-m-d');
+        $trendLabels[$key] = $cursor->format($byMonth ? 'M Y' : 'M d');
+        $trendData[$key] = 0;
+        $cursor->modify($byMonth ? '+1 month' : '+1 day');
+    }
+    foreach ($unitsByDate as $d => $units) {
+        $key = $byMonth ? substr($d, 0, 7) : $d;
+        if (isset($trendData[$key])) {
+            $trendData[$key] += $units;
+        }
+    }
+
+    return [
+        'card_range' => $cardRange,
+        'card_summary' => $cardSummary,
+        'ms_months' => $msMonths,
+        'monthly_sales' => $monthlySales,
+        'range' => $range,
+        'category' => $category,
+        'by_group' => $byGroup,
+        'trend_by_month' => $byMonth,
+        'trend_labels' => array_values($trendLabels),
+        'trend_data' => array_values($trendData),
+    ];
+}
+
+/**
+ * Print rules shared by the Retail report pages (Print button = window.print()).
+ * Hides the app chrome and floating widgets, keeps chart canvases inside the page width
+ * and keeps cards/rows from splitting across pages.
+ */
+function ias_retail_print_css(): string
+{
+    return <<<'CSS'
+.print-header { display: none; }
+@media print {
+    @page { margin: 12mm; }
+    html, body { background: #fff !important; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .sidebar, .topbar, .no-print, .report-toolbar, #cwFab, #cwPanel, #ias-alert-overlay { display: none !important; }
+    .main { margin: 0 !important; width: 100% !important; }
+    .page-content { padding: 0 !important; max-width: none !important; }
+    .print-header {
+        display: flex !important; align-items: center; gap: 14px;
+        border-bottom: 2px solid #171717; padding-bottom: 12px; margin-bottom: 18px;
+    }
+    .print-header img { height: 40px; filter: brightness(0); }   /* the sidebar logo is white; print it solid black */
+    .print-header h1 { font-size: 20px; margin: 0; }
+    .print-header p { margin: 2px 0 0; font-size: 12px; color: #555; }
+    .card, .inv-stockin-panel, .stat-card { box-shadow: none !important; break-inside: avoid; }
+    .card { border: 1px solid #ddd !important; }
+    .stat-num { font-size: 20px !important; overflow-wrap: anywhere; }
+    .stat-icon { display: none !important; }
+    canvas { max-width: 100% !important; height: auto !important; }
+    .chart-wrap, .trend-wrap, .ms-chart-wrap { height: auto !important; }
+    .table-wrap, .deliv-wrap { overflow: visible !important; }
+    tr { break-inside: avoid; }
+    thead { display: table-header-group; }
+    a[href]::after { content: none !important; }
+}
+CSS;
+}
+
+/** DB timestamp (UTC, timestamp without time zone) -> branch-local display string. */
+function ias_report_datetime(?string $utc, string $format = 'M d, Y g:i A'): string
+{
+    if ($utc === null || trim($utc) === '') {
+        return '';
+    }
+    try {
+        return (new DateTime($utc, new DateTimeZone('UTC')))->setTimezone(new DateTimeZone('Asia/Manila'))->format($format);
+    } catch (Throwable $e) {
+        return $utc;
+    }
+}
+
 /* -------------------------------------------------------------------------
  * Export emitters — CSV (native) and Excel (HTML-table served as .xls,
  * which Microsoft Excel opens natively; no external library required).
@@ -670,6 +799,37 @@ function ias_emit_csv(string $filename, array $headers, array $rows): void
     fputcsv($out, $headers);
     foreach ($rows as $row) {
         fputcsv($out, $row);
+    }
+    fclose($out);
+    exit;
+}
+
+/**
+ * Stream a CSV made of titled sections (one per dashboard panel) and exit.
+ * $sections: [['title' => string, 'headers' => [...], 'rows' => [[...], ...]], ...]
+ */
+function ias_emit_csv_sections(string $filename, array $preamble, array $sections): void
+{
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    $out = fopen('php://output', 'w');
+    fputs($out, "\xEF\xBB\xBF");
+    foreach ($preamble as $line) {
+        fputcsv($out, (array)$line);
+    }
+    foreach ($sections as $s) {
+        fputs($out, "\r\n");
+        fputcsv($out, [$s['title']]);
+        fputcsv($out, $s['headers']);
+        foreach ($s['rows'] as $row) {
+            fputcsv($out, $row);
+        }
+        if (empty($s['rows'])) {
+            fputcsv($out, ['No data']);
+        }
     }
     fclose($out);
     exit;

@@ -23,50 +23,23 @@ function retail_dashboard_preserve_hidden(array $ownKeys): void
     }
 }
 
-$cardRange = ias_resolve_section_range($_GET, 'card', 'this_month');
-$cardRows = ias_fetch_sales_rows($db, $retailId, $cardRange['from'], $cardRange['to']);
-$cardSummary = ias_summarize_sales($cardRows);
-
-$msMonths = max(1, min(24, (int)($_GET['ms_months'] ?? 12)));
-$monthlySales = ias_monthly_sales_report($db, $retailId, $msMonths);
+// Same data source as the CSV/PDF export (retail_export.php?type=dashboard), so the files match the screen.
+$dash = ias_retail_dashboard_data($db, $retailId, $_GET);
+$cardRange = $dash['card_range'];
+$cardSummary = $dash['card_summary'];
+$msMonths = $dash['ms_months'];
+$monthlySales = $dash['monthly_sales'];
 
 // Sales by Category: same period + category filter as the Inventory dashboard's "Products Stocked Per Month"
 $periods = ['month' => 'This Month', 'last' => 'Last Month', '3m' => 'Last 3 Months', 'year' => 'This Year'];
-$range = ias_sales_period_range((string)($_GET['period'] ?? 'year'));
+$range = $dash['range'];
 $from = $range['from'];
 $to = $range['to'];
 $categoryTabs = ias_category_groups();
-$category = trim((string)($_GET['category'] ?? ''));
-if (!in_array($category, $categoryTabs, true)) {
-    $category = '';
-}
-$salesRows = ias_filter_delivery_rows_by_group(ias_fetch_delivery_rows($db, $retailId, $from, $to), $category);
-$byGroup = ias_delivered_units_by_group($db, $retailId, $salesRows, $from, $to);   // one pie per Client menu group
-if ($category !== '') {
-    $byGroup = array_intersect_key($byGroup, [$category => true]);
-}
+$category = $dash['category'];
 
-// Sales graph for the selected category ('' = all): units delivered per day, or per month for long ranges
-$unitsByDate = ias_delivered_units_by_date($db, $retailId, $salesRows, $category, $from, $to);
-$byMonth = $from->diff($to)->days > 62;
-$trendLabels = [];
-$trendData = [];
-$cursor = $byMonth ? (clone $from)->modify('first day of this month') : clone $from;
-while ($cursor <= $to) {
-    $key = $cursor->format($byMonth ? 'Y-m' : 'Y-m-d');
-    $trendLabels[$key] = $cursor->format($byMonth ? 'M Y' : 'M d');
-    $trendData[$key] = 0;
-    $cursor->modify($byMonth ? '+1 month' : '+1 day');
-}
-foreach ($unitsByDate as $d => $units) {
-    $key = $byMonth ? substr($d, 0, 7) : $d;
-    if (isset($trendData[$key])) {
-        $trendData[$key] += $units;
-    }
-}
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
-$trendJson = json_encode(['labels' => array_values($trendLabels), 'data' => array_values($trendData), 'total' => array_sum($trendData)], $jsonFlags);
-$pieJson = json_encode($byGroup, $jsonFlags);
+$trendJson = json_encode(['labels' => $dash['trend_labels'], 'data' => $dash['trend_data'], 'total' => array_sum($dash['trend_data'])], $jsonFlags);
 $msChartJson = json_encode([
     'labels' => array_column($monthlySales, 'month'),
     'sales' => array_map(fn($m) => round((float)$m['total_sales'], 2), $monthlySales),
@@ -114,17 +87,17 @@ $dashboardCss = <<<'CSS'
 .pie-card { border:1px solid var(--ep-border,#e5e7e5); border-radius:12px; padding:14px; break-inside:avoid; }
 .pie-card h4 { margin:0 0 2px; color:var(--ep-green-dark); font-size:15px; }
 .pie-wrap { position:relative; height:240px; margin-top:8px; }
-.print-header { display:none; }
+.print-only { display:none; }
 @media print {
-    .sidebar, .topbar, .no-print, .report-toolbar, .filter-modal, .inv-stockin-tools, .inv-category-nav, .view-toggle { display:none !important; }
-    .main { margin:0 !important; }
-    .page-content { padding:0 !important; }
-    .ms-view { display:block !important; }
+    .filter-modal, .inv-stockin-tools, .inv-category-nav, .view-toggle { display:none !important; }
+    .print-only { display:inline !important; }
+    /* Print always shows the Monthly Sales table, whichever view is active on screen */
+    #msDetailView { display:block !important; }
     #msGraphView { display:none !important; }
-    .print-header { display:flex !important; align-items:center; gap:14px; border-bottom:2px solid #171717; padding-bottom:12px; margin-bottom:18px; }
-    .print-header img { height:48px; }
+    .inv-stockin-panel, .inv-stockin-header { background:#fff !important; }
 }
 CSS;
+$dashboardCss .= ias_retail_print_css();
 
 staff_page_start([
     'role' => 'retail_officer',
@@ -142,14 +115,15 @@ $logoPath = staff_logo_href();
     <img src="<?php echo h($logoPath); ?>" alt="EasyPC">
     <div>
         <h1>Retail Dashboard</h1>
-        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(date('M d, Y g:i A')); ?></p>
+        <p>Summary: <?php echo h($cardRange['label']); ?> &middot; Sales by Category: <?php echo h($range['label'] . ($category !== '' ? ' (' . $category . ')' : '')); ?></p>
+        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(ias_report_datetime(gmdate('Y-m-d H:i:s'))); ?></p>
     </div>
 </div>
 
 <div class="report-toolbar no-print">
-    <button type="button" class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
-    <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_dashboard_qs(['type' => 'sales', 'format' => 'csv']); ?>"><i class="fas fa-file-csv"></i> Export CSV</a>
-    <button type="button" class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+    <button type="button" class="btn btn-outline btn-sm" onclick="window.print()" title="Print the dashboard"><i class="fas fa-print"></i> Print</button>
+    <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_dashboard_qs(['type' => 'dashboard', 'format' => 'csv']); ?>" title="Download the summary, monthly sales and sales by category as CSV"><i class="fas fa-file-csv"></i> Export CSV</a>
+    <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_dashboard_qs(['type' => 'dashboard', 'format' => 'pdf']); ?>" title="Download the dashboard as a PDF file"><i class="fas fa-file-pdf"></i> Export PDF</a>
 </div>
 
 <div class="stats-grid">
@@ -228,7 +202,7 @@ $logoPath = staff_logo_href();
     <div class="inv-stockin-header">
         <div>
             <h3>Sales by Category</h3>
-            <div class="inv-stockin-meta">Units delivered per product, one chart per category group · <?php echo h($from->format('M d, Y') . ' – ' . $to->format('M d, Y')); ?></div>
+            <div class="inv-stockin-meta">Units delivered per product, one chart per category group · <?php echo h($from->format('M d, Y') . ' – ' . $to->format('M d, Y')); ?><span class="print-only"> · <?php echo h($category !== '' ? $category : 'All categories'); ?></span></div>
         </div>
         <div class="inv-stockin-tools no-print">
             <form method="get" id="periodForm">
@@ -363,29 +337,6 @@ new Chart(document.getElementById('trendChart').getContext('2d'), {
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } } } }
 });
-const PIE_DATA = __PIE__;
-const PIE_COLORS = ['#61b337', '#fed700', '#2f7d32', '#f59e0b', '#3d7422', '#a3d977', '#c9a800', '#6b7280'];
-const MAX_SLICES = 6;
-Object.keys(PIE_DATA).forEach(function (group, i) {
-    const items = PIE_DATA[group];
-    const top = items.slice(0, MAX_SLICES);
-    const rest = items.slice(MAX_SLICES).reduce(function (a, r) { return a + r.units; }, 0);
-    const labels = top.map(function (r) { return r.product; });
-    const data = top.map(function (r) { return r.units; });
-    if (rest > 0) { labels.push('Other products'); data.push(rest); }
-    new Chart(document.getElementById('pie-' + i).getContext('2d'), {
-        type: 'pie',
-        data: { labels: labels, datasets: [{ data: data, backgroundColor: PIE_COLORS, borderColor: '#fff', borderWidth: 2 }] },
-        options: { responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 },
-                generateLabels: function (chart) {
-                    return Chart.defaults.plugins.legend.labels.generateLabels(chart).map(function (l) {
-                        if (l.text.length > 28) { l.text = l.text.slice(0, 27) + '…'; }
-                        return l;
-                    });
-                } } } } }
-    });
-});
 </script>
 SCRIPTS;
-staff_page_end(str_replace(['__MS_DATA__', '__TREND__', '__PIE__'], [$msChartJson, $trendJson, $pieJson], $scripts));
+staff_page_end(str_replace(['__MS_DATA__', '__TREND__'], [$msChartJson, $trendJson], $scripts));

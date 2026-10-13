@@ -57,22 +57,10 @@ staff_page_start([
 .deliv-table .col-num { text-align: right; white-space: nowrap; }
 .deliv-table .col-nowrap { white-space: nowrap; }
 .deliv-table tbody tr:last-child td { border-bottom: 0; }
-.print-header { display: none; }
-@media print {
-    .sidebar, .topbar, .no-print, .report-toolbar, .inv-stockin-tools { display: none !important; }
-    .main { margin: 0 !important; }
-    .page-content { padding: 0 !important; }
-    .print-header {
-        display: flex !important; align-items: center; gap: 14px;
-        border-bottom: 2px solid #171717; padding-bottom: 12px; margin-bottom: 18px;
-    }
-    .print-header img { height: 48px; }
-    .print-header h1 { font-size: 20px; margin: 0; }
-    .print-header p { margin: 2px 0 0; font-size: 12px; color: #555; }
-    .card { box-shadow: none !important; border: 1px solid #ddd !important; break-inside: avoid; }
-}
+@media print { .inv-stockin-tools { display: none !important; } .inv-stockin-panel, .inv-stockin-header { background: #fff !important; } }
 </style>
 EXTRA
+    . '<style>' . ias_retail_print_css() . '</style>',
 ]);
 
 $logoPath = staff_logo_href();
@@ -83,15 +71,15 @@ $logoPath = staff_logo_href();
     <div>
         <h1>Sales</h1>
         <p><?php echo h($dRange['label']); ?> &middot; <?php echo h($dRange['from']->format('M d, Y') . ' - ' . $dRange['to']->format('M d, Y')); ?></p>
-        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(date('M d, Y g:i A')); ?></p>
+        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(ias_report_datetime(gmdate('Y-m-d H:i:s'))); ?></p>
     </div>
 </div>
 
         <div class="report-toolbar no-print">
-            <button type="button" class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
-            <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_sales_export_qs($dRange, 'csv'); ?>"><i class="fas fa-file-csv"></i> Export CSV</a>
-            <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_sales_export_qs($dRange, 'excel'); ?>"><i class="fas fa-file-excel"></i> Export Excel</a>
-            <button type="button" class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="window.print()" title="Print this page"><i class="fas fa-print"></i> Print</button>
+            <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_sales_export_qs($dRange, 'csv'); ?>" title="Raw data: one row per delivery, for importing into other systems"><i class="fas fa-file-csv"></i> Export CSV</a>
+            <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_sales_export_qs($dRange, 'excel'); ?>" title="Excel workbook (.xlsx): summary, deliveries and per-product items with totals and filters"><i class="fas fa-file-excel"></i> Export Excel</a>
+            <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_sales_export_qs($dRange, 'pdf'); ?>" title="Download completed deliveries as a PDF file"><i class="fas fa-file-pdf"></i> Export PDF</a>
         </div>
 
         <div class="stats-grid">
