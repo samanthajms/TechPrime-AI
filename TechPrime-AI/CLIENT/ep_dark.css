@@ -130,6 +130,7 @@ html[data-theme="dark"] .ep-review-modal { background: #16181c; border-color: #2
 html[data-theme="dark"] .ep-review-modal h3,
 html[data-theme="dark"] .ep-review-label,
 html[data-theme="dark"] .pf-order-btn.is-review { color: #d7ecc4; }
+html[data-theme="dark"] .pf-orders > .pf-order-list { scrollbar-color: #323f28 transparent; }
 html[data-theme="dark"] .ep-review-order,
 html[data-theme="dark"] .ep-review-hint { color: #a3a9b3; }
 html[data-theme="dark"] .ep-review-close,

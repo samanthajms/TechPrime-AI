@@ -615,7 +615,7 @@ function ep_complete_order(PDO $db, int $orderId, int $ownerUserId = 0, int $sta
         $userId,
         "Order #ORD-{$orderId} completed. Thank you!",
         'order_received',
-        'user_dashboard.php#order-history'
+        'user_dashboard.php?status=history'
     );
     inv_notify_role(
         $db,

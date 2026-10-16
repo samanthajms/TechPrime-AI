@@ -109,9 +109,8 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
                         <input type="hidden" name="action" value="hide_order">
                         <input type="hidden" name="order_id" value="<?php echo $oid; ?>">
                         <input type="hidden" name="from" value="<?php echo h($list); ?>">
-                        <button type="submit" class="pf-order-remove" title="Remove" aria-label="Remove order #ORD-<?php echo $oid; ?>">
+                        <button type="submit" class="pf-order-remove" title="Remove from this list" aria-label="Remove order #ORD-<?php echo $oid; ?> from this list">
                             <i class="fas fa-trash-alt" aria-hidden="true"></i>
-                            <span>Remove</span>
                         </button>
                     </form>
                 <?php endif; ?>
@@ -169,10 +168,21 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
         <?php if ($hasActions): ?>
             <div class="pf-order-actions">
                 <?php if ($hasDetails): ?>
-                    <button type="button" class="pf-order-btn" aria-expanded="false"
+                    <button type="button" class="pf-order-btn is-ghost" aria-expanded="false"
                             aria-controls="pfOrderDetails<?php echo h($idPrefix . $oid); ?>" data-order-details>
                         Order details <i class="fas fa-chevron-down" aria-hidden="true"></i>
                     </button>
+                <?php endif; ?>
+                <span class="pf-order-actions-gap" aria-hidden="true"></span>
+                <?php if ($canCancel): ?>
+                    <button type="button" class="pf-order-btn is-danger" aria-expanded="false"
+                            aria-controls="pfCancel<?php echo h($idPrefix . $oid); ?>" data-cancel-toggle>
+                        Cancel order
+                    </button>
+                <?php elseif ($cancelRequested && $ostNorm !== 'cancelled' && $ostNorm !== 'canceled'): ?>
+                    <span class="pf-order-btn is-static">
+                        <i class="fas fa-hourglass-half" aria-hidden="true"></i> Cancel pending
+                    </span>
                 <?php endif; ?>
                 <?php if ($canReview): ?>
                     <button type="button" class="pf-order-btn is-review" data-open-review="<?php echo $oid; ?>">
@@ -181,11 +191,13 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
                     </button>
                 <?php endif; ?>
                 <?php if ($canPay): ?>
-                    <a href="payment.php?order_id=<?php echo $oid; ?>" class="pf-order-btn is-pay">Pay</a>
+                    <a href="payment.php?order_id=<?php echo $oid; ?>" class="pf-order-btn is-pay">
+                        <i class="fas fa-wallet" aria-hidden="true"></i> Pay now
+                    </a>
                 <?php endif; ?>
                 <?php if ($canReceive): ?>
                     <form method="post" class="order-cancel-form"
-                          data-confirm="Confirm Item Received? Stock will be deducted once and this order will move to Order History."
+                          data-confirm="Confirm Item Received? Stock will be deducted once and this order will move to History."
                           data-confirm-title="Item received?"
                           data-confirm-ok="Item Received"
                           data-confirm-cancel="Not yet"
@@ -193,32 +205,31 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
                         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                         <input type="hidden" name="action" value="receive_order">
                         <input type="hidden" name="order_id" value="<?php echo $oid; ?>">
-                        <button type="submit" class="pf-order-btn is-pay">Item Received</button>
+                        <button type="submit" class="pf-order-btn is-pay">
+                            <i class="fas fa-check" aria-hidden="true"></i> Item Received
+                        </button>
                     </form>
                 <?php endif; ?>
-                <?php if ($canCancel): ?>
-                    <form method="post" class="order-cancel-form pf-cancel-form"
-                          data-confirm="Submit a cancellation request? The store must approve it. Stock will not be deducted."
-                          data-confirm-title="Cancel this order?"
-                          data-confirm-ok="Request cancel"
-                          data-confirm-cancel="Keep order"
-                          data-confirm-type="danger">
-                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                        <input type="hidden" name="action" value="cancel_order">
-                        <input type="hidden" name="order_id" value="<?php echo $oid; ?>">
-                        <label class="sr-only" for="cancelReason<?php echo h($idPrefix . $oid); ?>">Cancellation reason</label>
+            </div>
+            <?php if ($canCancel): ?>
+                <form method="post" class="pf-cancel-panel" id="pfCancel<?php echo h($idPrefix . $oid); ?>" hidden>
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                    <input type="hidden" name="action" value="cancel_order">
+                    <input type="hidden" name="order_id" value="<?php echo $oid; ?>">
+                    <label class="pf-cancel-label" for="cancelReason<?php echo h($idPrefix . $oid); ?>">Why do you want to cancel?</label>
+                    <p class="pf-cancel-hint">EasyPC must approve the request before the order is cancelled.</p>
+                    <div class="pf-cancel-row">
                         <select name="cancel_reason" id="cancelReason<?php echo h($idPrefix . $oid); ?>" class="pf-cancel-reason" required>
-                            <option value="">Reason…</option>
+                            <option value="">Choose a reason…</option>
                             <?php foreach ($cancelReasons as $cr): ?>
                                 <option value="<?php echo h($cr); ?>"><?php echo h($cr); ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <button type="submit" class="pf-order-btn is-danger">Cancel order</button>
-                    </form>
-                <?php elseif ($cancelRequested && $ostNorm !== 'cancelled' && $ostNorm !== 'canceled'): ?>
-                    <span class="pf-order-btn" style="cursor:default;opacity:.85;">Cancel pending</span>
-                <?php endif; ?>
-            </div>
+                        <button type="button" class="pf-order-btn" aria-controls="pfCancel<?php echo h($idPrefix . $oid); ?>" data-cancel-close>Keep order</button>
+                        <button type="submit" class="pf-order-btn is-danger-solid">Request cancellation</button>
+                    </div>
+                </form>
+            <?php endif; ?>
             <?php if ($hasDetails): ?>
                 <dl class="pf-order-details" id="pfOrderDetails<?php echo h($idPrefix . $oid); ?>" hidden>
                     <?php if ($fulfil !== ''): ?>

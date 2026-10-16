@@ -777,7 +777,7 @@ html[data-theme="dark"] .pf-btn{border:1px solid transparent}
 html[data-theme="dark"] .pf-btn-primary{background:var(--ep-green);color:#fff}
 html[data-theme="dark"] .pf-btn-primary:hover,html[data-theme="dark"] .pf-btn-primary.is-active{background:var(--ep-green-dark)}
 html[data-theme="dark"] .pf-btn-outline{background:#131518;border-color:var(--ep-green);color:#b0e097}
-html[data-theme="dark"] .pf-btn-outline:hover{background:#253419}
+html[data-theme="dark"] .pf-btn-outline:hover,html[data-theme="dark"] .pf-btn-outline.is-active{background:#253419}
 html[data-theme="dark"] .pf-btn-quiet{background:transparent;color:#a1a6b0}
 html[data-theme="dark"] .pf-btn-quiet:hover{background:#321818;color:#e8857d}
 html[data-theme="dark"] .pf-btn:focus-visible,html[data-theme="dark"] .pf-link:focus-visible,html[data-theme="dark"] .pf-tab:focus-visible,html[data-theme="dark"] .pf-shortcut:focus-visible,html[data-theme="dark"] .pf-new-item:focus-visible{outline:3px solid rgba(98, 178, 54, 0.45);outline-offset:2px}
@@ -790,22 +790,28 @@ html[data-theme="dark"] .pf-name{color:#dee0e3}
 html[data-theme="dark"] .pf-verified{color:#9bd77a}
 html[data-theme="dark"] .pf-meta{color:#a1a6b0}
 html[data-theme="dark"] .pf-meta i{color:#b0e097}
-html[data-theme="dark"] .pf-orders-sub{color:#a1a6b0}
-html[data-theme="dark"] .pf-history-count{color:#a1a6b0}
+html[data-theme="dark"] .pf-orders-sub{background:#1b1e23;color:#b5bcc7}
+html[data-theme="dark"] .pf-orders-sub i{color:#b0e097}
 html[data-theme="dark"] .pf-orders-page-meta{color:#a1a6b0}
-html[data-theme="dark"] .pf-order-remove{border:1px solid #5e2828;background:#131518;color:#e8857d}
-html[data-theme="dark"] .pf-order-remove:hover{background:#321818;border-color:#672c2c}
+html[data-theme="dark"] .pf-order-remove{border:1px solid transparent;background:transparent;color:#9ca3af}
+html[data-theme="dark"] .pf-order-remove:focus-visible{outline:3px solid rgba(98, 178, 54, 0.45);outline-offset:2px}
 html[data-theme="dark"] .pf-order-search i{color:#9ca3af}
 html[data-theme="dark"] .pf-order-search input{border:1px solid #343840;background:#1b1e23;color:#dee0e3}
 html[data-theme="dark"] .pf-order-search input:focus{outline:none;border-color:var(--ep-green);background:#131518}
-html[data-theme="dark"] .pf-tabs{border-bottom:1px solid #343840}
-html[data-theme="dark"] .pf-tab{color:#a1a6b0}
-html[data-theme="dark"] .pf-tab::after{background:transparent}
-html[data-theme="dark"] .pf-tab:hover{color:#dee0e3}
-html[data-theme="dark"] .pf-tab.is-active{color:#dee0e3}
-html[data-theme="dark"] .pf-tab.is-active::after{background:var(--ep-green)}
-html[data-theme="dark"] .pf-tab-count{background:#1b1e23;color:#b5bcc7}
-html[data-theme="dark"] .pf-tab.is-active .pf-tab-count{background:#253419;color:#b0e097}
+html[data-theme="dark"] .pf-tab{border:1px solid #343840;background:#131518;color:#b5bcc7}
+html[data-theme="dark"] .pf-tab-icon{background:#1b1e23;color:#b5bcc7}
+html[data-theme="dark"] .pf-tab-count{background:#4b5563;color:#fff;box-shadow:0 0 0 2px #1b1d22}
+html[data-theme="dark"] .pf-tab-count.is-attention{background:var(--ep-yellow);color:var(--ep-black)}
+html[data-theme="dark"] .pf-tab.is-active{border-color:var(--ep-green);background:#253419;color:#dee0e3}
+html[data-theme="dark"] .pf-tab.is-active .pf-tab-icon{background:var(--ep-green);color:#fff}
+html[data-theme="dark"] .pf-tab.is-active .pf-tab-count{box-shadow:0 0 0 2px var(--ep-green-light)}
+@media (hover: hover) and (pointer: fine){
+  html[data-theme="dark"] .pf-tab:not(.is-active):hover{border-color:#465838;color:#dee0e3}
+  html[data-theme="dark"] .pf-tab:not(.is-active):hover .pf-tab-icon{background:#253419;color:#b0e097}
+  html[data-theme="dark"] .pf-order-remove:hover{background:#321818;color:#e8857d}
+}
+html[data-theme="dark"] .pf-orders > .pf-order-list::-webkit-scrollbar-thumb{background:#323f28}
+html[data-theme="dark"] .pf-orders > .pf-order-list::-webkit-scrollbar-track{background:transparent}
 html[data-theme="dark"] .pf-order{border:1px solid #343840;background:#131518}
 html[data-theme="dark"] .pf-order-head{background:#181a1e;border-bottom:1px solid #343840}
 html[data-theme="dark"] .pf-order-ref strong{color:#dee0e3}
@@ -827,11 +833,20 @@ html[data-theme="dark"] .pf-order-total span{color:#a1a6b0}
 html[data-theme="dark"] .pf-order-total strong{color:#b0e097}
 html[data-theme="dark"] .pf-order-btn{border:1px solid #343840;background:#131518;color:#dee0e3}
 html[data-theme="dark"] .pf-order-btn:hover{border-color:var(--ep-green);background:#253419}
+html[data-theme="dark"] .pf-order-btn.is-ghost{border-color:transparent;background:transparent;color:#b0e097}
+html[data-theme="dark"] .pf-order-btn.is-ghost:hover{border-color:transparent;background:#253419}
+html[data-theme="dark"] .pf-order-btn.is-static,html[data-theme="dark"] .pf-order-btn.is-static:hover{border-color:transparent;background:#38311b;color:#efdaa7}
+html[data-theme="dark"] .pf-order-btn.is-danger-solid{border-color:#b42318;background:#b42318;color:#fff}
+html[data-theme="dark"] .pf-order-btn.is-danger-solid:hover{border-color:#912018;background:#912018;color:#fff}
 html[data-theme="dark"] .pf-order-btn.is-danger{border-color:#5e2828;color:#e8857d}
 html[data-theme="dark"] .pf-order-btn.is-danger:hover{background:#321818;border-color:#672c2c}
 html[data-theme="dark"] .pf-order-btn.is-pay{border-color:var(--ep-green);background:var(--ep-green);color:#fff}
 html[data-theme="dark"] .pf-order-btn.is-pay:hover{background:var(--ep-green);border-color:var(--ep-green);color:#fff}
+html[data-theme="dark"] .pf-cancel-panel{border:1px solid #5e2828;background:#16181c}
+html[data-theme="dark"] .pf-cancel-label{color:#dee0e3}
+html[data-theme="dark"] .pf-cancel-hint{color:#a1a6b0}
 html[data-theme="dark"] .pf-cancel-reason{border:1px solid #343840;background:#131518;color:inherit}
+html[data-theme="dark"] .pf-cancel-reason:focus-visible{outline:3px solid rgba(98, 178, 54, 0.45);outline-offset:2px}
 html[data-theme="dark"] .pf-order-btn:focus-visible,html[data-theme="dark"] .pf-more-items:focus-visible,html[data-theme="dark"] a.pf-item-name:focus-visible{outline:3px solid rgba(98, 178, 54, 0.45);outline-offset:2px}
 html[data-theme="dark"] .pf-order-details{background:#181a1e}
 html[data-theme="dark"] .pf-order-details dt{color:#a1a6b0}

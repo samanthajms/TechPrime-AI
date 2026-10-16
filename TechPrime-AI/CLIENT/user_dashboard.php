@@ -22,7 +22,7 @@ ep_review_ensure_schema($db);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'submit_review') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-        header('Location: user_dashboard.php?alert=error#pfHistoryTitle');
+        header('Location: user_dashboard.php?status=history&alert=error');
         exit;
     }
     $orderId = (int) ($_POST['order_id'] ?? 0);
@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'submi
     [$fileError, $uploads] = ep_review_collect_uploads($_FILES['media'] ?? []);
     $code = $fileError !== '' ? $fileError : ep_review_submit($db, $user_id, $orderId, $rating, $comment, $tags, $uploads, $anonymous);
     $alert = $code === '' ? 'reviewed' : 'review_' . $code;
-    header('Location: user_dashboard.php?alert=' . rawurlencode($alert) . '#pfHistoryTitle');
+    header('Location: user_dashboard.php?status=history&alert=' . rawurlencode($alert));
     exit;
 }
 
@@ -195,7 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'recei
     $result = ep_confirm_order_received($db, $user_id, $oid);
     $redir = 'user_dashboard.php?';
     if (!empty($result['ok'])) {
-        $redir .= 'alert=received#order-history';
+        $redir .= 'status=history&alert=received';
     } elseif (($result['error'] ?? '') === 'stock') {
         $redir .= 'status=to_receive&alert=receive_stock';
     } elseif (($result['error'] ?? '') === 'not_receivable') {
@@ -217,7 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'hide_
     $result = ep_hide_client_order($db, $user_id, $oid);
     $redir = 'user_dashboard.php?';
     if ($from === 'history') {
-        $redir .= 'alert=' . (!empty($result['ok']) ? 'order_removed' : 'error') . '#order-history';
+        $redir .= 'status=history&alert=' . (!empty($result['ok']) ? 'order_removed' : 'error');
     } elseif (!empty($result['ok'])) {
         $redir .= 'alert=order_removed';
     } elseif (($result['error'] ?? '') === 'not_removable') {
@@ -366,11 +366,12 @@ $orderItemsShown = 3;   // more items collapse behind "Show N more"
 
 $search_query = trim($_GET['q'] ?? '');
 $current_filter = ias_normalize_order_status_filter($_GET['status'] ?? 'All');
-// Order Summary tabs only — completed (to_review) and cancelled live in Order History.
-$allowed_filters = ['All', 'to_pay', 'to_ship', 'to_receive'];
+// Active-order tabs plus History (completed = to_review, and cancelled orders).
+$allowed_filters = ['All', 'to_pay', 'to_ship', 'to_receive', 'history'];
 if (!in_array($current_filter, $allowed_filters, true)) {
     $current_filter = 'All';
 }
+$showHistory = $current_filter === 'history';
 
 $legacyStatus = [
     'to_pay' => 'To Pay',
@@ -420,18 +421,24 @@ if ($current_filter === 'to_ship') {
 $summaryWhere .= $searchSql;
 $summaryParams = array_merge($summaryParams, $searchParams);
 
-$stSumCount = $db->prepare('SELECT COUNT(*) FROM orders o WHERE o.user_id = ? AND COALESCE(o.client_history_hidden, FALSE) = FALSE' . $summaryWhere);
-$stSumCount->execute($summaryParams);
-$summaryTotal = (int)$stSumCount->fetchColumn();
-$summaryPages = max(1, (int)ceil($summaryTotal / $perPage));
-if ($summaryPage > $summaryPages) {
-    $summaryPage = $summaryPages;
-}
-$summaryOffset = ($summaryPage - 1) * $perPage;
+// Only the list for the open tab is loaded.
+$summaryTotal = 0;
+$summaryPages = 1;
+$orders = [];
+if (!$showHistory) {
+    $stSumCount = $db->prepare('SELECT COUNT(*) FROM orders o WHERE o.user_id = ? AND COALESCE(o.client_history_hidden, FALSE) = FALSE' . $summaryWhere);
+    $stSumCount->execute($summaryParams);
+    $summaryTotal = (int)$stSumCount->fetchColumn();
+    $summaryPages = max(1, (int)ceil($summaryTotal / $perPage));
+    if ($summaryPage > $summaryPages) {
+        $summaryPage = $summaryPages;
+    }
+    $summaryOffset = ($summaryPage - 1) * $perPage;
 
-$stOrders = $db->prepare($orderSelect . $summaryWhere . ' ORDER BY o.id DESC LIMIT ' . (int)$perPage . ' OFFSET ' . (int)$summaryOffset);
-$stOrders->execute($summaryParams);
-$orders = $stOrders->fetchAll(PDO::FETCH_ASSOC);
+    $stOrders = $db->prepare($orderSelect . $summaryWhere . ' ORDER BY o.id DESC LIMIT ' . (int)$perPage . ' OFFSET ' . (int)$summaryOffset);
+    $stOrders->execute($summaryParams);
+    $orders = $stOrders->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // ---- Order History (received / cancelled) ----
 $historyWhere = " AND (
@@ -440,18 +447,23 @@ $historyWhere = " AND (
 $historyWhere .= $searchSql;
 $historyParams = array_merge([$user_id], $searchParams);
 
-$stHistCount = $db->prepare('SELECT COUNT(*) FROM orders o WHERE o.user_id = ? AND COALESCE(o.client_history_hidden, FALSE) = FALSE' . $historyWhere);
-$stHistCount->execute($historyParams);
-$historyTotal = (int)$stHistCount->fetchColumn();
-$historyPages = max(1, (int)ceil($historyTotal / $perPage));
-if ($historyPage > $historyPages) {
-    $historyPage = $historyPages;
-}
-$historyOffset = ($historyPage - 1) * $perPage;
+$historyTotal = 0;
+$historyPages = 1;
+$historyOrders = [];
+if ($showHistory) {
+    $stHistCount = $db->prepare('SELECT COUNT(*) FROM orders o WHERE o.user_id = ? AND COALESCE(o.client_history_hidden, FALSE) = FALSE' . $historyWhere);
+    $stHistCount->execute($historyParams);
+    $historyTotal = (int)$stHistCount->fetchColumn();
+    $historyPages = max(1, (int)ceil($historyTotal / $perPage));
+    if ($historyPage > $historyPages) {
+        $historyPage = $historyPages;
+    }
+    $historyOffset = ($historyPage - 1) * $perPage;
 
-$stHistory = $db->prepare($orderSelect . $historyWhere . ' ORDER BY o.id DESC LIMIT ' . (int)$perPage . ' OFFSET ' . (int)$historyOffset);
-$stHistory->execute($historyParams);
-$historyOrders = $stHistory->fetchAll(PDO::FETCH_ASSOC);
+    $stHistory = $db->prepare($orderSelect . $historyWhere . ' ORDER BY o.id DESC LIMIT ' . (int)$perPage . ' OFFSET ' . (int)$historyOffset);
+    $stHistory->execute($historyParams);
+    $historyOrders = $stHistory->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Items for both lists in one query.
 $orderItems = [];
@@ -476,16 +488,21 @@ $reviewMap = ep_review_map_for_user(
     array_map(static fn($o) => (int) $o['id'], $allListed)
 );
 
-// Summary tab counts (active, not hidden).
+// Tab counts (not hidden, ignoring the search box).
 $statusCounts = array_fill_keys($allowed_filters, 0);
 $stCounts = $db->prepare(
     "SELECT status, COUNT(*) AS n FROM orders
      WHERE user_id = ? AND COALESCE(client_history_hidden, FALSE) = FALSE
-       AND LOWER(TRIM(status)) IN ('to_pay', 'to_ship', 'to_receive', 'to pay', 'to ship', 'to receive')
+       AND LOWER(TRIM(status)) IN ('to_pay', 'to_ship', 'to_receive', 'to pay', 'to ship', 'to receive',
+                                   'to_review', 'to review', 'cancelled', 'canceled')
      GROUP BY status"
 );
 $stCounts->execute([$user_id]);
 foreach ($stCounts->fetchAll(PDO::FETCH_ASSOC) as $cRow) {
+    if (in_array(strtolower(trim((string)$cRow['status'])), ['to_review', 'to review', 'cancelled', 'canceled'], true)) {
+        $statusCounts['history'] += (int)$cRow['n'];
+        continue;
+    }
     $statusCounts['All'] += (int)$cRow['n'];
     $cKey = ias_normalize_order_status_filter((string)$cRow['status']);
     if ($cKey !== 'All' && isset($statusCounts[$cKey])) {
@@ -649,7 +666,7 @@ if ($showSettings) {
 
             <div class="pf-hero-actions">
                 <a href="user_dashboard.php?settings=1"
-                   class="pf-btn pf-btn-primary<?php echo $showSettings ? ' is-active' : ''; ?>"
+                   class="pf-btn pf-btn-outline<?php echo $showSettings ? ' is-active' : ''; ?>"
                    <?php echo $showSettings ? 'aria-current="page"' : ''; ?>>
                     <i class="fas fa-user-cog" aria-hidden="true"></i> Profile settings
                 </a>
@@ -738,13 +755,10 @@ if ($showSettings) {
             <div class="pf-orders-col">
             <section class="pf-card pf-orders" id="order-summary" aria-labelledby="pfOrdersTitle">
                 <div class="pf-card-head">
-                    <h2 class="pf-card-title" id="pfOrdersTitle">Order Summary</h2>
+                    <h2 class="pf-card-title" id="pfOrdersTitle">My orders</h2>
                     <form action="user_dashboard.php" method="GET" class="pf-order-search" role="search">
                         <?php if ($current_filter !== 'All'): ?>
                             <input type="hidden" name="status" value="<?php echo h($current_filter); ?>">
-                        <?php endif; ?>
-                        <?php if ($historyPage > 1): ?>
-                            <input type="hidden" name="hpage" value="<?php echo (int)$historyPage; ?>">
                         <?php endif; ?>
                         <i class="fas fa-search" aria-hidden="true"></i>
                         <input type="text" name="q" placeholder="Search by order number or date"
@@ -753,13 +767,23 @@ if ($showSettings) {
                 </div>
 
                 <?php
+                // [label, icon, one-line help under the tabs, empty-state title, empty-state text]
                 $orderTabs = [
-                    'All' => 'All',
-                    'to_pay' => 'To pay',
-                    'to_ship' => 'To ship',
-                    'to_receive' => 'To receive',
+                    'All' => ['All active', 'fa-layer-group', 'Every order still in progress. Finished and cancelled orders are under History.',
+                        'No active orders', 'Placed and in-progress orders will show up here.'],
+                    'to_pay' => ['To pay', 'fa-wallet', 'Orders waiting for your payment. Pay now, or cancel if you changed your mind.',
+                        'Nothing to pay', 'Orders waiting for payment will show up here.'],
+                    'to_ship' => ['To ship', 'fa-box', 'Paid orders EasyPC is preparing for Lalamove delivery or store pickup.',
+                        'Nothing being prepared', 'Paid orders show up here while EasyPC packs them.'],
+                    'to_receive' => ['To receive', 'fa-truck', 'Orders on the way. Press Item Received once your order arrives.',
+                        'Nothing on the way', 'Orders handed to Lalamove will show up here.'],
+                    'history' => ['History', 'fa-history', 'Completed and cancelled orders. You can review completed ones.',
+                        'No order history yet', 'When you confirm Item Received, the order moves here.'],
                 ];
+                $activeTab = $orderTabs[$current_filter];
+                $listOrders = $showHistory ? $historyOrders : $orders;
                 $cardCtx = [
+                    'list' => $showHistory ? 'history' : 'summary',
                     'current_filter' => $current_filter,
                     'orderItemsShown' => $orderItemsShown,
                     'cancelReasons' => $cancelReasons,
@@ -770,88 +794,62 @@ if ($showSettings) {
                     'reviews' => $reviewMap,
                 ];
                 ?>
-                <nav class="pf-tabs" aria-label="Filter Order Summary by status">
-                    <?php foreach ($orderTabs as $tabKey => $tabLabel): ?>
-                        <a href="<?php echo h($epOrdersUrl(['status' => $tabKey, 'spage' => 1])); ?>"
-                           class="pf-tab<?php echo $current_filter === $tabKey ? ' is-active' : ''; ?>"
-                           <?php echo $current_filter === $tabKey ? 'aria-current="page"' : ''; ?>>
-                            <?php echo h($tabLabel); ?>
-                            <?php if ($statusCounts[$tabKey] > 0): ?>
-                                <span class="pf-tab-count"><?php echo (int)$statusCounts[$tabKey]; ?></span>
-                            <?php endif; ?>
+                <nav class="pf-tabs" aria-label="Filter your orders by status">
+                    <?php foreach ($orderTabs as $tabKey => $tab):
+                        $isTab = $current_filter === $tabKey;
+                        $tabCount = (int)$statusCounts[$tabKey];
+                        ?>
+                        <a href="<?php echo h($epOrdersUrl(['status' => $tabKey, 'spage' => 1, 'hpage' => 1])); ?>"
+                           class="pf-tab<?php echo $isTab ? ' is-active' : ''; ?><?php echo $tabKey === 'history' ? ' is-history' : ''; ?>"
+                           <?php echo $isTab ? 'aria-current="page"' : ''; ?>>
+                            <span class="pf-tab-icon">
+                                <i class="fas <?php echo h($tab[1]); ?>" aria-hidden="true"></i>
+                                <?php if ($tabCount > 0): ?>
+                                    <span class="pf-tab-count<?php echo in_array($tabKey, ['to_pay', 'to_receive'], true) ? ' is-attention' : ''; ?>" aria-hidden="true"><?php echo $tabCount; ?></span>
+                                <?php endif; ?>
+                            </span>
+                            <span class="pf-tab-label"><?php echo h($tab[0]); ?><?php if ($tabCount > 0): ?><span class="sr-only"> (<?php echo $tabCount; ?>)</span><?php endif; ?></span>
                         </a>
                     <?php endforeach; ?>
                 </nav>
 
-                <p class="pf-orders-sub">Active orders only. Received orders move to Order History below. Delivery is handled by Lalamove.</p>
+                <p class="pf-orders-sub">
+                    <i class="fas fa-info-circle" aria-hidden="true"></i>
+                    <span><?php echo h($activeTab[2]); ?></span>
+                </p>
 
-                <?php if (count($orders) > 0): ?>
+                <?php if (count($listOrders) > 0): ?>
                     <ul class="pf-order-list">
-                        <?php foreach ($orders as $o):
-                            ep_render_client_order_card($o, $orderItems[(int)$o['id']] ?? [], $cardCtx + ['list' => 'summary']);
+                        <?php foreach ($listOrders as $o):
+                            ep_render_client_order_card($o, $orderItems[(int)$o['id']] ?? [], $cardCtx);
                         endforeach; ?>
                     </ul>
                     <?php
-                    ep_render_orders_pagination(
-                        $summaryPage,
-                        $summaryPages,
-                        $summaryTotal,
-                        count($orders),
-                        'spage',
-                        $epOrdersUrl,
-                        $epOrderPageRange,
-                        'Order Summary pagination'
-                    );
+                    if ($showHistory) {
+                        ep_render_orders_pagination($historyPage, $historyPages, $historyTotal, count($historyOrders),
+                            'hpage', $epOrdersUrl, $epOrderPageRange, 'Order history pagination');
+                    } else {
+                        ep_render_orders_pagination($summaryPage, $summaryPages, $summaryTotal, count($orders),
+                            'spage', $epOrdersUrl, $epOrderPageRange, 'Orders pagination');
+                    }
                     ?>
-                <?php elseif ($search_query !== '' || $current_filter !== 'All'): ?>
+                <?php elseif ($search_query !== ''): ?>
                     <div class="pf-empty">
                         <span class="pf-empty-icon"><i class="fas fa-search" aria-hidden="true"></i></span>
-                        <strong>No orders match</strong>
-                        <span>Try another status or search term.</span>
-                        <a href="user_dashboard.php" class="pf-btn pf-btn-outline">Show all orders</a>
+                        <strong>No orders match &ldquo;<?php echo h($search_query); ?>&rdquo;</strong>
+                        <span>Try an order number like 36, or a month like October.</span>
+                        <a href="<?php echo h($epOrdersUrl(['q' => '', 'spage' => 1, 'hpage' => 1])); ?>" class="pf-btn pf-btn-outline">Clear search</a>
                     </div>
                 <?php else: ?>
                     <div class="pf-empty">
-                        <span class="pf-empty-icon"><i class="fas fa-box-open" aria-hidden="true"></i></span>
-                        <strong>No active orders</strong>
-                        <span>Placed and in-progress orders will show up here.</span>
-                        <a href="shop.php" class="pf-btn pf-btn-primary">Start shopping</a>
-                    </div>
-                <?php endif; ?>
-            </section>
-
-            <section class="pf-card pf-orders pf-order-history" id="order-history" aria-labelledby="pfHistoryTitle">
-                <div class="pf-card-head">
-                    <h2 class="pf-card-title" id="pfHistoryTitle">Order History</h2>
-                    <?php if ($historyTotal > 0): ?>
-                        <span class="pf-history-count"><?php echo (int)$historyTotal; ?> completed / cancelled</span>
-                    <?php endif; ?>
-                </div>
-                <p class="pf-orders-sub">Orders you marked as received (and cancelled orders) appear here.</p>
-
-                <?php if (count($historyOrders) > 0): ?>
-                    <ul class="pf-order-list">
-                        <?php foreach ($historyOrders as $o):
-                            ep_render_client_order_card($o, $orderItems[(int)$o['id']] ?? [], $cardCtx + ['list' => 'history']);
-                        endforeach; ?>
-                    </ul>
-                    <?php
-                    ep_render_orders_pagination(
-                        $historyPage,
-                        $historyPages,
-                        $historyTotal,
-                        count($historyOrders),
-                        'hpage',
-                        $epOrdersUrl,
-                        $epOrderPageRange,
-                        'Order History pagination'
-                    );
-                    ?>
-                <?php else: ?>
-                    <div class="pf-empty pf-empty-compact">
-                        <span class="pf-empty-icon"><i class="fas fa-history" aria-hidden="true"></i></span>
-                        <strong>No order history yet</strong>
-                        <span>When you confirm Item Received, that order moves here.</span>
+                        <span class="pf-empty-icon"><i class="fas <?php echo h($activeTab[1]); ?>" aria-hidden="true"></i></span>
+                        <strong><?php echo h($activeTab[3]); ?></strong>
+                        <span><?php echo h($activeTab[4]); ?></span>
+                        <?php if ($current_filter === 'All'): ?>
+                            <a href="shop.php" class="pf-btn pf-btn-primary">Start shopping</a>
+                        <?php else: ?>
+                            <a href="user_dashboard.php" class="pf-btn pf-btn-outline">See all active orders</a>
+                        <?php endif; ?>
                     </div>
                 <?php endif; ?>
             </section>
@@ -860,7 +858,7 @@ if ($showSettings) {
                 <button type="button" class="ep-review-close" id="epReviewClose" aria-label="Close">&times;</button>
                 <h3 id="epReviewTitle">Review your order</h3>
                 <p class="ep-review-order" id="epReviewOrderLabel"></p>
-                <form method="post" enctype="multipart/form-data" id="epReviewForm" action="user_dashboard.php#pfHistoryTitle">
+                <form method="post" enctype="multipart/form-data" id="epReviewForm" action="user_dashboard.php?status=history">
                     <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                     <input type="hidden" name="action" value="submit_review">
                     <input type="hidden" name="order_id" id="epReviewOrderId" value="">
@@ -995,7 +993,28 @@ if ($showSettings) {
     // Order cards + payment success dialog.
     $extraScripts = <<<'JS'
 <script>
+// Older notifications link to the removed "#order-history" section; it is now the History tab.
+if ((location.hash === '#order-history' || location.hash === '#pfHistoryTitle') && !/[?&]status=/.test(location.search)) {
+    location.replace('user_dashboard.php?status=history');
+}
 document.addEventListener('click', function (e) {
+    // Cancel order: first press opens the reason panel, the panel's own button submits.
+    var cancelBtn = e.target.closest('[data-cancel-toggle], [data-cancel-close]');
+    if (cancelBtn) {
+        var panel = document.getElementById(cancelBtn.getAttribute('aria-controls'));
+        var toggle = document.querySelector('[data-cancel-toggle][aria-controls="' + cancelBtn.getAttribute('aria-controls') + '"]');
+        if (!panel || !toggle) return;
+        var show = cancelBtn.hasAttribute('data-cancel-toggle') ? panel.hidden : false;
+        panel.hidden = !show;
+        toggle.setAttribute('aria-expanded', show ? 'true' : 'false');
+        if (show) {
+            var sel = panel.querySelector('select');
+            if (sel) sel.focus();
+        } else {
+            toggle.focus();
+        }
+        return;
+    }
     var btn = e.target.closest('[data-order-details], [data-more-items]');
     if (!btn) return;
     var open = btn.getAttribute('aria-expanded') !== 'true';
