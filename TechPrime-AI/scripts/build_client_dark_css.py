@@ -40,8 +40,9 @@ IDENTITY_SELECTORS = re.compile(
     r'|\.ep-theme-toggle|\.ep-pnav|\.ep-account'
 )
 
-# The Build a PC case preview (.pcx) stays dark. Primo stays on its own light colours.
-SKIP_SELECTORS = re.compile(r'^\s*(\.pcx|\[data-view|\.primo)')
+# The Build a PC case preview (.pcx) stays dark. Primo stays on its own colours,
+# including rules that already start with html[data-theme="dark"] .primo-...
+SKIP_SELECTORS = re.compile(r'(\.pcx|\[data-view|\.primo)')
 
 # --------------------------------------------------------------------------- CSS parsing
 

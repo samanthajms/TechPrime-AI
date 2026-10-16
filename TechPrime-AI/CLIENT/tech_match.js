@@ -848,7 +848,8 @@
         brandFilter = {};
         if ($('tmPickerTitle')) $('tmPickerTitle').textContent = meta.select;
         if ($('tmPickerSearch')) $('tmPickerSearch').value = '';
-        if ($('tmPickerSort')) $('tmPickerSort').value = 'price-asc';
+        var hasParts = Object.keys(build).some(function (k) { return k !== slotId && build[k]; });
+        if ($('tmPickerSort')) $('tmPickerSort').value = hasParts ? 'recommended' : 'price-asc';
         if ($('tmPickerInStock')) $('tmPickerInStock').checked = true;
         if ($('tmPickerCompatOnly')) $('tmPickerCompatOnly').checked = true;
         setFiltersOpen(false);
@@ -901,7 +902,23 @@
         pickerProducts = [];
         if ($('tmPickerCount')) $('tmPickerCount').textContent = '';
         list.innerHTML = '<div class="tm-picker-loading">Loading products…</div>';
-        fetch('tech_match_api.php?slot=' + encodeURIComponent(slotId), { credentials: 'same-origin' })
+        var picked = {};
+        Object.keys(build).forEach(function (k) {
+            if (k === slotId || !build[k]) return;
+            picked[k] = {
+                id: build[k].id,
+                name: build[k].name,
+                price: build[k].price,
+                category: build[k].category || '',
+                description: build[k].description || ''
+            };
+        });
+        fetch('tech_match_api.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slot: slotId, csrf_token: window.EP_CSRF || '', build: picked })
+        })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 if (token !== pickerToken || activeSlot !== slotId) return;
@@ -956,6 +973,9 @@
             list = list.filter(function (x) { return !x.reason; });
         }
         list.sort(function (a, b) {
+            if (sort === 'recommended') {
+                return (Number(b.p.recommend_score) || 0) - (Number(a.p.recommend_score) || 0) || a.p._rank - b.p._rank;
+            }
             if (sort === 'price-desc') return Number(b.p.price) - Number(a.p.price);
             if (sort === 'name') return String(a.p.name).localeCompare(String(b.p.name));
             if (sort === 'stock') return Number(b.p.stock) - Number(a.p.stock) || a.p._rank - b.p._rank;
@@ -993,14 +1013,17 @@
             else if (x.reason) btn = '<button type="button" class="tm-select-btn" disabled>Incompatible</button>';
             else if (out) btn = '<button type="button" class="tm-select-btn" disabled>Out of stock</button>';
             else btn = '<button type="button" class="tm-select-btn" data-select="' + pid + '">Select</button>';
-            return '<article class="tm-product-card' + (x.reason ? ' is-incompatible' : '') + (isCurrent ? ' is-current' : '') + '">' +
+            var recommended = !x.reason && p.recommended && p.recommend_reason;
+            return '<article class="tm-product-card' + (x.reason ? ' is-incompatible' : '') + (recommended ? ' is-recommended' : '') + (isCurrent ? ' is-current' : '') + '">' +
                 img +
                 '<div class="tm-product-body">' +
+                (recommended ? '<span class="tm-recommend">Recommended</span>' : '') +
                 (p.brand ? '<span class="tm-product-brand">' + escapeHtml(p.brand) + '</span>' : '') +
                 '<h4 title="' + escapeHtml(p.name || '') + '">' +
                 (pid > 0 ? '<a href="products.php?id=' + pid + '" target="_blank" rel="noopener">' + escapeHtml(p.name || '') + '</a>' : escapeHtml(p.name || '')) +
                 '</h4>' +
                 specChips(p, false) +
+                (recommended ? '<p class="tm-recommend-why">' + escapeHtml(p.recommend_reason) + '</p>' : '') +
                 (x.reason ? '<p class="tm-compat-warn">' + escapeHtml(x.reason) + '</p>' : '') +
                 '</div>' +
                 '<div class="tm-product-side">' +

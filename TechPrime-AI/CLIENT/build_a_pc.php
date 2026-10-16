@@ -21,7 +21,7 @@ $isHomePage = false;
 $pageTitle = 'Build a PC';
 $csrf = generateCsrfToken();
 
-$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-12">';
+$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-14">';
 
 include __DIR__ . '/ep_header.php';
 ?>
@@ -202,6 +202,7 @@ include __DIR__ . '/ep_header.php';
         <input type="search" class="tm-drawer-search" id="tmPickerSearch" placeholder="Search products..." autocomplete="off" aria-label="Search products">
         <div class="tm-drawer-row">
             <select id="tmPickerSort" class="tm-picker-sort" aria-label="Sort products">
+                <option value="recommended">Recommended</option>
                 <option value="price-asc">Price: Low to High</option>
                 <option value="price-desc">Price: High to Low</option>
                 <option value="name">Name: A to Z</option>
@@ -237,7 +238,7 @@ window.EP_TM_USER = <?php echo (int)($_SESSION['user_id'] ?? 0); ?>;
 window.EP_TM_CAN_SAVE = <?php echo $canSaveBuilds ? 'true' : 'false'; ?>;
 window.EP_TM_LOGIN_URL = <?php echo json_encode($buildLoginUrl); ?>;
 </script>
-<script src="tech_match.js?v=pcx-13" defer></script>
+<script src="tech_match.js?v=pcx-14" defer></script>
 
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>

@@ -9,33 +9,32 @@ require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/client_helpers.php';
 require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
 require_once __DIR__ . '/../includes/pc_compatibility.php';
+require_once __DIR__ . '/../includes/pc_recommend.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
-$slot = trim((string)($_GET['slot'] ?? ''));
-$q = trim((string)($_GET['q'] ?? ''));
+$payload = [];
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    $payload = json_decode((string)file_get_contents('php://input'), true);
+    if (!is_array($payload)) {
+        $payload = [];
+    }
+    if (!verifyCsrfToken((string)($payload['csrf_token'] ?? ''))) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'products' => [], 'error' => 'csrf']);
+        exit;
+    }
+}
+
+$slot = trim((string)($payload['slot'] ?? $_GET['slot'] ?? ''));
+$q = trim((string)($payload['q'] ?? $_GET['q'] ?? ''));
 
 /*
- * Slot => shop taxonomy subcategories (includes/client_shop_taxonomy.php).
- * products.category is too coarse (most parts are "Others"), and loose keyword
- * matches pulled laptops ("RTX 4060") and APUs ("Radeon Graphics") into the GPU
- * slot — so every product is classified from its name, like the shop does.
+ * Slot lists use the shop taxonomy. products.category is too coarse, so each
+ * product is classified from its name before it is offered for a build slot.
  */
-$slotMap = [
-    'processor' => ['label' => 'Processor', 'subs' => ['processor-amd', 'processor-intel', 'processor-tray']],
-    'motherboard' => ['label' => 'Motherboard', 'subs' => ['motherboard']],
-    /* SO-DIMM sticks are laptop memory and do not fit a desktop board. */
-    'memory' => ['label' => 'Memory', 'subs' => ['memory'], 'exclude' => '/\bso-?dimm\b/i'],
-    'ssd' => ['label' => 'SSD (NVMe / M.2)', 'subs' => ['ssd'], 'storage' => 'nvme'],
-    'ssd_sata' => ['label' => 'SSD (SATA)', 'subs' => ['ssd'], 'storage' => 'sata'],
-    'hdd' => ['label' => 'Hard Disk', 'subs' => ['hard-disk']],
-    'gpu' => ['label' => 'Graphics Card', 'subs' => ['graphics-card']],
-    'psu' => ['label' => 'Power Supply', 'subs' => ['power-supply']],
-    'case' => ['label' => 'PC Case', 'subs' => ['pc-case']],
-    'cooler' => ['label' => 'CPU Cooler', 'subs' => ['cpu-cooling']],
-    'case_fan' => ['label' => 'Case Fan', 'subs' => ['chassis-fan']],
-];
+$slotMap = pc_recommend_slot_map();
 
 if ($slot === '' || !isset($slotMap[$slot])) {
     http_response_code(400);
@@ -45,69 +44,27 @@ if ($slot === '' || !isset($slotMap[$slot])) {
 
 $meta = $slotMap[$slot];
 $db = getDbConnection();
-$vis = ias_client_product_list_sql_condition('p');
-
-$stmt = $db->prepare(
-    "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, p.description,
-            u.name AS seller_name
-     FROM products p
-     INNER JOIN users u ON u.id = p.seller_id
-     WHERE {$vis}
-     ORDER BY p.stock DESC, p.name ASC"
-);
-if (!$stmt) {
-    echo json_encode(['ok' => false, 'products' => [], 'error' => 'query_failed']);
-    exit;
+$products = pc_recommend_products_for_slot($db, $slot);
+if ($q !== '') {
+    $products = array_values(array_filter($products, static function (array $p) use ($q): bool {
+        $hay = $p['name'] . ' ' . $p['brand'] . ' ' . $p['type'];
+        return mb_stripos($hay, $q) !== false;
+    }));
 }
-$stmt->execute();
-$rows = ias_client_filter_products_for_display($stmt->fetchAll(PDO::FETCH_ASSOC));
 
-$products = [];
-$seen = [];
-foreach ($rows as $p) {
-    $id = (int)($p['id'] ?? 0);
-    if ($id <= 0 || isset($seen[$id])) {
+$buildMap = pc_recommend_build_map($db, is_array($payload['build'] ?? null) ? $payload['build'] : []);
+foreach ($products as &$product) {
+    $scored = pc_recommend_score($slot, $product, $buildMap);
+    if ($scored === null) {
         continue;
     }
-    $name = (string)($p['name'] ?? '');
-    $category = (string)($p['category'] ?? '');
-    $description = (string)($p['description'] ?? '');
-
-    $tax = ep_shop_classify_product($p);
-    if ($tax['is_power_station'] || !in_array($tax['sub'], $meta['subs'], true)) {
-        continue;
+    $product['recommend_score'] = $scored['score'];
+    if ($scored['recommended']) {
+        $product['recommended'] = true;
+        $product['recommend_reason'] = $scored['reason'];
     }
-    if (!empty($meta['exclude']) && preg_match($meta['exclude'], $name)) {
-        continue;
-    }
-    if (!empty($meta['storage'])) {
-        $isSata = (bool)preg_match('/\bsata\b/i', $name) && !preg_match('/\b(nvme|m\.2|pcie)\b/i', $name);
-        if (($meta['storage'] === 'sata') !== $isSata) {
-            continue;
-        }
-    }
-    if ($q !== '') {
-        $hay = $name . ' ' . $tax['brand'] . ' ' . $tax['sub_label'];
-        if (mb_stripos($hay, $q) === false) {
-            continue;
-        }
-    }
-
-    $seen[$id] = true;
-    $products[] = [
-        'id' => $id,
-        'name' => $name,
-        'price' => (float)($p['price'] ?? 0),
-        'stock' => (int)($p['stock'] ?? 0),
-        'category' => $category,
-        'type' => (string)$tax['sub_label'],
-        'brand' => (string)$tax['brand'],
-        'description' => $description,
-        'image' => ias_client_product_image_url($p),
-        'seller' => (string)($p['seller_name'] ?? ''),
-        'compat' => ep_pc_compat_tags($name, $description, $category),
-    ];
 }
+unset($product);
 
 echo json_encode([
     'ok' => true,
