@@ -97,15 +97,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
  
-// ── Fetch Users by Role ───────────────────────────────────────────────────────
-$all_users     = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id ORDER BY u.role, u.name ASC");
-$clients       = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='client' ORDER BY u.name ASC");
-$admins        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='admin' ORDER BY u.name ASC");
-$retail_officers        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='retail_officer' ORDER BY u.name ASC");
-$inventory_custodians        = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='inventory_custodian' ORDER BY u.name ASC");
-$cashiers      = $db->query("SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id WHERE u.role='cashier' ORDER BY u.name ASC");
-
- 
 // Counts
 $count_all     = $db->query("SELECT COUNT(*) as c FROM users")->fetch(PDO::FETCH_ASSOC)['c'];
 $count_client  = $db->query("SELECT COUNT(*) as c FROM users WHERE role='client'")->fetch(PDO::FETCH_ASSOC)['c'];
@@ -123,22 +114,28 @@ if (!in_array($active_tab, $valid_tabs, true)) {
     $active_tab = 'all';
 }
  
-// Helper: fetch all users to PHP arrays for JS injection
-function fetchToArray($result) {
-    $arr = [];
-    while ($row = $result->fetch(PDO::FETCH_ASSOC)) $arr[] = $row;
-    return $arr;
-}
-$user_rows = [
-    'all'     => fetchToArray($all_users),
-    'client'  => fetchToArray($clients),
-    'admin'   => fetchToArray($admins),
-    'retail_officer' => fetchToArray($retail_officers),
-    'inventory_custodian' => fetchToArray($inventory_custodians),
-    'cashier' => fetchToArray($cashiers),
-    
-];
-$users = $user_rows[$active_tab];
+// ── Users for the active tab, one page at a time (server-side paging) ─────────
+$tabWhere = $active_tab === 'all' ? '' : 'WHERE u.role = ?';
+$tabParams = $active_tab === 'all' ? [] : [$active_tab];
+$tabOrder = $active_tab === 'all' ? 'u.role, u.name ASC' : 'u.name ASC';
+$countStmt = $db->prepare("SELECT COUNT(*) FROM users u LEFT JOIN locked_accounts la ON la.user_id = u.id {$tabWhere}");
+$countStmt->execute($tabParams);
+$usersTotal = (int)$countStmt->fetchColumn();
+$perPage = 25;
+$totalPages = max(1, (int)ceil($usersTotal / $perPage));
+$page = min(max(1, (int)($_GET['page'] ?? 1)), $totalPages);
+$usersStmt = $db->prepare(
+    "SELECT u.*, la.reason as lock_reason, la.locked_at FROM users u
+     LEFT JOIN locked_accounts la ON la.user_id = u.id
+     {$tabWhere}
+     ORDER BY {$tabOrder}, u.id ASC
+     LIMIT " . (int)$perPage . ' OFFSET ' . (int)(($page - 1) * $perPage)
+);
+$usersStmt->execute($tabParams);
+$users = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
+$usersPageUrl = static function (int $p) use ($active_tab): string {
+    return 'manage_users.php?' . http_build_query(['tab' => $active_tab, 'page' => $p]);
+};
 $roleLabels = ['client' => 'Client', 'admin' => 'Admin'] + $staffRoles;
 
 $usersCss = <<<'CSS'
@@ -505,7 +502,7 @@ staff_page_start([
             <div class="card-header">
                 <div>
                     <h3><span class="card-icon"><i class="fas fa-user-cog"></i></span> User Accounts</h3>
-                    <div class="card-subtitle">Showing <?php echo count($users); ?> account<?php echo count($users) === 1 ? '' : 's'; ?> for the selected role</div>
+                    <div class="card-subtitle"><?php echo (int)$usersTotal; ?> account<?php echo $usersTotal === 1 ? '' : 's'; ?> for the selected role</div>
                 </div>
                 <button type="button" class="btn btn-primary no-print" onclick="openFilterModal('createStaffModal')"><i class="fas fa-user-plus"></i> Create Staff Account</button>
             </div>
@@ -589,6 +586,7 @@ staff_page_start([
                 </tbody>
             </table>
         </div>
+        <?php staff_pagination($page, $totalPages, $usersTotal, $perPage, $usersPageUrl, 'User account pages'); ?>
     </div>
 
 <div id="createStaffModal" class="filter-modal no-print" onclick="if(event.target===this)closeFilterModal('createStaffModal')">

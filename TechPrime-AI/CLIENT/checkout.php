@@ -236,6 +236,12 @@ $showDeliveryNotice = in_array($addressMode, ['saved', 'custom'], true);
             <p class="ep-info-note" style="margin:0;">Checkout is empty.</p>
         </div>
     <?php else: ?>
+    <?php /* How ordering works, for first-time shoppers (survey feedback). */ ?>
+    <ol class="ep-howto-steps ep-checkout-howto" aria-label="How ordering works">
+        <li><strong>Your details</strong><span>Enter your phone number and choose delivery (via Lalamove) or pick-up at the store.</span></li>
+        <li><strong>Place the order</strong><span>Check the Order Summary, then press <b>Place Order</b>.</span></li>
+        <li><strong>Pay</strong><span>Pay from <b>My Profile → To Pay</b>. You can track the order there too.</span></li>
+    </ol>
     <form method="POST" class="ep-checkout-grid" id="epCheckoutForm">
         <div class="ep-panel">
             <h3 class="ep-panel-title"><i class="fas fa-map-marker-alt"></i> Shipping Details</h3>

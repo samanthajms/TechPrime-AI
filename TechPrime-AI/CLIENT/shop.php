@@ -536,6 +536,22 @@ if ($isPartial) {
                             <span>₱0</span>
                             <span>₱100,000</span>
                         </div>
+                        <?php /* Typed prices for exact filtering; the slider moves in ₱500 steps. Unnamed: the hidden fields below are what gets sent. */ ?>
+                        <div class="ep-shop-price-inputs">
+                            <div class="ep-shop-price-field">
+                                <span aria-hidden="true">Min ₱</span>
+                                <input type="number" id="epShopPriceMinBox" inputmode="numeric"
+                                       min="<?php echo (int)$priceFloor; ?>" max="<?php echo (int)$priceCeiling; ?>" step="1"
+                                       value="<?php echo (int)$selectedMinPrice; ?>" aria-label="Minimum price in pesos">
+                            </div>
+                            <span class="ep-shop-price-dash" aria-hidden="true">–</span>
+                            <div class="ep-shop-price-field">
+                                <span aria-hidden="true">Max ₱</span>
+                                <input type="number" id="epShopPriceMaxBox" inputmode="numeric"
+                                       min="<?php echo (int)$priceFloor; ?>" max="<?php echo (int)$priceCeiling; ?>" step="1"
+                                       value="<?php echo (int)$selectedMaxPrice; ?>" aria-label="Maximum price in pesos">
+                            </div>
+                        </div>
                         <input type="hidden" name="price_min" id="epShopPriceMin" value="<?php echo (int)$selectedMinPrice; ?>">
                         <input type="hidden" name="price_max" id="epShopPriceMax" value="<?php echo (int)$selectedMaxPrice; ?>">
                     </div>
@@ -606,14 +622,21 @@ $extraScripts = <<<'SCRIPTS'
     var maxRange = document.getElementById('epShopRangeMax');
     var label = document.getElementById('epShopPriceLabel');
     var slider = form.querySelector('.ep-shop-slider');
+    var minBox = document.getElementById('epShopPriceMinBox');
+    var maxBox = document.getElementById('epShopPriceMaxBox');
     var floor = 0;
     var ceiling = 100000;
     function formatPeso(n) { return '₱' + Number(n).toLocaleString('en-PH'); }
-    function updateUI() {
-        var minVal = Number(minRange.value);
-        var maxVal = Number(maxRange.value);
+    // The hidden fields hold the exact price; the sliders only snap to ₱500 steps.
+    function updateUI(minVal, maxVal) {
+        if (minVal === undefined) {
+            minVal = Number(minRange.value);
+            maxVal = Number(maxRange.value);
+        }
         minInput.value = minVal;
         maxInput.value = maxVal;
+        if (minBox && document.activeElement !== minBox) minBox.value = minVal;
+        if (maxBox && document.activeElement !== maxBox) maxBox.value = maxVal;
         if (label) label.textContent = formatPeso(minVal) + ' — ' + formatPeso(maxVal);
         if (slider) {
             var span = ceiling - floor;
@@ -632,7 +655,45 @@ $extraScripts = <<<'SCRIPTS'
     }
     minRange.addEventListener('input', function () { syncFromRanges('min'); scheduleLoad(300); });
     maxRange.addEventListener('input', function () { syncFromRanges('max'); scheduleLoad(300); });
-    updateUI();
+
+    function readBox(box, fallback) {
+        var raw = String(box.value).trim();
+        if (raw === '') return fallback;
+        var n = Math.round(Number(raw));
+        if (!isFinite(n)) return fallback;
+        return Math.min(ceiling, Math.max(floor, n));
+    }
+    // Typed prices: clamp to ₱0–₱100,000, swap if Min > Max, then move the sliders to match.
+    function syncFromBoxes() {
+        if (!minBox || !maxBox) return;
+        var minVal = readBox(minBox, floor);
+        var maxVal = readBox(maxBox, ceiling);
+        if (minVal > maxVal) { var t = minVal; minVal = maxVal; maxVal = t; }
+        minRange.value = minVal;
+        maxRange.value = maxVal;
+        updateUI(minVal, maxVal);
+    }
+    var boxTimer = null;
+    [minBox, maxBox].forEach(function (box) {
+        if (!box) return;
+        box.addEventListener('input', function () {
+            // Wait until the shopper pauses typing before filtering.
+            if (boxTimer) clearTimeout(boxTimer);
+            boxTimer = setTimeout(function () {
+                boxTimer = null;
+                syncFromBoxes();
+                load(buildParams());
+            }, 700);
+        });
+        box.addEventListener('change', function () {
+            if (boxTimer) { clearTimeout(boxTimer); boxTimer = null; }
+            syncFromBoxes();
+            minBox.value = minInput.value;
+            maxBox.value = maxInput.value;
+            load(buildParams());
+        });
+    });
+    updateUI(Number(minInput.value), Number(maxInput.value));
 
     /* ---- Live results: refresh the product grid without reloading the page ---- */
     var results = document.getElementById('epShopResults');
@@ -760,6 +821,8 @@ $extraScripts = <<<'SCRIPTS'
 
     form.addEventListener('submit', function (e) {
         e.preventDefault();
+        if (boxTimer) { clearTimeout(boxTimer); boxTimer = null; }
+        if (minBox && (document.activeElement === minBox || document.activeElement === maxBox)) syncFromBoxes();
         load(buildParams(), { force: true });
     });
 

@@ -1128,3 +1128,78 @@ function ep_toggle_wishlist(PDO $db, int $productId): bool
     }
     return !$on;
 }
+
+/* ---- Recently viewed products ----
+ * Kept in a browser cookie (ep_recent: product ids, newest first) so guests get it too
+ * and it lasts across visits. No DB table: products are re-read on display, so prices,
+ * stock and visibility are always current. Written by product_detail.php, shown on the
+ * homepage and under the product page.
+ */
+const EP_RECENT_COOKIE = 'ep_recent';
+const EP_RECENT_MAX = 12;
+
+function ep_recent_ids(): array
+{
+    $raw = (string)($_COOKIE[EP_RECENT_COOKIE] ?? '');
+    $ids = [];
+    foreach (explode(',', $raw) as $part) {
+        $id = (int)$part;
+        if ($id > 0 && !in_array($id, $ids, true)) {
+            $ids[] = $id;
+        }
+        if (count($ids) >= EP_RECENT_MAX) {
+            break;
+        }
+    }
+    return $ids;
+}
+
+/** Moves $productId to the front of the list. Must run before any page output. */
+function ep_recent_record(int $productId): void
+{
+    if ($productId <= 0 || headers_sent()) {
+        return;
+    }
+    $ids = array_values(array_diff(ep_recent_ids(), [$productId]));
+    array_unshift($ids, $productId);
+    $ids = array_slice($ids, 0, EP_RECENT_MAX);
+    $value = implode(',', $ids);
+    setcookie(EP_RECENT_COOKIE, $value, [
+        'expires'  => time() + 60 * 60 * 24 * 30,
+        'path'     => rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/') . '/',
+        'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    $_COOKIE[EP_RECENT_COOKIE] = $value;
+}
+
+/** Recently viewed products that are still listed, newest first. */
+function ep_recent_products(PDO $db, int $excludeId = 0, int $limit = 8): array
+{
+    $ids = array_values(array_diff(ep_recent_ids(), [$excludeId]));
+    if (!$ids) {
+        return [];
+    }
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $vis = ias_client_product_list_sql_condition('p');
+    $stmt = $db->prepare(
+        "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url
+         FROM products p WHERE p.id IN ({$in}) AND {$vis}"
+    );
+    $stmt->execute($ids);
+    $byId = [];
+    foreach (ias_client_filter_products_for_display($stmt->fetchAll(PDO::FETCH_ASSOC)) as $p) {
+        $byId[(int)$p['id']] = $p;
+    }
+    $out = [];
+    foreach ($ids as $id) {
+        if (isset($byId[$id])) {
+            $out[] = $byId[$id];
+        }
+        if (count($out) >= $limit) {
+            break;
+        }
+    }
+    return $out;
+}

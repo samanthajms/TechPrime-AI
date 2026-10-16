@@ -38,6 +38,7 @@ $newArrivalsResult = $db->query($newArrivalsQuery);
 $newArrivals = $newArrivalsResult ? $newArrivalsResult->fetchAll(PDO::FETCH_ASSOC) : [];
 
 $categoryTiles = ep_shop_category_tiles($db);
+$epRecent = ep_recent_products($db, 0, 8);
 
 $returnTo = 'index.php';
 ?>
@@ -81,6 +82,8 @@ $returnTo = 'index.php';
         </div>
     </section>
     <?php endif; ?>
+
+    <?php include __DIR__ . '/ep_recent_section.php'; ?>
 
     <section class="ep-section ep-featured-section">
         <div class="ep-featured-head">

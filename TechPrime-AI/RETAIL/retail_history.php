@@ -14,8 +14,19 @@ $retailId = (int)$_SESSION['user_id'];
 // Completed Deliveries has its own time filter (dperiod)
 $periods = ['month' => 'This Month', 'last' => 'Last Month', '3m' => 'Last 3 Months', 'year' => 'This Year'];
 $dRange = ias_sales_period_range((string)($_GET['dperiod'] ?? 'year'));
-$rows = ias_fetch_delivery_rows($db, $retailId, $dRange['from'], $dRange['to']);
-$stats = ias_summarize_deliveries($db, $retailId, $dRange['from'], $dRange['to'], count($rows));
+// Server-side paging: count every delivery in the range, fetch only the current page.
+$totalRows = ias_count_delivery_rows($db, $dRange['from'], $dRange['to']);
+$perPage = 20;
+$totalPages = max(1, (int)ceil($totalRows / $perPage));
+$page = min(max(1, (int)($_GET['page'] ?? 1)), $totalPages);
+$rows = ias_fetch_delivery_rows($db, $retailId, $dRange['from'], $dRange['to'], [
+    'limit' => $perPage,
+    'offset' => ($page - 1) * $perPage,
+]);
+$stats = ias_summarize_deliveries($db, $retailId, $dRange['from'], $dRange['to'], $totalRows);
+$historyPageUrl = static function (int $p) use ($dRange): string {
+    return 'retail_history.php?' . http_build_query(['dperiod' => $dRange['key'], 'page' => $p]);
+};
 
 /** Export links carry the resolved dates so retail_export.php needs no knowledge of the period keys. */
 function ias_sales_export_qs(array $range, string $format): string
@@ -159,6 +170,7 @@ $logoPath = staff_logo_href();
                             <?php endif; ?>
                         </tbody>
                     </table>
+                    <?php staff_pagination($page, $totalPages, $totalRows, $perPage, $historyPageUrl, 'Completed deliveries pages'); ?>
             </div>
         </section>
 

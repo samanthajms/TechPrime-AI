@@ -209,6 +209,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
     exit;
 }
 
+$selectedStatus = trim((string)($_GET['status'] ?? ''));
+if ($selectedStatus !== '' && !isset($orderStatusFilters[$selectedStatus])) {
+    $selectedStatus = '';
+}
+
+// Server-side paging: count the filtered orders, then fetch only the current page.
+$where = '';
+$whereParams = [];
+if ($selectedStatus === 'cancel_requested') {
+    $where = "WHERE COALESCE(o.cancel_requested, FALSE) = TRUE AND COALESCE(o.status, '') <> 'cancelled'";
+} elseif ($selectedStatus !== '') {
+    $where = 'WHERE o.status = ?';
+    $whereParams[] = $selectedStatus;
+}
+$countStmt = $db->prepare("SELECT COUNT(*) FROM orders o INNER JOIN users u ON u.id = o.user_id {$where}");
+$countStmt->execute($whereParams);
+$filteredCount = (int)$countStmt->fetchColumn();
+
+$perPage = 20;
+$currentPage = max(1, (int)($_GET['page'] ?? 1));
+$totalPages = max(1, (int)ceil($filteredCount / $perPage));
+if ($currentPage > $totalPages) {
+    $currentPage = $totalPages;
+}
+
 $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.customer_phone,
                o.payment_status, o.payment_method, o.cancel_requested, o.cancel_reason, o.fulfillment_type,
                u.name, u.surname, u.email, u.address AS user_address,
@@ -218,35 +243,14 @@ $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.cust
                (SELECT shipment_status FROM shipments WHERE order_id = o.id ORDER BY id DESC LIMIT 1) AS shipment_status
         FROM orders o
         INNER JOIN users u ON u.id = o.user_id
+        {$where}
         ORDER BY
             CASE WHEN COALESCE(o.cancel_requested, FALSE) = TRUE AND o.status <> 'cancelled' THEN 0 ELSE 1 END,
-            o.id DESC";
-$allRows = $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-
-$selectedStatus = trim((string)($_GET['status'] ?? ''));
-if ($selectedStatus !== '' && !isset($orderStatusFilters[$selectedStatus])) {
-    $selectedStatus = '';
-}
-
-$filteredRows = $allRows;
-if ($selectedStatus === 'cancel_requested') {
-    $filteredRows = array_values(array_filter($allRows, static function ($row) {
-        return !empty($row['cancel_requested']) && ($row['status'] ?? '') !== 'cancelled';
-    }));
-} elseif ($selectedStatus !== '') {
-    $filteredRows = array_values(array_filter($allRows, static function ($row) use ($selectedStatus) {
-        return ($row['status'] ?? '') === $selectedStatus;
-    }));
-}
-$filteredCount = count($filteredRows);
-
-$perPage = 20;
-$currentPage = max(1, (int)($_GET['page'] ?? 1));
-$totalPages = max(1, (int)ceil($filteredCount / $perPage));
-if ($currentPage > $totalPages) {
-    $currentPage = $totalPages;
-}
-$pagedRows = array_slice($filteredRows, ($currentPage - 1) * $perPage, $perPage);
+            o.id DESC
+        LIMIT " . (int)$perPage . ' OFFSET ' . (int)(($currentPage - 1) * $perPage);
+$pageStmt = $db->prepare($sql);
+$pageStmt->execute($whereParams);
+$pagedRows = $pageStmt->fetchAll(PDO::FETCH_ASSOC);
 
 function inv_orders_page_url(int $page, string $status = ''): string
 {

@@ -21,7 +21,7 @@ $isHomePage = false;
 $pageTitle = 'Build a PC';
 $csrf = generateCsrfToken();
 
-$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-14">';
+$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-15">';
 
 include __DIR__ . '/ep_header.php';
 ?>
@@ -30,6 +30,9 @@ include __DIR__ . '/ep_header.php';
     <div class="bp-top">
         <div class="bp-titlebar">
             <h1><span class="bp-title-icon"><i class="fas fa-microchip" aria-hidden="true"></i></span> Build Your PC</h1>
+            <button type="button" class="bp-help-btn" id="bpGuideOpen" aria-controls="bpGuide">
+                <i class="far fa-question-circle" aria-hidden="true"></i> How it works
+            </button>
         </div>
         <div class="bp-budget">
             <span class="bp-budget-label">Budget</span>
@@ -41,6 +44,50 @@ include __DIR__ . '/ep_header.php';
         </div>
         <nav class="tm-steps" id="tmSteps" aria-label="Build stages"></nav>
     </div>
+
+    <?php /* First-visit guide (survey feedback). Shown until dismissed; "How it works" reopens it. */ ?>
+    <section class="ep-howto" id="bpGuide" aria-labelledby="bpGuideTitle" hidden>
+        <div class="ep-howto-head">
+            <h2 id="bpGuideTitle"><i class="far fa-lightbulb" aria-hidden="true"></i> New here? Build your PC in 3 steps</h2>
+            <button type="button" class="ep-howto-close" id="bpGuideClose">Got it</button>
+        </div>
+        <ol class="ep-howto-steps">
+            <li>
+                <strong>Pick your parts</strong>
+                <span>Choose a component from the list on the left, or click a part inside the case. The picker shows parts that fit your build first. You can set a budget at the top.</span>
+            </li>
+            <li>
+                <strong>Check the build</strong>
+                <span>The compatibility status, power draw and Build Score on the right update as you add parts.</span>
+            </li>
+            <li>
+                <strong>Buy or save it</strong>
+                <span>Use <b>Add to Cart</b> or <b>Buy Now</b> to order the whole build, or <b>Save Build</b> (needs a login) to finish it later.</span>
+            </li>
+        </ol>
+    </section>
+    <script>
+    (function () {
+        var KEY = 'ep_bp_guide_done';
+        var guide = document.getElementById('bpGuide');
+        var openBtn = document.getElementById('bpGuideOpen');
+        var closeBtn = document.getElementById('bpGuideClose');
+        var done = false;
+        try { done = localStorage.getItem(KEY) === '1'; } catch (e) {}
+        guide.hidden = done;
+        if (openBtn) openBtn.setAttribute('aria-expanded', done ? 'false' : 'true');
+        closeBtn.addEventListener('click', function () {
+            guide.hidden = true;
+            if (openBtn) { openBtn.setAttribute('aria-expanded', 'false'); openBtn.focus(); }
+            try { localStorage.setItem(KEY, '1'); } catch (e) {}
+        });
+        if (openBtn) openBtn.addEventListener('click', function () {
+            guide.hidden = !guide.hidden;
+            openBtn.setAttribute('aria-expanded', guide.hidden ? 'false' : 'true');
+            if (!guide.hidden) guide.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    })();
+    </script>
 
     <div class="tm-edit-banner" id="tmEditBanner" hidden>
         <i class="fas fa-pen" aria-hidden="true"></i>

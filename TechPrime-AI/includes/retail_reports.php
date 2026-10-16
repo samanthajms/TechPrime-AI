@@ -235,7 +235,7 @@ function ias_sales_daily_trend(array $rows, DateTime $from, DateTime $to): array
 
 /**
  * Fetch completed (delivered) shipments for a retail officer's products within a date range.
- * Optional filters: customer, product_id.
+ * Optional filters: customer, product, and limit/offset for one page (Sales History).
  */
 function ias_fetch_delivery_rows(PDO $db, int $sellerId, DateTime $from, DateTime $to, array $filters = []): array
 {
@@ -275,12 +275,28 @@ function ias_fetch_delivery_rows(PDO $db, int $sellerId, DateTime $from, DateTim
         $bind[] = '%' . $filters['product'] . '%';
     }
 
-    $sql .= " ORDER BY s.updated_at DESC";
+    $sql .= " ORDER BY s.updated_at DESC, s.id DESC";
+    if (!empty($filters['limit'])) {
+        $sql .= ' LIMIT ' . max(1, (int)$filters['limit']) . ' OFFSET ' . max(0, (int)($filters['offset'] ?? 0));
+    }
 
     $stmt = $db->prepare($sql);
     $stmt->execute($bind);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     return $rows;
+}
+
+/** Number of delivered shipments in the range (same rows as ias_fetch_delivery_rows() without filters). */
+function ias_count_delivery_rows(PDO $db, DateTime $from, DateTime $to): int
+{
+    $stmt = $db->prepare("SELECT COUNT(*)
+                          FROM shipments s
+                          INNER JOIN orders o ON s.order_id = o.id
+                          INNER JOIN users u ON u.id = o.user_id
+                          WHERE s.shipment_status = 'delivered'
+                            AND s.updated_at >= ? AND s.updated_at < ?");
+    $stmt->execute([$from->format('Y-m-d 00:00:00'), (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00')]);
+    return (int)$stmt->fetchColumn();
 }
 
 /** Order line items for the given order ids: [order_id => [['product_name', 'category', 'quantity', 'price'], ...]] */

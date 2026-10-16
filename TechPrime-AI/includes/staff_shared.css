@@ -1554,3 +1554,25 @@ table.staff-table tbody tr:hover { background: var(--ep-green-light); }
     .filter-modal.open .filter-modal-card { transform: none; }
   }
 }
+
+/* ---- Server-side table pager (staff_pagination() in staff_layout.php) ---- */
+.staff-pagination {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.staff-pagination .pg-info { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.staff-pagination .pg-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.staff-page {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 36px; height: 36px; padding: 0 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: #fff; color: var(--text-main);
+  font-size: 13px; font-weight: 600; text-decoration: none; font-variant-numeric: tabular-nums;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform 160ms cubic-bezier(.23,1,.32,1);
+}
+a.staff-page:hover { background: var(--ep-green-light); border-color: var(--ep-green); color: var(--ep-green-dark); }
+a.staff-page:active { transform: scale(.95); }
+a.staff-page:focus-visible { outline: 2px solid var(--ep-green); outline-offset: 2px; }
+.staff-page.active { background: var(--ep-green); border-color: var(--ep-green); color: #fff; }
+.staff-page.disabled { opacity: .4; pointer-events: none; }
+.staff-page.gap { border: none; background: none; min-width: 0; padding: 0 2px; }
+@media (prefers-reduced-motion: reduce) { a.staff-page:active { transform: none; } }

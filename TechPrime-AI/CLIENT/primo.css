@@ -1883,10 +1883,62 @@ html[data-theme="dark"] .primo-root.is-compact .primo-greet::after {
     }
 }
 
+/* ---- First-visit attention pulse ----
+ * Until Primo has been opened once in this browser (primo.js, localStorage primo_seen),
+ * a soft green ring pulses around the round launcher and the homepage "Ask Primo" tag.
+ */
+.primo-root.is-compact .primo-mascot {
+    position: relative;
+}
+
+.primo-root.is-compact.is-attention .primo-mascot::after,
+.primo-root.is-attention .primo-label {
+    animation: primo-attention 2.4s ease-out infinite;
+}
+
+.primo-root.is-compact.is-attention .primo-mascot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.primo-root.is-chat-open .primo-mascot::after,
+.primo-root.is-chat-open .primo-label {
+    animation: none;
+}
+
+@keyframes primo-attention {
+    0%   { box-shadow: 0 0 0 0 rgba(98, 178, 54, 0.55); }
+    70%  { box-shadow: 0 0 0 14px rgba(98, 178, 54, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(98, 178, 54, 0); }
+}
+
+/* Header "Ask Primo" nav entry (ep_header.php): a <button> styled like the page links. */
+.ep-pnav-primo {
+    background: none;
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.ep-drawer-primo {
+    width: 100%;
+    background: none;
+    border: 0;
+    font-family: inherit;
+    text-align: left;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .primo-root.is-compact .primo-mascot,
     .primo-launcher-face,
     .primo-launcher-close {
         transition: none !important;
+    }
+    .primo-root.is-attention .primo-mascot::after,
+    .primo-root.is-attention .primo-label {
+        animation: none !important;
     }
 }

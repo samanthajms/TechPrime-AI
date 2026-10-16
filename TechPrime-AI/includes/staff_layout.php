@@ -254,7 +254,7 @@ if (!function_exists('staff_page_start')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo h($title); ?> — EasyPC</title>
-    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-motion-1">
+    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-motion-2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <?php if ($useInvPageTitle): ?>
     <style>
@@ -844,6 +844,49 @@ if (!function_exists('staff_page_end')) {
 </script>
 </body>
 </html>
+        <?php
+    }
+}
+
+if (!function_exists('staff_pagination')) {
+    /**
+     * Server-side pager for staff tables: "Showing a–b of n" plus Prev / page numbers / Next.
+     * $url(int $page): string builds each link (keep the page's other filters in it).
+     * Renders nothing when $total is 0, so the table's own empty-state row stays the message.
+     */
+    function staff_pagination(int $page, int $totalPages, int $total, int $perPage, callable $url, string $label = 'Table pages'): void
+    {
+        if ($total <= 0) {
+            return;
+        }
+        $first = ($page - 1) * $perPage + 1;
+        $last = min($page * $perPage, $total);
+        $pages = [];
+        for ($p = 1; $p <= $totalPages; $p++) {
+            if ($p === 1 || $p === $totalPages || abs($p - $page) <= 2) {
+                if ($pages && end($pages) !== $p - 1) {
+                    $pages[] = 0;   // gap
+                }
+                $pages[] = $p;
+            }
+        }
+        ?>
+        <nav class="staff-pagination no-print" aria-label="<?php echo h($label); ?>">
+            <div class="pg-info">Showing <?php echo number_format($first); ?>–<?php echo number_format($last); ?> of <?php echo number_format($total); ?></div>
+            <?php if ($totalPages > 1): ?>
+            <div class="pg-controls">
+                <a class="staff-page<?php echo $page <= 1 ? ' disabled' : ''; ?>" href="<?php echo h($url(max(1, $page - 1))); ?>"<?php echo $page <= 1 ? ' aria-disabled="true" tabindex="-1"' : ''; ?>><i class="fas fa-chevron-left" aria-hidden="true"></i> Prev</a>
+                <?php foreach ($pages as $p): ?>
+                    <?php if ($p === 0): ?>
+                    <span class="staff-page gap" aria-hidden="true">…</span>
+                    <?php else: ?>
+                    <a class="staff-page<?php echo $p === $page ? ' active' : ''; ?>" href="<?php echo h($url($p)); ?>"<?php echo $p === $page ? ' aria-current="page"' : ''; ?>><?php echo $p; ?></a>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+                <a class="staff-page<?php echo $page >= $totalPages ? ' disabled' : ''; ?>" href="<?php echo h($url(min($totalPages, $page + 1))); ?>"<?php echo $page >= $totalPages ? ' aria-disabled="true" tabindex="-1"' : ''; ?>>Next <i class="fas fa-chevron-right" aria-hidden="true"></i></a>
+            </div>
+            <?php endif; ?>
+        </nav>
         <?php
     }
 }

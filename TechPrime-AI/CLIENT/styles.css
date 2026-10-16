@@ -5109,6 +5109,131 @@ body.ep-tm-modal-open { overflow: hidden; }
     color: #888;
     font-weight: 600;
 }
+/* "How it works" guide for first-time shoppers (build_a_pc.php card, checkout.php strip). */
+.ep-howto {
+    margin: 0 0 18px;
+    padding: 16px 18px;
+    border: 1px solid rgba(97, 178, 54, 0.28);
+    border-radius: 12px;
+    background: var(--ep-green-light);
+}
+.ep-howto-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.ep-howto-head h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ep-green-dark);
+}
+.ep-howto-head h2 i { margin-right: 6px; }
+.ep-howto-close {
+    flex-shrink: 0;
+    border: 1px solid var(--ep-green);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ep-green-dark);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 14px;
+    cursor: pointer;
+}
+.ep-howto-close:hover { background: var(--ep-green); color: #fff; }
+.ep-howto-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    counter-reset: ep-howto;
+}
+.ep-howto-steps li {
+    counter-increment: ep-howto;
+    position: relative;
+    padding: 0 0 0 38px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #555;
+}
+.ep-howto-steps li::before {
+    content: counter(ep-howto);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--ep-green);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+}
+.ep-howto-steps strong { color: var(--ep-black); font-size: 14px; }
+.ep-checkout-howto {
+    margin: 0 0 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--ep-border);
+    border-radius: 12px;
+    background: #fff;
+}
+
+/* Typed Min / Max price boxes under the slider (shop.php) and next to it (category.php). */
+.ep-shop-price-inputs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ep-shop-price-dash { color: #999; font-weight: 700; }
+.ep-shop-price-field {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--ep-border);
+    border-radius: 10px;
+    padding: 0 10px;
+    background: #fafbfc;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.ep-shop-price-field span {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #888;
+    white-space: nowrap;
+}
+.ep-shop-price-field input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    padding: 9px 0;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ep-black);
+    outline: none;
+    -moz-appearance: textfield;
+}
+.ep-shop-price-field input::-webkit-outer-spin-button,
+.ep-shop-price-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.ep-shop-price-field:focus-within {
+    border-color: var(--ep-green);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(97, 178, 54, 0.18);
+}
+.ep-price-range .ep-shop-price-inputs { margin-top: 10px; }
 .ep-shop-filter-actions {
     display: flex;
     flex-direction: row;

@@ -59,6 +59,9 @@ $sku   = trim((string)($product['sku'] ?? ''));
 $inWishlist = ep_wishlist_has($pid);
 $returnTo = 'products.php?id=' . $pid;
 $csrf = generateCsrfToken();
+// Recently viewed: list what was viewed before this product, then record this one.
+$epRecent = ep_recent_products($db, $pid, 8);
+ep_recent_record($pid);
 
 // Description: "Label: value" lines become spec rows, the rest stays as overview prose.
 $descParas = [];
@@ -414,6 +417,8 @@ include __DIR__ . '/ep_header.php';
             </div>
         </section>
     <?php endif; ?>
+
+    <?php include __DIR__ . '/ep_recent_section.php'; ?>
 </main>
 
 <?php

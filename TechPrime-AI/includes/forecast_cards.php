@@ -204,14 +204,14 @@ function ias_forecast_cards_render(array $fc, array $categories, string $which =
             <div class="table-wrap fc-scroll fc-sub-monthly">
                 <table class="ias-table">
                     <thead><tr><th>Month</th><th>Type</th><th>Units</th><th>Sales (PHP)</th><th title="Change vs the month before">Sales MoM</th><th title="Change vs the month before">Units MoM</th><th>Likely range (PHP)</th></tr></thead>
-                    <tbody id="fcRevBody"></tbody>
+                    <tbody id="fcRevBody"><tr><td colspan="7" class="empty-state">Loading&hellip;</td></tr></tbody>
                 </table>
             </div>
             <div class="fc-subhead fc-sub-cat">By category (whole forecast window)</div>
             <div class="table-wrap fc-scroll fc-sub-cat">
                 <table class="ias-table">
                     <thead><tr><th>Category</th><th>Group</th><th>Forecast units</th><th>Forecast sales (PHP)</th><th title="First forecast month vs the latest actual month">Sales MoM (next month)</th><th title="First forecast month vs the latest actual month">Units MoM (next month)</th></tr></thead>
-                    <tbody id="fcRevCatBody"></tbody>
+                    <tbody id="fcRevCatBody"><tr><td colspan="6" class="empty-state">Loading&hellip;</td></tr></tbody>
                 </table>
             </div>
             <div class="fc-note">MoM = change versus the month before. For the first forecast month that is the latest actual month. A jump from a very small base can look extreme.</div>
@@ -340,13 +340,19 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
     function get(type, c, extra) {
         var q = 'type=' + type + '&horizon=' + c.months + '&from=' + c.from + '&to=' + c.to + (extra || '') +
                 (c.category ? '&category=' + encodeURIComponent(c.category) : '');
-        return fetch(API + '?' + q, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        // Give up after 60 s so a stuck request shows an error instead of "Loading…" forever.
+        var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var timer = ctl ? setTimeout(function () { ctl.abort(); }, 60000) : null;
+        return fetch(API + '?' + q, { credentials: 'same-origin', headers: { 'Accept': 'application/json' }, signal: ctl ? ctl.signal : undefined })
             .then(function (r) {
                 return r.json().catch(function () { return {}; }).then(function (j) {
                     if (!r.ok || j.ok === false) { throw new Error(j.error || ('HTTP ' + r.status)); }
                     return j;
                 });
-            });
+            }, function (e) {
+                throw new Error(e && e.name === 'AbortError' ? 'the request timed out. Refresh to try again.' : 'could not reach the server. Check your connection and refresh.');
+            })
+            .finally(function () { if (timer) { clearTimeout(timer); } });
     }
     function windowLabel(m) { return 'next ' + m + (m === 1 ? ' month' : ' months'); }
     function shorten(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
@@ -590,6 +596,9 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
         initSubToggle('fc-sales', 'sales');
         get('revenue', cfg.sales).then(function (d) { renderSales(d, cfg.sales); }).catch(function (e) {
             document.getElementById('fcRevSub').textContent = 'Forecast unavailable: ' + e.message;
+            // Don't leave the tables on "Loading…" when the request fails.
+            emptyRow(document.getElementById('fcRevBody'), 7, 'Forecast unavailable: ' + e.message);
+            emptyRow(document.getElementById('fcRevCatBody'), 6, 'Forecast unavailable: ' + e.message);
         });
     }
 })();

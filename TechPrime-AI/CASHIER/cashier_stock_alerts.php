@@ -16,7 +16,7 @@ staff_page_start([
     'active' => 'alerts',
     'heading' => 'Stock Alerts',
     'subtitle' => 'Low, critical and out-of-stock products · read-only · restocking is handled by the Inventory Custodian',
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=6">',
+    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=7">',
 ]);
 ?>
         <div class="cash-page">
@@ -130,7 +130,7 @@ staff_page_start([
         </div>
 <?php
 $alertsJson = json_encode($alerts, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-$script = '<script src="stock_alerts.js?v=1"></script>'
+$script = '<script src="stock_alerts.js?v=2"></script>'
     . '<script>var INITIAL_ALERTS = ' . $alertsJson . ';</script>'
     . <<<'SCRIPT'
 <script>
@@ -228,7 +228,7 @@ $script = '<script src="stock_alerts.js?v=1"></script>'
         document.getElementById('statLow').textContent = d.low;
         document.getElementById('statCritical').textContent = d.critical;
         document.getElementById('statOut').textContent = d.out;
-        document.getElementById('alertsLive').textContent = 'Live · updated ' + SA.timeLabel(at);
+        SA.markLive(document.getElementById('alertsLive'), at);
         render();
     }
 
@@ -275,7 +275,7 @@ $script = '<script src="stock_alerts.js?v=1"></script>'
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setFilterOpen(false); });
 
     setData(INITIAL_ALERTS, new Date());
-    SA.sync('../backend/api/stock_alerts.php', setData);
+    SA.sync('../backend/api/stock_alerts.php', setData, function () { SA.markStale(document.getElementById('alertsLive')); });
 })();
 </script>
 SCRIPT;

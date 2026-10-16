@@ -245,6 +245,9 @@
     content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ep-green);
     animation: pos-pulse 1.6s ease-in-out infinite;
 }
+/* A poll failed: the list shows older data until the next successful refresh. */
+.alerts-live.is-stale { color: #b7791f; white-space: normal; }
+.alerts-live.is-stale::before { background: #d69e2e; animation: none; }
 
 /* Toolbar / filter / pagination: same values as inventory_stocks.php */
 .stocks-toolbar {

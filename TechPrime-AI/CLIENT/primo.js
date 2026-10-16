@@ -4,6 +4,8 @@
  *
  * Panel: docked + non-blocking on desktop/tablet, full-screen sheet on phones.
  * "Expand" (is-wide) is remembered per browser in localStorage (primo_wide).
+ * The launcher pulses (is-attention) until Primo is opened once (primo_seen); any
+ * element with [data-primo-open] (header "Ask Primo") opens the chat.
  */
 (function () {
     'use strict';
@@ -51,6 +53,7 @@
     var COUNT_FROM = Math.floor(MAX_LEN * 0.8);
     var STATUS_IDLE = 'AI Product Assistant';
     var WIDE_KEY = 'primo_wide';
+    var SEEN_KEY = 'primo_seen';   // set once Primo has been opened; stops the launcher pulse
     /* Guests chat normally, but nothing is saved to Recent chats (history API is client-only). */
     var IS_GUEST = root.getAttribute('data-guest') === '1';
 
@@ -159,6 +162,11 @@
     }
 
     /* ---------- Size (compact / expanded) ---------- */
+
+    function markPrimoSeen() {
+        root.classList.remove('is-attention');
+        try { window.localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* private mode */ }
+    }
 
     function readWidePref() {
         try { return window.localStorage.getItem(WIDE_KEY) === '1'; } catch (e) { return false; }
@@ -590,6 +598,7 @@
     }
 
     function openChat() {
+        markPrimoSeen();
         hideBubbleForChat();
         if (closeTimer) {
             window.clearTimeout(closeTimer);
@@ -945,6 +954,13 @@
 
     if (mascot) mascot.addEventListener('click', onMascotClick);
     if (tuck) tuck.addEventListener('click', onTuckClick);
+    // "Ask Primo" entries in the header nav and the mobile drawer (ep_header.php).
+    document.addEventListener('click', function (e) {
+        var trigger = e.target.closest ? e.target.closest('[data-primo-open]') : null;
+        if (!trigger) return;
+        e.preventDefault();
+        if (!isChatOpen()) openChat();
+    });
     if (closeBtn) closeBtn.addEventListener('click', function (e) {
         e.preventDefault();
         closeChat();
@@ -1074,6 +1090,10 @@
     }
 
     if (historyPanel) historyPanel.setAttribute('inert', '');
+    // Until a shopper opens Primo once, the launcher pulses so it is noticed (survey feedback).
+    try {
+        if (window.localStorage.getItem(SEEN_KEY) !== '1') root.classList.add('is-attention');
+    } catch (e) { /* private mode: no pulse */ }
     setWide(readWidePref(), false);
     syncComposer();
 

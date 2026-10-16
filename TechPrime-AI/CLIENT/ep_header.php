@@ -71,15 +71,15 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
         /* Apply the saved theme before the stylesheets load so dark mode never flashes white. */
         try { if (localStorage.getItem('ep_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
     </script>
-    <link rel="stylesheet" href="styles.css?v=motion-1">
+    <link rel="stylesheet" href="styles.css?v=motion-2">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <?php if ($epShowPrimo): ?><link rel="stylesheet" href="primo.css?v=ux-11"><?php endif; ?>
+    <?php if ($epShowPrimo): ?><link rel="stylesheet" href="primo.css?v=ux-12"><?php endif; ?>
     <?php if (!empty($extraHead)) echo $extraHead; ?>
     <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
-    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-19">
+    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-20">
     <link rel="stylesheet" href="ep_dark.css?v=dark-18">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
@@ -134,6 +134,12 @@ $epPrimaryLinks = [
                 <span><?php echo h($link['label']); ?></span>
             </a>
         <?php endforeach; ?>
+        <?php if ($epShowPrimo): /* Survey feedback: shoppers missed the corner launcher, so Primo also gets a nav entry. */ ?>
+            <button type="button" class="ep-pnav-link ep-pnav-primo" data-primo-open aria-controls="primoPanel">
+                <i class="fas fa-robot" aria-hidden="true"></i>
+                <span>Ask Primo</span>
+            </button>
+        <?php endif; ?>
     </nav>
 
     <div class="search-wrap" id="epSearchWrap">
@@ -322,6 +328,12 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
             <?php endif; ?>
         <?php endforeach; ?>
 
+        <?php if ($epShowPrimo): ?>
+            <button type="button" class="ep-drawer-link ep-drawer-primo" data-primo-open aria-controls="primoPanel">
+                <i class="fas fa-robot" aria-hidden="true"></i><span>Ask Primo (AI assistant)</span>
+            </button>
+        <?php endif; ?>
+
         <?php if (!empty($isLoggedIn)): ?>
             <div class="ep-drawer-label">My account</div>
             <a href="user_dashboard.php"
@@ -428,7 +440,7 @@ $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' =
         if (drawerClose) drawerClose.addEventListener('click', function () { closeDrawer(true); });
         if (drawerBackdrop) drawerBackdrop.addEventListener('click', function () { closeDrawer(true); });
         drawer.addEventListener('click', function (e) {
-            if (e.target.closest('a[href]')) closeDrawer(false);
+            if (e.target.closest('a[href], [data-primo-open]')) closeDrawer(false);
         });
         document.addEventListener('keydown', function (e) {
             if (!drawer.classList.contains('open')) return;

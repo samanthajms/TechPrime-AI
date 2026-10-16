@@ -179,12 +179,25 @@ function ep_pagination_range(int $current, int $total): array
                                     <span>₱<?php echo number_format($categoryMinPrice); ?></span>
                                     <span id="epPriceMaxLabel">₱<?php echo number_format($selectedMaxPrice); ?></span>
                                 </div>
-                                <input type="range" name="price_max"
+                                <input type="range" name="price_max" id="epPriceMaxRange"
                                        min="<?php echo (int) $categoryMinPrice; ?>"
                                        max="<?php echo (int) $categoryMaxPrice; ?>"
                                        value="<?php echo (int) $selectedMaxPrice; ?>"
-                                       oninput="document.getElementById('epPriceMaxLabel').textContent = '₱' + Number(this.value).toLocaleString();"
+                                       oninput="document.getElementById('epPriceMaxLabel').textContent = '₱' + Number(this.value).toLocaleString(); document.getElementById('epPriceMaxBox').value = this.value;"
                                        onchange="this.form.submit()">
+                                <?php /* Typed max price (unnamed): copies into the slider, which is what gets submitted. */ ?>
+                                <div class="ep-shop-price-inputs">
+                                    <div class="ep-shop-price-field">
+                                        <span aria-hidden="true">Max ₱</span>
+                                        <input type="number" id="epPriceMaxBox" inputmode="numeric"
+                                               min="<?php echo (int) $categoryMinPrice; ?>"
+                                               max="<?php echo (int) $categoryMaxPrice; ?>" step="1"
+                                               value="<?php echo (int) $selectedMaxPrice; ?>"
+                                               aria-label="Maximum price in pesos"
+                                               onchange="epApplyMaxPrice(this)"
+                                               onkeydown="if (event.key === 'Enter') { event.preventDefault(); epApplyMaxPrice(this); }">
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -290,6 +303,19 @@ function ep_pagination_range(int $current, int $total): array
     function epToggleFilterGroup(btn) {
         var group = btn.closest('.ep-filter-group');
         if (group) group.classList.toggle('collapsed');
+    }
+    // Typed max price: clamp to the category's range, copy into the slider and filter.
+    function epApplyMaxPrice(box) {
+        var range = document.getElementById('epPriceMaxRange');
+        if (!range) return;
+        var lo = Number(range.min), hi = Number(range.max);
+        var n = Math.round(Number(String(box.value).trim()));
+        if (String(box.value).trim() === '' || !isFinite(n)) n = hi;
+        n = Math.min(hi, Math.max(lo, n));
+        box.value = n;
+        if (String(n) === range.value) return;
+        range.value = n;
+        range.form.submit();
     }
 </script>
 

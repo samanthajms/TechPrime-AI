@@ -35,8 +35,12 @@
         return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
     }
 
-    /** Calls onData(data, fetchedAt) with every fresh result. Returns {refresh}. */
-    function sync(url, onData) {
+    /**
+     * Calls onData(data, fetchedAt) with every fresh result, and onError() when a poll
+     * fails (network, server error, bad JSON) so the page can say its data is stale.
+     * Returns {refresh}.
+     */
+    function sync(url, onData, onError) {
         var stopped = false;
         var busy = false;
         function load() {
@@ -50,9 +54,14 @@
                     } else if (d && (d.error === 'session_expired' || d.error === 'forbidden')) {
                         stopped = true;
                         if (global.IAS_Session) global.IAS_Session.check();
+                    } else if (onError) {
+                        onError();
                     }
                 })
-                .catch(function () { /* keep showing the last data; retry on the next tick */ })
+                .catch(function () {
+                    // Keep showing the last data and retry on the next tick, but say so.
+                    if (onError) onError();
+                })
                 .then(function () { busy = false; });
         }
         setInterval(load, POLL_MS);
@@ -60,8 +69,21 @@
         return { refresh: load };
     }
 
+    /** Live label helpers shared by the dashboard panel and the Stock Alerts page. */
+    var lastUpdate = null;
+    function markLive(el, at) {
+        lastUpdate = at;
+        el.classList.remove('is-stale');
+        el.textContent = 'Live · updated ' + timeLabel(at);
+    }
+    function markStale(el) {
+        el.classList.add('is-stale');
+        el.textContent = 'Connection problem · showing data from ' + (lastUpdate ? timeLabel(lastUpdate) : 'page load') + ', retrying';
+    }
+
     global.CashierStockAlerts = {
         esc: esc, pill: pill, qtyClass: qtyClass, peso: peso,
-        barcodeLabel: barcodeLabel, timeLabel: timeLabel, sync: sync
+        barcodeLabel: barcodeLabel, timeLabel: timeLabel, sync: sync,
+        markLive: markLive, markStale: markStale
     };
 })(window);

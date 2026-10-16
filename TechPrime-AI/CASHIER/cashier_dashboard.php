@@ -21,7 +21,7 @@ staff_page_start([
     'active' => 'dashboard',
     'heading' => 'Cashier Dashboard',
     'subtitle' => 'Welcome, ' . ($_SESSION['name'] ?? 'Cashier') . ' · ' . pos_format_datetime(gmdate('Y-m-d H:i:s'), 'l, F j, Y'),
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=6">',
+    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=7">',
 ]);
 ?>
         <div class="cash-page">
@@ -147,7 +147,7 @@ staff_page_start([
         </div>
 <?php
 $alertsJson = json_encode($alerts, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-$script = '<script src="stock_alerts.js?v=1"></script>'
+$script = '<script src="stock_alerts.js?v=2"></script>'
     . '<script>var INITIAL_ALERTS = ' . $alertsJson . ';</script>'
     . <<<'SCRIPT'
 <script>
@@ -175,11 +175,11 @@ $script = '<script src="stock_alerts.js?v=1"></script>'
                 '<td>' + SA.pill(p.status) + '</td>' +
             '</tr>';
         }).join('');
-        live.textContent = 'Live · updated ' + SA.timeLabel(at);
+        SA.markLive(live, at);
     }
 
     render(INITIAL_ALERTS, new Date());
-    SA.sync('../backend/api/stock_alerts.php', render);
+    SA.sync('../backend/api/stock_alerts.php', render, function () { SA.markStale(live); });
 })();
 </script>
 SCRIPT;
