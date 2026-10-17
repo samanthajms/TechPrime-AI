@@ -15,122 +15,102 @@ staff_page_start([
     'title' => 'Stock Alerts',
     'active' => 'alerts',
     'heading' => 'Stock Alerts',
-    'subtitle' => 'Low, critical and out-of-stock products · read-only · restocking is handled by the Inventory Custodian',
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=7">',
+    'subtitle' => 'Products running low · read-only · restocking is handled by the Inventory Custodian',
+    'actions' => '<span class="alerts-live" id="alertsLive" title="Refreshes every 30 seconds">Live stock</span>',
 ]);
 ?>
-        <div class="cash-page">
-            <div class="inv-stats-grid">
-                <div class="inv-stat-card stat-dark">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">All Alerts</div>
-                            <div class="inv-stat-num" id="statAll"><?php echo count($alerts['items']); ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-bell"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">Products with 15 or fewer units</div>
-                </div>
-                <div class="inv-stat-card stat-yellow">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Low Stock</div>
-                            <div class="inv-stat-num" id="statLow"><?php echo (int)$alerts['low']; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">6–15 units left</div>
-                </div>
-                <div class="inv-stat-card stat-red">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Critical Stock</div>
-                            <div class="inv-stat-num" id="statCritical"><?php echo (int)$alerts['critical']; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-exclamation-circle"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">5 or fewer units left</div>
-                </div>
-                <div class="inv-stat-card stat-red">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Out of Stock</div>
-                            <div class="inv-stat-num" id="statOut"><?php echo (int)$alerts['out']; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-times-circle"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">None left · cannot be sold</div>
-                </div>
+        <div class="alerts-page">
+            <div class="level-tiles" id="statusToggle" role="group" aria-label="Filter by alert level">
+                <button type="button" class="status-btn level-tile is-all active" data-status="all" aria-pressed="true">
+                    <span class="level-tile-icon" aria-hidden="true"><i class="ph ph-bell"></i></span>
+                    <span class="level-tile-body">
+                        <strong class="cx-num" id="statAll"><?php echo count($alerts['items']); ?></strong>
+                        <span class="level-tile-label">All alerts</span>
+                        <span class="level-tile-hint">15 or fewer units</span>
+                    </span>
+                </button>
+                <button type="button" class="status-btn level-tile is-out" data-status="out" aria-pressed="false">
+                    <span class="level-tile-icon" aria-hidden="true"><i class="ph ph-x-circle"></i></span>
+                    <span class="level-tile-body">
+                        <strong class="cx-num" id="statOut"><?php echo (int)$alerts['out']; ?></strong>
+                        <span class="level-tile-label">Out of stock</span>
+                        <span class="level-tile-hint">None left · cannot be sold</span>
+                    </span>
+                </button>
+                <button type="button" class="status-btn level-tile is-critical" data-status="critical" aria-pressed="false">
+                    <span class="level-tile-icon" aria-hidden="true"><i class="ph ph-warning-circle"></i></span>
+                    <span class="level-tile-body">
+                        <strong class="cx-num" id="statCritical"><?php echo (int)$alerts['critical']; ?></strong>
+                        <span class="level-tile-label">Critical</span>
+                        <span class="level-tile-hint">5 or fewer units left</span>
+                    </span>
+                </button>
+                <button type="button" class="status-btn level-tile is-low" data-status="low" aria-pressed="false">
+                    <span class="level-tile-icon" aria-hidden="true"><i class="ph ph-warning"></i></span>
+                    <span class="level-tile-body">
+                        <strong class="cx-num" id="statLow"><?php echo (int)$alerts['low']; ?></strong>
+                        <span class="level-tile-label">Low stock</span>
+                        <span class="level-tile-hint">6–15 units left</span>
+                    </span>
+                </button>
             </div>
 
-            <section class="cash-panel" aria-label="Stock alert list">
-                <div class="cash-panel-body">
-                    <div class="stocks-toolbar">
-                        <div class="search-wrap">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="searchInput" class="form-control" placeholder="Search by name, category or barcode..." autocomplete="off">
-                            <button type="button" id="scanBtn" class="btn btn-outline btn-scan" title="Focus this field, then use the barcode scanner">
-                                <i class="fas fa-barcode"></i> Scan
-                            </button>
-                        </div>
-                        <div class="toolbar-actions">
-                            <span class="alerts-live" id="alertsLive" title="Refreshes every 30 seconds">Live stock</span>
-                            <div class="stocks-filter-wrap">
-                                <button type="button" id="filterToggleBtn" class="stocks-filter-btn" aria-expanded="false" aria-controls="stocksFilterPanel">
-                                    <i class="fas fa-filter"></i> Filter <i class="fas fa-chevron-down"></i> <span class="filter-dot" aria-hidden="true"></span>
-                                </button>
-                                <div id="stocksFilterPanel" class="stocks-filter-panel" role="dialog" aria-label="Stock alert filters">
-                                    <h4 class="stocks-filter-panel-title">Filter Stock Alerts</h4>
-                                    <div>
-                                        <span class="filter-title">Alert Level</span>
-                                        <div class="status-toggle" id="statusToggle">
-                                            <button type="button" class="status-btn active" data-status="all">All Alerts <span class="cnt" data-cnt="all"></span></button>
-                                            <button type="button" class="status-btn" data-status="out">Out of Stock <span class="cnt" data-cnt="out"></span></button>
-                                            <button type="button" class="status-btn" data-status="critical">Critical Stock (&le; 5) <span class="cnt" data-cnt="critical"></span></button>
-                                            <button type="button" class="status-btn" data-status="low">Low Stock (6–15) <span class="cnt" data-cnt="low"></span></button>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <span class="filter-title">Sort By</span>
-                                        <select id="sortBy" class="form-control">
-                                            <option value="stock_asc" selected>Stock Quantity (Low to High)</option>
-                                            <option value="stock_desc">Stock Quantity (High to Low)</option>
-                                            <option value="name_asc">Alphabetical (A-Z)</option>
-                                            <option value="name_desc">Alphabetical (Z-A)</option>
-                                            <option value="price_asc">Price (Low to High)</option>
-                                            <option value="price_desc">Price (High to Low)</option>
-                                        </select>
-                                    </div>
-                                    <button type="button" id="resetFilters" class="btn btn-outline btn-reset">Reset Filters</button>
-                                </div>
-                            </div>
-                        </div>
+            <section class="cx-card" aria-labelledby="alertListTitle">
+                <h2 class="cx-sr" id="alertListTitle">Stock alert list</h2>
+                <div class="alerts-toolbar">
+                    <div class="search-wrap">
+                        <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+                        <label class="cx-sr" for="searchInput">Search alerts</label>
+                        <input type="text" id="searchInput" placeholder="Search name, category or barcode" autocomplete="off">
+                        <button type="button" id="scanBtn" class="btn-scan" title="Focus this field, then use the barcode scanner">
+                            <i class="ph ph-barcode" aria-hidden="true"></i> Scan
+                        </button>
                     </div>
+                    <div class="alerts-toolbar-side">
+                        <label class="sort-wrap">
+                            <span>Sort</span>
+                            <select id="sortBy">
+                                <option value="stock_asc" selected>Stock: low to high</option>
+                                <option value="stock_desc">Stock: high to low</option>
+                                <option value="name_asc">Name: A–Z</option>
+                                <option value="name_desc">Name: Z–A</option>
+                                <option value="price_asc">Price: low to high</option>
+                                <option value="price_desc">Price: high to low</option>
+                            </select>
+                        </label>
+                        <button type="button" id="resetFilters" class="cx-btn cx-btn-ghost" disabled>
+                            <i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i> Reset
+                        </button>
+                    </div>
+                </div>
 
-                    <div class="stocks-table-wrap">
-                        <table class="stocks-table wide">
-                            <thead><tr>
-                                <th>Product Name</th>
-                                <th class="col-barcode">Barcode</th>
-                                <th class="col-stock">Stock</th>
-                                <th class="col-status">Status</th>
-                                <th class="col-price">Price</th>
-                            </tr></thead>
-                            <tbody id="alertRows"></tbody>
-                        </table>
-                    </div>
-                    <div id="emptyState" class="empty-state-row" style="margin-top:14px;" hidden>No products match your filters.</div>
+                <div class="cx-table-wrap" id="alertTableWrap">
+                    <table class="cx-table alerts-table">
+                        <thead><tr>
+                            <th scope="col">Product</th>
+                            <th scope="col" class="col-barcode">Barcode</th>
+                            <th scope="col" class="col-stock">Stock</th>
+                            <th scope="col" class="col-status">Status</th>
+                            <th scope="col" class="col-price num">Price</th>
+                        </tr></thead>
+                        <tbody id="alertRows"></tbody>
+                    </table>
+                </div>
+                <div id="emptyState" class="cx-empty" hidden>
+                    <span class="cx-empty-icon" aria-hidden="true"><i class="ph ph-magnifying-glass"></i></span>
+                    <strong id="emptyTitle">No products match your filters</strong>
+                    <span id="emptyText">Try another search or alert level.</span>
+                </div>
 
-                    <div class="pagination-bar">
-                        <div class="pg-info" id="pgInfo"></div>
-                        <div class="pg-controls" id="pgControls"></div>
-                    </div>
+                <div class="pagination-bar">
+                    <div class="pg-info" id="pgInfo" aria-live="polite"></div>
+                    <div class="pg-controls" id="pgControls"></div>
                 </div>
             </section>
         </div>
 <?php
 $alertsJson = json_encode($alerts, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-$script = '<script src="stock_alerts.js?v=2"></script>'
+$script = '<script src="stock_alerts.js?v=3"></script>'
     . '<script>var INITIAL_ALERTS = ' . $alertsJson . ';</script>'
     . <<<'SCRIPT'
 <script>
@@ -138,13 +118,14 @@ $script = '<script src="stock_alerts.js?v=2"></script>'
     'use strict';
     var SA = CashierStockAlerts;
     var PAGE_SIZE = 10;
-    var state = { status: 'all', sort: 'stock_asc', search: '', page: 1 };
+    var DEFAULT_SORT = 'stock_asc';
+    var state = { status: 'all', sort: DEFAULT_SORT, search: '', page: 1 };
     var items = [];
 
     var searchInput = document.getElementById('searchInput');
     var sortBy = document.getElementById('sortBy');
-    var filterBtn = document.getElementById('filterToggleBtn');
-    var filterPanel = document.getElementById('stocksFilterPanel');
+    var resetBtn = document.getElementById('resetFilters');
+    var tableWrap = document.getElementById('alertTableWrap');
 
     function getFiltered() {
         var q = state.search.trim().toLowerCase();
@@ -172,14 +153,16 @@ $script = '<script src="stock_alerts.js?v=2"></script>'
     function rowHtml(p) {
         var barcode = p.barcode
             ? '<span class="barcode-code">' + SA.esc(SA.barcodeLabel(p.barcode)) + '</span>'
-            : '<span class="barcode-missing"><i class="fas fa-minus-circle"></i> None</span>';
-        return '<tr>' +
-            '<td><div class="stocks-pname">' + SA.esc(p.name || ('Product #' + p.id)) + '</div>' +
+            : '<span class="barcode-missing"><i class="ph ph-prohibit" aria-hidden="true"></i> None</span>';
+        var pct = Math.max(0, Math.min(100, Math.round(p.stock / 15 * 100)));
+        return '<tr class="is-' + SA.esc(p.status) + '">' +
+            '<td data-label="Product"><div class="stocks-pname">' + SA.esc(p.name || ('Product #' + p.id)) + '</div>' +
             '<span class="stocks-pcat">' + SA.esc(p.category) + '</span></td>' +
-            '<td>' + barcode + '</td>' +
-            '<td><span class="stocks-qty' + SA.qtyClass(p.status) + '">' + p.stock + '</span></td>' +
-            '<td>' + SA.pill(p.status) + '</td>' +
-            '<td class="price-tag">' + SA.peso(p.price) + '</td>' +
+            '<td data-label="Barcode">' + barcode + '</td>' +
+            '<td data-label="Stock"><div class="qty-cell"><span class="stocks-qty' + SA.qtyClass(p.status) + '">' + p.stock + '</span>' +
+                '<span class="qty-meter ' + SA.esc(p.status) + '" aria-hidden="true"><i style="width:' + pct + '%"></i></span></div></td>' +
+            '<td data-label="Status">' + SA.pill(p.status) + '</td>' +
+            '<td data-label="Price" class="num price-tag cx-num">' + SA.peso(p.price) + '</td>' +
         '</tr>';
     }
 
@@ -188,13 +171,13 @@ $script = '<script src="stock_alerts.js?v=2"></script>'
         var start = Math.floor((state.page - 1) / WINDOW) * WINDOW + 1;
         var end = Math.min(start + WINDOW - 1, totalPages);
         var html = '';
-        if (start > 1) html += '<button type="button" data-page="' + (start - 1) + '" title="Previous page set">&lt;</button>';
-        html += '<button type="button" data-page="' + (state.page - 1) + '"' + (state.page <= 1 ? ' disabled' : '') + '>Prev</button>';
+        if (start > 1) html += '<button type="button" data-page="' + (start - 1) + '" aria-label="Previous page set">&hellip;</button>';
+        html += '<button type="button" data-page="' + (state.page - 1) + '"' + (state.page <= 1 ? ' disabled' : '') + ' aria-label="Previous page"><i class="ph ph-caret-left" aria-hidden="true"></i></button>';
         for (var i = start; i <= end; i++) {
-            html += '<button type="button" data-page="' + i + '"' + (i === state.page ? ' class="active"' : '') + '>' + i + '</button>';
+            html += '<button type="button" data-page="' + i + '"' + (i === state.page ? ' class="active" aria-current="page"' : '') + '>' + i + '</button>';
         }
-        html += '<button type="button" data-page="' + (state.page + 1) + '"' + (state.page >= totalPages ? ' disabled' : '') + '>Next</button>';
-        if (end < totalPages) html += '<button type="button" data-page="' + (end + 1) + '" title="Next page set">&gt;</button>';
+        html += '<button type="button" data-page="' + (state.page + 1) + '"' + (state.page >= totalPages ? ' disabled' : '') + ' aria-label="Next page"><i class="ph ph-caret-right" aria-hidden="true"></i></button>';
+        if (end < totalPages) html += '<button type="button" data-page="' + (end + 1) + '" aria-label="Next page set">&hellip;</button>';
         document.getElementById('pgControls').innerHTML = html;
     }
 
@@ -206,25 +189,26 @@ $script = '<script src="stock_alerts.js?v=2"></script>'
         var pageItems = filtered.slice(startIdx, startIdx + PAGE_SIZE);
 
         document.getElementById('alertRows').innerHTML = pageItems.map(rowHtml).join('');
-        document.querySelector('.stocks-table-wrap').hidden = pageItems.length === 0;
+        tableWrap.hidden = pageItems.length === 0;
         document.getElementById('emptyState').hidden = pageItems.length !== 0;
-        document.getElementById('emptyState').textContent = items.length === 0
-            ? 'All products are well stocked.' : 'No products match your filters.';
+        var allClear = items.length === 0;
+        document.getElementById('emptyTitle').textContent = allClear ? 'All products are well stocked' : 'No products match your filters';
+        document.getElementById('emptyText').textContent = allClear ? 'Nothing is at 15 units or fewer right now.' : 'Try another search or alert level.';
         document.getElementById('pgInfo').textContent = filtered.length === 0
             ? 'No products'
             : 'Showing ' + (startIdx + 1) + '–' + (startIdx + pageItems.length) + ' of ' + filtered.length;
         renderPagination(totalPages);
-        filterBtn.classList.toggle('has-active', state.status !== 'all' || state.sort !== 'stock_asc');
+        resetBtn.disabled = state.status === 'all' && state.sort === DEFAULT_SORT && state.search === '';
         document.querySelectorAll('#statusToggle .status-btn').forEach(function (b) {
-            b.classList.toggle('active', b.getAttribute('data-status') === state.status);
+            var on = b.getAttribute('data-status') === state.status;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
     }
 
     function setData(d, at) {
         items = d.items.map(function (p) { p.price = Number(p.price); return p; });
-        var counts = { all: items.length, out: d.out, critical: d.critical, low: d.low };
-        document.querySelectorAll('[data-cnt]').forEach(function (el) { el.textContent = counts[el.getAttribute('data-cnt')]; });
-        document.getElementById('statAll').textContent = counts.all;
+        document.getElementById('statAll').textContent = items.length;
         document.getElementById('statLow').textContent = d.low;
         document.getElementById('statCritical').textContent = d.critical;
         document.getElementById('statOut').textContent = d.out;
@@ -247,9 +231,9 @@ $script = '<script src="stock_alerts.js?v=2"></script>'
         state.page = 1;
         render();
     });
-    document.getElementById('resetFilters').addEventListener('click', function () {
+    resetBtn.addEventListener('click', function () {
         state.status = 'all';
-        state.sort = sortBy.value = 'stock_asc';
+        state.sort = sortBy.value = DEFAULT_SORT;
         state.search = searchInput.value = '';
         state.page = 1;
         render();
@@ -260,19 +244,6 @@ $script = '<script src="stock_alerts.js?v=2"></script>'
         state.page = parseInt(btn.getAttribute('data-page'), 10);
         render();
     });
-
-    function setFilterOpen(open) {
-        filterPanel.classList.toggle('open', open);
-        filterBtn.classList.toggle('open', open);
-        filterBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-    filterBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        setFilterOpen(!filterPanel.classList.contains('open'));
-    });
-    filterPanel.addEventListener('click', function (e) { e.stopPropagation(); });
-    document.addEventListener('click', function () { setFilterOpen(false); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setFilterOpen(false); });
 
     setData(INITIAL_ALERTS, new Date());
     SA.sync('../backend/api/stock_alerts.php', setData, function () { SA.markStale(document.getElementById('alertsLive')); });

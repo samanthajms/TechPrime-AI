@@ -1,7 +1,8 @@
 <?php
 /**
  * Shared EasyPC staff layout (Admin / Retail / Inventory / Courier).
- * Design tokens match CLIENT/index.php.
+ * Design tokens match CLIENT/index.php. Cashier pages are handed to their own
+ * shell in cashier_layout.php (see the top of staff_page_start / staff_page_end).
  */
 
 if (!function_exists('staff_nav_for_role')) {
@@ -142,6 +143,12 @@ if (!function_exists('staff_page_start')) {
     function staff_page_start(array $opts): void
     {
         $role = $opts['role'] ?? ($_SESSION['role'] ?? 'admin');
+        if ($role === 'cashier') {
+            /* Cashier pages use their own app shell (includes/cashier_layout.php) */
+            require_once __DIR__ . '/cashier_layout.php';
+            cashier_shell_start($opts);
+            return;
+        }
         $title = $opts['title'] ?? 'EasyPC';
         $active = $opts['active'] ?? '';
         $activeChild = (string)($opts['active_child'] ?? '');
@@ -188,24 +195,8 @@ if (!function_exists('staff_page_start')) {
             'activity' => 'fa-clipboard-list',
             'profile' => 'fa-user',
         ];
-        if ($role === 'cashier') {
-            /* Cashier pages reuse the Inventory page title banner */
-            $invTitleIcons = [
-                'cashier_dashboard.php' => 'fa-tachometer-alt',
-                'cashier_pos.php' => 'fa-cash-register',
-                'cashier_stock_alerts.php' => 'fa-bell',
-                'cashier_receipt.php' => 'fa-receipt',
-                'cashier_profile.php' => 'fa-user',
-            ];
-            $invActiveIcons = [
-                'dashboard' => 'fa-tachometer-alt',
-                'pos' => 'fa-cash-register',
-                'alerts' => 'fa-bell',
-                'profile' => 'fa-user',
-            ];
-        }
         $currentScript = strtolower(basename($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? ''));
-        $useInvPageTitle = (in_array($role, ['inventory_custodian', 'cashier'], true) && (
+        $useInvPageTitle = ($role === 'inventory_custodian' && (
             isset($invTitleIcons[$currentScript]) || isset($invActiveIcons[$active])
         ));
         $invTitleIcon = $invTitleIcons[$currentScript]
@@ -724,6 +715,10 @@ if (!function_exists('staff_page_start')) {
 if (!function_exists('staff_page_end')) {
     function staff_page_end(string $extraScripts = ''): void
     {
+        if (!empty($GLOBALS['IAS_CASHIER_SHELL']) && function_exists('cashier_shell_end')) {
+            cashier_shell_end($extraScripts);
+            return;
+        }
         ?>
     </div><!-- /.page-content -->
 </div><!-- /.main -->

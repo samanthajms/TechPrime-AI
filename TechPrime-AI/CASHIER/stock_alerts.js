@@ -9,7 +9,7 @@
 
     var POLL_MS = 30000;
     var LABELS = { out: 'Out of Stock', critical: 'Critical Stock', low: 'Low Stock', ok: 'In Stock' };
-    var ICONS = { out: 'fa-times-circle', critical: 'fa-exclamation-circle', low: 'fa-exclamation-triangle', ok: 'fa-check-circle' };
+    var ICONS = { out: 'ph-x-circle', critical: 'ph-warning-circle', low: 'ph-warning', ok: 'ph-check-circle' };
 
     function esc(str) {
         return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
@@ -18,7 +18,7 @@
     }
     function pill(status) {
         var s = LABELS[status] ? status : 'ok';
-        return '<span class="stock-status-pill ' + s + '"><i class="fas ' + ICONS[s] + '"></i> ' + LABELS[s] + '</span>';
+        return '<span class="stock-status-pill ' + s + '"><i class="ph-fill ' + ICONS[s] + '" aria-hidden="true"></i> ' + LABELS[s] + '</span>';
     }
     function qtyClass(status) {
         return status === 'out' ? ' out' : (status === 'ok' ? '' : ' warn');

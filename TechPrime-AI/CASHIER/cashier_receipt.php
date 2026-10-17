@@ -12,35 +12,18 @@ $uid = (int)$_SESSION['user_id'];
 $saleId = (int)($_GET['id'] ?? 0);
 $sale = $saleId > 0 ? pos_get_sale_for_cashier($db, $saleId, $uid) : null;
 $autoPrint = $sale !== null && isset($_GET['print']);
+/* ?frame=1: bare receipt for the hidden print frame (receipt_print.js), so
+   Print / Reprint print from the current tab instead of opening a new one */
+$frameMode = isset($_GET['frame']);
 
-staff_page_start([
-    'role' => 'cashier',
-    'title' => $sale ? 'Receipt ' . $sale['invoice_no'] : 'Receipt',
-    'active' => 'dashboard',
-    'heading' => 'Receipt',
-    'subtitle' => $sale ? 'Invoice ' . $sale['invoice_no'] : 'Receipt not found',
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=7">',
-]);
-?>
-        <div class="receipt-toolbar">
-            <?php if ($sale): ?>
-            <button type="button" class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> Print Receipt</button>
-            <?php endif; ?>
-            <a href="cashier_pos.php" class="btn btn-outline"><i class="fas fa-cash-register"></i> New Sale</a>
-            <a href="cashier_dashboard.php" class="btn btn-outline"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
-        </div>
-
-        <?php if (!$sale): ?>
-            <div class="alert alert-error" style="max-width:520px;margin:0 auto;">
-                <i class="fas fa-times-circle"></i>
-                <div>This receipt does not exist or belongs to another cashier.</div>
-            </div>
-        <?php else:
-            $units = 0;
-            foreach ($sale['items'] as $it) {
-                $units += (int)$it['quantity'];
-            }
-            ?>
+$receiptHtml = '';
+if ($sale) {
+    $units = 0;
+    foreach ($sale['items'] as $it) {
+        $units += (int)$it['quantity'];
+    }
+    ob_start();
+    ?>
         <article class="receipt" aria-label="Receipt <?php echo h($sale['invoice_no']); ?>">
             <div class="r-center">
                 <div class="r-store">EasyPC</div>
@@ -84,6 +67,55 @@ staff_page_start([
                 THIS IS NOT AN OFFICIAL RECEIPT.
             </div>
         </article>
+    <?php
+    $receiptHtml = ob_get_clean();
+}
+
+if ($frameMode) {
+    ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title><?php echo h($sale ? 'Receipt ' . $sale['invoice_no'] : 'Receipt not found'); ?></title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&amp;family=Fira+Sans:wght@700;800&amp;display=swap">
+    <link rel="stylesheet" href="cashier.css?v=11">
+</head>
+<body class="cx-app cx-receipt-frame">
+<?php if ($sale): ?>
+<?php echo $receiptHtml; ?>
+<?php else: ?>
+<p data-receipt-missing>This receipt does not exist or belongs to another cashier.</p>
+<?php endif; ?>
+</body>
+</html>
+    <?php
+    exit;
+}
+
+$receiptActions = '<div class="receipt-toolbar">'
+    . ($sale ? '<button type="button" class="cx-btn cx-btn-primary" onclick="window.print()"><i class="ph ph-printer" aria-hidden="true"></i> Print receipt</button>' : '')
+    . '<a href="cashier_pos.php" class="cx-btn cx-btn-outline"><i class="ph ph-cash-register" aria-hidden="true"></i> New sale</a>'
+    . '<a href="cashier_dashboard.php" class="cx-btn cx-btn-outline"><i class="ph ph-squares-four" aria-hidden="true"></i> Dashboard</a>'
+    . '</div>';
+
+staff_page_start([
+    'role' => 'cashier',
+    'title' => $sale ? 'Receipt ' . $sale['invoice_no'] : 'Receipt',
+    'active' => 'dashboard',
+    'heading' => 'Receipt',
+    'subtitle' => $sale ? 'Invoice ' . $sale['invoice_no'] . ' · ' . pos_format_datetime($sale['created_at']) : 'Receipt not found',
+    'actions' => $receiptActions,
+]);
+?>
+        <?php if (!$sale): ?>
+            <div class="cx-empty receipt-missing">
+                <span class="cx-empty-icon is-bad" aria-hidden="true"><i class="ph ph-receipt"></i></span>
+                <strong>Receipt not found</strong>
+                <span>This receipt does not exist or belongs to another cashier.</span>
+            </div>
+        <?php else: ?>
+<?php echo $receiptHtml; ?>
         <?php endif; ?>
 <?php
 staff_page_end($autoPrint

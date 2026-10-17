@@ -15,101 +15,109 @@ staff_page_start([
     'title' => 'POS Checkout',
     'active' => 'pos',
     'heading' => 'POS Checkout',
-    'subtitle' => 'Scan items to add them to the sale',
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=7">',
+    'hide_head' => true,
 ]);
 ?>
-        <div class="cash-page">
-            <div class="pos-layout">
-                <section class="cash-panel" aria-label="Current sale">
-                    <div class="cash-panel-header">
-                        <div>
-                            <h3><span class="card-icon"><i class="fas fa-shopping-basket"></i></span> Current Sale</h3>
-                            <div class="card-subtitle"><span id="lineCount">0</span> line(s) · scan the same item again to add one more</div>
-                        </div>
+        <div class="pos">
+            <section class="pos-work" aria-labelledby="posSaleTitle">
+                <div class="pos-scan">
+                    <label class="pos-scan-label" for="scanInput">
+                        <i class="ph ph-scan" aria-hidden="true"></i> Scan or enter a barcode
+                    </label>
+                    <div class="pos-scan-bar" id="scanBar">
+                        <span class="pos-scan-icon" aria-hidden="true"><i class="ph ph-barcode"></i></span>
+                        <input type="text" id="scanInput" maxlength="20"
+                               placeholder="Waiting for scanner, or type digits and press Enter">
+                        <span class="scan-state" id="scanState">Ready to scan</span>
                     </div>
-                    <div class="cash-panel-body">
-                        <div class="pos-scan-bar" id="scanBar">
-                            <i class="fas fa-barcode" aria-hidden="true"></i>
-                            <input type="text" id="scanInput" maxlength="20" aria-label="Scan or type a barcode"
-                                   placeholder="Scan a barcode, or type it and press Enter">
-                            <span class="scan-state" id="scanState">Ready to scan</span>
-                        </div>
-                        <p class="pos-scan-hint">Supports UPC-A, UPC-E, EAN-13 and EAN-8. The scan field stays focused, so you can scan at any time.</p>
-                        <div id="scanStatus" hidden></div>
-                        <div id="cartWrap" style="margin-top:16px;"></div>
-                    </div>
-                </section>
+                    <p class="pos-scan-hint">
+                        UPC-A, UPC-E, EAN-13 and EAN-8. Scanning the same item again adds one more.
+                        <span class="pos-keys"><kbd>Enter</kbd> add item</span>
+                    </p>
+                    <div id="scanStatus" role="status" aria-live="polite" hidden></div>
+                </div>
 
-                <aside class="cash-panel pos-summary" aria-label="Order summary">
-                    <div class="cash-panel-header">
-                        <div>
-                            <h3><span class="card-icon"><i class="fas fa-calculator"></i></span> Order Summary</h3>
-                            <div class="card-subtitle">Prices are VAT-inclusive (12%)</div>
-                        </div>
+                <div class="pos-cart">
+                    <div class="pos-cart-head">
+                        <h2 id="posSaleTitle">Current sale <span class="pos-count"><span id="lineCount">0</span> lines</span></h2>
+                        <button type="button" id="clearBtn" class="cx-btn cx-btn-ghost-danger" disabled>
+                            <i class="ph ph-trash" aria-hidden="true"></i> Clear sale
+                        </button>
                     </div>
-                    <div class="cash-panel-body">
-                        <div class="pos-totals">
-                            <div class="row"><span>Items</span><strong id="sumUnits">0</strong></div>
-                            <div class="row"><span>Subtotal</span><strong id="sumSubtotal">₱0.00</strong></div>
-                            <div class="row"><span>VATable sales</span><strong id="sumVatable">₱0.00</strong></div>
-                            <div class="row"><span>VAT (12%)</span><strong id="sumVat">₱0.00</strong></div>
-                            <div class="row grand"><span>Total</span><strong id="sumTotal">₱0.00</strong></div>
-                        </div>
-                        <div class="pos-actions">
-                            <button type="button" id="checkoutBtn" class="btn btn-primary" disabled>
-                                <i class="fas fa-wallet"></i> Checkout
-                            </button>
-                            <button type="button" id="clearBtn" class="btn btn-danger" disabled>
-                                <i class="fas fa-trash"></i> Clear Sale
-                            </button>
-                        </div>
+                    <div id="cartWrap"></div>
+                </div>
+            </section>
+
+            <aside class="pos-register" aria-label="Order summary">
+                <div class="pos-display">
+                    <div class="pos-display-top">
+                        <span>Total due</span>
+                        <span><span id="sumUnits">0</span> items</span>
                     </div>
-                </aside>
-            </div>
+                    <strong class="pos-display-total" id="sumTotal">₱0.00</strong>
+                </div>
+                <dl class="pos-breakdown">
+                    <div><dt>Subtotal</dt><dd id="sumSubtotal">₱0.00</dd></div>
+                    <div><dt>VATable sales</dt><dd id="sumVatable">₱0.00</dd></div>
+                    <div><dt>VAT (12%)</dt><dd id="sumVat">₱0.00</dd></div>
+                </dl>
+                <button type="button" id="checkoutBtn" class="cx-btn cx-btn-primary cx-btn-xl pos-checkout" disabled>
+                    <i class="ph ph-wallet" aria-hidden="true"></i>
+                    <span>Checkout</span>
+                    <span class="pos-checkout-amt" id="checkoutAmt" aria-hidden="true"></span>
+                </button>
+                <p class="pos-register-note"><i class="ph ph-info" aria-hidden="true"></i> Prices are VAT-inclusive (12%). Stock is re-checked when the sale is completed.</p>
+            </aside>
         </div>
 
         <!-- ============================== PAYMENT MODAL ============================== -->
-        <div id="payModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+        <div id="payModal" class="modal pay-modal" role="dialog" aria-modal="true" aria-labelledby="payTitle">
             <div class="modal-content">
-                <button type="button" class="close" id="payClose" aria-label="Close">&times;</button>
+                <button type="button" class="close" id="payClose" aria-label="Close payment"><i class="ph ph-x" aria-hidden="true"></i></button>
                 <div id="payForm">
-                    <h3 id="payTitle"><i class="fas fa-wallet"></i> Payment</h3>
+                    <h3 id="payTitle"><i class="ph ph-wallet" aria-hidden="true"></i> Take payment</h3>
                     <div class="pay-total-box"><span>Total due</span><strong id="payTotal">₱0.00</strong></div>
-                    <div class="pay-methods" id="payMethods">
-                        <button type="button" class="pay-method" data-method="cash"><i class="fas fa-money-bill-wave"></i> Cash</button>
-                        <button type="button" class="pay-method" data-method="gcash"><i class="fas fa-mobile-alt"></i> GCash</button>
-                        <button type="button" class="pay-method" data-method="maya"><i class="fas fa-mobile-alt"></i> Maya</button>
-                        <button type="button" class="pay-method" data-method="card"><i class="fas fa-credit-card"></i> Card</button>
+                    <div class="pay-label" id="payMethodLabel">Payment method</div>
+                    <div class="pay-methods" id="payMethods" role="group" aria-labelledby="payMethodLabel">
+                        <button type="button" class="pay-method" data-method="cash"><i class="ph ph-money" aria-hidden="true"></i> Cash</button>
+                        <button type="button" class="pay-method" data-method="gcash"><i class="ph ph-device-mobile" aria-hidden="true"></i> GCash</button>
+                        <button type="button" class="pay-method" data-method="maya"><i class="ph ph-device-mobile" aria-hidden="true"></i> Maya</button>
+                        <button type="button" class="pay-method" data-method="card"><i class="ph ph-credit-card" aria-hidden="true"></i> Card</button>
                     </div>
                     <div id="cashFields">
-                        <div class="form-group" style="margin-bottom:8px;">
+                        <div class="form-group pay-group">
                             <label class="form-label" for="tendered">Amount tendered</label>
-                            <input type="text" id="tendered" class="form-control pay-amount" inputmode="decimal" autocomplete="off" placeholder="0.00">
+                            <div class="pay-amount-wrap">
+                                <span class="pay-amount-prefix" aria-hidden="true">₱</span>
+                                <input type="text" id="tendered" class="form-control pay-amount" inputmode="decimal" autocomplete="off" placeholder="0.00">
+                            </div>
                             <div class="pay-quick" id="payQuick"></div>
                         </div>
-                        <div class="pay-change" id="payChange"><span>Change</span><span id="changeVal">₱0.00</span></div>
+                        <div class="pay-change" id="payChange" aria-live="polite"><span>Change</span><span id="changeVal">₱0.00</span></div>
                     </div>
                     <div id="refFields" hidden>
-                        <div class="form-group">
+                        <div class="form-group pay-group">
                             <label class="form-label" for="payRef">Reference number</label>
-                            <input type="text" id="payRef" class="form-control" maxlength="64" autocomplete="off" placeholder="e.g. 1009 234 567890">
-                            <div class="form-hint">Required for GCash, Maya and card payments.</div>
+                            <input type="text" id="payRef" class="form-control" maxlength="64" autocomplete="off" placeholder="e.g. 1009 234 567890" aria-describedby="payRefHint">
+                            <div class="form-hint" id="payRefHint">Required for GCash, Maya and card payments.</div>
                         </div>
                     </div>
-                    <div id="payError" class="alert alert-error" hidden></div>
-                    <button type="button" id="payConfirm" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px;">
-                        <i class="fas fa-check"></i> Complete Sale
+                    <div id="payError" class="pay-error" role="alert" hidden></div>
+                    <button type="button" id="payConfirm" class="cx-btn cx-btn-primary cx-btn-xl pay-confirm">
+                        <i class="ph ph-check" aria-hidden="true"></i> Complete sale
                     </button>
+                    <p class="pay-keys"><kbd>Enter</kbd> complete · <kbd>Esc</kbd> cancel</p>
                 </div>
                 <div id="payDone" class="sale-done" hidden>
-                    <div class="done-icon"><i class="fas fa-check"></i></div>
+                    <div class="done-icon" aria-hidden="true"><i class="ph ph-check"></i></div>
                     <h3>Sale completed</h3>
                     <div class="inv-no" id="doneInvoice"></div>
                     <div class="change-due" id="doneChange"></div>
-                    <a id="donePrint" class="btn btn-primary" href="#" target="_blank" rel="noopener"><i class="fas fa-print"></i> Print Receipt</a>
-                    <button type="button" id="doneNew" class="btn btn-outline"><i class="fas fa-plus"></i> New Sale</button>
-                    <p class="form-hint" style="margin-top:14px;">Scanning the next item also starts a new sale.</p>
+                    <div class="sale-done-actions">
+                        <a id="donePrint" class="cx-btn cx-btn-primary cx-btn-lg" href="#" data-print-receipt><i class="ph ph-printer" aria-hidden="true"></i> Print receipt</a>
+                        <button type="button" id="doneNew" class="cx-btn cx-btn-outline cx-btn-lg"><i class="ph ph-plus" aria-hidden="true"></i> New sale</button>
+                    </div>
+                    <p class="form-hint">Scanning the next item also starts a new sale.</p>
                 </div>
             </div>
         </div>
@@ -122,6 +130,7 @@ $config = json_encode([
 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
 $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
+    . '<script src="receipt_print.js?v=2"></script>'
     . '<script>var POS_CONFIG = ' . $config . ';</script>'
     . <<<'SCRIPT'
 <script>
@@ -143,6 +152,7 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         sumVat: document.getElementById('sumVat'),
         sumTotal: document.getElementById('sumTotal'),
         checkoutBtn: document.getElementById('checkoutBtn'),
+        checkoutAmt: document.getElementById('checkoutAmt'),
         clearBtn: document.getElementById('clearBtn'),
         payModal: document.getElementById('payModal'),
         payClose: document.getElementById('payClose'),
@@ -170,6 +180,8 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
     var saleDone = false;
     var submitting = false;
     var method = 'cash';
+
+    var CONFIRM_HTML = '<i class="ph ph-check" aria-hidden="true"></i> Complete sale';
 
     /* ---------- helpers ---------- */
     function toCents(v) { return Math.round(parseFloat(v) * 100); }
@@ -209,7 +221,18 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         var vatable = Math.round(total / (1 + POS_CONFIG.vatRate));
         return { total: total, units: units, vatable: vatable, vat: total - vatable };
     }
-    function status(type, title, detail) { EP_Scanner.status(el.scanStatus, type, title, detail); }
+    /* Inline scan feedback (same contract as EP_Scanner.status, with this page's icons) */
+    var STATUS_ICONS = { success: 'ph-check-circle', error: 'ph-x-circle', info: 'ph-info', warn: 'ph-warning' };
+    function status(type, title, detail) {
+        var box = el.scanStatus;
+        box.className = 'pos-status pos-status-' + type;
+        box.innerHTML = '<i class="ph-fill ' + (STATUS_ICONS[type] || STATUS_ICONS.info) + '" aria-hidden="true"></i>' +
+            '<div><strong>' + esc(title) + '</strong>' + (detail ? '<span>' + esc(detail) + '</span>' : '') + '</div>';
+        box.hidden = false;
+        box.classList.remove('pos-flash');
+        void box.offsetWidth; // restart the flash animation
+        box.classList.add('pos-flash');
+    }
     function readJson(r) {
         return r.json().catch(function () {
             return { ok: false, error: 'bad_response', message: 'Unexpected server response (HTTP ' + r.status + ').' };
@@ -228,27 +251,42 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
     }
 
     /* ---------- rendering ---------- */
+    function lineHtml(l, flashId) {
+        var over = l.qty > l.stock;
+        var max = Math.min(l.stock, POS_CONFIG.maxQty);
+        var cls = 'pos-line' + (l.id === flashId ? ' pos-line-flash' : '') + (over ? ' is-over' : '');
+        var name = esc(l.name);
+        return '<li class="' + cls + '" data-id="' + l.id + '">' +
+            '<div class="pos-line-info">' +
+                '<div class="pos-line-name">' + name + '</div>' +
+                '<div class="pos-line-meta">' + esc(l.category || 'Product') +
+                    (l.barcode ? '<span class="mono">' + esc(l.barcode) + '</span>' : '') + '</div>' +
+                (over ? '<div class="pos-over"><i class="ph-fill ph-warning" aria-hidden="true"></i> Only ' + l.stock + ' in stock — lower the quantity</div>' : '') +
+            '</div>' +
+            '<div class="pos-line-price"><span class="cx-num">' + peso(l.priceC) + '</span><span>each</span></div>' +
+            '<div class="pos-stepper">' +
+                '<button type="button" class="pos-step" data-step="-1" data-id="' + l.id + '"' + (l.qty <= 1 ? ' disabled' : '') +
+                    ' aria-label="One less ' + name + '"><i class="ph ph-minus" aria-hidden="true"></i></button>' +
+                '<input type="number" class="pos-qty" data-id="' + l.id + '" min="1" max="' + max + '" value="' + l.qty + '" aria-label="Quantity for ' + name + '">' +
+                '<button type="button" class="pos-step" data-step="1" data-id="' + l.id + '"' + (l.qty >= max ? ' disabled' : '') +
+                    ' aria-label="One more ' + name + '"><i class="ph ph-plus" aria-hidden="true"></i></button>' +
+            '</div>' +
+            '<div class="pos-line-total cx-num">' + peso(l.priceC * l.qty) + '</div>' +
+            '<button type="button" class="pos-remove" data-remove="' + l.id + '" title="Remove line" aria-label="Remove ' + name + '"><i class="ph ph-trash" aria-hidden="true"></i></button>' +
+        '</li>';
+    }
     function render(flashId) {
         var t = totals();
         if (!cart.length) {
-            el.cartWrap.innerHTML = '<div class="empty-state-row"><i class="fas fa-barcode"></i> No items yet — scan a product to begin.</div>';
-        } else {
             el.cartWrap.innerHTML =
-                '<div class="stocks-table-wrap"><table class="stocks-table">' +
-                '<thead><tr><th>Product</th><th class="num">Price</th><th>Qty</th><th class="num">Line Total</th><th></th></tr></thead><tbody>' +
-                cart.map(function (l) {
-                    var over = l.qty > l.stock;
-                    return '<tr data-id="' + l.id + '"' + (l.id === flashId ? ' class="pos-line-flash"' : '') + '>' +
-                        '<td><div class="stocks-pname">' + esc(l.name) + '</div>' +
-                        '<span class="stocks-pcat">' + esc(l.category || '') + (l.barcode ? ' · <span class="mono">' + esc(l.barcode) + '</span>' : '') + '</span>' +
-                        (over ? '<span class="stocks-pcat" style="color:#c0392b;">Only ' + l.stock + ' in stock</span>' : '') + '</td>' +
-                        '<td class="num">' + peso(l.priceC) + '</td>' +
-                        '<td><input type="number" class="pos-qty" data-id="' + l.id + '" min="1" max="' + Math.min(l.stock, POS_CONFIG.maxQty) + '" value="' + l.qty + '" aria-label="Quantity for ' + esc(l.name) + '"></td>' +
-                        '<td class="num price-tag">' + peso(l.priceC * l.qty) + '</td>' +
-                        '<td class="num"><button type="button" class="pos-remove" data-remove="' + l.id + '" title="Remove line" aria-label="Remove ' + esc(l.name) + '"><i class="fas fa-times"></i></button></td>' +
-                        '</tr>';
-                }).join('') +
-                '</tbody></table></div>';
+                '<div class="pos-empty">' +
+                    '<span class="pos-empty-icon" aria-hidden="true"><i class="ph ph-barcode"></i></span>' +
+                    '<strong>No items yet</strong>' +
+                    '<span>Scan a product barcode to start the sale.</span>' +
+                '</div>';
+        } else {
+            el.cartWrap.innerHTML = '<ul class="pos-lines">' +
+                cart.map(function (l) { return lineHtml(l, flashId); }).join('') + '</ul>';
         }
         el.lineCount.textContent = cart.length;
         el.sumUnits.textContent = t.units;
@@ -256,6 +294,7 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         el.sumVatable.textContent = peso(t.vatable);
         el.sumVat.textContent = peso(t.vat);
         el.sumTotal.textContent = peso(t.total);
+        el.checkoutAmt.textContent = cart.length ? peso(t.total) : '';
         el.checkoutBtn.disabled = cart.length === 0;
         el.clearBtn.disabled = cart.length === 0;
     }
@@ -263,6 +302,7 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
     function setScanState(text) {
         var focused = document.activeElement === el.scanInput;
         el.scanBar.classList.toggle('is-idle', !focused && !text);
+        el.scanBar.classList.toggle('is-busy', !!text);
         el.scanState.textContent = text || (focused ? 'Ready to scan' : 'Click here to scan');
     }
 
@@ -320,10 +360,12 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
     var scanner = EP_Scanner.attach(el.scanInput, {
         onScan: onScan,
         onInvalid: function (res) { status('error', 'Invalid barcode', res.message); },
-        canRefocus: function () { return !paying; }
+        /* not while paying, or while the account menu in the top bar is open */
+        canRefocus: function () { return !paying && !document.querySelector('.cx-user.is-open'); }
     });
     el.scanInput.addEventListener('focus', function () { setScanState(null); });
     el.scanInput.addEventListener('blur', function () { setTimeout(function () { setScanState(null); }, 10); });
+    el.scanBar.addEventListener('click', function () { el.scanInput.focus(); });
 
     /* ---------- cart editing ---------- */
     el.cartWrap.addEventListener('change', function (e) {
@@ -350,6 +392,15 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         }
     });
     el.cartWrap.addEventListener('click', function (e) {
+        /* − / + steppers go through the quantity field's own change handling */
+        var step = e.target.closest('[data-step]');
+        if (step) {
+            var qty = el.cartWrap.querySelector('.pos-qty[data-id="' + step.getAttribute('data-id') + '"]');
+            if (!qty) return;
+            qty.value = Math.max(1, (parseInt(qty.value, 10) || 1) + Number(step.getAttribute('data-step')));
+            qty.dispatchEvent(new Event('change', { bubbles: true }));
+            return;
+        }
         var btn = e.target.closest('[data-remove]');
         if (!btn) return;
         var id = Number(btn.getAttribute('data-remove'));
@@ -386,7 +437,9 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
     function selectMethod(m) {
         method = m;
         Array.prototype.forEach.call(el.payMethods.querySelectorAll('.pay-method'), function (b) {
-            b.classList.toggle('active', b.getAttribute('data-method') === m);
+            var on = b.getAttribute('data-method') === m;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
         el.cashFields.hidden = m !== 'cash';
         el.refFields.hidden = m === 'cash';
@@ -420,8 +473,8 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
             if (list.indexOf(v) === -1) list.push(v);
         });
         el.payQuick.innerHTML = list.map(function (v, i) {
-            return '<button type="button" class="btn btn-outline btn-xs" data-amount="' + (v / 100).toFixed(2) + '">' +
-                (i === 0 ? 'Exact ' : '') + peso(v) + '</button>';
+            return '<button type="button" class="pay-chip-amt' + (i === 0 ? ' is-exact' : '') + '" data-amount="' + (v / 100).toFixed(2) + '">' +
+                (i === 0 ? '<span>Exact</span>' : '') + peso(v) + '</button>';
         }).join('');
     }
     function openPay() {
@@ -452,7 +505,7 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         scanner.refocus();
     }
     function payFail(msg) {
-        el.payError.textContent = msg;
+        el.payError.innerHTML = '<i class="ph-fill ph-x-circle" aria-hidden="true"></i><span>' + esc(msg) + '</span>';
         el.payError.hidden = false;
         EP_Scanner.beep(false);
     }
@@ -471,7 +524,7 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         if (!clientRef) clientRef = uuid();
         submitting = true;
         el.payConfirm.disabled = true;
-        el.payConfirm.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing…';
+        el.payConfirm.innerHTML = '<i class="ph ph-spinner-gap cx-spin" aria-hidden="true"></i> Processing…';
         el.payError.hidden = true;
 
         fetch(API + 'stock_out.php', {
@@ -518,10 +571,10 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
                 });
             }
         }).catch(function () {
-            payFail('Connection problem. The sale may not have been saved — press Complete Sale again; it will not be recorded twice.');
+            payFail('Connection problem. The sale may not have been saved — press Complete sale again; it will not be recorded twice.');
         }).then(function () {
             submitting = false;
-            el.payConfirm.innerHTML = '<i class="fas fa-check"></i> Complete Sale';
+            el.payConfirm.innerHTML = CONFIRM_HTML;
             updateChange();
         });
     }

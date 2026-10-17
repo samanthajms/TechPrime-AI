@@ -14,140 +14,153 @@ $today = pos_today_stats($db, $uid);
 $recent = pos_recent_sales($db, $uid, 10);
 $alerts = pos_stock_alerts($db);
 $avgSale = $today['count'] > 0 ? $today['total'] / $today['count'] : 0;
+$firstName = trim((string)($_SESSION['name'] ?? '')) ?: 'Cashier';
+$payIcons = ['cash' => 'ph-money', 'gcash' => 'ph-device-mobile', 'maya' => 'ph-device-mobile', 'card' => 'ph-credit-card'];
 
 staff_page_start([
     'role' => 'cashier',
     'title' => 'Cashier Dashboard',
     'active' => 'dashboard',
-    'heading' => 'Cashier Dashboard',
-    'subtitle' => 'Welcome, ' . ($_SESSION['name'] ?? 'Cashier') . ' · ' . pos_format_datetime(gmdate('Y-m-d H:i:s'), 'l, F j, Y'),
-    'extra_head' => '<link rel="stylesheet" href="cashier.css?v=7">',
+    'heading' => 'Good to see you, ' . $firstName,
+    'subtitle' => pos_format_datetime(gmdate('Y-m-d H:i:s'), 'l, F j, Y') . ' · your sales and stock at a glance',
+    'actions' => '<a href="cashier_stock_alerts.php" class="cx-btn cx-btn-outline"><i class="ph ph-bell" aria-hidden="true"></i> Stock alerts</a>',
 ]);
 ?>
-        <div class="cash-page">
-            <div class="cash-quick">
-                <a href="cashier_pos.php" class="btn btn-primary"><i class="fas fa-cash-register"></i> Start New Sale</a>
-                <a href="cashier_stock_alerts.php" class="btn btn-outline"><i class="fas fa-bell"></i> View Stock Alerts</a>
-            </div>
-
-            <div class="inv-stats-grid">
-                <div class="inv-stat-card stat-green">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Today's Sales</div>
-                            <div class="inv-stat-num"><?php echo (int)$today['count']; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-receipt"></i></div>
+        <div class="dash">
+            <div class="dash-top">
+                <section class="cx-card dash-today" aria-labelledby="todayTitle">
+                    <div class="cx-card-head">
+                        <h2 id="todayTitle"><i class="ph ph-chart-line-up" aria-hidden="true"></i> Today</h2>
+                        <span class="cx-card-meta">Completed sales only</span>
                     </div>
-                    <div class="inv-stat-foot">Completed transactions today</div>
-                </div>
-                <div class="inv-stat-card stat-dark">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Today's Total</div>
-                            <div class="inv-stat-num"><?php echo h(pos_peso($today['total'])); ?></div>
+                    <div class="kpis">
+                        <div class="kpi kpi-hero">
+                            <span class="kpi-label">Revenue</span>
+                            <strong class="kpi-value cx-num"><?php echo h(pos_peso($today['total'])); ?></strong>
+                            <span class="kpi-sub">VAT-inclusive</span>
                         </div>
-                        <div class="inv-stat-icon"><i class="fas fa-coins"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">Average sale <?php echo h(pos_peso($avgSale)); ?> · <?php echo (int)$today['units']; ?> unit<?php echo $today['units'] === 1 ? '' : 's'; ?> sold</div>
-                </div>
-                <div class="inv-stat-card stat-yellow">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Low Stock</div>
-                            <div class="inv-stat-num" id="statLow"><?php echo (int)$alerts['low']; ?></div>
+                        <div class="kpi">
+                            <span class="kpi-label">Transactions</span>
+                            <strong class="kpi-value cx-num"><?php echo (int)$today['count']; ?></strong>
+                            <span class="kpi-sub">sale<?php echo (int)$today['count'] === 1 ? '' : 's'; ?> completed</span>
                         </div>
-                        <div class="inv-stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">Products with 6–15 units left</div>
-                </div>
-                <div class="inv-stat-card stat-red">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Critical / Out</div>
-                            <div class="inv-stat-num" id="statCritOut"><?php echo (int)$alerts['critical']; ?> / <?php echo (int)$alerts['out']; ?></div>
+                        <div class="kpi">
+                            <span class="kpi-label">Average sale</span>
+                            <strong class="kpi-value cx-num"><?php echo h(pos_peso($avgSale)); ?></strong>
+                            <span class="kpi-sub">per transaction</span>
                         </div>
-                        <div class="inv-stat-icon"><i class="fas fa-times-circle"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">5 or fewer units / none left</div>
-                </div>
-            </div>
-
-            <div class="cash-grid-2">
-                <section class="cash-panel" aria-label="Recent transactions">
-                    <div class="cash-panel-header">
-                        <div>
-                            <h3><span class="card-icon"><i class="fas fa-history"></i></span> My Recent Transactions</h3>
-                            <div class="card-subtitle">Your last <?php echo count($recent); ?> sale<?php echo count($recent) === 1 ? '' : 's'; ?> · reprint a receipt anytime</div>
+                        <div class="kpi">
+                            <span class="kpi-label">Units sold</span>
+                            <strong class="kpi-value cx-num"><?php echo (int)$today['units']; ?></strong>
+                            <span class="kpi-sub">item<?php echo (int)$today['units'] === 1 ? '' : 's'; ?> scanned out</span>
                         </div>
-                    </div>
-                    <div class="cash-panel-body">
-                        <?php if (!$recent): ?>
-                            <div class="empty-state-row"><i class="fas fa-receipt"></i> No sales yet. Start a new sale to see it here.</div>
-                        <?php else: ?>
-                        <div class="stocks-table-wrap">
-                            <table class="stocks-table compact">
-                                <thead><tr>
-                                    <th>Invoice / Date</th>
-                                    <th class="num">Items</th>
-                                    <th>Payment</th>
-                                    <th class="num">Total</th>
-                                    <th></th>
-                                </tr></thead>
-                                <tbody>
-                                <?php foreach ($recent as $s): ?>
-                                    <tr>
-                                        <td>
-                                            <span class="mono" style="white-space:nowrap;font-weight:700;"><?php echo h($s['invoice_no']); ?></span>
-                                            <?php if ($s['status'] === 'voided'): ?><span class="stock-status-pill out">Voided</span><?php endif; ?>
-                                            <span class="stocks-pcat"><?php echo h(pos_format_datetime($s['created_at'])); ?></span>
-                                        </td>
-                                        <td class="num"><?php echo (int)$s['units']; ?></td>
-                                        <td><?php echo h(pos_payment_label((string)$s['payment_method'])); ?></td>
-                                        <td class="num price-tag"><?php echo h(pos_peso($s['total'])); ?></td>
-                                        <td class="num">
-                                            <a class="btn btn-outline btn-xs" href="cashier_receipt.php?id=<?php echo (int)$s['id']; ?>&amp;print=1" target="_blank" rel="noopener">
-                                                <i class="fas fa-print"></i> Reprint
-                                            </a>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                        <?php endif; ?>
                     </div>
                 </section>
 
-                <section class="cash-panel" aria-label="Stock alerts">
-                    <div class="cash-panel-header">
+                <a class="dash-cta" href="cashier_pos.php">
+                    <span class="dash-cta-icon" aria-hidden="true"><i class="ph ph-cash-register"></i></span>
+                    <span class="dash-cta-text">
+                        <strong>Start a new sale</strong>
+                        <span>Open checkout and scan the first item</span>
+                    </span>
+                    <i class="ph ph-arrow-right dash-cta-arrow" aria-hidden="true"></i>
+                </a>
+            </div>
+
+            <div class="dash-grid">
+                <section class="cx-card" aria-labelledby="recentTitle">
+                    <div class="cx-card-head">
                         <div>
-                            <h3><span class="card-icon"><i class="fas fa-bell"></i></span> Stock Alerts</h3>
-                            <div class="card-subtitle">Read-only · lowest stock first · restocking is handled by the Inventory Custodian</div>
+                            <h2 id="recentTitle"><i class="ph ph-receipt" aria-hidden="true"></i> Recent transactions</h2>
+                            <p>Your last <?php echo count($recent); ?> sale<?php echo count($recent) === 1 ? '' : 's'; ?> · reprint a receipt anytime</p>
                         </div>
-                        <a href="cashier_stock_alerts.php" class="btn btn-outline btn-xs"><i class="fas fa-expand"></i> View all</a>
                     </div>
-                    <div class="cash-panel-body">
-                        <div class="alert-counts">
-                            <span class="stock-status-pill out"><i class="fas fa-times-circle"></i> <span id="cntOut"><?php echo (int)$alerts['out']; ?></span> out</span>
-                            <span class="stock-status-pill critical"><i class="fas fa-exclamation-circle"></i> <span id="cntCritical"><?php echo (int)$alerts['critical']; ?></span> critical</span>
-                            <span class="stock-status-pill low"><i class="fas fa-exclamation-triangle"></i> <span id="cntLow"><?php echo (int)$alerts['low']; ?></span> low</span>
-                            <span class="alerts-live" id="alertsLive" title="Refreshes every 30 seconds">Live stock</span>
+                    <?php if (!$recent): ?>
+                        <div class="cx-empty">
+                            <span class="cx-empty-icon" aria-hidden="true"><i class="ph ph-receipt"></i></span>
+                            <strong>No sales yet</strong>
+                            <span>Completed sales will appear here with a reprint button.</span>
+                            <a href="cashier_pos.php" class="cx-btn cx-btn-primary"><i class="ph ph-cash-register" aria-hidden="true"></i> Start a sale</a>
                         </div>
-                        <div class="empty-state-row" id="alertsEmpty" hidden><i class="fas fa-check-circle"></i> All products are well stocked.</div>
-                        <div class="stocks-table-wrap alerts-scroll" id="alertsWrap" tabindex="0" aria-label="Stock alert list">
-                            <table class="stocks-table compact">
-                                <thead><tr><th>Product</th><th class="num">Stock</th><th>Status</th></tr></thead>
-                                <tbody id="alertsRows"></tbody>
-                            </table>
+                    <?php else: ?>
+                    <div class="cx-table-wrap">
+                        <table class="cx-table tx-table">
+                            <thead><tr>
+                                <th scope="col">Invoice</th>
+                                <th scope="col" class="num">Items</th>
+                                <th scope="col">Payment</th>
+                                <th scope="col" class="num">Total</th>
+                                <th scope="col"><span class="cx-sr">Receipt</span></th>
+                            </tr></thead>
+                            <tbody>
+                            <?php foreach ($recent as $s):
+                                $pm = (string)$s['payment_method'];
+                                $voided = $s['status'] === 'voided'; ?>
+                                <tr<?php echo $voided ? ' class="is-voided"' : ''; ?>>
+                                    <td data-label="Invoice">
+                                        <span class="tx-inv mono"><?php echo h($s['invoice_no']); ?></span>
+                                        <span class="tx-time"><?php echo h(pos_format_datetime($s['created_at'])); ?></span>
+                                        <?php if ($voided): ?><span class="cx-badge cx-badge-out">Voided</span><?php endif; ?>
+                                    </td>
+                                    <td data-label="Items" class="num cx-num"><?php echo (int)$s['units']; ?></td>
+                                    <td data-label="Payment">
+                                        <span class="pay-chip pay-<?php echo h($pm); ?>"><i class="ph <?php echo h($payIcons[$pm] ?? 'ph-wallet'); ?>" aria-hidden="true"></i> <?php echo h(pos_payment_label($pm)); ?></span>
+                                    </td>
+                                    <td data-label="Total" class="num tx-total cx-num"><?php echo h(pos_peso($s['total'])); ?></td>
+                                    <td class="num tx-action">
+                                        <a class="cx-btn cx-btn-outline cx-btn-sm" href="cashier_receipt.php?id=<?php echo (int)$s['id']; ?>&amp;print=1" data-print-receipt
+                                           aria-label="Reprint receipt <?php echo h($s['invoice_no']); ?>">
+                                            <i class="ph ph-printer" aria-hidden="true"></i> Reprint
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                </section>
+
+                <section class="cx-card watch" aria-labelledby="watchTitle">
+                    <div class="cx-card-head">
+                        <div>
+                            <h2 id="watchTitle"><i class="ph ph-bell" aria-hidden="true"></i> Stock watch</h2>
+                            <p>Read-only · restocking is handled by the Inventory Custodian</p>
                         </div>
+                        <a href="cashier_stock_alerts.php" class="cx-link">View all <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+                    </div>
+                    <div class="watch-counts">
+                        <div class="watch-count is-out">
+                            <strong class="cx-num" id="cntOut"><?php echo (int)$alerts['out']; ?></strong>
+                            <span><i class="ph-fill ph-x-circle" aria-hidden="true"></i> Out of stock</span>
+                        </div>
+                        <div class="watch-count is-critical">
+                            <strong class="cx-num" id="cntCritical"><?php echo (int)$alerts['critical']; ?></strong>
+                            <span><i class="ph-fill ph-warning-circle" aria-hidden="true"></i> Critical</span>
+                        </div>
+                        <div class="watch-count is-low">
+                            <strong class="cx-num" id="cntLow"><?php echo (int)$alerts['low']; ?></strong>
+                            <span><i class="ph-fill ph-warning" aria-hidden="true"></i> Low</span>
+                        </div>
+                    </div>
+                    <div class="watch-bar">
+                        <span>Lowest stock first</span>
+                        <span class="alerts-live" id="alertsLive" title="Refreshes every 30 seconds">Live stock</span>
+                    </div>
+                    <div class="cx-empty cx-empty-sm" id="alertsEmpty" hidden>
+                        <span class="cx-empty-icon is-ok" aria-hidden="true"><i class="ph ph-check-circle"></i></span>
+                        <strong>All products are well stocked</strong>
+                    </div>
+                    <div class="watch-scroll" id="alertsWrap" tabindex="0" aria-label="Stock alert list">
+                        <ul class="watch-list" id="alertsRows"></ul>
                     </div>
                 </section>
             </div>
         </div>
 <?php
 $alertsJson = json_encode($alerts, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-$script = '<script src="stock_alerts.js?v=2"></script>'
+$script = '<script src="stock_alerts.js?v=3"></script>'
+    . '<script src="receipt_print.js?v=2"></script>'
     . '<script>var INITIAL_ALERTS = ' . $alertsJson . ';</script>'
     . <<<'SCRIPT'
 <script>
@@ -163,17 +176,15 @@ $script = '<script src="stock_alerts.js?v=2"></script>'
         document.getElementById('cntOut').textContent = d.out;
         document.getElementById('cntCritical').textContent = d.critical;
         document.getElementById('cntLow').textContent = d.low;
-        document.getElementById('statLow').textContent = d.low;
-        document.getElementById('statCritOut').textContent = d.critical + ' / ' + d.out;
         wrap.hidden = d.items.length === 0;
         empty.hidden = d.items.length !== 0;
         rows.innerHTML = d.items.map(function (p) {
-            return '<tr>' +
-                '<td><div class="stocks-pname">' + SA.esc(p.name || ('Product #' + p.id)) + '</div>' +
-                '<span class="stocks-pcat">' + SA.esc(p.category) + '</span></td>' +
-                '<td class="num"><span class="stocks-qty' + SA.qtyClass(p.status) + '">' + p.stock + '</span></td>' +
-                '<td>' + SA.pill(p.status) + '</td>' +
-            '</tr>';
+            return '<li class="watch-item is-' + SA.esc(p.status) + '">' +
+                '<div class="watch-item-info"><div class="watch-item-name">' + SA.esc(p.name || ('Product #' + p.id)) + '</div>' +
+                '<div class="watch-item-cat">' + SA.esc(p.category) + '</div></div>' +
+                '<div class="watch-item-qty"><span class="stocks-qty' + SA.qtyClass(p.status) + '">' + p.stock + '</span><span>left</span></div>' +
+                SA.pill(p.status) +
+            '</li>';
         }).join('');
         SA.markLive(live, at);
     }
