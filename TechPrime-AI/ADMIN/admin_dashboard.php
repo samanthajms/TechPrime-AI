@@ -19,6 +19,8 @@ $cnt['clients'] = $db->query("SELECT COUNT(*) FROM users WHERE role='client'")->
 $cnt['retail_officer'] = $db->query("SELECT COUNT(*) FROM users WHERE role='retail_officer'")->fetchColumn();
 $cnt['technician'] = $db->query("SELECT COUNT(*) FROM users WHERE role='technician'")->fetchColumn();
 $cnt['inventory_custodian'] = $db->query("SELECT COUNT(*) FROM users WHERE role='inventory_custodian'")->fetchColumn();
+$cnt['cashier'] = $db->query("SELECT COUNT(*) FROM users WHERE role='cashier'")->fetchColumn();
+$cnt['admin'] = $db->query("SELECT COUNT(*) FROM users WHERE role='admin'")->fetchColumn();
 $cnt['orders'] = $db->query("SELECT COUNT(*) FROM orders")->fetchColumn();
 
 $statRange = ias_resolve_section_range($_GET, 'stat', 'this_month');
@@ -47,6 +49,8 @@ $people = [
     ['tab' => 'client', 'label' => 'Clients', 'hint' => 'Storefront accounts', 'icon' => 'ph-user', 'count' => (int)$cnt['clients']],
     ['tab' => 'retail_officer', 'label' => 'Retail Officers', 'hint' => 'Reports and forecasting', 'icon' => 'ph-storefront', 'count' => (int)$cnt['retail_officer']],
     ['tab' => 'inventory_custodian', 'label' => 'Inventory Custodians', 'hint' => 'Stock and receiving', 'icon' => 'ph-warehouse', 'count' => (int)$cnt['inventory_custodian']],
+    ['tab' => 'cashier', 'label' => 'Cashiers', 'hint' => 'Walk-in POS checkout', 'icon' => 'ph-cash-register', 'count' => (int)$cnt['cashier']],
+    ['tab' => 'admin', 'label' => 'Admins', 'hint' => 'Full system access', 'icon' => 'ph-shield-check', 'count' => (int)$cnt['admin']],
 ];
 
 staff_page_start([
