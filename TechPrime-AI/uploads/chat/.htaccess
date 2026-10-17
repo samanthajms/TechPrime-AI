@@ -1,0 +1,4 @@
+# Staff chat attachments are private: never served directly.
+# They are streamed only by includes/staff_chat_messages.php?action=file after an access check.
+Require all denied
+Options -Indexes -ExecCGI

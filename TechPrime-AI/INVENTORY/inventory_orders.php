@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
+require_once __DIR__ . '/../includes/inventory_alerts.php';
+require_once __DIR__ . '/../includes/client_helpers.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -9,65 +11,287 @@ checkRole('inventory_custodian');
 
 $uid = (int)$_SESSION['user_id'];
 
+$orderStatusOptions = [
+    'to_pay' => 'To Pay',
+    'to_ship' => 'To Ship',
+    'to_receive' => 'With Courier',
+    'to_review' => 'Completed',
+];
+$orderStatusFilters = $orderStatusOptions + [
+    'cancelled' => 'Cancelled',
+    'cancel_requested' => 'Cancel Requests',
+];
+
+/**
+ * Move one order to a new status (forward only). Shared by the single and bulk update.
+ * @return string ok | completed | complete_failed | locked | backward | pickup_no_ship | invalid
+ */
+function inv_orders_change_status(PDO $db, int $oid, string $status, int $uid, array $statusLabels): string
+{
+    $statusRank = ['to_pay' => 0, 'to_ship' => 1, 'to_receive' => 2, 'to_review' => 3];
+    if ($oid <= 0 || !isset($statusRank[$status])) {
+        return 'invalid';
+    }
+    $prev = $db->prepare('SELECT user_id, status, cancel_requested, fulfillment_type FROM orders WHERE id = ? LIMIT 1');
+    $prev->execute([$oid]);
+    $prevRow = $prev->fetch(PDO::FETCH_ASSOC) ?: [];
+    $prevStatus = (string)($prevRow['status'] ?? '');
+    $orderUserId = (int)($prevRow['user_id'] ?? 0);
+
+    // Completed / cancelled orders are final (stock already deducted, sale recorded).
+    if (!$prevRow || in_array($prevStatus, ['to_review', 'cancelled'], true) || !empty($prevRow['cancel_requested'])) {
+        return 'locked';
+    }
+    // Status only moves forward: To Pay -> To Ship -> To Receive -> Completed.
+    if ($statusRank[$status] < ($statusRank[$prevStatus] ?? 0)) {
+        return 'backward';
+    }
+    // Pickup orders have no shipping step: they go straight from payment to To Receive.
+    if (ep_order_is_pickup($prevRow) && in_array($status, ['to_pay', 'to_ship'], true)) {
+        return 'pickup_no_ship';
+    }
+    if ($status === 'to_review') {
+        // Completed: deduct stock, record the sale for the Retail Officer, notify everyone.
+        $done = ep_complete_order($db, $oid, 0, $uid);
+        return !empty($done['ok']) ? 'completed' : 'complete_failed';
+    }
+
+    $up = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
+    $up->execute([$status, $oid]);
+    // Ensure a shipment row exists for fulfillment tracking (no courier assignment)
+    $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
+    $chk->execute([$oid]);
+    $ship = $chk->fetch(PDO::FETCH_ASSOC);
+    if (!$ship) {
+        $ins = $db->prepare('INSERT INTO shipments (order_id, shipment_status) VALUES (?, ?)');
+        $ins->execute([$oid, 'pending']);
+    } else {
+        $shipMap = [
+            'to_pay' => 'pending',
+            'to_ship' => 'processing',
+            'to_receive' => ep_order_is_pickup($prevRow) ? 'processing' : 'out_for_delivery',
+            'to_review' => 'delivered',
+        ];
+        $su = $db->prepare('UPDATE shipments SET shipment_status = ? WHERE id = ?');
+        $su->execute([$shipMap[$status] ?? 'pending', (int)$ship['id']]);
+    }
+
+    if ($orderUserId > 0 && $prevStatus !== $status) {
+        $label = $statusLabels[$status] ?? $status;
+        inv_notify_user($db, $orderUserId, "Order #ORD-{$oid}: {$label}.", 'order_status', 'user_dashboard.php');
+    }
+    logActivity($db, $uid, 'update_order_status', "Order #$oid -> $status");
+    return 'ok';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'accept_order') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $oid = (int)($_POST['order_id'] ?? 0);
+    $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
+    $returnStatus = trim((string)($_POST['return_status'] ?? ''));
+    $result = ep_accept_order($db, $oid, $uid);
+    $params = [
+        'page' => $returnPage,
+        'alert' => !empty($result['ok']) ? 'accepted' : 'error',
+    ];
+    if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
+        $params['status'] = $returnStatus;
+    } elseif (!empty($result['ok'])) {
+        $params['status'] = $result['status'] ?? 'to_ship';   // pickup orders land in To Receive
+    }
+    header('Location: inventory_orders.php?' . http_build_query($params));
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'accept_cancel') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $oid = (int)($_POST['order_id'] ?? 0);
+    $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
+    $returnStatus = trim((string)($_POST['return_status'] ?? ''));
+    $result = ep_accept_order_cancel($db, $oid, $uid);
+    $params = [
+        'page' => $returnPage,
+        'alert' => !empty($result['ok']) ? 'cancel_accepted' : 'error',
+    ];
+    if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
+        $params['status'] = $returnStatus;
+    } elseif (!empty($result['ok'])) {
+        $params['status'] = 'cancelled';
+    }
+    header('Location: inventory_orders.php?' . http_build_query($params));
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_status') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
         die('Invalid CSRF token.');
     }
     $oid = (int)($_POST['order_id'] ?? 0);
     $status = $_POST['order_status'] ?? '';
-    $allowed = ['to_pay', 'to_ship', 'to_receive', 'to_review'];
+    $allowed = array_keys($orderStatusOptions);
+    $returnStatus = trim((string)($_POST['return_status'] ?? ''));
+    $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
     if ($oid > 0 && in_array($status, $allowed, true)) {
-        $up = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
-        $up->bind_param('si', $status, $oid);
-        $up->execute();
-        $up->close();
-
-        // Ensure a shipment row exists for fulfillment tracking (no courier assignment)
-        $chk = $db->prepare('SELECT id FROM shipments WHERE order_id = ? LIMIT 1');
-        $chk->bind_param('i', $oid);
-        $chk->execute();
-        $ship = $chk->get_result()->fetch_assoc();
-        $chk->close();
-
-        if (!$ship) {
-            $shipStatus = $status === 'to_review' ? 'delivered' : 'pending';
-            $ins = $db->prepare('INSERT INTO shipments (order_id, shipment_status) VALUES (?, ?)');
-            $ins->bind_param('is', $oid, $shipStatus);
-            $ins->execute();
-            $ins->close();
-        } else {
-            $shipMap = [
-                'to_pay' => 'pending',
-                'to_ship' => 'processing',
-                'to_receive' => 'out_for_delivery',
-                'to_review' => 'delivered',
-            ];
-            $shipStatus = $shipMap[$status] ?? 'pending';
-            $sid = (int)$ship['id'];
-            $su = $db->prepare('UPDATE shipments SET shipment_status = ? WHERE id = ?');
-            $su->bind_param('si', $shipStatus, $sid);
-            $su->execute();
-            $su->close();
+        $code = inv_orders_change_status($db, $oid, $status, $uid, $orderStatusOptions);
+        $alertByCode = [
+            'ok' => 'order_updated',
+            'completed' => 'order_completed',
+            'complete_failed' => 'order_complete_failed',
+            'locked' => 'order_locked',
+            'backward' => 'status_backward',
+            'pickup_no_ship' => 'pickup_no_ship',
+        ];
+        if (!isset($alertByCode[$code])) {
+            header('Location: inventory_orders.php?alert=error');
+            exit;
         }
-
-        logActivity($db, $uid, 'update_order_status', "Order #$oid -> $status");
-        header('Location: inventory_orders.php?alert=updated');
+        $redirectParams = ['alert' => $alertByCode[$code], 'page' => $returnPage];
+        if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
+            $redirectParams['status'] = $returnStatus;
+        }
+        header('Location: inventory_orders.php?' . http_build_query($redirectParams));
         exit;
     }
     header('Location: inventory_orders.php?alert=error');
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_update') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['order_ids'] ?? [])), static fn($v) => $v > 0)));
+    $ids = array_slice($ids, 0, 100);
+    $target = (string)($_POST['bulk_target'] ?? '');
+    $returnStatus = trim((string)($_POST['return_status'] ?? ''));
+    $returnPage = max(1, (int)($_POST['return_page'] ?? 1));
+    $redirectParams = ['page' => $returnPage];
+    if ($returnStatus !== '' && isset($orderStatusFilters[$returnStatus])) {
+        $redirectParams['status'] = $returnStatus;
+    }
+    if (!$ids || ($target !== 'accept' && !isset($orderStatusOptions[$target]))) {
+        header('Location: inventory_orders.php?' . http_build_query($redirectParams + ['alert' => 'error']));
+        exit;
+    }
+    // Bulk updates are per status: every selected order must currently have the same status.
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $stSel = $db->prepare("SELECT DISTINCT status FROM orders WHERE id IN ($in)");
+    $stSel->execute($ids);
+    if (count($stSel->fetchAll(PDO::FETCH_COLUMN)) !== 1) {
+        header('Location: inventory_orders.php?' . http_build_query($redirectParams + ['alert' => 'bulk_mixed']));
+        exit;
+    }
+    $okCount = 0;
+    $skipCount = 0;
+    foreach ($ids as $bid) {
+        if ($target === 'accept') {
+            $res = ep_accept_order($db, $bid, $uid);
+            $good = !empty($res['ok']);
+        } else {
+            $code = inv_orders_change_status($db, $bid, $target, $uid, $orderStatusOptions);
+            $good = in_array($code, ['ok', 'completed'], true);
+        }
+        if ($good) {
+            $okCount++;
+        } else {
+            $skipCount++;
+        }
+    }
+    $redirectParams += ['alert' => 'bulk_updated', 'n' => $okCount, 'skipped' => $skipCount];
+    if ($target === 'to_review' && $okCount > 0) {
+        $redirectParams['completed'] = 1;
+    }
+    header('Location: inventory_orders.php?' . http_build_query($redirectParams));
+    exit;
+}
+
+$selectedStatus = trim((string)($_GET['status'] ?? ''));
+if ($selectedStatus !== '' && !isset($orderStatusFilters[$selectedStatus])) {
+    $selectedStatus = '';
+}
+
+// Server-side paging: count the filtered orders, then fetch only the current page.
+$where = '';
+$whereParams = [];
+if ($selectedStatus === 'cancel_requested') {
+    $where = "WHERE COALESCE(o.cancel_requested, FALSE) = TRUE AND COALESCE(o.status, '') <> 'cancelled'";
+} elseif ($selectedStatus !== '') {
+    $where = 'WHERE o.status = ?';
+    $whereParams[] = $selectedStatus;
+}
+$countStmt = $db->prepare("SELECT COUNT(*) FROM orders o INNER JOIN users u ON u.id = o.user_id {$where}");
+$countStmt->execute($whereParams);
+$filteredCount = (int)$countStmt->fetchColumn();
+
+$perPage = 20;
+$currentPage = max(1, (int)($_GET['page'] ?? 1));
+$totalPages = max(1, (int)ceil($filteredCount / $perPage));
+if ($currentPage > $totalPages) {
+    $currentPage = $totalPages;
+}
+
 $sql = "SELECT o.id, o.total, o.status, o.created_at, o.shipping_address, o.customer_phone,
+               o.payment_status, o.payment_method, o.cancel_requested, o.cancel_reason, o.fulfillment_type,
                u.name, u.surname, u.email, u.address AS user_address,
-               (SELECT GROUP_CONCAT(CONCAT(pr.name, ' x', oi.quantity) SEPARATOR ', ')
+               (SELECT STRING_AGG(pr.name || ' x' || oi.quantity::text, ', ')
                 FROM order_items oi INNER JOIN products pr ON pr.id = oi.product_id
                 WHERE oi.order_id = o.id) AS products,
                (SELECT shipment_status FROM shipments WHERE order_id = o.id ORDER BY id DESC LIMIT 1) AS shipment_status
         FROM orders o
         INNER JOIN users u ON u.id = o.user_id
-        ORDER BY o.id DESC";
-$rows = $db->query($sql)->fetch_all(MYSQLI_ASSOC);
+        {$where}
+        ORDER BY
+            CASE WHEN COALESCE(o.cancel_requested, FALSE) = TRUE AND o.status <> 'cancelled' THEN 0 ELSE 1 END,
+            o.id DESC
+        LIMIT " . (int)$perPage . ' OFFSET ' . (int)(($currentPage - 1) * $perPage);
+$pageStmt = $db->prepare($sql);
+$pageStmt->execute($whereParams);
+$pagedRows = $pageStmt->fetchAll(PDO::FETCH_ASSOC);
+
+function inv_orders_page_url(int $page, string $status = ''): string
+{
+    $params = ['page' => $page];
+    if ($status !== '') {
+        $params['status'] = $status;
+    }
+    return 'inventory_orders.php?' . http_build_query($params);
+}
+
+/* Weekly total deliveries from shipments.created_at (last 8 weeks, Mon–Sun). */
+$weekLabels = [];
+$weekCounts = [];
+$weekMap = [];
+$weekStart = new DateTime('monday this week');
+$weekStart->modify('-7 weeks');
+for ($i = 0; $i < 8; $i++) {
+    $ws = clone $weekStart;
+    $ws->modify('+' . $i . ' weeks');
+    $key = $ws->format('Y-m-d');
+    $weekMap[$key] = 0;
+    $weekLabels[] = $ws->format('M d');
+}
+$rangeStart = array_key_first($weekMap);
+$weeklySql = "SELECT date_trunc('week', created_at)::date AS week_start, COUNT(*) AS cnt
+              FROM shipments
+              WHERE created_at >= ?
+              GROUP BY week_start
+              ORDER BY week_start";
+$weeklyStmt = $db->prepare($weeklySql);
+$weeklyStmt->execute([$rangeStart]);
+$weeklyRes = $weeklyStmt;
+while ($w = $weeklyRes->fetch(PDO::FETCH_ASSOC)) {
+    $key = substr((string)($w['week_start'] ?? ''), 0, 10);
+    if ($key !== '' && isset($weekMap[$key])) {
+        $weekMap[$key] = (int)$w['cnt'];
+    }
+}
+$weekCounts = array_values($weekMap);
+$weekLabelsJson = json_encode($weekLabels);
+$weekCountsJson = json_encode($weekCounts);
 
 staff_page_start([
     'role' => 'inventory_custodian',
@@ -75,68 +299,198 @@ staff_page_start([
     'active' => 'orders',
     'heading' => 'Orders',
     'subtitle' => 'Customer orders and status updates',
-    'extra_head' => <<<'EXTRA'
-<style>
-.status-pill { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-.st-ship { background: #fff8db; color: #926c00; }
-.st-courier { background: #eef4ff; color: #2452c9; }
-.st-done { background: #eef8e6; color: #3d7422; }
-.st-pay { background: #fef2f2; color: #b91c1c; }
-.price-tag { color: var(--ep-green-dark); font-weight: 800; }
-.customer-cell div { line-height: 1.35; }
-.action-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-</style>
-EXTRA
+    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>',
 ]);
 ?>
 
-        <div class="card">
-            <div class="card-header">
-                <div>
-                    <h3><span class="card-icon"><i class="fas fa-shopping-cart"></i></span> Customer Orders</h3>
-                    <div class="card-subtitle">All orders appear automatically</div>
+        <div class="inv-stack">
+
+            <section class="cx-card orders-card" aria-labelledby="ordersTitle">
+                <div class="cx-card-head">
+                    <div>
+                        <h2 id="ordersTitle"><i class="ph ph-shopping-cart-simple" aria-hidden="true"></i> Customer orders</h2>
+                        <p>
+                            <?php if ($selectedStatus !== ''): ?>
+                                Filtered by <?php echo h($orderStatusFilters[$selectedStatus]); ?> · <a class="cx-link" href="inventory_orders.php">Show all</a>
+                            <?php else: ?>
+                                All customer orders · cancel requests first, then newest
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    <div class="cx-card-tools">
+                        <span class="cx-count"><i class="ph ph-list-bullets" aria-hidden="true"></i> <?php echo number_format($filteredCount); ?> order<?php echo $filteredCount === 1 ? '' : 's'; ?></span>
+                        <form method="get" action="inventory_orders.php" id="statusFilterForm">
+                            <label class="sort-wrap" for="statusFilter">
+                                <span>Status</span>
+                                <select name="status" id="statusFilter" onchange="this.form.submit()">
+                                    <option value="">All Statuses</option>
+                                    <?php foreach ($orderStatusFilters as $val => $lbl): ?>
+                                    <option value="<?php echo h($val); ?>"<?php echo $selectedStatus === $val ? ' selected' : ''; ?>><?php echo h($lbl); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <noscript><button type="submit" class="cx-btn cx-btn-outline">Apply</button></noscript>
+                        </form>
+                    </div>
                 </div>
-            </div>
-            <div class="card-body" style="padding-top:0;">
-                <div class="table-wrap">
-                    <table class="ias-table">
+                <?php
+                $bulkCounts = ['to_pay' => 0, 'to_ship' => 0, 'to_receive' => 0];
+                foreach ($pagedRows as $br) {
+                    $bs = (string)($br['status'] ?? '');
+                    $bCancel = !empty($br['cancel_requested']) && $bs !== 'cancelled';
+                    $bPaid = strtolower((string)($br['payment_status'] ?? 'unpaid')) === 'paid';
+                    if ($bCancel) {
+                        continue;
+                    }
+                    if ($bs === 'to_pay' && $bPaid) {
+                        $bulkCounts['to_pay']++;
+                    } elseif (isset($bulkCounts[$bs]) && $bs !== 'to_pay') {
+                        $bulkCounts[$bs]++;
+                    }
+                }
+                ?>
+                <?php if (array_sum($bulkCounts) > 0): ?>
+                <div class="bulk-tools" id="bulkTools">
+                    <span class="bulk-tools-label">Select all on this page:</span>
+                    <?php foreach (['to_pay' => 'To Pay (Accept)', 'to_ship' => 'To Ship', 'to_receive' => 'To Receive'] as $bk => $bl): ?>
+                        <?php if ($bulkCounts[$bk] > 0): ?>
+                        <button type="button" class="bulk-chip" data-select-status="<?php echo h($bk); ?>"><?php echo h($bl); ?> <span class="cx-num"><?php echo (int)$bulkCounts[$bk]; ?></span></button>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                    <span class="bulk-tools-hint">Bulk updates work on one order status at a time.</span>
+                </div>
+                <?php endif; ?>
+                <form method="post" id="bulkForm" class="bulk-bar" hidden>
+                    <input type="hidden" name="action" value="bulk_update">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                    <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
+                    <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
+                    <span class="bulk-bar-count" role="status"><strong id="bulkCount" class="cx-num">0</strong> selected</span>
+                    <label class="sort-wrap" for="bulkTarget">
+                        <span>Move to</span>
+                        <select name="bulk_target" id="bulkTarget"></select>
+                    </label>
+                    <button type="submit" class="cx-btn cx-btn-primary" id="bulkApply"><i class="ph ph-check" aria-hidden="true"></i> Update selected</button>
+                    <button type="button" class="cx-btn cx-btn-ghost" id="bulkClear">Clear</button>
+                </form>
+                <?php if (empty($pagedRows)): ?>
+                    <div class="cx-empty">
+                        <span class="cx-empty-icon" aria-hidden="true"><i class="ph ph-shopping-cart-simple"></i></span>
+                        <strong>No orders found<?php echo $selectedStatus !== '' ? ' for this status' : ' yet'; ?></strong>
+                        <span><?php echo $selectedStatus !== '' ? 'Pick another status, or show all orders.' : 'Customer orders will be listed here.'; ?></span>
+                        <?php if ($selectedStatus !== ''): ?><a class="cx-btn cx-btn-outline" href="inventory_orders.php">Show all orders</a><?php endif; ?>
+                    </div>
+                <?php else: ?>
+                <div class="cx-table-wrap">
+                    <table class="cx-table orders-table">
                         <thead>
                             <tr>
-                                <th>Order ID</th>
-                                <th>Customer</th>
-                                <th>Products</th>
-                                <th>Total</th>
-                                <th>Status</th>
-                                <th>Date</th>
-                                <th>Action</th>
+                                <th scope="col" class="bulk-col"><span class="cx-sr">Select</span></th>
+                                <th scope="col">Order</th>
+                                <th scope="col">Customer</th>
+                                <th scope="col">Products</th>
+                                <th scope="col" class="num">Total</th>
+                                <th scope="col">Status</th>
+                                <th scope="col" class="col-actions">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($rows as $r):
-                                $ost = $r['status'] ?? '';
-                                $pill = $ost === 'to_receive' ? 'st-courier' : ($ost === 'to_review' ? 'st-done' : ($ost === 'to_pay' ? 'st-pay' : 'st-ship'));
+                            <?php foreach ($pagedRows as $r):
+                                $ost = (string)($r['status'] ?? '');
+                                $payStatus = strtolower((string)($r['payment_status'] ?? 'unpaid'));
+                                $isPaid = ($payStatus === 'paid');
+                                $cancelRequested = !empty($r['cancel_requested']) && $ost !== 'cancelled';
+                                $canAcceptCancel = $cancelRequested;
+                                $canAccept = ($ost === 'to_pay' && $isPaid && !$cancelRequested);
+                                $awaitingPayment = ($ost === 'to_pay' && !$isPaid && !$cancelRequested);
                                 $addr = $r['shipping_address'] ?: ($r['user_address'] ?? '');
+                                $cancelReason = trim((string)($r['cancel_reason'] ?? ''));
+                                // Bulk-selectable: waiting for Accept, or To Ship / To Receive.
+                                $bulkEligible = !$cancelRequested && ($canAccept || in_array($ost, ['to_ship', 'to_receive'], true));
+                                if ($cancelRequested) {
+                                    $statusBadge = ['is-cancelreq', 'ph-prohibit', 'Cancel requested'];
+                                } elseif ($awaitingPayment) {
+                                    $statusBadge = ['is-pay', 'ph-hourglass-medium', 'Awaiting payment'];
+                                } elseif ($canAccept) {
+                                    $statusBadge = ['is-accept', 'ph-check-circle', 'Paid · to accept'];
+                                } elseif ($ost === 'to_ship') {
+                                    $statusBadge = ['is-ship', 'ph-package', 'To ship'];
+                                } elseif ($ost === 'to_receive') {
+                                    $statusBadge = ['is-courier', 'ph-truck', 'With courier'];
+                                } elseif ($ost === 'to_review') {
+                                    $statusBadge = ['is-done', 'ph-seal-check', 'Completed'];
+                                } elseif ($ost === 'cancelled') {
+                                    $statusBadge = ['is-cancel', 'ph-x-circle', 'Cancelled'];
+                                } else {
+                                    $statusBadge = ['is-cancel', 'ph-circle', $orderStatusFilters[$ost] ?? ucfirst(str_replace('_', ' ', $ost))];
+                                }
+                                $contact = array_filter([(string)($r['email'] ?? ''), trim((string)($r['customer_phone'] ?? ''))], 'strlen');
                             ?>
-                            <tr>
-                                <td><strong>#<?php echo (int)$r['id']; ?></strong></td>
-                                <td class="customer-cell">
-                                    <div style="font-weight:700;"><?php echo h($r['name'] . ' ' . $r['surname']); ?></div>
-                                    <div class="text-muted text-small"><?php echo h($r['email']); ?></div>
-                                    <div class="text-muted text-small"><?php echo h($r['customer_phone'] ?? ''); ?></div>
-                                    <div class="text-small"><?php echo h($addr); ?></div>
+                            <tr class="<?php echo h($statusBadge[0]); ?>">
+                                <td class="bulk-col">
+                                    <?php if ($bulkEligible): ?>
+                                    <input type="checkbox" class="bulk-check" value="<?php echo (int)$r['id']; ?>"
+                                           data-status="<?php echo h($ost); ?>"
+                                           aria-label="Select order #<?php echo (int)$r['id']; ?>">
+                                    <?php endif; ?>
                                 </td>
-                                <td><small><?php echo h($r['products'] ?? ''); ?></small></td>
-                                <td class="price-tag">₱<?php echo number_format((float)$r['total'], 2); ?></td>
-                                <td><span class="status-pill <?php echo $pill; ?>"><?php echo h(ias_order_display_status($ost)); ?></span></td>
-                                <td class="text-muted text-small"><?php echo date('M d, Y', strtotime($r['created_at'])); ?></td>
-                                <td>
+                                <td data-label="Order" class="col-order">
+                                    <strong class="order-id cx-mono">#<?php echo (int)$r['id']; ?></strong>
+                                    <span class="order-date cx-num"><?php echo date('M d, Y', strtotime($r['created_at'])); ?></span>
+                                </td>
+                                <td data-label="Customer" class="customer-cell">
+                                    <div class="customer-name"><?php echo h($r['name'] . ' ' . $r['surname']); ?></div>
+                                    <div class="customer-meta" title="<?php echo h(implode(' · ', $contact)); ?>"><?php echo h(implode(' · ', $contact)); ?></div>
+                                    <div class="customer-addr" title="<?php echo h($addr); ?>"><?php echo h($addr); ?></div>
+                                    <?php if ($cancelRequested && $cancelReason !== ''): ?>
+                                        <div class="cancel-reason"><i class="ph ph-chat-text" aria-hidden="true"></i> <span><strong>Cancel reason:</strong> <?php echo h($cancelReason); ?></span></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Products"><div class="order-products" title="<?php echo h($r['products'] ?? ''); ?>"><?php echo h($r['products'] ?? ''); ?></div></td>
+                                <td data-label="Total" class="num cx-num"><span class="price-tag">₱<?php echo number_format((float)$r['total'], 2); ?></span></td>
+                                <td data-label="Status">
+                                    <div class="order-status">
+                                        <span class="ord-badge <?php echo h($statusBadge[0]); ?>"><i class="ph-fill <?php echo h($statusBadge[1]); ?>" aria-hidden="true"></i> <?php echo h($statusBadge[2]); ?></span>
+                                        <?php if (ep_order_is_pickup($r)): ?><span class="pickup-tag"><i class="ph ph-storefront" aria-hidden="true"></i> Store pickup</span><?php endif; ?>
+                                    </div>
+                                </td>
+                                <td class="col-actions">
                                     <div class="action-row">
-                                        <a href="inventory_details.php?id=<?php echo (int)$r['id']; ?>" class="btn btn-outline btn-sm">View</a>
-                                        <form method="post" style="display:flex;gap:6px;margin:0;align-items:center;flex-wrap:wrap;">
+                                        <a href="inventory_details.php?id=<?php echo (int)$r['id']; ?>" class="cx-btn cx-btn-outline cx-btn-sm" aria-label="View order #<?php echo (int)$r['id']; ?>"><i class="ph ph-eye" aria-hidden="true"></i> View</a>
+                                        <?php if ($canAcceptCancel): ?>
+                                            <form method="post" class="action-form"
+                                                  data-confirm="Accept this cancellation?"
+                                                  data-confirm-title="Accept cancel?"
+                                                  data-confirm-ok="Accept Cancel"
+                                                  data-confirm-type="danger">
+                                                <input type="hidden" name="action" value="accept_cancel">
+                                                <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
+                                                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                                <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
+                                                <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
+                                                <button type="submit" class="cx-btn cx-btn-sm act-danger"><i class="ph ph-prohibit" aria-hidden="true"></i> Accept cancel</button>
+                                            </form>
+                                        <?php elseif ($awaitingPayment): ?>
+                                            <?php /* Nothing to do until the customer pays; the Status column says so. */ ?>
+                                        <?php elseif ($canAccept): ?>
+                                            <form method="post" class="action-form">
+                                                <input type="hidden" name="action" value="accept_order">
+                                                <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
+                                                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                                <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
+                                                <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
+                                                <button type="submit" class="cx-btn cx-btn-primary cx-btn-sm"><i class="ph ph-check" aria-hidden="true"></i> Accept</button>
+                                            </form>
+                                        <?php elseif (in_array($ost, ['to_review', 'cancelled'], true)): ?>
+                                            <?php /* Final state: shown in the Status column, nothing to act on. */ ?>
+                                        <?php else: ?>
+                                        <form method="post" class="action-form status-form">
                                             <input type="hidden" name="action" value="update_status">
                                             <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
                                             <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                            <select name="order_status" class="form-control" style="width:auto;min-width:130px;">
+                                            <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
+                                            <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
+                                            <select name="order_status" class="row-select" aria-label="New status for order #<?php echo (int)$r['id']; ?>">
                                                 <?php
                                                 $opts = [
                                                     'to_pay' => 'To Pay',
@@ -144,33 +498,204 @@ EXTRA
                                                     'to_receive' => 'To Receive',
                                                     'to_review' => 'Completed',
                                                 ];
+                                                if (ep_order_is_pickup($r)) {
+                                                    // Store pickup: no shipping step.
+                                                    unset($opts['to_pay'], $opts['to_ship']);
+                                                }
+                                                // Forward only: hide statuses before the current one.
+                                                $rankMap = ['to_pay' => 0, 'to_ship' => 1, 'to_receive' => 2, 'to_review' => 3];
+                                                foreach (array_keys($opts) as $k) {
+                                                    if (($rankMap[$k] ?? 0) < ($rankMap[$ost] ?? 0)) {
+                                                        unset($opts[$k]);
+                                                    }
+                                                }
                                                 foreach ($opts as $val => $lbl):
                                                 ?>
                                                 <option value="<?php echo h($val); ?>"<?php echo $ost === $val ? ' selected' : ''; ?>><?php echo h($lbl); ?></option>
                                                 <?php endforeach; ?>
                                             </select>
-                                            <button type="submit" class="btn btn-primary btn-sm">Update</button>
+                                            <button type="submit" class="cx-btn cx-btn-primary cx-btn-sm">Update</button>
                                         </form>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($rows)): ?>
-                            <tr><td colspan="8" class="empty-state">No orders yet.</td></tr>
-                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
-            </div>
+                <?php endif; ?>
+                <?php staff_pagination($currentPage, $totalPages, $filteredCount, $perPage, static fn(int $p): string => inv_orders_page_url($p, $selectedStatus), 'Orders pages'); ?>
+            </section>
+
+            <section class="cx-card" aria-labelledby="weeklyTitle">
+                <div class="cx-card-head">
+                    <div>
+                        <h2 id="weeklyTitle"><i class="ph ph-chart-bar" aria-hidden="true"></i> Weekly total deliveries</h2>
+                        <p>Shipments created per week, last 8 weeks</p>
+                    </div>
+                </div>
+                <div class="cx-chart cx-chart-sm"><canvas id="weeklyDeliveriesChart" role="img" aria-label="Weekly total deliveries chart, last 8 weeks"></canvas></div>
+            </section>
         </div>
 
 <?php
 $flash = '';
 if ($__m = ias_alert_message_from_request()) {
-    $__t = ((!empty($_GET['alert']) && $_GET['alert'] === 'error') || !empty($_GET['error'])) ? 'error' : 'success';
+    $__a = (string)($_GET['alert'] ?? '');
+    $__t = (in_array($__a, ['error', 'order_locked', 'order_complete_failed', 'pickup_no_ship', 'status_backward', 'bulk_mixed'], true) || !empty($_GET['error'])) ? 'error' : 'success';
+    $__opts = $__a === 'order_completed' ? ['title' => 'Completed Order'] : new stdClass();
+    if ($__a === 'bulk_updated') {
+        $__n = (int)($_GET['n'] ?? 0);
+        $__sk = (int)($_GET['skipped'] ?? 0);
+        $__m = $__n . ' order' . ($__n === 1 ? '' : 's') . ' updated.';
+        if (!empty($_GET['completed'])) {
+            $__m = $__n . ' order' . ($__n === 1 ? ' is' : 's are') . ' now Completed. '
+                . ($__n === 1 ? 'It has' : 'They have') . ' been sent to the Retail Officer and recorded for sales, and the purchased items were removed from inventory.';
+            $__opts = ['title' => 'Completed Order'];
+        }
+        if ($__sk > 0) {
+            $__m .= ' ' . $__sk . ' could not be updated (already completed, cancelled, or not eligible).';
+        }
+        if ($__n === 0) {
+            $__t = 'error';
+        }
+    }
     $flash = '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof IAS_UI!=="undefined")IAS_UI.alert('
         . json_encode($__m, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ','
-        . json_encode($__t) . ',0);});</script>';
+        . json_encode($__t) . ',0,'
+        . json_encode($__opts) . ');});</script>';
 }
-staff_page_end($flash);
+
+$chartScript = <<<SCRIPT
+<script>
+(function () {
+    var canvas = document.getElementById('weeklyDeliveriesChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    var labels = {$weekLabelsJson};
+    var values = {$weekCountsJson};
+    Chart.defaults.font.family = "'Fira Sans', 'Segoe UI', system-ui, sans-serif";
+    Chart.defaults.color = '#45514a';
+    new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Total Deliveries',
+                data: values,
+                backgroundColor: '#4b8b2a',
+                borderRadius: 6,
+                maxBarThickness: 48
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: function (items) {
+                            return items.length ? 'Week of ' + items[0].label : '';
+                        },
+                        label: function (ctx) {
+                            var n = ctx.parsed.y;
+                            return n + ' deliver' + (n === 1 ? 'y' : 'ies');
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 12 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { precision: 0, font: { size: 12 } },
+                    grid: { color: '#e0e6dd' }
+                }
+            }
+        }
+    });
+})();
+</script>
+SCRIPT;
+
+$bulkScript = <<<'BULK'
+<script>
+(function () {
+    var form = document.getElementById('bulkForm');
+    if (!form) return;
+    var checks = Array.prototype.slice.call(document.querySelectorAll('.bulk-check'));
+    var countEl = document.getElementById('bulkCount');
+    var target = document.getElementById('bulkTarget');
+    var NEXT = {
+        to_pay: [['accept', 'Accept']],
+        to_ship: [['to_receive', 'To Receive'], ['to_review', 'Completed']],
+        to_receive: [['to_review', 'Completed']]
+    };
+    function checked() { return checks.filter(function (c) { return c.checked; }); }
+    function refresh() {
+        var on = checked();
+        var status = on.length ? on[0].getAttribute('data-status') : '';
+        checks.forEach(function (c) {
+            // one status at a time
+            c.disabled = !!status && c.getAttribute('data-status') !== status;
+        });
+        countEl.textContent = on.length;
+        form.hidden = on.length === 0;
+        if (status && target.getAttribute('data-for') !== status) {
+            target.innerHTML = '';
+            NEXT[status].forEach(function (o) {
+                var opt = document.createElement('option');
+                opt.value = o[0];
+                opt.textContent = o[1];
+                target.appendChild(opt);
+            });
+            target.setAttribute('data-for', status);
+        }
+    }
+    checks.forEach(function (c) { c.addEventListener('change', refresh); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-select-status]'), function (btn) {
+        btn.addEventListener('click', function () {
+            var st = btn.getAttribute('data-select-status');
+            checks.forEach(function (c) { c.checked = false; c.disabled = false; });
+            checks.forEach(function (c) { if (c.getAttribute('data-status') === st) c.checked = true; });
+            refresh();
+        });
+    });
+    document.getElementById('bulkClear').addEventListener('click', function () {
+        checks.forEach(function (c) { c.checked = false; });
+        refresh();
+    });
+    form.addEventListener('submit', function (e) {
+        if (form.getAttribute('data-confirmed') === '1') return;
+        e.preventDefault();
+        var on = checked();
+        if (!on.length) return;
+        var label = target.options[target.selectedIndex].textContent;
+        var msg = 'Update ' + on.length + ' selected order' + (on.length === 1 ? '' : 's') + ' to "' + label + '"?';
+        var go = function () {
+            Array.prototype.forEach.call(form.querySelectorAll('input[name="order_ids[]"]'), function (n) { n.remove(); });
+            on.forEach(function (c) {
+                var h = document.createElement('input');
+                h.type = 'hidden'; h.name = 'order_ids[]'; h.value = c.value;
+                form.appendChild(h);
+            });
+            form.setAttribute('data-confirmed', '1');
+            form.submit();
+        };
+        if (typeof IAS_UI !== 'undefined' && IAS_UI.confirm) {
+            IAS_UI.confirm(msg, { title: 'Update orders?', confirmLabel: 'Update' }).then(function (ok) { if (ok) go(); });
+        } else {
+            go();
+        }
+    });
+    refresh();
+})();
+</script>
+BULK;
+
+staff_page_end($flash . $chartScript . $bulkScript);
 ?>

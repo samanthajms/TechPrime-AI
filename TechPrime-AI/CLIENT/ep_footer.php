@@ -3,60 +3,44 @@
  * ep_footer.php — Shared EasyPC footer for all CLIENT pages.
  * Variables expected:
  *   $isLoggedIn  (bool)
+ *   $epShowPrimo (bool, set by ep_header.php) — adds the Primo chat widget
  */
 ?>
-    <button class="messages-float-btn ep-chat-float" onclick="location.href='messages.php'">
-        <i class="fas fa-comment-dots"></i>
-    </button>
-
     <footer class="ep-footer full-width">
-        <div class="ep-newsletter-bar">
-            <div>
-                <h4>Join Our Newsletter</h4>
-                <p>Get the latest deals &amp; updates</p>
-            </div>
-            <form class="ep-newsletter-form" action="#" method="POST" onsubmit="return false;">
-                <input type="email" name="newsletter_email" placeholder="Enter your email" required>
-                <button type="submit">Subscribe</button>
-            </form>
-        </div>
         <div class="ep-footer-grid">
             <div class="ep-footer-brand">
                 <div class="ep-footer-logo">
                     <img src="../assets/logo.png" alt="EasyPC" class="ep-footer-logo-img">
                 </div>
+                <p class="ep-footer-tagline">PCs, laptops, parts and accessories from the One Oasis branch.</p>
+                <ul class="ep-footer-contact">
+                    <li><i class="fas fa-phone-alt" aria-hidden="true"></i><a href="tel:+639176255078">0917 625 5078</a></li>
+                    <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>One Oasis, Rosario, Pasig City</span></li>
+                </ul>
                 <div class="ep-social-row">
-                    <a href="#" aria-label="X"><i class="fab fa-twitter"></i></a>
-                    <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
-                    <a href="#" aria-label="YouTube"><i class="fab fa-youtube"></i></a>
-                    <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                    <a href="https://www.facebook.com/EASYPCOneOasisPasigBranch" target="_blank" rel="noopener" aria-label="EasyPC One Oasis on Facebook"><i class="fab fa-facebook-f" aria-hidden="true"></i></a>
                 </div>
             </div>
-            <div class="ep-footer-col">
-                <h5>Shop</h5>
-                <a href="category.php?type=Desktop">Desktop</a>
-                <a href="category.php?type=Laptops">Laptop</a>
-                <a href="category.php?type=Accessories">Accessories</a>
-                <a href="shop.php">Shop Now</a>
-            </div>
-            <div class="ep-footer-col">
+            <nav class="ep-footer-col" aria-label="Explore">
                 <h5>Explore</h5>
                 <a href="index.php">Home</a>
                 <a href="cart.php">Cart</a>
-                <a href="user_dashboard.php">My Orders</a>
-                <a href="messages.php">EasyFix Support</a>
-            </div>
-            <div class="ep-footer-col">
+                <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Orders</a>
+            </nav>
+            <nav class="ep-footer-col" aria-label="Resources">
                 <h5>Resources</h5>
                 <a href="privacy_policy.php">Privacy Policy</a>
                 <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Account</a>
-                <a href="messages.php">Help Center</a>
-            </div>
+            </nav>
         </div>
         <div class="ep-footer-bottom">&copy; 2026 EASYPC One Oasis. All Rights Reserved.</div>
     </footer>
 
+<?php if (!empty($epShowPrimo)) include __DIR__ . '/primo.php'; ?>
+<?php if (empty($GLOBALS['ias_ui_alerts_loaded'])): $GLOBALS['ias_ui_alerts_loaded'] = true; // shared with ias_alert_footer() ?>
     <script src="../includes/ui_alerts.js"></script>
+<?php endif; ?>
+    <script src="ep_back.js"></script>
     <script>
         // ── Nav dropdown toggle ────────────────────────────────────────────
         function epToggleDropdown(btn) {

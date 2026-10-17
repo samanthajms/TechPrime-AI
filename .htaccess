@@ -1,0 +1,9 @@
+# Local XAMPP only: the repo root sits inside htdocs, so Apache would otherwise serve
+# .git/, docs, tool output and screenshots. Only the TechPrime-AI/ app folder is public
+# (it has its own .htaccess). Render deploys just that folder, so this file isn't used there.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule !^TechPrime-AI(/|$) - [R=404,L]
+</IfModule>

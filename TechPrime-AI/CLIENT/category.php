@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/product_categories.php';
 
 $db = getDbConnection();
 
@@ -22,17 +23,17 @@ $categoryHeroTitle = $type;
  * counts stay consistent with whatever ias_client_filter_products_for_display()
  * decides to hide.
  * ------------------------------------------------------------------ */
+$catBind = [];   // matches the old buckets AND the aligned Client/Custodian labels (see includes/product_categories.php)
 $stmt = $db->prepare(
-    "SELECT p.*, u.name as seller_name
+    "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, u.name as seller_name
      FROM products p
      JOIN users u ON p.seller_id = u.id
-     WHERE p.category = ? AND " . ias_client_product_list_sql_condition('p')
+     WHERE " . ias_category_in_sql('p.category', $type, $catBind) . " AND " . ias_client_product_list_sql_condition('p')
 );
-$stmt->bind_param('s', $type);
-$stmt->execute();
-$baseResult = $stmt->get_result();
-$baseRows = $baseResult ? $baseResult->fetch_all(MYSQLI_ASSOC) : [];
-$baseProducts = ias_client_filter_products_for_display($baseRows);
+$stmt->execute($catBind);
+$baseResult = $stmt;
+$baseRows = $baseResult ? $baseResult->fetchAll(PDO::FETCH_ASSOC) : [];
+$baseProducts = $baseRows;
 
 // ---- Facet data (brands + price bounds) from the whole category ----
 $availableBrands = [];
@@ -178,12 +179,25 @@ function ep_pagination_range(int $current, int $total): array
                                     <span>₱<?php echo number_format($categoryMinPrice); ?></span>
                                     <span id="epPriceMaxLabel">₱<?php echo number_format($selectedMaxPrice); ?></span>
                                 </div>
-                                <input type="range" name="price_max"
+                                <input type="range" name="price_max" id="epPriceMaxRange"
                                        min="<?php echo (int) $categoryMinPrice; ?>"
                                        max="<?php echo (int) $categoryMaxPrice; ?>"
                                        value="<?php echo (int) $selectedMaxPrice; ?>"
-                                       oninput="document.getElementById('epPriceMaxLabel').textContent = '₱' + Number(this.value).toLocaleString();"
+                                       oninput="document.getElementById('epPriceMaxLabel').textContent = '₱' + Number(this.value).toLocaleString(); document.getElementById('epPriceMaxBox').value = this.value;"
                                        onchange="this.form.submit()">
+                                <?php /* Typed max price (unnamed): copies into the slider, which is what gets submitted. */ ?>
+                                <div class="ep-shop-price-inputs">
+                                    <div class="ep-shop-price-field">
+                                        <span aria-hidden="true">Max ₱</span>
+                                        <input type="number" id="epPriceMaxBox" inputmode="numeric"
+                                               min="<?php echo (int) $categoryMinPrice; ?>"
+                                               max="<?php echo (int) $categoryMaxPrice; ?>" step="1"
+                                               value="<?php echo (int) $selectedMaxPrice; ?>"
+                                               aria-label="Maximum price in pesos"
+                                               onchange="epApplyMaxPrice(this)"
+                                               onkeydown="if (event.key === 'Enter') { event.preventDefault(); epApplyMaxPrice(this); }">
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -231,9 +245,12 @@ function ep_pagination_range(int $current, int $total): array
                     <div class="ep-products-grid">
                         <?php foreach ($displayProducts as $p): ?>
                             <div class="ep-product-card ep-grid-card">
+                                <a href="products.php?id=<?php echo (int)$p['id']; ?>">
                                 <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                     class="ep-product-img" alt="<?php echo h($p['name']); ?>">
-                                <div class="ep-product-name"><?php echo h($p['name']); ?></div>
+                                     class="ep-product-img" alt="<?php echo h($p['name']); ?>"
+                                     loading="lazy" decoding="async">
+                                </a>
+                                <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
                                 <div class="ep-product-cat">Store: <?php echo h($p['seller_name']); ?></div>
                                 <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
                             <div class="ep-card-actions">
@@ -286,6 +303,19 @@ function ep_pagination_range(int $current, int $total): array
     function epToggleFilterGroup(btn) {
         var group = btn.closest('.ep-filter-group');
         if (group) group.classList.toggle('collapsed');
+    }
+    // Typed max price: clamp to the category's range, copy into the slider and filter.
+    function epApplyMaxPrice(box) {
+        var range = document.getElementById('epPriceMaxRange');
+        if (!range) return;
+        var lo = Number(range.min), hi = Number(range.max);
+        var n = Math.round(Number(String(box.value).trim()));
+        if (String(box.value).trim() === '' || !isFinite(n)) n = hi;
+        n = Math.min(hi, Math.max(lo, n));
+        box.value = n;
+        if (String(n) === range.value) return;
+        range.value = n;
+        range.form.submit();
     }
 </script>
 
