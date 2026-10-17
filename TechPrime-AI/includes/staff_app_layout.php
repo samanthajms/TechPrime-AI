@@ -1,0 +1,492 @@
+<?php
+/**
+ * Staff app shell (the design introduced by the Cashier redesign), shared by every
+ * role switched over in staff_app_shell_roles(): a collapsible green sidebar
+ * (desktop), a slim top bar with the breadcrumb, a live store clock and the account
+ * menu, and a bottom tab bar instead of the sidebar on phones/tablets. Roles with
+ * more than five destinations get four tabs plus "More", which opens the full list
+ * in a sheet. staff_page_start() / staff_page_end() hand those roles' pages here.
+ *
+ * Navigation comes from staff_nav_for_role(); the shell reads these extra keys:
+ *   ph       Phosphor icon class (ph-…)
+ *   short    tab bar label
+ *   tab      true = one of the four phone tabs (only used when a role has > 5 items)
+ *   section  label printed above this item in the sidebar (starts a new group)
+ *   children [['slug','href','label'], …] sub-pages (shown under the item, active by active_child)
+ *
+ * Extra staff_page_start() options read here only:
+ *   actions   => string  HTML for the page-header action area
+ *   hide_head => bool    no page header (an sr-only h1 is still printed)
+ *
+ * Styles: includes/staff_app.css (tokens, shell, components) + the role's own
+ * stylesheet (CASHIER/cashier.css, ADMIN/admin.css). staff_shared.css is still
+ * loaded for the shared pieces rendered inside (cards, forms, alerts, dialogs).
+ */
+
+if (!function_exists('staff_app_shell_roles')) {
+    /** Roles rendered with this shell; the others still use the legacy shell in staff_layout.php. */
+    function staff_app_shell_roles(): array
+    {
+        return ['cashier', 'admin'];
+    }
+}
+
+if (!function_exists('staff_app_role_css')) {
+    /** The role's page stylesheet, relative to its folder (bump ?v= when it changes). */
+    function staff_app_role_css(string $role): string
+    {
+        $map = [
+            'cashier' => 'cashier.css?v=12',
+            'admin' => 'admin.css?v=1',
+        ];
+        return $map[$role] ?? '';
+    }
+}
+
+if (!function_exists('staff_app_css_href')) {
+    function staff_app_css_href(): string
+    {
+        return str_replace('staff_shared.css', 'staff_app.css', staff_css_href()) . '?v=1';
+    }
+}
+
+if (!function_exists('staff_app_nav')) {
+    /** staff_nav_for_role() items that the shell can draw (each needs a Phosphor icon). */
+    function staff_app_nav(string $role): array
+    {
+        $nav = [];
+        foreach (staff_nav_for_role($role) as $item) {
+            $item['ph'] = $item['ph'] ?? 'ph-circle';
+            $item['short'] = $item['short'] ?? $item['label'];
+            $item['children'] = $item['children'] ?? [];
+            $nav[] = $item;
+        }
+        return $nav;
+    }
+}
+
+if (!function_exists('staff_app_shell_start')) {
+    function staff_app_shell_start(array $opts): void
+    {
+        $role = (string)($opts['role'] ?? ($_SESSION['role'] ?? ''));
+        $GLOBALS['IAS_APP_SHELL'] = true;
+        $title = $opts['title'] ?? 'EasyPC';
+        $active = $opts['active'] ?? '';
+        $activeChild = (string)($opts['active_child'] ?? '');
+        $heading = $opts['heading'] ?? $title;
+        $subtitle = $opts['subtitle'] ?? '';
+        $actions = (string)($opts['actions'] ?? '');
+        $hideHead = !empty($opts['hide_head']);
+        $extraHead = $opts['extra_head'] ?? '';
+        $nav = staff_app_nav($role);
+        $roleLabel = staff_role_label($role);
+        $home = (string)($nav[0]['href'] ?? '#');
+        $profileHref = '';
+        $settingsHref = '';
+        foreach ($nav as $item) {
+            if ($item['key'] === 'profile') {
+                $profileHref = (string)$item['href'];
+            } elseif ($item['key'] === 'settings') {
+                $settingsHref = (string)$item['href'];
+            }
+        }
+        $userName = $_SESSION['name'] ?? 'User';
+        $userSurname = trim((string)($_SESSION['surname'] ?? ''));
+        $userFullName = trim($userName . ' ' . $userSurname);
+        $userEmail = (string)($_SESSION['email'] ?? '');
+        $initials = staff_user_initials($userName, $userSurname);
+        $css = staff_css_href();
+        $logo = staff_logo_href();
+        $logout = staff_logout_href();
+        $roleCss = staff_app_role_css($role);
+
+        $userAvatarUrl = '';
+        if (function_exists('getDbConnection') && isset($_SESSION['user_id'])) {
+            try {
+                require_once __DIR__ . '/staff_chat_lib.php';
+                $aStmt = getDbConnection()->prepare('SELECT profile_image FROM users WHERE id = ? LIMIT 1');
+                $aStmt->execute([(int)$_SESSION['user_id']]);
+                $userAvatarUrl = staff_chat_avatar_url($aStmt->fetchColumn() ?: null);
+            } catch (Throwable $e) {
+                $userAvatarUrl = '';
+            }
+        }
+        $avatar = $userAvatarUrl !== ''
+            ? '<img src="' . h($userAvatarUrl) . '" alt="">'
+            : h($initials);
+        $displayName = $userFullName !== '' ? $userFullName : $userName;
+        ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#4b8b2a">
+    <title><?php echo h($title); ?> — EasyPC <?php echo h($roleLabel); ?></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&amp;family=Fira+Sans:wght@400;500;600;700;800&amp;display=swap">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-motion-2">
+    <link rel="stylesheet" href="<?php echo h(staff_app_css_href()); ?>">
+    <?php if ($roleCss !== ''): ?><link rel="stylesheet" href="<?php echo h($roleCss); ?>"><?php endif; ?>
+    <?php echo $extraHead; ?>
+</head>
+<body class="cx-app cx-role-<?php echo h(str_replace('_', '-', $role)); ?> cx-page-<?php echo h($active !== '' ? $active : 'other'); ?>">
+<script>
+/* Apply the saved sidebar width before first paint (same preference key as the other staff roles) */
+try {
+    if (localStorage.getItem('ep_sidebar_collapsed') === '1' && window.matchMedia('(min-width: 901px)').matches) {
+        document.body.classList.add('cx-side-collapsed');
+    }
+} catch (e) {}
+</script>
+<a class="cx-skip" href="#cxMain">Skip to main content</a>
+
+<aside class="cx-sidebar" id="cxSidebar" aria-label="<?php echo h($roleLabel); ?> navigation">
+    <div class="cx-side-brand">
+        <a class="cx-side-logo" href="<?php echo h($home); ?>" aria-label="EasyPC <?php echo h($roleLabel); ?>, go to dashboard">
+            <img src="<?php echo h($logo); ?>" alt="" width="96" height="23">
+        </a>
+        <div class="cx-side-store">
+            <strong><?php echo h($roleLabel); ?></strong>
+            <span>One Oasis · Pasig</span>
+        </div>
+    </div>
+
+    <nav class="cx-side-nav" aria-label="<?php echo h($roleLabel); ?> sections">
+        <span class="cx-side-label">Menu</span>
+        <?php foreach ($nav as $item):
+            $on = $item['key'] === $active;
+            if (!empty($item['section'])): ?>
+        <span class="cx-side-label cx-side-label-gap"><?php echo h($item['section']); ?></span>
+            <?php endif;
+            if ($item['children'] !== []):
+                $subId = 'cxSub-' . preg_replace('/[^a-z0-9_-]/i', '', (string)$item['key']); ?>
+        <div class="cx-side-group<?php echo $on ? ' is-open' : ''; ?>">
+            <button type="button" class="cx-side-link cx-side-parent<?php echo $on ? ' is-active' : ''; ?>" aria-expanded="<?php echo $on ? 'true' : 'false'; ?>" aria-controls="<?php echo h($subId); ?>" title="<?php echo h($item['label']); ?>">
+                <i class="ph<?php echo $on ? '-fill' : ''; ?> <?php echo h($item['ph']); ?>" aria-hidden="true"></i>
+                <span class="cx-side-text"><?php echo h($item['label']); ?></span>
+                <i class="ph ph-caret-down cx-side-caret" aria-hidden="true"></i>
+            </button>
+            <div class="cx-side-sub" id="<?php echo h($subId); ?>">
+                <?php foreach ($item['children'] as $child):
+                    $childOn = $on && (string)($child['slug'] ?? '') === $activeChild; ?>
+                <a href="<?php echo h((string)$child['href']); ?>" class="cx-side-sublink<?php echo $childOn ? ' is-active' : ''; ?>"<?php echo $childOn ? ' aria-current="page"' : ''; ?>><?php echo h((string)$child['label']); ?></a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+            <?php else: ?>
+        <a href="<?php echo h($item['href']); ?>" class="cx-side-link<?php echo $on ? ' is-active' : ''; ?>"<?php echo $on ? ' aria-current="page"' : ''; ?> title="<?php echo h($item['label']); ?>">
+            <i class="ph<?php echo $on ? '-fill' : ''; ?> <?php echo h($item['ph']); ?>" aria-hidden="true"></i>
+            <span class="cx-side-text"><?php echo h($item['label']); ?></span>
+        </a>
+            <?php endif;
+        endforeach; ?>
+    </nav>
+
+    <div class="cx-side-foot">
+        <button type="button" class="cx-side-link cx-side-toggle" id="cxSideToggle" aria-controls="cxSidebar" aria-expanded="true" title="Collapse sidebar">
+            <i class="ph ph-sidebar-simple" aria-hidden="true"></i>
+            <span class="cx-side-text">Collapse</span>
+        </button>
+        <a href="<?php echo h($logout); ?>" class="cx-side-link cx-side-logout" title="Log out">
+            <i class="ph ph-sign-out" aria-hidden="true"></i>
+            <span class="cx-side-text">Log out</span>
+        </a>
+    </div>
+</aside>
+
+<div class="cx-frame">
+<header class="cx-topbar">
+    <div class="cx-topbar-inner">
+        <a class="cx-brand" href="<?php echo h($home); ?>" aria-label="EasyPC <?php echo h($roleLabel); ?>, go to dashboard">
+            <span class="cx-brand-mark"><img src="<?php echo h($logo); ?>" alt="" width="88" height="21"></span>
+            <span class="cx-brand-text"><strong><?php echo h($roleLabel); ?></strong><span>One Oasis · Pasig</span></span>
+        </a>
+
+        <?php foreach ($nav as $item): if ($item['key'] !== $active) { continue; }
+            $crumbChild = '';
+            foreach ($item['children'] as $child) {
+                if ((string)($child['slug'] ?? '') === $activeChild) {
+                    $crumbChild = (string)$child['label'];
+                }
+            } ?>
+        <div class="cx-crumb">
+            <span><?php echo h($roleLabel); ?></span>
+            <i class="ph ph-caret-right" aria-hidden="true"></i>
+            <?php if ($crumbChild !== ''): ?>
+            <span><?php echo h($item['label']); ?></span>
+            <i class="ph ph-caret-right" aria-hidden="true"></i>
+            <strong><?php echo h($crumbChild); ?></strong>
+            <?php else: ?>
+            <strong><?php echo h($item['key'] === 'dashboard' && $heading === 'Receipt' ? 'Receipt' : $item['label']); ?></strong>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+
+        <div class="cx-topbar-right">
+            <div class="cx-clock" id="cxClock">
+                <i class="ph ph-clock" aria-hidden="true"></i>
+                <span class="cx-clock-date" data-clock="date"></span>
+                <time class="cx-clock-time" data-clock="time"></time>
+            </div>
+            <div class="cx-user" id="cxUser">
+                <button type="button" class="cx-user-btn" id="cxUserBtn" aria-haspopup="true" aria-expanded="false" aria-controls="cxUserMenu">
+                    <span class="cx-avatar<?php echo $userAvatarUrl !== '' ? ' has-img' : ''; ?>" aria-hidden="true"><?php echo $avatar; ?></span>
+                    <span class="cx-user-text">
+                        <span class="cx-user-name"><?php echo h($displayName); ?></span>
+                        <span class="cx-user-role"><?php echo h($roleLabel); ?></span>
+                    </span>
+                    <i class="ph ph-caret-down cx-user-caret" aria-hidden="true"></i>
+                    <span class="cx-sr">Account menu</span>
+                </button>
+                <div class="cx-user-menu" id="cxUserMenu" role="menu" aria-label="Account" hidden>
+                    <div class="cx-user-menu-head">
+                        <span class="cx-avatar cx-avatar-lg<?php echo $userAvatarUrl !== '' ? ' has-img' : ''; ?>" aria-hidden="true"><?php echo $avatar; ?></span>
+                        <div>
+                            <strong><?php echo h($displayName); ?></strong>
+                            <?php if ($userEmail !== ''): ?><span><?php echo h($userEmail); ?></span><?php endif; ?>
+                        </div>
+                    </div>
+                    <?php if ($profileHref !== ''): ?>
+                    <a role="menuitem" href="<?php echo h($profileHref); ?>"<?php echo $active === 'profile' ? ' aria-current="page"' : ''; ?>>
+                        <i class="ph ph-user-circle" aria-hidden="true"></i><span>My Profile</span>
+                    </a>
+                    <?php endif; ?>
+                    <?php if ($settingsHref !== ''): ?>
+                    <a role="menuitem" href="<?php echo h($settingsHref); ?>"<?php echo $active === 'settings' ? ' aria-current="page"' : ''; ?>>
+                        <i class="ph ph-gear-six" aria-hidden="true"></i><span>Settings</span>
+                    </a>
+                    <?php endif; ?>
+                    <a role="menuitem" href="<?php echo h($logout); ?>" class="cx-user-logout">
+                        <i class="ph ph-sign-out" aria-hidden="true"></i><span>Log out</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="cx-main" id="cxMain" tabindex="-1">
+    <?php if (!$hideHead): ?>
+    <div class="cx-pagehead">
+        <div class="cx-pagehead-text">
+            <h1><?php echo h($heading); ?></h1>
+            <?php if ($subtitle !== ''): ?><p><?php echo h($subtitle); ?></p><?php endif; ?>
+        </div>
+        <?php if ($actions !== ''): ?><div class="cx-pagehead-actions"><?php echo $actions; ?></div><?php endif; ?>
+    </div>
+    <?php else: ?>
+    <h1 class="cx-sr"><?php echo h($heading); ?></h1>
+    <?php endif; ?>
+        <?php
+        $GLOBALS['IAS_APP_NAV'] = ['role' => $role, 'nav' => $nav, 'active' => $active, 'active_child' => $activeChild, 'logout' => $logout];
+    }
+}
+
+if (!function_exists('staff_app_shell_end')) {
+    function staff_app_shell_end(string $extraScripts = ''): void
+    {
+        $state = $GLOBALS['IAS_APP_NAV'] ?? [];
+        $role = (string)($state['role'] ?? ($_SESSION['role'] ?? ''));
+        $nav = $state['nav'] ?? staff_app_nav($role);
+        $active = (string)($state['active'] ?? '');
+        $activeChild = (string)($state['active_child'] ?? '');
+        $logout = (string)($state['logout'] ?? staff_logout_href());
+        $roleLabel = staff_role_label($role);
+        /* Up to five destinations fit the tab bar; more get four tabs + "More" (full list in a sheet). */
+        $useMore = count($nav) > 5;
+        $tabs = $useMore ? array_values(array_filter($nav, static fn($i) => !empty($i['tab']))) : $nav;
+        $moreOn = $useMore && !in_array($active, array_column($tabs, 'key'), true);
+        ?>
+</main>
+</div><!-- /.cx-frame -->
+
+<nav class="cx-tabbar<?php echo $useMore ? ' has-more' : ''; ?>" aria-label="<?php echo h($roleLabel); ?> sections (bottom)">
+    <?php foreach ($tabs as $item): $on = $item['key'] === $active; ?>
+    <a href="<?php echo h($item['href']); ?>" class="cx-tab<?php echo $on ? ' is-active' : ''; ?>"<?php echo $on ? ' aria-current="page"' : ''; ?>>
+        <i class="ph<?php echo $on ? '-fill' : ''; ?> <?php echo h($item['ph']); ?>" aria-hidden="true"></i>
+        <span><?php echo h($item['short']); ?></span>
+    </a>
+    <?php endforeach; ?>
+    <?php if ($useMore): ?>
+    <button type="button" class="cx-tab cx-tab-more<?php echo $moreOn ? ' is-active' : ''; ?>" id="cxMoreBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="cxMore">
+        <i class="ph<?php echo $moreOn ? '-fill' : ''; ?> ph-dots-three-circle" aria-hidden="true"></i>
+        <span>More</span>
+    </button>
+    <?php endif; ?>
+</nav>
+
+<?php if ($useMore): ?>
+<div class="cx-sheet" id="cxMore" role="dialog" aria-modal="true" aria-labelledby="cxMoreTitle" hidden>
+    <div class="cx-sheet-scrim" data-sheet-close></div>
+    <div class="cx-sheet-panel">
+        <div class="cx-sheet-head">
+            <h2 id="cxMoreTitle"><?php echo h($roleLabel); ?> menu</h2>
+            <button type="button" class="cx-sheet-close" data-sheet-close aria-label="Close menu"><i class="ph ph-x" aria-hidden="true"></i></button>
+        </div>
+        <nav class="cx-sheet-nav" aria-label="All <?php echo h(strtolower($roleLabel)); ?> sections">
+            <?php foreach ($nav as $item):
+                $on = $item['key'] === $active;
+                if (!empty($item['section'])): ?>
+            <span class="cx-sheet-label"><?php echo h($item['section']); ?></span>
+                <?php endif;
+                if ($item['children'] !== []): ?>
+            <div class="cx-sheet-group">
+                <span class="cx-sheet-link is-group<?php echo $on ? ' is-active' : ''; ?>">
+                    <i class="ph<?php echo $on ? '-fill' : ''; ?> <?php echo h($item['ph']); ?>" aria-hidden="true"></i><?php echo h($item['label']); ?>
+                </span>
+                <?php foreach ($item['children'] as $child):
+                    $childOn = $on && (string)($child['slug'] ?? '') === $activeChild; ?>
+                <a href="<?php echo h((string)$child['href']); ?>" class="cx-sheet-sublink<?php echo $childOn ? ' is-active' : ''; ?>"<?php echo $childOn ? ' aria-current="page"' : ''; ?>><?php echo h((string)$child['label']); ?></a>
+                <?php endforeach; ?>
+            </div>
+                <?php else: ?>
+            <a href="<?php echo h($item['href']); ?>" class="cx-sheet-link<?php echo $on ? ' is-active' : ''; ?>"<?php echo $on ? ' aria-current="page"' : ''; ?>>
+                <i class="ph<?php echo $on ? '-fill' : ''; ?> <?php echo h($item['ph']); ?>" aria-hidden="true"></i><?php echo h($item['label']); ?>
+            </a>
+                <?php endif;
+            endforeach; ?>
+            <a href="<?php echo h($logout); ?>" class="cx-sheet-link cx-sheet-logout"><i class="ph ph-sign-out" aria-hidden="true"></i>Log out</a>
+        </nav>
+    </div>
+</div>
+<?php endif; ?>
+
+<script src="../includes/ui_alerts.js"></script>
+<?php echo ias_session_timeout_assets(); ?>
+<?php echo $extraScripts; ?>
+<?php staff_chat_widget_maybe(); ?>
+<script>
+(function () {
+    'use strict';
+    /* Live clock in store time (Asia/Manila), refreshed on the minute */
+    var clock = document.getElementById('cxClock');
+    if (clock) {
+        var dEl = clock.querySelector('[data-clock="date"]');
+        var tEl = clock.querySelector('[data-clock="time"]');
+        var fDate = new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', weekday: 'short', month: 'short', day: 'numeric' });
+        var fTime = new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' });
+        var tick = function () {
+            var now = new Date();
+            dEl.textContent = fDate.format(now);
+            tEl.textContent = fTime.format(now);
+            tEl.setAttribute('datetime', now.toISOString());
+            setTimeout(tick, 60000 - (now.getSeconds() * 1000 + now.getMilliseconds()) + 50);
+        };
+        tick();
+    }
+
+    /* Sidebar: full width or icon rail on desktop; remembered across pages */
+    var KEY = 'ep_sidebar_collapsed';
+    var desk = window.matchMedia('(min-width: 901px)');
+    var toggle = document.getElementById('cxSideToggle');
+    function readCollapsed() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } }
+    function applySide() {
+        var collapsed = readCollapsed() && desk.matches;
+        document.body.classList.toggle('cx-side-collapsed', collapsed);
+        if (!toggle) return;
+        var label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        toggle.setAttribute('aria-label', label);
+        toggle.title = label;
+        toggle.querySelector('.cx-side-text').textContent = collapsed ? 'Expand' : 'Collapse';
+    }
+    if (toggle) {
+        toggle.addEventListener('click', function () {
+            try { localStorage.setItem(KEY, readCollapsed() ? '0' : '1'); } catch (e) {}
+            document.body.classList.add('cx-side-animate');
+            applySide();
+        });
+    }
+    if (typeof desk.addEventListener === 'function') desk.addEventListener('change', applySide);
+    applySide();
+
+    /* Sidebar items with sub-pages: open/close in place; on the icon rail, widen the sidebar first */
+    Array.prototype.forEach.call(document.querySelectorAll('.cx-side-parent'), function (btn) {
+        btn.addEventListener('click', function () {
+            var group = btn.parentElement;
+            if (document.body.classList.contains('cx-side-collapsed')) {
+                try { localStorage.setItem(KEY, '0'); } catch (e) {}
+                document.body.classList.add('cx-side-animate');
+                applySide();
+                group.classList.add('is-open');
+            } else {
+                group.classList.toggle('is-open');
+            }
+            btn.setAttribute('aria-expanded', group.classList.contains('is-open') ? 'true' : 'false');
+        });
+    });
+
+    /* "More" sheet (phones/tablets, roles with more than five destinations) */
+    var sheet = document.getElementById('cxMore');
+    var moreBtn = document.getElementById('cxMoreBtn');
+    if (sheet && moreBtn) {
+        var setSheet = function (open) {
+            sheet.hidden = !open;
+            moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            document.body.classList.toggle('cx-sheet-open', open);
+            if (open) {
+                var cur = sheet.querySelector('[aria-current="page"]') || sheet.querySelector('.cx-sheet-close');
+                if (cur) cur.focus({ preventScroll: true });
+            } else {
+                moreBtn.focus({ preventScroll: true });
+            }
+        };
+        moreBtn.addEventListener('click', function () { setSheet(sheet.hidden); });
+        sheet.addEventListener('click', function (e) { if (e.target.closest('[data-sheet-close]')) setSheet(false); });
+        document.addEventListener('keydown', function (e) {
+            if (sheet.hidden) return;
+            if (e.key === 'Escape') { e.preventDefault(); setSheet(false); return; }
+            if (e.key !== 'Tab') return;
+            var items = sheet.querySelectorAll('a[href], button');
+            var first = items[0], last = items[items.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        });
+        if (typeof desk.addEventListener === 'function') {
+            desk.addEventListener('change', function () { if (desk.matches && !sheet.hidden) setSheet(false); });
+        }
+    }
+
+    /* Account menu */
+    var wrap = document.getElementById('cxUser');
+    var btn = document.getElementById('cxUserBtn');
+    var menu = document.getElementById('cxUserMenu');
+    if (!wrap || !btn || !menu) return;
+    function setOpen(open) {
+        menu.hidden = !open;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        wrap.classList.toggle('is-open', open);
+    }
+    btn.addEventListener('click', function () {
+        setOpen(menu.hidden);
+        if (!menu.hidden) {
+            var first = menu.querySelector('a');
+            if (first) first.focus({ preventScroll: true });
+        }
+    });
+    document.addEventListener('click', function (e) {
+        if (!menu.hidden && !wrap.contains(e.target)) setOpen(false);
+    }, true);
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !menu.hidden) { setOpen(false); btn.focus(); }
+    });
+    menu.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        var items = Array.prototype.slice.call(menu.querySelectorAll('a'));
+        var i = items.indexOf(document.activeElement);
+        if (i < 0) return;
+        e.preventDefault();
+        items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+    });
+})();
+</script>
+</body>
+</html>
+        <?php
+    }
+}

@@ -20,12 +20,6 @@ $fc = ias_forecast_selection($categories);
 
 logActivity($db, $admin_id, 'view_forecast', 'Admin viewed forecast');
 
-$forecastCss = <<<'CSS'
-.card-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.detail-panel { display:none; margin-top:14px; }
-.detail-panel.open { display:block; }
-CSS;
-
 staff_page_start([
     'role' => 'admin',
     'title' => $view === 'sales' ? 'Sales Forecast' : 'Product Demand Forecast',
@@ -33,7 +27,7 @@ staff_page_start([
     'active_child' => $view,
     'heading' => $view === 'sales' ? 'Sales Forecast' : 'Product Demand Forecast',
     'subtitle' => $view === 'sales' ? 'Store-wide sales projections, 1–3 months ahead' : 'Store-wide product demand projections, 1–3 months ahead',
-    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><style>' . $forecastCss . '</style>',
+    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>',
 ]);
 ?>
 

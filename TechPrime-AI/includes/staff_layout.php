@@ -10,17 +10,18 @@ if (!function_exists('staff_nav_for_role')) {
     {
         switch ($role) {
             case 'admin':
+                // ph / short / tab / section: read by the app shell (includes/staff_app_layout.php)
                 return [
-                    ['key' => 'dashboard', 'href' => 'admin_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'forecast', 'href' => 'admin_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'children' => [
+                    ['key' => 'dashboard', 'href' => 'admin_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt', 'ph' => 'ph-squares-four', 'short' => 'Home', 'tab' => true],
+                    ['key' => 'forecast', 'href' => 'admin_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'ph' => 'ph-chart-line-up', 'short' => 'Forecast', 'tab' => true, 'children' => [
                         ['slug' => 'demand', 'href' => 'admin_forecast.php?view=demand', 'label' => 'Product Demand'],
                         ['slug' => 'sales', 'href' => 'admin_forecast.php?view=sales', 'label' => 'Sales'],
                     ]],
-                    ['key' => 'messages', 'href' => 'admin_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
-                    ['key' => 'users', 'href' => 'manage_users.php', 'label' => 'Manage Users', 'icon' => 'fa-users'],
-                    ['key' => 'logs', 'href' => 'view_logs.php', 'label' => 'Activity Logs', 'icon' => 'fa-clipboard-list'],
-                    ['key' => 'profile', 'href' => 'admin_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user'],
-                    ['key' => 'settings', 'href' => 'admin_settings.php', 'label' => 'Settings', 'icon' => 'fa-cog'],
+                    ['key' => 'messages', 'href' => 'admin_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments', 'ph' => 'ph-chats-circle', 'short' => 'Messages'],
+                    ['key' => 'users', 'href' => 'manage_users.php', 'label' => 'Manage Users', 'icon' => 'fa-users', 'ph' => 'ph-users-three', 'short' => 'Users', 'tab' => true],
+                    ['key' => 'logs', 'href' => 'view_logs.php', 'label' => 'Activity Logs', 'icon' => 'fa-clipboard-list', 'ph' => 'ph-clipboard-text', 'short' => 'Activity', 'tab' => true],
+                    ['key' => 'profile', 'href' => 'admin_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user', 'ph' => 'ph-user-circle', 'short' => 'Profile', 'section' => 'Account'],
+                    ['key' => 'settings', 'href' => 'admin_settings.php', 'label' => 'Settings', 'icon' => 'fa-cog', 'ph' => 'ph-gear-six', 'short' => 'Settings'],
                 ];
             case 'retail_officer':
                 return [
@@ -46,10 +47,10 @@ if (!function_exists('staff_nav_for_role')) {
                 ];
             case 'cashier':
                 return [
-                    ['key' => 'dashboard', 'href' => 'cashier_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'pos', 'href' => 'cashier_pos.php', 'label' => 'POS Checkout', 'icon' => 'fa-cash-register'],
-                    ['key' => 'alerts', 'href' => 'cashier_stock_alerts.php', 'label' => 'Stock Alerts', 'icon' => 'fa-bell'],
-                    ['key' => 'profile', 'href' => 'cashier_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
+                    ['key' => 'dashboard', 'href' => 'cashier_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt', 'ph' => 'ph-squares-four', 'short' => 'Home'],
+                    ['key' => 'pos', 'href' => 'cashier_pos.php', 'label' => 'POS Checkout', 'icon' => 'fa-cash-register', 'ph' => 'ph-cash-register', 'short' => 'Checkout'],
+                    ['key' => 'alerts', 'href' => 'cashier_stock_alerts.php', 'label' => 'Stock Alerts', 'icon' => 'fa-bell', 'ph' => 'ph-bell', 'short' => 'Alerts'],
+                    ['key' => 'profile', 'href' => 'cashier_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user', 'ph' => 'ph-user-circle', 'short' => 'Profile'],
                 ];
             case 'courier':
                 return [
@@ -143,10 +144,10 @@ if (!function_exists('staff_page_start')) {
     function staff_page_start(array $opts): void
     {
         $role = $opts['role'] ?? ($_SESSION['role'] ?? 'admin');
-        if ($role === 'cashier') {
-            /* Cashier pages use their own app shell (includes/cashier_layout.php) */
-            require_once __DIR__ . '/cashier_layout.php';
-            cashier_shell_start($opts);
+        require_once __DIR__ . '/staff_app_layout.php';
+        if (in_array($role, staff_app_shell_roles(), true)) {
+            /* Roles migrated to the app shell (includes/staff_app_layout.php) */
+            staff_app_shell_start(['role' => $role] + $opts);
             return;
         }
         $title = $opts['title'] ?? 'EasyPC';
@@ -715,8 +716,8 @@ if (!function_exists('staff_page_start')) {
 if (!function_exists('staff_page_end')) {
     function staff_page_end(string $extraScripts = ''): void
     {
-        if (!empty($GLOBALS['IAS_CASHIER_SHELL']) && function_exists('cashier_shell_end')) {
-            cashier_shell_end($extraScripts);
+        if (!empty($GLOBALS['IAS_APP_SHELL']) && function_exists('staff_app_shell_end')) {
+            staff_app_shell_end($extraScripts);
             return;
         }
         ?>
@@ -730,15 +731,7 @@ if (!function_exists('staff_page_end')) {
     ?>"></script>
 <?php echo ias_session_timeout_assets(); ?>
 <?php echo $extraScripts; ?>
-<?php
-        $endRole = (string)($_SESSION['role'] ?? '');
-        $endScript = strtolower(basename((string)($_SERVER['SCRIPT_NAME'] ?? '')));
-        $skipChat = (defined('STAFF_CHAT_SKIP_WIDGET') && STAFF_CHAT_SKIP_WIDGET)
-            || in_array($endScript, ['admin_messages.php', 'retail_messages.php', 'inventory_messages.php'], true);
-        if (!$skipChat && in_array($endRole, ['admin', 'retail_officer', 'inventory_custodian'], true)) {
-            require __DIR__ . '/staff_chat_widget.php';
-        }
-?>
+<?php staff_chat_widget_maybe(); ?>
 <script>
 (function () {
     var KEY = 'ep_sidebar_collapsed';
@@ -843,6 +836,20 @@ if (!function_exists('staff_page_end')) {
     }
 }
 
+if (!function_exists('staff_chat_widget_maybe')) {
+    /** Floating staff chat widget (admin, retail officer, inventory custodian), except on the Messages pages. */
+    function staff_chat_widget_maybe(): void
+    {
+        $endRole = (string)($_SESSION['role'] ?? '');
+        $endScript = strtolower(basename((string)($_SERVER['SCRIPT_NAME'] ?? '')));
+        $skipChat = (defined('STAFF_CHAT_SKIP_WIDGET') && STAFF_CHAT_SKIP_WIDGET)
+            || in_array($endScript, ['admin_messages.php', 'retail_messages.php', 'inventory_messages.php'], true);
+        if (!$skipChat && in_array($endRole, ['admin', 'retail_officer', 'inventory_custodian'], true)) {
+            require __DIR__ . '/staff_chat_widget.php';
+        }
+    }
+}
+
 if (!function_exists('staff_pagination')) {
     /**
      * Server-side pager for staff tables: "Showing a–b of n" plus Prev / page numbers / Next.
@@ -856,6 +863,10 @@ if (!function_exists('staff_pagination')) {
         }
         $first = ($page - 1) * $perPage + 1;
         $last = min($page * $perPage, $total);
+        // App-shell pages use Phosphor; legacy-shell pages keep Font Awesome
+        $appShell = !empty($GLOBALS['IAS_APP_SHELL']);
+        $prevIcon = $appShell ? 'ph ph-caret-left' : 'fas fa-chevron-left';
+        $nextIcon = $appShell ? 'ph ph-caret-right' : 'fas fa-chevron-right';
         $pages = [];
         for ($p = 1; $p <= $totalPages; $p++) {
             if ($p === 1 || $p === $totalPages || abs($p - $page) <= 2) {
@@ -870,7 +881,7 @@ if (!function_exists('staff_pagination')) {
             <div class="pg-info">Showing <?php echo number_format($first); ?>–<?php echo number_format($last); ?> of <?php echo number_format($total); ?></div>
             <?php if ($totalPages > 1): ?>
             <div class="pg-controls">
-                <a class="staff-page<?php echo $page <= 1 ? ' disabled' : ''; ?>" href="<?php echo h($url(max(1, $page - 1))); ?>"<?php echo $page <= 1 ? ' aria-disabled="true" tabindex="-1"' : ''; ?>><i class="fas fa-chevron-left" aria-hidden="true"></i> Prev</a>
+                <a class="staff-page<?php echo $page <= 1 ? ' disabled' : ''; ?>" href="<?php echo h($url(max(1, $page - 1))); ?>"<?php echo $page <= 1 ? ' aria-disabled="true" tabindex="-1"' : ''; ?>><i class="<?php echo $prevIcon; ?>" aria-hidden="true"></i> Prev</a>
                 <?php foreach ($pages as $p): ?>
                     <?php if ($p === 0): ?>
                     <span class="staff-page gap" aria-hidden="true">…</span>
@@ -878,7 +889,7 @@ if (!function_exists('staff_pagination')) {
                     <a class="staff-page<?php echo $p === $page ? ' active' : ''; ?>" href="<?php echo h($url($p)); ?>"<?php echo $p === $page ? ' aria-current="page"' : ''; ?>><?php echo $p; ?></a>
                     <?php endif; ?>
                 <?php endforeach; ?>
-                <a class="staff-page<?php echo $page >= $totalPages ? ' disabled' : ''; ?>" href="<?php echo h($url(min($totalPages, $page + 1))); ?>"<?php echo $page >= $totalPages ? ' aria-disabled="true" tabindex="-1"' : ''; ?>>Next <i class="fas fa-chevron-right" aria-hidden="true"></i></a>
+                <a class="staff-page<?php echo $page >= $totalPages ? ' disabled' : ''; ?>" href="<?php echo h($url(min($totalPages, $page + 1))); ?>"<?php echo $page >= $totalPages ? ' aria-disabled="true" tabindex="-1"' : ''; ?>>Next <i class="<?php echo $nextIcon; ?>" aria-hidden="true"></i></a>
             </div>
             <?php endif; ?>
         </nav>

@@ -39,27 +39,24 @@ $restockTotal = (int)$db->query('SELECT COUNT(*) FROM products WHERE stock <= 15
 
 logActivity($db, $admin_id, 'view_dashboard', 'Admin viewed dashboard');
 
-$dashboardCss = <<<'CSS'
-.stock-status-pill {
-    display:inline-flex; align-items:center; gap:6px;
-    padding:5px 11px; border-radius:100px; font-size:11.5px; font-weight:700;
-    white-space:nowrap; border:1px solid transparent;
-}
-.stock-status-pill.low { background:#fffbeb; color:#b45309; border-color:#fde68a; }
-.stock-status-pill.critical { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
-.stock-status-pill.out { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
-.report-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin:-6px 0 18px; }
-.report-toolbar p { margin:0; }
-CSS;
-$dashboardCss .= ias_retail_print_css();
+$firstName = trim((string)($_SESSION['name'] ?? ''));
+$rangeText = $statRange['from']->format('M j') . ' – ' . $statRange['to']->format('M j, Y');
+$statusLabels = ['out' => 'Out of Stock', 'critical' => 'Critical', 'low' => 'Low Stock'];
+$statusIcons = ['out' => 'ph-x-circle', 'critical' => 'ph-warning-circle', 'low' => 'ph-warning'];
+$people = [
+    ['tab' => 'client', 'label' => 'Clients', 'hint' => 'Storefront accounts', 'icon' => 'ph-user', 'count' => (int)$cnt['clients']],
+    ['tab' => 'retail_officer', 'label' => 'Retail Officers', 'hint' => 'Reports and forecasting', 'icon' => 'ph-storefront', 'count' => (int)$cnt['retail_officer']],
+    ['tab' => 'inventory_custodian', 'label' => 'Inventory Custodians', 'hint' => 'Stock and receiving', 'icon' => 'ph-warehouse', 'count' => (int)$cnt['inventory_custodian']],
+];
 
 staff_page_start([
     'role' => 'admin',
     'title' => 'Admin Dashboard',
     'active' => 'dashboard',
-    'heading' => 'System Administration',
-    'subtitle' => 'Dashboard overview',
-    'extra_head' => '<style>' . $dashboardCss . '</style>',
+    'heading' => $firstName !== '' ? 'Good to see you, ' . $firstName : 'Dashboard',
+    'subtitle' => date('l, F j, Y') . ' · store sales, accounts and stock at a glance',
+    'actions' => '<button type="button" class="cx-btn cx-btn-outline no-print" onclick="window.print()"><i class="ph ph-printer" aria-hidden="true"></i> Print</button>',
+    'extra_head' => '<style>' . ias_retail_print_css() . '</style>',
 ]);
 ?>
 
@@ -72,87 +69,120 @@ staff_page_start([
     </div>
 </div>
 
-<div class="report-toolbar no-print">
-    <p class="text-muted text-small">System overview and statistics</p>
-    <button type="button" class="btn btn-outline btn-sm" onclick="window.print()" title="Print the dashboard"><i class="fas fa-print"></i> Print</button>
-</div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Clients</div>
-                <div class="stat-num"><?php echo (int)$cnt['clients']; ?></div>
-                <div class="stat-icon"><i class="fas fa-users"></i></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Retail Officers</div>
-                <div class="stat-num"><?php echo (int)$cnt['retail_officer']; ?></div>
-                <div class="stat-icon"><i class="fas fa-store"></i></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Inventory Custodian</div>
-                <div class="stat-num"><?php echo (int)$cnt['inventory_custodian']; ?></div>
-                <div class="stat-icon"><i class="fas fa-warehouse"></i></div>
-            </div>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Revenue (this month)</div>
-                <div class="stat-num">₱<?php echo number_format($statSales['total_sales'], 2); ?></div>
-                <div class="stat-icon"><i class="fas fa-peso-sign"></i></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Orders</div>
-                <div class="stat-num"><?php echo (int)$cnt['orders']; ?></div>
-                <div class="stat-icon"><i class="fas fa-shopping-bag"></i></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Deliveries (this month)</div>
-                <div class="stat-num"><?php echo number_format($statDeliveries['delivered']); ?></div>
-                <div class="stat-icon"><i class="fas fa-truck"></i></div>
-            </div>
-        </div>
-        <p class="text-muted text-small" style="margin:-6px 0 18px;">Store-wide totals · <?php echo h($statRange['label']); ?> · <?php echo h($statRange['from']->format('M d, Y') . ' – ' . $statRange['to']->format('M d, Y')); ?></p>
-
-        <div class="card">
-            <div class="card-header">
-                <div>
-                    <h3><span class="card-icon"><i class="fas fa-exclamation-triangle"></i></span> Restocking Alerts</h3>
-                    <div class="card-subtitle">
-                        Products at or below the low-stock threshold (15)
-                        <?php if ($restockTotal > 0): ?>
-                            · showing <?php echo count($restockAlerts); ?> of <?php echo (int)$restockTotal; ?>
-                        <?php endif; ?>
+        <div class="adm-dash">
+            <div class="adm-top">
+                <section class="cx-card adm-month" aria-labelledby="monthTitle">
+                    <div class="cx-card-head">
+                        <h2 id="monthTitle"><i class="ph ph-chart-line-up" aria-hidden="true"></i> <?php echo h($statRange['label']); ?></h2>
+                        <span class="cx-card-meta cx-num"><?php echo h($rangeText); ?> · store-wide</span>
                     </div>
-                </div>
+                    <div class="kpis kpis-3">
+                        <div class="kpi kpi-hero">
+                            <span class="kpi-label">Revenue</span>
+                            <strong class="kpi-value cx-num">₱<?php echo number_format($statSales['total_sales'], 2); ?></strong>
+                            <span class="kpi-sub">Online orders + walk-in sales</span>
+                        </div>
+                        <div class="kpi">
+                            <span class="kpi-label">Deliveries</span>
+                            <strong class="kpi-value cx-num"><?php echo number_format($statDeliveries['delivered']); ?></strong>
+                            <span class="kpi-sub">delivered in this period</span>
+                        </div>
+                        <div class="kpi">
+                            <span class="kpi-label">Orders</span>
+                            <strong class="kpi-value cx-num"><?php echo number_format((int)$cnt['orders']); ?></strong>
+                            <span class="kpi-sub">online, all-time</span>
+                        </div>
+                    </div>
+                </section>
+
+                <a class="dash-cta no-print" href="manage_users.php?create=1">
+                    <span class="dash-cta-icon" aria-hidden="true"><i class="ph ph-user-plus"></i></span>
+                    <span class="dash-cta-text">
+                        <strong>Create a staff account</strong>
+                        <span>Add a cashier, retail officer or custodian</span>
+                    </span>
+                    <i class="ph ph-arrow-right dash-cta-arrow" aria-hidden="true"></i>
+                </a>
             </div>
-            <div class="card-body" style="padding-top:0;">
-                <div class="table-wrap">
-                    <table class="ias-table">
-                        <thead>
-                            <tr><th>Product</th><th>Category</th><th>Stock</th><th>Status</th></tr>
-                        </thead>
-                        <tbody>
-                            <?php
-                            $statusLabels = ['out' => 'Out of Stock', 'critical' => 'Critical', 'low' => 'Low'];
-                            foreach ($restockAlerts as $item):
+
+            <div class="adm-grid">
+                <section class="cx-card" aria-labelledby="restockTitle">
+                    <div class="cx-card-head">
+                        <div>
+                            <h2 id="restockTitle"><i class="ph ph-package" aria-hidden="true"></i> Restocking alerts</h2>
+                            <p>
+                                At or below the low-stock threshold (15), lowest stock first<?php if ($restockTotal > count($restockAlerts)): ?>
+                                · showing <?php echo count($restockAlerts); ?> of <?php echo (int)$restockTotal; ?><?php endif; ?>
+                            </p>
+                        </div>
+                        <a href="admin_forecast.php?view=demand" class="cx-link no-print">Demand forecast <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+                    </div>
+                    <?php if (empty($restockAlerts)): ?>
+                        <div class="cx-empty">
+                            <span class="cx-empty-icon is-ok" aria-hidden="true"><i class="ph ph-check-circle"></i></span>
+                            <strong>All products are well stocked</strong>
+                            <span>Nothing is at or below the low-stock threshold.</span>
+                        </div>
+                    <?php else: ?>
+                    <div class="cx-table-wrap">
+                        <table class="cx-table restock-table">
+                            <thead><tr>
+                                <th scope="col">Product</th>
+                                <th scope="col" class="col-stock">Stock</th>
+                                <th scope="col" class="col-status">Status</th>
+                            </tr></thead>
+                            <tbody>
+                            <?php foreach ($restockAlerts as $item):
                                 $stock = (int)$item['stock'];
                                 $status = inv_stock_status_label($stock);
-                                $statusLabel = $statusLabels[$status] ?? ucfirst($status);
+                                $pct = max(0, min(100, (int)round($stock / 15 * 100)));
                             ?>
-                            <tr>
-                                <td><strong><?php echo h((string)$item['name']); ?></strong></td>
-                                <td><?php echo h((string)$item['category']); ?></td>
-                                <td><?php echo number_format($stock); ?></td>
-                                <td><span class="stock-status-pill <?php echo h($status); ?>"><?php echo h($statusLabel); ?></span></td>
-                            </tr>
+                                <tr class="is-<?php echo h($status); ?>">
+                                    <td data-label="Product">
+                                        <span class="stocks-pname"><?php echo h((string)$item['name']); ?></span>
+                                        <span class="stocks-pcat"><?php echo h((string)$item['category']); ?></span>
+                                    </td>
+                                    <td data-label="Stock">
+                                        <div class="qty-cell">
+                                            <span class="stocks-qty<?php echo $status === 'out' ? ' out' : ' warn'; ?>"><?php echo number_format($stock); ?></span>
+                                            <span class="qty-meter <?php echo h($status); ?>" aria-hidden="true"><i style="width:<?php echo $pct; ?>%"></i></span>
+                                        </div>
+                                    </td>
+                                    <td data-label="Status">
+                                        <span class="stock-status-pill <?php echo h($status); ?>"><i class="ph-fill <?php echo h($statusIcons[$status] ?? 'ph-warning'); ?>" aria-hidden="true"></i> <?php echo h($statusLabels[$status] ?? ucfirst($status)); ?></span>
+                                    </td>
+                                </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($restockAlerts)): ?>
-                            <tr><td colspan="4" class="empty-state">All products are above the low-stock threshold.</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                </section>
+
+                <section class="cx-card" aria-labelledby="peopleTitle">
+                    <div class="cx-card-head">
+                        <div>
+                            <h2 id="peopleTitle"><i class="ph ph-users-three" aria-hidden="true"></i> Accounts</h2>
+                            <p>Registered users by role</p>
+                        </div>
+                        <a href="manage_users.php" class="cx-link no-print">Manage users <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+                    </div>
+                    <ul class="people-list">
+                        <?php foreach ($people as $p): ?>
+                        <li>
+                            <a class="people-row" href="manage_users.php?tab=<?php echo h($p['tab']); ?>">
+                                <span class="people-icon role-<?php echo h($p['tab']); ?>" aria-hidden="true"><i class="ph <?php echo h($p['icon']); ?>"></i></span>
+                                <span class="people-text">
+                                    <span class="people-label"><?php echo h($p['label']); ?></span>
+                                    <span class="people-hint"><?php echo h($p['hint']); ?></span>
+                                </span>
+                                <strong class="people-count cx-num"><?php echo number_format($p['count']); ?></strong>
+                                <i class="ph ph-caret-right people-go" aria-hidden="true"></i>
+                            </a>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </section>
             </div>
         </div>
 
