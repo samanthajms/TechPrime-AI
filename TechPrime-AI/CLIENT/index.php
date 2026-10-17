@@ -41,134 +41,181 @@ $categoryTiles = ep_shop_category_tiles($db);
 $epRecent = ep_recent_products($db, 0, 8);
 
 $returnTo = 'index.php';
+$homeCsrf = generateCsrfToken();
+
+// Hero facts: how many products are on the shelf right now (same visibility rule as the lists).
+$inStockCount = (int)$db->query("SELECT COUNT(*) FROM products p INNER JOIN users u ON p.seller_id = u.id WHERE {$vis}")->fetchColumn();
+
+$bodyClass = 'sf-page';
+$extraHead = '<link rel="stylesheet" href="storefront.css?v=home-3">'
+    . '<link rel="preload" as="image" href="../assets/home-hero.webp" fetchpriority="high">';
+require_once __DIR__ . '/../includes/storefront_components.php';
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main ep-home-main">
-    <?php if (!empty($categoryTiles)): ?>
-    <section class="ep-section ep-cat-rail-section" aria-labelledby="epCatRailTitle">
-        <div class="ep-cat-rail-head">
-            <div>
-                <p class="ep-featured-kicker">Browse the store</p>
-                <h3 id="epCatRailTitle">Shop by Category</h3>
+<main class="ep-main sf-main" id="main">
+    <section class="sf-hero" aria-labelledby="sfHeroTitle">
+        <img class="sf-hero-media" src="../assets/home-hero.webp" alt="" width="1600" height="900" fetchpriority="high" decoding="async">
+        <div class="sf-wrap sf-hero-inner">
+            <p class="sf-hero-kicker"><i class="fas fa-map-marker-alt" aria-hidden="true"></i> EasyPC One Oasis &middot; Rosario, Pasig City</p>
+            <h1 class="sf-hero-title" id="sfHeroTitle">Tech it easy at <span>EasyPC One Oasis</span></h1>
+            <p class="sf-hero-sub">Laptops, PC parts and accessories from our Pasig branch. Build a PC with compatibility checks, then pay cash on delivery or online.</p>
+            <div class="sf-hero-ctas">
+                <a href="shop.php" class="sf-btn sf-btn-lg sf-btn-bright">Shop all products <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+                <a href="build_a_pc.php" class="sf-btn sf-btn-lg sf-btn-glass"><i class="fas fa-desktop" aria-hidden="true"></i> Build a PC</a>
             </div>
-            <a href="shop.php" class="ep-cat-rail-all">View all products <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+            <?php if ($inStockCount > 0): ?>
+                <ul class="sf-hero-facts">
+                    <li><i class="fas fa-check-circle" aria-hidden="true"></i><span><strong class="sf-num"><?php echo number_format($inStockCount); ?></strong> products in stock</span></li>
+                    <?php if (!empty($categoryTiles)): ?>
+                        <li><i class="fas fa-th-large" aria-hidden="true"></i><span><strong class="sf-num"><?php echo count($categoryTiles); ?></strong> categories</span></li>
+                    <?php endif; ?>
+                    <li><i class="fas fa-tag" aria-hidden="true"></i><span>Prices include VAT</span></li>
+                </ul>
+            <?php endif; ?>
         </div>
+    </section>
 
-        <div class="ep-cat-rail" data-cat-rail>
-            <button type="button" class="ep-cat-rail-arrow is-prev" data-cat-rail-prev aria-label="Previous categories" disabled>
-                <i class="fas fa-chevron-left" aria-hidden="true"></i>
-            </button>
-            <ul class="ep-cat-rail-track" data-cat-rail-track>
+    <div class="sf-wrap sf-perks-wrap">
+        <ul class="sf-perks" aria-label="Why shop with EasyPC">
+            <li>
+                <div class="sf-perk">
+                    <span class="sf-perk-icon"><i class="fas fa-money-bill-wave" aria-hidden="true"></i></span>
+                    <span class="sf-perk-text"><strong>Cash on delivery or online</strong><span>Pay when it arrives, or pay online at checkout.</span></span>
+                </div>
+            </li>
+            <li>
+                <div class="sf-perk">
+                    <span class="sf-perk-icon"><i class="fas fa-truck" aria-hidden="true"></i></span>
+                    <span class="sf-perk-text"><strong>Delivery or store pickup</strong><span>Lalamove delivery, or pick up at One Oasis.</span></span>
+                </div>
+            </li>
+            <li>
+                <a class="sf-perk-btn" href="build_a_pc.php">
+                    <span class="sf-perk-icon"><i class="fas fa-puzzle-piece" aria-hidden="true"></i></span>
+                    <span class="sf-perk-text"><strong>Parts that fit <i class="fas fa-arrow-right" aria-hidden="true"></i></strong><span>Build a PC flags parts that don't work together.</span></span>
+                </a>
+            </li>
+            <li>
+                <?php if (!empty($epShowPrimo)): ?>
+                    <button type="button" class="sf-perk-btn" data-primo-open aria-controls="primoPanel">
+                        <span class="sf-perk-icon"><i class="fas fa-robot" aria-hidden="true"></i></span>
+                        <span class="sf-perk-text"><strong>Ask Primo <i class="fas fa-arrow-right" aria-hidden="true"></i></strong><span>Our AI assistant helps you find the right item.</span></span>
+                    </button>
+                <?php else: ?>
+                    <div class="sf-perk">
+                        <span class="sf-perk-icon"><i class="fas fa-store" aria-hidden="true"></i></span>
+                        <span class="sf-perk-text"><strong>Sold by EasyPC One Oasis</strong><span>Rosario, Pasig City</span></span>
+                    </div>
+                <?php endif; ?>
+            </li>
+        </ul>
+    </div>
+
+    <?php if (!empty($categoryTiles)): ?>
+    <section class="sf-wrap sf-section" aria-labelledby="sfCatsTitle">
+        <?php echo sf_section_head('sfCatsTitle', 'Browse the store', 'Shop by category', '', 'sfCatsRail', 'shop.php', 'View all products'); ?>
+        <div class="sf-rail is-cats" data-sf-rail>
+            <ul class="sf-rail-track" id="sfCatsRail" data-sf-rail-track>
                 <?php foreach ($categoryTiles as $tile): ?>
-                    <li class="ep-catrail-tile">
-                        <a href="<?php echo h($tile['url']); ?>" class="ep-catrail-tile-link">
-                            <span class="ep-catrail-tile-media">
+                    <li>
+                        <a href="<?php echo h($tile['url']); ?>" class="sf-tile">
+                            <span class="sf-tile-media">
                                 <?php if ($tile['image'] !== ''): ?>
-                                    <img src="<?php echo h($tile['image']); ?>" alt="" loading="lazy" decoding="async">
+                                    <img src="<?php echo h($tile['image']); ?>" alt="" width="140" height="140" loading="lazy" decoding="async">
                                 <?php else: ?>
                                     <i class="fas fa-box" aria-hidden="true"></i>
                                 <?php endif; ?>
                             </span>
-                            <span class="ep-catrail-tile-name"><?php echo h($tile['label']); ?></span>
-                            <span class="ep-catrail-tile-count"><?php echo (int)$tile['count']; ?> item<?php echo (int)$tile['count'] === 1 ? '' : 's'; ?></span>
+                            <span class="sf-tile-name"><?php echo h($tile['label']); ?></span>
+                            <span class="sf-tile-count sf-num"><?php echo (int)$tile['count']; ?> item<?php echo (int)$tile['count'] === 1 ? '' : 's'; ?></span>
                         </a>
                     </li>
                 <?php endforeach; ?>
             </ul>
-            <button type="button" class="ep-cat-rail-arrow is-next" data-cat-rail-next aria-label="More categories">
-                <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            </button>
         </div>
     </section>
     <?php endif; ?>
 
-    <?php include __DIR__ . '/ep_recent_section.php'; ?>
-
-    <section class="ep-section ep-featured-section">
-        <div class="ep-featured-head">
-            <div>
-                <p class="ep-featured-kicker">Curated for you</p>
-                <h3>Featured Products</h3>
-                <p class="ep-featured-subtitle">Handpicked items from EasyPC inventory, ready for your next build.</p>
-            </div>
+    <?php if (!empty($epRecent)): ?>
+    <section class="sf-wrap sf-section" aria-labelledby="sfRecentTitle">
+        <?php echo sf_section_head('sfRecentTitle', 'Pick up where you left off', 'Recently viewed', '', 'sfRecentRail'); ?>
+        <div class="sf-rail" data-sf-rail>
+            <ul class="sf-rail-track" id="sfRecentRail" data-sf-rail-track>
+                <?php foreach ($epRecent as $p): ?>
+                    <li><?php echo sf_product_card($p, $returnTo, $homeCsrf); ?></li>
+                <?php endforeach; ?>
+            </ul>
         </div>
+    </section>
+    <?php endif; ?>
 
-        <div class="ep-carousel-wrap">
-            <button class="ep-arrow ep-arrow-left" onclick="epScroll('topSellersRow', -1)" aria-label="Scroll left"><i class="fas fa-arrow-left"></i></button>
-            <div class="ep-carousel" id="topSellersRow">
-                <?php if (!empty($topSellers)): ?>
+    <section class="sf-wrap sf-section" aria-labelledby="sfFeaturedTitle">
+        <?php echo sf_section_head('sfFeaturedTitle', 'Curated for you', 'Featured products',
+            'A selection from the EasyPC One Oasis catalog, in stock and ready to order.',
+            !empty($topSellers) ? 'sfFeaturedRail' : '', 'shop.php', 'Shop all'); ?>
+        <?php if (!empty($topSellers)): ?>
+            <div class="sf-rail" data-sf-rail>
+                <ul class="sf-rail-track" id="sfFeaturedRail" data-sf-rail-track>
                     <?php foreach ($topSellers as $p): ?>
-                        <div class="ep-product-card ep-featured-card">
-                            <div class="ep-featured-card-media">
-                                <a href="products.php?id=<?php echo (int)$p['id']; ?>">
-                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>" class="ep-product-img" alt="<?php echo h($p['name']); ?>" loading="lazy" decoding="async">
-                                </a>
-                            </div>
-                            <div class="ep-featured-card-body">
-                                <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
-                                <div class="ep-product-cat"><?php echo h($p['category'] ?: 'Uncategorized'); ?></div>
-                                <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
-                                <div class="ep-card-actions">
-                                    <form action="products.php" method="POST" class="ep-buy-form">
-                                        <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                        <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
-                                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                        <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
-                                        <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
+                        <li><?php echo sf_product_card($p, $returnTo, $homeCsrf); ?></li>
                     <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="empty-state">No products available yet. Check back later!</div>
-                <?php endif; ?>
+                </ul>
             </div>
-            <button class="ep-arrow ep-arrow-right" onclick="epScroll('topSellersRow', 1)" aria-label="Scroll right"><i class="fas fa-arrow-right"></i></button>
+        <?php else: ?>
+            <div class="sf-empty">
+                <span class="sf-empty-icon"><i class="fas fa-box-open" aria-hidden="true"></i></span>
+                <span class="sf-empty-text"><strong>No products available yet</strong><span>Check back soon. New stock is added regularly.</span></span>
+            </div>
+        <?php endif; ?>
+    </section>
+
+    <section class="sf-wrap sf-section" aria-label="Featured collections">
+        <div class="sf-promos">
+            <div class="sf-promo is-dark">
+                <div class="sf-promo-copy">
+                    <p class="sf-eyebrow">Build a PC</p>
+                    <h2 class="sf-promo-title">Plan your next build, part by part</h2>
+                    <p class="sf-promo-text">Pick a processor, motherboard, memory and more from what's in stock.</p>
+                    <ul class="sf-promo-list">
+                        <li><i class="fas fa-check" aria-hidden="true"></i>Flags parts that don't fit together</li>
+                        <li><i class="fas fa-check" aria-hidden="true"></i>Running total as you go</li>
+                        <li><i class="fas fa-check" aria-hidden="true"></i>Save builds to your account</li>
+                    </ul>
+                </div>
+                <a href="build_a_pc.php" class="sf-btn sf-btn-lg sf-btn-bright">Start a build <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+                <img class="sf-promo-art" src="../assets/desktop.png" alt="" width="300" height="300" loading="lazy" decoding="async">
+            </div>
+            <div class="sf-promo">
+                <div class="sf-promo-copy">
+                    <p class="sf-eyebrow">Accessories</p>
+                    <h2 class="sf-promo-title">Gear for work and play</h2>
+                    <p class="sf-promo-text">Keyboards, mice, headsets and the small things that finish a setup.</p>
+                </div>
+                <a href="category.php?type=Accessories" class="sf-btn sf-btn-outline">Browse accessories <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+                <img class="sf-promo-art" src="../assets/headset.png" alt="" width="210" height="210" loading="lazy" decoding="async">
+            </div>
         </div>
     </section>
 
-    <div class="ep-promo-banner">
-        <div>
-            <h2>Boost Your Productivity</h2>
-            <p>Essential accessories for work &amp; play.</p>
-            <a href="category.php?type=Accessories" class="ep-btn ep-btn-primary">Browse Accessories</a>
-        </div>
-        <div class="ep-promo-icons" aria-hidden="true">
-            <i class="fas fa-laptop"></i>
-            <i class="fas fa-keyboard"></i>
-            <i class="fas fa-mouse"></i>
-        </div>
-    </div>
-
-    <section class="ep-promo-banner ep-new-arrivals-banner" aria-labelledby="epNewArrivalsTitle">
-        <div class="ep-new-arrivals-copy">
-            <h2 id="epNewArrivalsTitle">New Arrivals</h2>
-            <p>Fresh stock added by EasyPC inventory within the last 7 days.</p>
-            <a href="shop.php" class="ep-btn ep-btn-primary">CHECK NEW ARRIVALS</a>
-        </div>
-        <div class="ep-new-arrivals-products">
-            <?php if (!empty($newArrivals)): ?>
-                <?php foreach ($newArrivals as $p): ?>
-                    <article class="ep-new-arrival-card">
-                        <a href="products.php?id=<?php echo (int)$p['id']; ?>">
-                        <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                             alt="<?php echo h($p['name']); ?>" loading="lazy" decoding="async">
-                        <div class="ep-new-arrival-card-body">
-                            <div class="ep-new-arrival-name"><?php echo h($p['name']); ?></div>
-                            <div class="ep-new-arrival-price">₱<?php echo number_format((float) $p['price'], 2); ?></div>
-                        </div>
-                        </a>
-                    </article>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div class="ep-new-arrivals-empty">
-                    <i class="fas fa-box-open" aria-hidden="true"></i>
-                    <span>No new arrivals in the last 7 days. Check back soon.</span>
-                </div>
-            <?php endif; ?>
-        </div>
+    <section class="sf-wrap sf-section" aria-labelledby="sfNewTitle">
+        <?php echo sf_section_head('sfNewTitle', 'Just in', 'New arrivals', 'Stock added to EasyPC One Oasis in the last 7 days.',
+            !empty($newArrivals) ? 'sfNewRail' : '', !empty($newArrivals) ? 'shop.php' : '', 'Shop all'); ?>
+        <?php if (!empty($newArrivals)): ?>
+            <div class="sf-rail" data-sf-rail>
+                <ul class="sf-rail-track" id="sfNewRail" data-sf-rail-track>
+                    <?php foreach ($newArrivals as $p): ?>
+                        <li><?php echo sf_product_card($p, $returnTo, $homeCsrf); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php else: ?>
+            <div class="sf-empty">
+                <span class="sf-empty-icon"><i class="fas fa-box-open" aria-hidden="true"></i></span>
+                <span class="sf-empty-text"><strong>No new arrivals this week</strong><span>Fresh stock shows up here as soon as it's added. The full catalog is one tap away.</span></span>
+                <a href="shop.php" class="sf-btn sf-btn-outline">Browse all products</a>
+            </div>
+        <?php endif; ?>
     </section>
 </main>
 
@@ -184,26 +231,40 @@ document.addEventListener('DOMContentLoaded', function () {
         window.location.replace('build_a_pc.php');
     }
 
-    /* Shop by Category: arrows page by the visible width and disable at either end. */
-    document.querySelectorAll('[data-cat-rail]').forEach(function (rail) {
-        var track = rail.querySelector('[data-cat-rail-track]');
-        var prev = rail.querySelector('[data-cat-rail-prev]');
-        var next = rail.querySelector('[data-cat-rail-next]');
-        if (!track || !prev || !next) return;
+    /* Rails (categories, products): the arrows in the section head page by the visible width,
+       disable at either end and stay hidden while everything already fits. */
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    document.querySelectorAll('[data-sf-rail]').forEach(function (rail) {
+        var track = rail.querySelector('[data-sf-rail-track]');
+        if (!track || !track.id) return;
+        var arrows = document.querySelector('[data-sf-rail-arrows="' + track.id + '"]');
+        var prev = document.querySelector('[data-sf-rail-prev="' + track.id + '"]');
+        var next = document.querySelector('[data-sf-rail-next="' + track.id + '"]');
+        var ticking = false;
         function update() {
+            ticking = false;
             var max = track.scrollWidth - track.clientWidth - 2;
-            prev.disabled = track.scrollLeft <= 2;
-            next.disabled = track.scrollLeft >= max;
-            rail.classList.toggle('has-prev', !prev.disabled);
-            rail.classList.toggle('has-next', !next.disabled);
+            var atStart = track.scrollLeft <= 2;
+            var atEnd = track.scrollLeft >= max;
+            if (arrows) arrows.hidden = max <= 0;
+            if (prev) prev.disabled = atStart;
+            if (next) next.disabled = atEnd;
+            rail.classList.toggle('has-prev', !atStart);
+            rail.classList.toggle('has-next', !atEnd);
+        }
+        function onScroll() {
+            if (!ticking) { ticking = true; requestAnimationFrame(update); }
         }
         function page(dir) {
-            track.scrollBy({ left: dir * Math.max(track.clientWidth * 0.85, 160), behavior: 'smooth' });
+            track.scrollBy({
+                left: dir * Math.max(track.clientWidth * 0.9, 160),
+                behavior: reduceMotion.matches ? 'auto' : 'smooth'
+            });
         }
-        prev.addEventListener('click', function () { page(-1); });
-        next.addEventListener('click', function () { page(1); });
-        track.addEventListener('scroll', update, { passive: true });
-        window.addEventListener('resize', update);
+        if (prev) prev.addEventListener('click', function () { page(-1); });
+        if (next) next.addEventListener('click', function () { page(1); });
+        track.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll);
         update();
     });
 });

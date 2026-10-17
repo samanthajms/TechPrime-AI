@@ -2688,7 +2688,7 @@ html[data-theme="dark"] .ep-theme-toggle .ep-theme-when-dark { display: inline; 
 .epc-remove:hover { background: #fdecec; color: #d63939; }
 
 /* Order summary */
-.epc-summary { padding: 22px; position: sticky; top: 110px; }
+.epc-summary { padding: 22px; position: sticky; top: calc(var(--ep-header-h, 116px) + 16px); }
 .epc-summary-title {
     margin: 0 0 16px;
     font-size: 18px;
@@ -4793,7 +4793,7 @@ body.ep-tm-modal-open { overflow: hidden; }
 .ep-shop-sidebar {
     grid-column: 1;
     position: sticky;
-    top: 120px;
+    top: calc(var(--ep-header-h, 116px) + 16px);
     min-width: 0;
     align-self: start;
     max-height: calc(100vh - 140px);
@@ -5677,7 +5677,7 @@ body.ep-tm-modal-open { overflow: hidden; }
 .ep-card-actions { display: flex; align-items: center; gap: 8px; }
 .ep-wish-form { margin: 0; }
 
-.ep-shop-sidebar { top: 120px; }
+.ep-shop-sidebar { top: calc(var(--ep-header-h, 116px) + 16px); }
 
 @media (max-width: 1100px) {
     .ep-shop-cat-tiles,
@@ -5923,7 +5923,7 @@ body.ep-tm-modal-open { overflow: hidden; }
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
     align-items: start;
 }
-.ep-pd-gallery { position: sticky; top: 110px; }
+.ep-pd-gallery { position: sticky; top: calc(var(--ep-header-h, 116px) + 16px); }
 .ep-pd-stage {
     position: relative;
     aspect-ratio: 1 / 1;
@@ -6177,7 +6177,7 @@ body.ep-tm-modal-open { overflow: hidden; }
     border-radius: 18px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
     overflow: hidden;
-    scroll-margin-top: 110px;
+    scroll-margin-top: calc(var(--ep-header-h, 116px) + 12px);
 }
 .ep-pd-tabs {
     display: flex;
@@ -7809,7 +7809,7 @@ a.pf-item-name:focus-visible {
 }
 .ep-legal-toc {
     position: sticky;
-    top: 120px;
+    top: calc(var(--ep-header-h, 116px) + 16px);
 }
 .ep-legal-toc-label {
     margin: 0 0 10px 12px;
@@ -7886,7 +7886,7 @@ a.pf-item-name:focus-visible {
     border: 1px solid var(--ep-border);
     border-radius: 16px;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
-    scroll-margin-top: 120px;
+    scroll-margin-top: calc(var(--ep-header-h, 116px) + 16px);
 }
 .ep-legal-section-icon {
     width: 44px;

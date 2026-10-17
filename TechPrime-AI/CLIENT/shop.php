@@ -763,7 +763,8 @@ $extraScripts = <<<'SCRIPTS'
                 history.replaceState({ epShop: true }, '', pageUrl);
             }
             if (opts.scroll) {
-                var top = results.getBoundingClientRect().top + window.pageYOffset - 110;
+                var hdrH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ep-header-h'), 10) || 116;
+                var top = results.getBoundingClientRect().top + window.pageYOffset - hdrH - 16;
                 if (window.pageYOffset > top) window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
             }
         }).catch(function (err) {
