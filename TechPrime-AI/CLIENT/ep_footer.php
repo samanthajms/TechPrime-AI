@@ -6,34 +6,53 @@
  *   $epShowPrimo (bool, set by ep_header.php) — adds the Primo chat widget
  */
 ?>
-    <footer class="ep-footer full-width">
-        <div class="ep-footer-grid">
-            <div class="ep-footer-brand">
-                <div class="ep-footer-logo">
-                    <img src="../assets/logo.png" alt="EasyPC" class="ep-footer-logo-img">
-                </div>
-                <p class="ep-footer-tagline">PCs, laptops, parts and accessories from the One Oasis branch.</p>
-                <ul class="ep-footer-contact">
+    <?php $epFootLoggedIn = !empty($isLoggedIn); ?>
+    <footer class="ep-footer sf-footer full-width">
+        <div class="sf-wrap sf-footer-grid">
+            <div class="sf-footer-brand">
+                <a href="index.php" class="sf-footer-logo"><img src="../assets/logo.png" alt="EasyPC home" width="137" height="32" loading="lazy"></a>
+                <p class="sf-footer-tagline">Laptops, PC parts and accessories from EasyPC One Oasis in Rosario, Pasig City.</p>
+                <ul class="sf-footer-contact">
                     <li><i class="fas fa-phone-alt" aria-hidden="true"></i><a href="tel:+639176255078">0917 625 5078</a></li>
                     <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>One Oasis, Rosario, Pasig City</span></li>
+                    <li><i class="fab fa-facebook-f" aria-hidden="true"></i><a href="https://www.facebook.com/EASYPCOneOasisPasigBranch" target="_blank" rel="noopener">EasyPC One Oasis on Facebook<span class="sf-sr"> (opens in a new tab)</span></a></li>
                 </ul>
-                <div class="ep-social-row">
-                    <a href="https://www.facebook.com/EASYPCOneOasisPasigBranch" target="_blank" rel="noopener" aria-label="EasyPC One Oasis on Facebook"><i class="fab fa-facebook-f" aria-hidden="true"></i></a>
-                </div>
             </div>
-            <nav class="ep-footer-col" aria-label="Explore">
-                <h5>Explore</h5>
-                <a href="index.php">Home</a>
-                <a href="cart.php">Cart</a>
-                <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Orders</a>
+            <nav class="sf-footer-col" aria-label="Shop">
+                <h2 class="sf-footer-head">Shop</h2>
+                <ul>
+                    <li><a href="shop.php">All products</a></li>
+                    <li><a href="build_a_pc.php">Build a PC</a></li>
+                    <li><a href="cart.php">Cart</a></li>
+                    <li><a href="wishlist.php">Wishlist</a></li>
+                </ul>
             </nav>
-            <nav class="ep-footer-col" aria-label="Resources">
-                <h5>Resources</h5>
-                <a href="privacy_policy.php">Privacy Policy</a>
-                <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Account</a>
+            <nav class="sf-footer-col" aria-label="Account">
+                <h2 class="sf-footer-head">Account</h2>
+                <ul>
+                    <?php if ($epFootLoggedIn): ?>
+                        <li><a href="user_dashboard.php">My orders</a></li>
+                        <li><a href="saved_builds.php">Saved builds</a></li>
+                        <li><a href="notifications.php">Notifications</a></li>
+                        <li><a href="user_dashboard.php?settings=1">Settings</a></li>
+                    <?php else: ?>
+                        <li><a href="../login.php">Log in</a></li>
+                        <li><a href="../register.php">Create an account</a></li>
+                    <?php endif; ?>
+                </ul>
+            </nav>
+            <nav class="sf-footer-col" aria-label="Help">
+                <h2 class="sf-footer-head">Help</h2>
+                <ul>
+                    <li><a href="privacy_policy.php">Privacy policy</a></li>
+                    <li><a href="tel:+639176255078">Call the store</a></li>
+                </ul>
             </nav>
         </div>
-        <div class="ep-footer-bottom">&copy; 2026 EASYPC One Oasis. All Rights Reserved.</div>
+        <div class="sf-wrap sf-footer-bottom">
+            <span>&copy; 2026 EasyPC One Oasis. All rights reserved.</span>
+            <span class="sf-footer-pay"><i class="fas fa-money-bill-wave" aria-hidden="true"></i> Cash on delivery &middot; Online payment &middot; Prices include VAT</span>
+        </div>
     </footer>
 
 <?php if (!empty($epShowPrimo)) include __DIR__ . '/primo.php'; ?>
@@ -41,6 +60,7 @@
     <script src="../includes/ui_alerts.js"></script>
 <?php endif; ?>
     <script src="ep_back.js"></script>
+    <script src="storefront.js?v=sf-1"></script>
     <script>
         // ── Nav dropdown toggle ────────────────────────────────────────────
         function epToggleDropdown(btn) {
@@ -55,12 +75,6 @@
             }
         });
 
-        // ── Carousel scroll helper ─────────────────────────────────────────
-        function epScroll(id, dir) {
-            const row = document.getElementById(id);
-            if (!row) return;
-            row.scrollBy({ left: dir * 320, behavior: 'smooth' });
-        }
     </script>
 <?php if (!empty($extraScripts)) echo $extraScripts; ?>
 </body>

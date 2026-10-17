@@ -8,7 +8,7 @@ $isLoggedIn = isset($_SESSION['user_id']);
 $activePage = 'privacy';
 $pageTitle = 'Privacy Policy';
 $searchQuery = '';
-$bodyClass = 'ep-shop-page-body';
+$bodyClass = '';
 
 /* 'body' is one paragraph per entry. */
 $legalSections = [
@@ -114,25 +114,18 @@ JS;
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main">
-    <div class="ep-page-inner ep-legal-page">
-        <a href="index.php" class="ep-profile-back-arrow" data-ep-back aria-label="Back">&lt;</a>
+<main class="ep-main sf-main" id="main">
+    <?php echo sf_page_hero([
+        'crumbs' => [['Home', 'index.php'], ['Privacy policy', '']],
+        'eyebrow' => 'Legal',
+        'title' => 'Privacy policy',
+        'sub' => 'What personal data EasyPC One Oasis Branch collects when you use this online store, how we use and protect it, and the choices you have.',
+        'icon' => 'fa-user-shield',
+        'meta' => '<span class="sf-meta-chip"><i class="far fa-calendar-alt" aria-hidden="true"></i><span>Last updated <time datetime="2026-10-13">October 13, 2026</time></span></span>',
+        'width' => 'narrow',
+    ]); ?>
 
-        <header class="ep-wish-hero ep-legal-hero">
-            <div class="ep-wish-hero-icon ep-notif-hero-icon" aria-hidden="true">
-                <i class="fas fa-user-shield"></i>
-            </div>
-            <div class="ep-wish-hero-copy">
-                <p class="ep-wish-kicker">Legal</p>
-                <h1 class="ep-wish-title">Privacy Policy</h1>
-                <p class="ep-wish-subtitle">This policy explains what personal data EasyPC One Oasis Branch collects when you use this online store, how we use and protect it, and the choices you have.</p>
-            </div>
-            <span class="ep-legal-updated">
-                <i class="far fa-calendar-alt" aria-hidden="true"></i>
-                Last updated <time datetime="2026-10-13">October 13, 2026</time>
-            </span>
-        </header>
-
+    <div class="sf-wrap sf-body is-narrow ep-legal-page">
         <div class="ep-legal-layout">
             <nav class="ep-legal-toc" aria-label="On this page">
                 <p class="ep-legal-toc-label">On this page</p>

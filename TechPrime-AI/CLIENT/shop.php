@@ -18,7 +18,7 @@ $isLoggedIn = isset($_SESSION['user_id']);
 $activePage = 'shop';
 $pageTitle  = 'Shop Now';
 $searchQuery = trim((string)($_GET['q'] ?? ''));
-$bodyClass  = 'ep-shop-page-body';
+$bodyClass  = '';
 
 $taxonomy = ep_shop_taxonomy();
 $priceFloor = 0;
@@ -218,34 +218,6 @@ $returnQuery = array_filter([
 ], fn($v) => $v !== null);
 $returnTo = 'shop.php' . ($returnQuery ? ('?' . http_build_query($returnQuery)) : '');
 
-function ep_shop_pagination_range(int $current, int $total): array
-{
-    if ($total <= 1) {
-        return [1];
-    }
-    $delta = 1;
-    $range = [];
-    for ($i = 1; $i <= $total; $i++) {
-        if ($i === 1 || $i === $total || ($i >= $current - $delta && $i <= $current + $delta)) {
-            $range[] = $i;
-        }
-    }
-    $withDots = [];
-    $last = null;
-    foreach ($range as $i) {
-        if ($last !== null) {
-            if ($i - $last === 2) {
-                $withDots[] = $last + 1;
-            } elseif ($i - $last > 1) {
-                $withDots[] = '...';
-            }
-        }
-        $withDots[] = $i;
-        $last = $i;
-    }
-    return $withDots;
-}
-
 $minPct = ($priceCeiling > $priceFloor)
     ? (($selectedMinPrice - $priceFloor) / ($priceCeiling - $priceFloor)) * 100
     : 0;
@@ -265,95 +237,34 @@ foreach ($allProducts as $p) {
     }
 }
 
+require_once __DIR__ . '/../includes/storefront_components.php';
+$shopCsrf = generateCsrfToken();
 ob_start();
 ?>
                 <?php if (!$isBrandDirectory && $resultCount > 0): ?>
-                    <p class="ep-shop-result-count">
-                        Showing <?php echo number_format(($page - 1) * $perPage + 1); ?>&ndash;<?php echo number_format(($page - 1) * $perPage + count($displayProducts)); ?>
-                        of <?php echo number_format($resultCount); ?> product<?php echo $resultCount === 1 ? '' : 's'; ?>
-                    </p>
+                    <div class="sf-results-bar">
+                        <p class="sf-results-count" role="status">
+                            Showing <strong class="sf-num"><?php echo number_format(($page - 1) * $perPage + 1); ?>&ndash;<?php echo number_format(($page - 1) * $perPage + count($displayProducts)); ?></strong>
+                            of <strong class="sf-num"><?php echo number_format($resultCount); ?></strong> product<?php echo $resultCount === 1 ? '' : 's'; ?>
+                        </p>
+                    </div>
                 <?php endif; ?>
                 <?php if (!empty($displayProducts) && !$isBrandDirectory): ?>
-                    <div class="ep-products-grid ep-shop-grid">
+                    <ul class="sf-grid ep-shop-grid">
                         <?php foreach ($displayProducts as $p): ?>
-                            <div class="ep-product-card ep-grid-card">
-                                <div class="ep-shop-card-media">
-                                    <a href="products.php?id=<?php echo (int)$p['id']; ?>">
-                                    <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                         class="ep-product-img" alt="<?php echo h($p['name']); ?>"
-                                         loading="lazy" decoding="async">
-                                    </a>
-                                    <form method="POST" action="wishlist.php" class="ep-wish-form ep-wish-overlay">
-                                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                        <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                        <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
-                                        <button type="submit" name="toggle_wishlist" value="1"
-                                                class="ep-wish-btn<?php echo ep_wishlist_has((int)$p['id']) ? ' is-on' : ''; ?>"
-                                                title="<?php echo ep_wishlist_has((int)$p['id']) ? 'Remove from wishlist' : 'Add to wishlist'; ?>">
-                                            <i class="<?php echo ep_wishlist_has((int)$p['id']) ? 'fas' : 'far'; ?> fa-heart" aria-hidden="true"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                                <div class="ep-shop-card-body">
-                                    <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
-                                    <div class="ep-product-cat">
-                                        <?php echo h($p['tax_parent_label']); ?>
-                                        <?php if ($p['tax_sub_label'] !== ''): ?>
-                                            · <?php echo h($p['tax_sub_label']); ?>
-                                        <?php endif; ?>
-                                    </div>
-                                    <?php if ($p['avg_rating'] !== null): ?>
-                                        <div class="ep-shop-card-rating" title="<?php echo number_format($p['avg_rating'], 1); ?> / 5">
-                                            <?php
-                                            $rounded = (int)round($p['avg_rating']);
-                                            for ($i = 1; $i <= 5; $i++):
-                                            ?>
-                                                <i class="<?php echo $i <= $rounded ? 'fas' : 'far'; ?> fa-star" aria-hidden="true"></i>
-                                            <?php endfor; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                    <div class="ep-product-price">₱<?php echo number_format((float)$p['price'], 2); ?></div>
-                                    <div class="ep-card-actions">
-                                        <form method="POST" action="products.php" class="ep-buy-form">
-                                            <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                            <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
-                                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                            <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
-                                            <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
+                            <li><?php echo sf_product_card($p, $returnTo, $shopCsrf, [
+                                'cat' => $p['tax_parent_label'] . ($p['tax_sub_label'] !== '' ? ' · ' . $p['tax_sub_label'] : ''),
+                                'wish' => true,
+                                'rating' => $p['avg_rating'],
+                            ]); ?></li>
                         <?php endforeach; ?>
-                    </div>
+                    </ul>
 
-                    <?php if ($totalPages > 1): ?>
-                        <nav class="ep-pagination" aria-label="Pagination">
-                            <a class="ep-page-link ep-page-nav<?php echo $page <= 1 ? ' disabled' : ''; ?>"
-                               href="<?php echo h(ep_shop_url(['page' => max(1, $page - 1)])); ?>">
-                                <i class="fas fa-arrow-left"></i> Previous
-                            </a>
-                            <?php foreach (ep_shop_pagination_range($page, $totalPages) as $item): ?>
-                                <?php if ($item === '...'): ?>
-                                    <span class="ep-page-ellipsis">…</span>
-                                <?php else: ?>
-                                    <a class="ep-page-link<?php echo $item === $page ? ' active' : ''; ?>"
-                                       href="<?php echo h(ep_shop_url(['page' => $item])); ?>"><?php echo (int)$item; ?></a>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                            <a class="ep-page-link ep-page-nav<?php echo $page >= $totalPages ? ' disabled' : ''; ?>"
-                               href="<?php echo h(ep_shop_url(['page' => min($totalPages, $page + 1)])); ?>">
-                                Next <i class="fas fa-arrow-right"></i>
-                            </a>
-                        </nav>
-                    <?php endif; ?>
+                    <?php echo sf_pagination($page, $totalPages, fn($n) => ep_shop_url(['page' => $n])); ?>
                 <?php elseif (!$isBrandDirectory): ?>
-                    <div class="ep-empty-state ep-shop-empty">
-                        <i class="fas fa-box-open" aria-hidden="true"></i>
-                        <h3>No products match your filters</h3>
-                        <p>Try another category, brand, or search, or reset filters to see the full catalog.</p>
-                        <a href="shop.php" class="ep-btn ep-btn-primary" data-shop-reset>Reset Filters</a>
-                    </div>
+                    <?php echo sf_empty_state('fa-box-open', 'No products match your filters',
+                        'Try another category, brand or search, or reset the filters to see the full catalog.',
+                        '<a href="shop.php" class="sf-btn sf-btn-primary" data-shop-reset>Reset filters</a>'); ?>
                 <?php endif; ?>
 <?php
 $productsHtml = ob_get_clean();
@@ -367,8 +278,27 @@ if ($isPartial) {
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main">
-    <?php $epShopSpecials = ep_shop_special_sections(); ?>
+<?php
+$epShopSpecials = ep_shop_special_sections();
+// No visible page header on the shop (the toolbar starts the page); the h1 stays for screen readers
+// and follows the current scope: section, category (+ type), search, or the whole catalog.
+$shopTitle = 'All products';
+if ($selectedSection !== '' && isset($epShopSpecials[$selectedSection])) {
+    $shopTitle = $epShopSpecials[$selectedSection]['label'];
+} elseif ($selectedParent !== '' && isset($taxonomy[$selectedParent])) {
+    $shopTitle = $taxonomy[$selectedParent]['label'];
+    if ($selectedSub !== '' && isset($taxonomy[$selectedParent]['subs'][$selectedSub])) {
+        $shopTitle = $taxonomy[$selectedParent]['subs'][$selectedSub];
+    }
+}
+if ($shopQuery !== '' && $selectedSection === '' && $selectedParent === '') {
+    $shopTitle = 'Results for “' . $shopQuery . '”';
+}
+?>
+<main class="ep-main sf-main" id="main">
+    <h1 class="sf-sr" id="sfPageTitle"><?php echo h($shopTitle); ?></h1>
+    <div class="sf-wrap sf-body">
+    <div class="sf-shop-toolbar">
     <nav class="ep-shop-cat-nav" aria-label="Shop categories">
         <div class="ep-shop-cat-nav-inner">
             <div class="ep-mega-wrap" id="epMegaWrap">
@@ -446,9 +376,6 @@ if ($isPartial) {
             <?php endforeach; ?>
         </div>
     </nav>
-
-    <div class="ep-page-inner ep-shop-page">
-
         <form class="ep-shop-searchbar" id="epShopSearchForm" method="GET" action="shop.php" role="search">
             <?php if ($selectedParent !== ''): ?><input type="hidden" name="cat" value="<?php echo h($selectedParent); ?>"><?php endif; ?>
             <?php if ($selectedSub !== ''): ?><input type="hidden" name="sub" value="<?php echo h($selectedSub); ?>"><?php endif; ?>
@@ -457,8 +384,13 @@ if ($isPartial) {
             <i class="fas fa-search" aria-hidden="true"></i>
             <input id="epShopSearch" type="search" name="q" value="<?php echo h($shopQuery); ?>" autocomplete="off"
                    placeholder="Search products, brands, or categories...">
-            <button type="submit" class="ep-btn ep-btn-primary">Search</button>
+            <button type="submit" class="sf-btn sf-btn-primary">Search</button>
         </form>
+    </div>
+    </div>
+
+    <div class="sf-wrap sf-body ep-shop-page">
+
 
         <?php if ($selectedSection === 'brands'): ?>
             <section class="ep-shop-brands" aria-label="Brands">
@@ -596,8 +528,8 @@ if ($isPartial) {
                     </div>
 
                     <div class="ep-shop-filter-actions">
-                        <a href="shop.php" class="ep-btn ep-shop-reset" data-shop-reset>Reset Filter</a>
-                        <button type="submit" class="ep-btn ep-btn-primary ep-shop-apply">Apply Filter</button>
+                        <a href="shop.php" class="ep-btn ep-shop-reset" data-shop-reset>Reset filters</a>
+                        <button type="submit" class="ep-btn ep-btn-primary ep-shop-apply">Apply filters</button>
                     </div>
                 </form>
             </aside>

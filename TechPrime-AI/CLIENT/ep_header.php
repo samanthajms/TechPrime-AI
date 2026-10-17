@@ -4,7 +4,9 @@
  *
  * Expected: $isLoggedIn (bool), $activePage (string), optional $searchQuery, $pageTitle, $bodyClass
  * Home-only: $isHomePage = true
- * Category pages: $categoryHeroTitle (string), $currentCategory (string)
+ * Category pages: $currentCategory (string)
+ * Every page gets body class "sf-page" plus storefront.css / storefront-pages.css (the homepage design);
+ * page headers use sf_page_hero() from includes/storefront_components.php.
  */
 if (!function_exists('ias_inventory_allowed_categories')) {
     require_once __DIR__ . '/../includes/product_categories.php';
@@ -14,7 +16,8 @@ $epWishCount = 0;
 
 $searchQuery = $searchQuery ?? '';
 $isHomePage  = ($activePage ?? '') === 'home' || !empty($isHomePage);
-$bodyClass   = $bodyClass ?? '';
+$bodyClass   = trim(($bodyClass ?? '') . ' sf-page');   // storefront v2 (storefront.css) on every customer page
+require_once __DIR__ . '/../includes/storefront_components.php';
 
 /* Primo chat: shown where shoppers browse and compare, kept off checkout/payment and
  * account pages. A page can override this by setting $epShowPrimo before the header. */
@@ -83,6 +86,10 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <link rel="stylesheet" href="ep_dark.css?v=dark-19">
     <?php /* Header v2: after the dark files so its token-driven rules win over the old header ones. */ ?>
     <link rel="stylesheet" href="header.css?v=hd-9">
+    <?php /* Storefront v2 (the homepage design) for every page: components, then the page-level styles.
+             Token-driven dark mode; loaded last so they win over styles.css and the generated dark rules. */ ?>
+    <link rel="stylesheet" href="storefront.css?v=sf-5">
+    <link rel="stylesheet" href="storefront-pages.css?v=sfp-2">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">
@@ -1038,4 +1045,4 @@ $epDrawerCatOpen = $epActive === 'shop' && !empty($_GET['cat']);
 })();
 </script>
 
-<?php /* The homepage hero lives in index.php (storefront v2); category heroes are rendered inside each category page. */ ?>
+<?php /* The homepage hero lives in index.php; other pages render sf_page_hero() inside their <main>. */ ?>

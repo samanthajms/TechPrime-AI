@@ -26,14 +26,20 @@ $extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-15">';
 include __DIR__ . '/ep_header.php';
 ?>
 
-<main class="bp-page">
+<main class="ep-main sf-main" id="main">
+    <?php echo sf_page_hero([
+        'crumbs' => [['Home', 'index.php'], ['Build a PC', '']],
+        'eyebrow' => 'Build a PC',
+        'title' => 'Build your PC',
+        'sub' => 'Pick parts from what is in stock. We flag parts that do not fit together and keep a running total.',
+        'icon' => 'fa-microchip',
+        'actions' => '<button type="button" class="sf-btn sf-btn-outline bp-help-btn" id="bpGuideOpen" aria-controls="bpGuide">'
+            . '<i class="far fa-question-circle" aria-hidden="true"></i> How it works</button>'
+            . ($canSaveBuilds ? '<a href="saved_builds.php" class="sf-btn sf-btn-outline"><i class="fas fa-folder-open" aria-hidden="true"></i> Saved builds</a>' : ''),
+    ]); ?>
+    <div class="sf-wrap sf-body">
+    <div class="bp-page">
     <div class="bp-top">
-        <div class="bp-titlebar">
-            <h1><span class="bp-title-icon"><i class="fas fa-microchip" aria-hidden="true"></i></span> Build Your PC</h1>
-            <button type="button" class="bp-help-btn" id="bpGuideOpen" aria-controls="bpGuide">
-                <i class="far fa-question-circle" aria-hidden="true"></i> How it works
-            </button>
-        </div>
         <div class="bp-budget">
             <span class="bp-budget-label">Budget</span>
             <div class="bp-budget-bar" aria-hidden="true"><span id="tmBudgetBar"></span></div>
@@ -236,6 +242,8 @@ include __DIR__ . '/ep_header.php';
                 </button>
             </div>
         </aside>
+    </div>
+    </div>
     </div>
 </main>
 

@@ -49,79 +49,40 @@ if (!empty($ids)) {
 
 $isLoggedIn = isset($_SESSION['user_id']);
 $activePage = 'wishlist';
-$pageTitle = 'My Wishlists';
+$pageTitle = 'My Wishlist';
 $searchQuery = '';
-$bodyClass = 'ep-shop-page-body';
+$bodyClass = '';
 $itemCount = count($items);
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main">
-    <div class="ep-page-inner ep-wishlist-page">
-        <a href="user_dashboard.php" class="ep-profile-back-arrow" data-ep-back aria-label="Back">&lt;</a>
+<?php $wishCsrf = generateCsrfToken(); ?>
+<main class="ep-main sf-main" id="main">
+    <?php echo sf_page_hero([
+        'back' => ['Back', 'user_dashboard.php'],
+        'eyebrow' => 'Saved for later',
+        'title' => 'My wishlist',
+        'sub' => 'Products you saved stay here so you can come back to them anytime.',
+        'icon' => 'fa-heart',
+        'meta' => '<span class="sf-meta-chip"><i class="fas fa-heart" aria-hidden="true"></i><span><strong class="sf-num">'
+            . $itemCount . '</strong> item' . ($itemCount === 1 ? '' : 's') . '</span></span>',
+        'actions' => $items ? '<a href="shop.php" class="sf-btn sf-btn-outline"><i class="fas fa-store" aria-hidden="true"></i> Keep shopping</a>' : '',
+    ]); ?>
 
-        <header class="ep-wish-hero">
-            <div class="ep-wish-hero-icon" aria-hidden="true">
-                <i class="fas fa-heart"></i>
-            </div>
-            <div class="ep-wish-hero-copy">
-                <p class="ep-wish-kicker">Saved for later</p>
-                <h1 class="ep-wish-title">My Wishlists</h1>
-                <p class="ep-wish-subtitle">Products you saved stay here so you can come back to them anytime.</p>
-            </div>
-            <span class="ep-wish-count"><?php echo $itemCount; ?> item<?php echo $itemCount === 1 ? '' : 's'; ?></span>
-        </header>
-
+    <div class="sf-wrap sf-body">
         <?php if (!empty($items)): ?>
-            <div class="ep-wish-grid">
-                <?php foreach ($items as $p):
-                    $stk = (int)($p['stock'] ?? 0);
-                    ?>
-                    <article class="ep-wish-card">
-                        <div class="ep-wish-card-media">
-                            <a href="products.php?id=<?php echo (int)$p['id']; ?>">
-                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                     alt="<?php echo h($p['name']); ?>"
-                                     loading="lazy" decoding="async">
-                            </a>
-                            <form method="POST" action="wishlist.php" class="ep-wish-form ep-wish-card-heart">
-                                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                <input type="hidden" name="return_to" value="wishlist.php">
-                                <button type="submit" name="toggle_wishlist" value="1" class="ep-wish-btn is-on" title="Remove from wishlist">
-                                    <i class="fas fa-heart" aria-hidden="true"></i>
-                                </button>
-                            </form>
-                        </div>
-                        <div class="ep-wish-card-body">
-                            <a class="ep-wish-card-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
-                            <div class="ep-wish-card-cat"><?php echo h($p['tax_sub_label'] ?: $p['tax_parent_label']); ?></div>
-                            <div class="ep-wish-card-price">₱<?php echo number_format((float)$p['price'], 2); ?></div>
-                            <div class="ep-wish-card-stock<?php echo $stk > 0 ? '' : ' is-out'; ?>">
-                                <?php echo $stk > 0 ? ('In stock · ' . $stk . ' available') : 'Out of stock'; ?>
-                            </div>
-                            <div class="ep-card-actions">
-                                <form method="POST" action="products.php" class="ep-buy-form">
-                                    <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                    <input type="hidden" name="return_to" value="wishlist.php">
-                                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                    <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
-                                    <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
-                                </form>
-                            </div>
-                        </div>
-                    </article>
+            <ul class="sf-grid">
+                <?php foreach ($items as $p): ?>
+                    <li><?php echo sf_product_card($p, 'wishlist.php', $wishCsrf, [
+                        'cat' => $p['tax_sub_label'] ?: $p['tax_parent_label'],
+                        'wish' => true,
+                    ]); ?></li>
                 <?php endforeach; ?>
-            </div>
+            </ul>
         <?php else: ?>
-            <div class="ep-wish-empty">
-                <div class="ep-wish-empty-icon" aria-hidden="true">
-                    <i class="far fa-heart"></i>
-                </div>
-                <h3>Your wishlist is empty</h3>
-                <p>Browse Shop Now and tap the heart on a product to save it here.</p>
-                <a href="shop.php" class="ep-btn ep-btn-primary">Browse products</a>
-            </div>
+            <?php echo sf_empty_state('fa-heart', 'Your wishlist is empty',
+                'Browse the shop and tap the heart on a product to save it here.',
+                '<a href="shop.php" class="sf-btn sf-btn-primary">Browse products</a>'); ?>
         <?php endif; ?>
     </div>
 </main>

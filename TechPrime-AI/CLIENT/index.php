@@ -46,9 +46,7 @@ $homeCsrf = generateCsrfToken();
 // Hero facts: how many products are on the shelf right now (same visibility rule as the lists).
 $inStockCount = (int)$db->query("SELECT COUNT(*) FROM products p INNER JOIN users u ON p.seller_id = u.id WHERE {$vis}")->fetchColumn();
 
-$bodyClass = 'sf-page';
-$extraHead = '<link rel="stylesheet" href="storefront.css?v=home-3">'
-    . '<link rel="preload" as="image" href="../assets/home-hero.webp" fetchpriority="high">';
+$extraHead = '<link rel="preload" as="image" href="../assets/home-hero.webp" fetchpriority="high">';
 require_once __DIR__ . '/../includes/storefront_components.php';
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
@@ -231,42 +229,6 @@ document.addEventListener('DOMContentLoaded', function () {
         window.location.replace('build_a_pc.php');
     }
 
-    /* Rails (categories, products): the arrows in the section head page by the visible width,
-       disable at either end and stay hidden while everything already fits. */
-    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    document.querySelectorAll('[data-sf-rail]').forEach(function (rail) {
-        var track = rail.querySelector('[data-sf-rail-track]');
-        if (!track || !track.id) return;
-        var arrows = document.querySelector('[data-sf-rail-arrows="' + track.id + '"]');
-        var prev = document.querySelector('[data-sf-rail-prev="' + track.id + '"]');
-        var next = document.querySelector('[data-sf-rail-next="' + track.id + '"]');
-        var ticking = false;
-        function update() {
-            ticking = false;
-            var max = track.scrollWidth - track.clientWidth - 2;
-            var atStart = track.scrollLeft <= 2;
-            var atEnd = track.scrollLeft >= max;
-            if (arrows) arrows.hidden = max <= 0;
-            if (prev) prev.disabled = atStart;
-            if (next) next.disabled = atEnd;
-            rail.classList.toggle('has-prev', !atStart);
-            rail.classList.toggle('has-next', !atEnd);
-        }
-        function onScroll() {
-            if (!ticking) { ticking = true; requestAnimationFrame(update); }
-        }
-        function page(dir) {
-            track.scrollBy({
-                left: dir * Math.max(track.clientWidth * 0.9, 160),
-                behavior: reduceMotion.matches ? 'auto' : 'smooth'
-            });
-        }
-        if (prev) prev.addEventListener('click', function () { page(-1); });
-        if (next) next.addEventListener('click', function () { page(1); });
-        track.addEventListener('scroll', onScroll, { passive: true });
-        window.addEventListener('resize', onScroll);
-        update();
-    });
 });
 </script>
 SCRIPTS;

@@ -34,12 +34,19 @@ if (!$product) {
     $pageTitle = 'Product not available';
     include __DIR__ . '/ep_header.php';
     ?>
-<main class="ep-main ep-pd-main">
-    <div class="ep-pd-missing">
-        <i class="fas fa-box-open" aria-hidden="true"></i>
-        <h1>This product is not available</h1>
-        <p>It may be out of stock or no longer listed in our catalog.</p>
-        <a href="shop.php" class="ep-btn ep-btn-primary">Continue shopping</a>
+<main class="ep-main sf-main" id="main">
+    <?php echo sf_page_hero([
+        'crumbs' => [['Home', 'index.php'], ['Shop', 'shop.php'], ['Product not available', '']],
+        'eyebrow' => 'Product',
+        'title' => 'This product is not available',
+        'sub' => 'It may be out of stock or no longer listed in our catalog.',
+        'size' => 'sm',
+    ]); ?>
+    <div class="sf-wrap sf-body">
+        <?php echo sf_empty_state('fa-box-open', 'We could not find this product',
+            'Browse the catalog for similar items, or ask Primo to help you find one.',
+            '<a href="shop.php" class="sf-btn sf-btn-primary">Continue shopping</a>'
+            . '<a href="index.php" class="sf-btn sf-btn-outline">Back to home</a>'); ?>
     </div>
 </main>
 <?php
@@ -178,7 +185,8 @@ $stars = function (?float $avg): string {
 include __DIR__ . '/ep_header.php';
 ?>
 
-<main class="ep-main ep-pd-main">
+<main class="ep-main ep-pd-main sf-main" id="main">
+    <div class="sf-wrap">
     <nav class="ep-pd-crumbs" aria-label="Breadcrumb">
         <a href="index.php">Home</a>
         <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -276,11 +284,11 @@ include __DIR__ . '/ep_header.php';
                     <div class="ep-pd-actions">
                         <button type="submit" name="add_to_cart" value="1" class="ep-pd-btn ep-pd-btn-cart" id="epPdAddCart"
                                 <?php echo $stock <= 0 ? 'disabled' : ''; ?>>
-                            <i class="fas fa-cart-plus" aria-hidden="true"></i> Add to Cart
+                            <i class="fas fa-cart-plus" aria-hidden="true"></i> Add to cart
                         </button>
                         <button type="submit" name="buy_now" value="1" class="ep-pd-btn ep-pd-btn-buy"
                                 <?php echo $stock <= 0 ? 'disabled' : ''; ?>>
-                            Buy Now
+                            Buy now
                         </button>
                     </div>
                 </form>
@@ -378,45 +386,10 @@ include __DIR__ . '/ep_header.php';
         </div>
     </section>
 
-    <?php if ($related): ?>
-        <section class="ep-section ep-featured-section ep-pd-related">
-            <div class="ep-featured-head">
-                <div>
-                    <p class="ep-featured-kicker">You may also like</p>
-                    <h3>Related Products</h3>
-                </div>
-            </div>
-            <div class="ep-carousel-wrap">
-                <button class="ep-arrow ep-arrow-left" onclick="epScroll('epPdRelatedRow', -1)" aria-label="Scroll left"><i class="fas fa-arrow-left"></i></button>
-                <div class="ep-carousel" id="epPdRelatedRow">
-                    <?php foreach ($related as $p): ?>
-                        <div class="ep-product-card ep-featured-card">
-                            <div class="ep-featured-card-media">
-                                <a href="products.php?id=<?php echo (int)$p['id']; ?>">
-                                    <img src="<?php echo h(ias_client_product_image_url($p)); ?>" class="ep-product-img" alt="<?php echo h($p['name']); ?>" loading="lazy" decoding="async">
-                                </a>
-                            </div>
-                            <div class="ep-featured-card-body">
-                                <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
-                                <div class="ep-product-cat"><?php echo h($p['tax_sub_label'] ?: $p['tax_parent_label']); ?></div>
-                                <div class="ep-product-price">₱<?php echo number_format((float)$p['price'], 2); ?></div>
-                                <div class="ep-card-actions">
-                                    <form action="products.php" method="POST" class="ep-buy-form">
-                                        <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                        <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
-                                        <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>">
-                                        <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
-                                        <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-                <button class="ep-arrow ep-arrow-right" onclick="epScroll('epPdRelatedRow', 1)" aria-label="Scroll right"><i class="fas fa-arrow-right"></i></button>
-            </div>
-        </section>
-    <?php endif; ?>
+    </div>
+
+    <?php echo sf_product_rail('epPdRelatedTitle', 'You may also like', 'Related products', $related, $returnTo, $csrf,
+        ep_shop_url(['cat' => $tax['parent']], []), 'Shop ' . $parentLabel); ?>
 
     <?php include __DIR__ . '/ep_recent_section.php'; ?>
 </main>

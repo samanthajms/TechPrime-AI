@@ -232,15 +232,17 @@ $extraHead = '<style>
 include __DIR__ . '/ep_header.php';
 ?>
 
-<main class="sb-page">
-    <section class="sb-hero">
-        <a class="ep-profile-back-arrow" href="user_dashboard.php" data-ep-back aria-label="Back">&lt;</a>
-        <div class="sb-hero-text">
-            <h1><i class="fas fa-folder-open" aria-hidden="true"></i> Saved Builds</h1>
-            <p>PC configurations you saved from Build a PC. Only you can see these.</p>
-        </div>
-        <a class="sb-new-btn" href="build_a_pc.php"><i class="fas fa-plus" aria-hidden="true"></i> New Build</a>
-    </section>
+<main class="ep-main sf-main" id="main">
+    <?php echo sf_page_hero([
+        'crumbs' => [['Home', 'index.php'], ['My account', 'user_dashboard.php'], ['Saved builds', '']],
+        'eyebrow' => 'Build a PC',
+        'title' => 'Saved builds',
+        'sub' => 'PC configurations you saved from Build a PC. Only you can see these.',
+        'icon' => 'fa-folder-open',
+        'actions' => '<a class="sf-btn sf-btn-primary" href="build_a_pc.php"><i class="fas fa-plus" aria-hidden="true"></i> New build</a>',
+    ]); ?>
+    <div class="sf-wrap sf-body">
+    <div class="sb-page">
 
     <div id="sbStage"<?php echo empty($builds) ? ' hidden' : ''; ?>>
         <div class="sb-toolbar">
@@ -264,7 +266,9 @@ include __DIR__ . '/ep_header.php';
         <div class="sb-empty-icon"><i class="fas fa-desktop" aria-hidden="true"></i></div>
         <h3>No saved builds yet</h3>
         <p>Pick parts in Build a PC, then click Save Build to keep them here.</p>
-        <a class="sb-new-btn" href="build_a_pc.php"><i class="fas fa-plus" aria-hidden="true"></i> Start a Build</a>
+        <a class="sb-new-btn" href="build_a_pc.php"><i class="fas fa-plus" aria-hidden="true"></i> Start a build</a>
+    </div>
+    </div>
     </div>
 </main>
 

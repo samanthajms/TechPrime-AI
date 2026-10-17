@@ -159,27 +159,26 @@ $csrf                 = generateCsrfToken();
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main ep-cart-main">
-        <div class="ep-page-header-row epc-header">
-            <a href="index.php" class="ep-back-link" data-ep-back><i class="fas fa-arrow-left"></i> Continue Shopping</a>
-            <h2 class="ep-page-title">
-                My Cart
-                <?php if ($cart_items): ?>
-                    <span class="epc-title-count" id="cartItemCount"><?php echo $totalUnits; ?> item<?php echo $totalUnits === 1 ? '' : 's'; ?></span>
-                <?php endif; ?>
-            </h2>
-        </div>
+<main class="ep-main ep-cart-main sf-main" id="main">
+        <?php echo sf_page_hero([
+            'back' => ['Continue shopping', 'shop.php'],
+            'eyebrow' => 'Your bag',
+            'title' => 'My cart',
+            'sub' => $cart_items ? 'Pick the items to check out now. The rest stay in your cart.' : '',
+            'meta' => $cart_items
+                ? '<span class="sf-meta-chip"><i class="fas fa-shopping-bag" aria-hidden="true"></i><span id="cartItemCount">'
+                    . $totalUnits . ' item' . ($totalUnits === 1 ? '' : 's') . '</span></span>'
+                    . '<span class="sf-meta-chip"><i class="fas fa-tag" aria-hidden="true"></i><span>Prices include VAT</span></span>'
+                : '',
+            'size' => 'sm',
+        ]); ?>
 
+        <div class="sf-wrap sf-body">
         <?php if (empty($cart_items)): ?>
-            <section class="epc-empty">
-                <div class="epc-empty-icon" aria-hidden="true"><i class="fas fa-shopping-bag"></i></div>
-                <h3>Your cart is empty</h3>
-                <p>Looks like you haven't added anything yet. Browse our PCs, parts and accessories to get started.</p>
-                <div class="epc-empty-actions">
-                    <a href="shop.php" class="epc-btn epc-btn-primary"><i class="fas fa-store"></i> Shop Now</a>
-                    <a href="build_a_pc.php" class="epc-btn epc-btn-ghost"><i class="fas fa-desktop"></i> Build a PC</a>
-                </div>
-            </section>
+            <?php echo sf_empty_state('fa-shopping-bag', 'Your cart is empty',
+                "Looks like you haven't added anything yet. Browse our PCs, parts and accessories to get started.",
+                '<a href="shop.php" class="sf-btn sf-btn-primary"><i class="fas fa-store" aria-hidden="true"></i> Shop now</a>'
+                . '<a href="build_a_pc.php" class="sf-btn sf-btn-outline"><i class="fas fa-desktop" aria-hidden="true"></i> Build a PC</a>'); ?>
         <?php else: ?>
             <form method="post" id="cartForm" class="epc-grid">
                 <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>">
@@ -188,9 +187,9 @@ $csrf                 = generateCsrfToken();
                     <div class="epc-items-head">
                         <label class="epc-check-label">
                             <input type="checkbox" id="cartSelectAll" class="epc-check">
-                            <span>Select All (<span id="cartRowCount"><?php echo count($cart_items); ?></span>)</span>
+                            <span>Select all (<span id="cartRowCount"><?php echo count($cart_items); ?></span>)</span>
                         </label>
-                        <span class="epc-col epc-col-price">Unit Price</span>
+                        <span class="epc-col epc-col-price">Unit price</span>
                         <span class="epc-col epc-col-qty">Quantity</span>
                         <span class="epc-col epc-col-total">Total</span>
                         <span class="epc-col epc-col-action" aria-hidden="true"></span>
@@ -249,7 +248,7 @@ $csrf                 = generateCsrfToken();
                 </section>
 
                 <aside class="epc-card epc-summary" aria-label="Order summary">
-                    <h3 class="epc-summary-title"><i class="fas fa-receipt"></i> Order Summary</h3>
+                    <h2 class="epc-summary-title"><i class="fas fa-receipt" aria-hidden="true"></i> Order summary</h2>
 
                     <div class="epc-sum-row">
                         <span>Subtotal (<span id="cartSelectedCount"><?php echo $selectedUnits; ?></span> selected)</span>
@@ -268,9 +267,9 @@ $csrf                 = generateCsrfToken();
 
                     <button type="submit" name="update_cart" class="primary-btn" hidden>Update Quantities</button>
                     <button type="button" class="epc-btn epc-btn-primary epc-btn-block" id="cartCheckoutBtn">
-                        <i class="fas fa-lock"></i> <span>Checkout (<span id="cartCheckoutCount"><?php echo $selectedUnits; ?></span>)</span>
+                        <i class="fas fa-lock" aria-hidden="true"></i> <span>Checkout (<span id="cartCheckoutCount"><?php echo $selectedUnits; ?></span>)</span>
                     </button>
-                    <a href="shop.php" class="epc-btn epc-btn-ghost epc-btn-block">Continue Shopping</a>
+                    <a href="shop.php" class="epc-btn epc-btn-ghost epc-btn-block">Continue shopping</a>
 
                     <ul class="epc-perks">
                         <li><i class="fas fa-credit-card"></i> Secure online payment</li>
@@ -279,6 +278,7 @@ $csrf                 = generateCsrfToken();
                 </aside>
             </form>
         <?php endif; ?>
+        </div>
     </main>
 
 <?php ias_alert_footer(); ?>

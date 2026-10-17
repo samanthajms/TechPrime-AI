@@ -75,53 +75,58 @@ $bodyClass = '';
 include __DIR__ . '/ep_header.php';
 ?>
 
-<main class="ep-main">
-    <div class="ep-panel" style="max-width:560px;margin:24px auto;">
-        <h2 class="ep-page-title" style="margin-bottom:6px;"><i class="fas fa-wallet"></i> Payment</h2>
-        <p class="ep-info-note" style="margin-bottom:18px;">
-            School/project placeholder — this is not a real payment gateway.
-        </p>
+<main class="ep-main sf-main" id="main">
+    <?php echo sf_page_hero([
+        'back' => ['Back to To Pay', 'user_dashboard.php?status=to_pay'],
+        'eyebrow' => 'Payment',
+        'title' => 'Pay order #ORD-' . (int)$order['id'],
+        'sub' => 'Check the details below, then confirm the payment.',
+        'size' => 'sm',
+        'width' => 'xnarrow',
+    ]); ?>
+    <div class="sf-wrap sf-body is-xnarrow">
+        <div class="ep-panel sf-pay-card">
+            <p class="sf-note is-warn"><i class="fas fa-info-circle" aria-hidden="true"></i>
+                <span>School/project placeholder — this is not a real payment gateway.</span></p>
 
-        <?php if ($error !== ''): ?>
-            <div class="ep-info-note" style="margin-bottom:16px;color:#b42318;border-color:#f1c4c4;">
-                <?php echo h($error); ?>
+            <?php if ($error !== ''): ?>
+                <p class="sf-note is-error" role="alert"><i class="fas fa-exclamation-circle" aria-hidden="true"></i><span><?php echo h($error); ?></span></p>
+            <?php endif; ?>
+
+            <h2 class="ep-panel-title"><i class="fas fa-receipt" aria-hidden="true"></i> Order details</h2>
+            <div class="ep-order-line">
+                <span>Order</span>
+                <strong>#ORD-<?php echo (int)$order['id']; ?></strong>
             </div>
-        <?php endif; ?>
-
-        <div class="ep-order-line">
-            <span>Order</span>
-            <strong>#ORD-<?php echo (int)$order['id']; ?></strong>
-        </div>
-        <div class="ep-order-line">
-            <span>Placed</span>
-            <strong><?php echo h(date('M d, Y g:i A', strtotime((string)$order['created_at']))); ?></strong>
-        </div>
-        <div class="ep-order-line" style="align-items:flex-start;">
-            <span>Items</span>
-            <strong style="text-align:right;max-width:65%;"><?php echo h((string)($order['products'] ?: '—')); ?></strong>
-        </div>
-        <?php if (trim((string)($order['shipping_address'] ?? '')) !== ''): ?>
-            <div class="ep-order-line" style="align-items:flex-start;">
-                <span><?php echo strtolower((string)($order['fulfillment_type'] ?? '')) === 'pickup' ? 'Pickup' : 'Ship to'; ?></span>
-                <strong style="text-align:right;max-width:65%;"><?php echo h((string)$order['shipping_address']); ?></strong>
+            <div class="ep-order-line">
+                <span>Placed</span>
+                <strong><?php echo h(date('M d, Y g:i A', strtotime((string)$order['created_at']))); ?></strong>
             </div>
-        <?php endif; ?>
-        <div class="ep-order-total">
-            <span>Amount due</span>
-            <strong>₱<?php echo number_format((float)$order['total'], 2); ?></strong>
-        </div>
+            <div class="ep-order-line is-top">
+                <span>Items</span>
+                <strong class="sf-pay-value"><?php echo h((string)($order['products'] ?: '—')); ?></strong>
+            </div>
+            <?php if (trim((string)($order['shipping_address'] ?? '')) !== ''): ?>
+                <div class="ep-order-line is-top">
+                    <span><?php echo strtolower((string)($order['fulfillment_type'] ?? '')) === 'pickup' ? 'Pickup' : 'Ship to'; ?></span>
+                    <strong class="sf-pay-value"><?php echo h((string)$order['shipping_address']); ?></strong>
+                </div>
+            <?php endif; ?>
+            <div class="ep-order-total">
+                <span>Amount due</span>
+                <strong>₱<?php echo number_format((float)$order['total'], 2); ?></strong>
+            </div>
 
-        <form method="post" style="margin-top:20px;">
-            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-            <input type="hidden" name="action" value="pay_now">
-            <input type="hidden" name="order_id" value="<?php echo (int)$order['id']; ?>">
-            <button type="submit" class="ep-btn ep-btn-primary ep-btn-block">
-                <i class="fas fa-check-circle"></i> Pay Now
-            </button>
-        </form>
-        <p style="margin-top:14px;text-align:center;">
-            <a href="user_dashboard.php?status=to_pay" class="ep-btn ep-btn-yellow">Back to To Pay</a>
-        </p>
+            <form method="post" class="sf-pay-form">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                <input type="hidden" name="action" value="pay_now">
+                <input type="hidden" name="order_id" value="<?php echo (int)$order['id']; ?>">
+                <button type="submit" class="ep-btn ep-btn-primary ep-btn-block sf-btn-lg">
+                    <i class="fas fa-lock" aria-hidden="true"></i> Pay ₱<?php echo number_format((float)$order['total'], 2); ?>
+                </button>
+            </form>
+            <a href="user_dashboard.php?status=to_pay" class="ep-btn ep-btn-outline ep-btn-block">Back to To Pay</a>
+        </div>
     </div>
 </main>
 

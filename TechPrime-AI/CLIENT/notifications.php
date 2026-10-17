@@ -86,31 +86,24 @@ $isLoggedIn = true;
 $activePage = 'notifications';
 $pageTitle = 'Notifications';
 $searchQuery = '';
-$bodyClass = 'ep-shop-page-body';
+$bodyClass = '';
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main">
-    <div class="ep-page-inner ep-notif-page">
-        <a href="user_dashboard.php" class="ep-profile-back-arrow" data-ep-back aria-label="Back">&lt;</a>
+<main class="ep-main sf-main" id="main">
+    <?php echo sf_page_hero([
+        'back' => ['Back', 'user_dashboard.php'],
+        'eyebrow' => 'Stay updated',
+        'title' => 'Notifications',
+        'sub' => 'Order, payment and cancellation updates from EasyPC One Oasis.',
+        'icon' => 'fa-bell',
+        'meta' => '<span class="sf-meta-chip"><i class="fas fa-circle" aria-hidden="true"></i><span id="epNotifPageUnread">' . $unreadAll . ' unread</span></span>',
+        'actions' => '<button type="button" class="sf-btn sf-btn-primary ep-notif-page-readall" data-notif-readall' . ($unreadAll > 0 ? '' : ' hidden') . '>'
+            . '<i class="fas fa-check-double" aria-hidden="true"></i> Mark all as read</button>',
+        'width' => 'narrow',
+    ]); ?>
 
-        <header class="ep-wish-hero ep-notif-hero">
-            <div class="ep-wish-hero-icon ep-notif-hero-icon" aria-hidden="true">
-                <i class="fas fa-bell"></i>
-            </div>
-            <div class="ep-wish-hero-copy">
-                <p class="ep-wish-kicker">Stay updated</p>
-                <h1 class="ep-wish-title">Notifications</h1>
-                <p class="ep-wish-subtitle">Order, payment and cancellation updates from EasyPC One Oasis.</p>
-            </div>
-            <div class="ep-notif-hero-side">
-                <span class="ep-wish-count" id="epNotifPageUnread"><?php echo $unreadAll; ?> unread</span>
-                <button type="button" class="ep-btn ep-btn-primary ep-notif-page-readall" data-notif-readall<?php echo $unreadAll > 0 ? '' : ' hidden'; ?>>
-                    <i class="fas fa-check-double" aria-hidden="true"></i> Mark all as read
-                </button>
-            </div>
-        </header>
-
+    <div class="sf-wrap sf-body is-narrow ep-notif-page">
         <nav class="ep-notif-tabs" aria-label="Filter notifications">
             <?php foreach ($tabs as $key => $def):
                 $badge = $key === 'all' ? 0 : ($key === 'unread' ? $unreadAll : (int)($counts[$key . '_unread'] ?? 0));
@@ -127,12 +120,8 @@ $bodyClass = 'ep-shop-page-body';
         <?php if (empty($rows)):
             [$emptyTitle, $emptyText] = $emptyCopy[$tab];
             ?>
-            <div class="ep-wish-empty ep-notif-page-empty">
-                <div class="ep-wish-empty-icon ep-notif-hero-icon" aria-hidden="true"><i class="far fa-bell"></i></div>
-                <h3><?php echo h($emptyTitle); ?></h3>
-                <p><?php echo h($emptyText); ?></p>
-                <a href="shop.php" class="ep-btn ep-btn-primary">Continue shopping</a>
-            </div>
+            <?php echo sf_empty_state('fa-bell', $emptyTitle, $emptyText,
+                '<a href="shop.php" class="sf-btn sf-btn-primary">Continue shopping</a>'); ?>
         <?php else: ?>
             <div class="ep-notif-groups" id="epNotifGroups">
                 <?php foreach ($groups as $label => $items): ?>

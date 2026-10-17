@@ -82,47 +82,28 @@ $peripheralCategories = ['Mobile', 'Cameras', 'Accessories'];
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main">
-    <div class="ep-page-inner">
+<?php $listCsrf = generateCsrfToken(); ?>
+<main class="ep-main sf-main" id="main">
+    <?php echo sf_page_hero([
+        'crumbs' => [['Home', 'index.php'], ['Shop', 'shop.php'], ['All products', '']],
+        'eyebrow' => 'Catalog',
+        'title' => 'All products',
+        'sub' => number_format(count($displayProducts)) . ' products from EasyPC One Oasis. Prices include VAT.',
+        'actions' => '<a href="shop.php" class="sf-btn sf-btn-outline"><i class="fas fa-sliders-h" aria-hidden="true"></i> Filter in Shop</a>',
+    ]); ?>
 
-        <div class="ep-page-header-row">
-            <a href="index.php" class="ep-back-link">← Back to Home</a>
-            <h2 class="ep-page-title">All Products</h2>
-        </div>
-
-        <section class="ep-products-section">
-            <?php if (!empty($displayProducts)): ?>
-                <div class="ep-products-grid">
-                    <?php foreach ($displayProducts as $p): ?>
-                        <div class="ep-product-card ep-grid-card">
-                            <a href="products.php?id=<?php echo (int)$p['id']; ?>">
-                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                     class="ep-product-img" alt="<?php echo h($p['name']); ?>">
-                            </a>
-                            <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
-                            <div class="ep-product-cat">By: <?php echo h($p['seller_name']); ?></div>
-                            <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
-                            <div class="ep-card-actions">
-                                <form method="POST" action="products.php" class="ep-buy-form">
-                                    <input type="hidden" name="product_id" value="<?php echo (int)$p['id']; ?>">
-                                    <input type="hidden" name="return_to" value="products.php">
-                                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                    <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
-                                    <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
-                                </form>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php else: ?>
-                <div class="ep-empty-state">
-                    <i class="fas fa-box-open" style="font-size:48px;color:#ccc;margin-bottom:14px;"></i>
-                    <p>No products found.</p>
-                    <a href="index.php" class="ep-back-link">← Back to Home</a>
-                </div>
-            <?php endif; ?>
-        </section>
-
+    <div class="sf-wrap sf-body">
+        <?php if (!empty($displayProducts)): ?>
+            <ul class="sf-grid">
+                <?php foreach ($displayProducts as $p): ?>
+                    <li><?php echo sf_product_card($p, 'products.php', $listCsrf); ?></li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <?php echo sf_empty_state('fa-box-open', 'No products found',
+                'Check back soon. New stock is added regularly.',
+                '<a href="index.php" class="sf-btn sf-btn-primary">Back to home</a>'); ?>
+        <?php endif; ?>
     </div>
 </main>
 

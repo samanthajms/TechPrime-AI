@@ -198,22 +198,23 @@ if (empty($_SESSION['checkout_token'])) {
 $isLoggedIn = true;
 $activePage = '';
 $pageTitle  = 'Checkout';
-$bodyClass  = 'ep-checkout-layout';
+$bodyClass  = '';
 $showDeliveryNotice = in_array($addressMode, ['saved', 'custom'], true);
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main">
-    <div class="ep-page-header-row">
-        <?php if (!$orderPlaced): ?>
-            <a href="<?php echo $isBuyNow ? 'shop.php' : 'cart.php'; ?>" class="ep-back-link"<?php echo $isBuyNow ? '' : ' data-ep-back'; ?>>
-                <i class="fas fa-arrow-left"></i> <?php echo $isBuyNow ? 'Back to Shop' : 'Back to Cart'; ?>
-            </a>
-        <?php else: ?>
-            <span class="ep-back-link" style="visibility:hidden;">&nbsp;</span>
-        <?php endif; ?>
-        <h2 class="ep-page-title">Secure Checkout</h2>
-    </div>
+<main class="ep-main sf-main" id="main">
+    <?php echo sf_page_hero([
+        'back' => $orderPlaced ? null : ($isBuyNow ? ['Back to shop', 'shop.php'] : ['Back to cart', 'cart.php']),
+        'eyebrow' => 'Secure checkout',
+        'title' => $orderPlaced ? 'Order placed' : 'Checkout',
+        'sub' => $orderPlaced ? '' : 'Enter your details, choose delivery or pick-up, then place the order.',
+        'meta' => $orderPlaced ? '' : '<span class="sf-meta-chip"><i class="fas fa-lock" aria-hidden="true"></i><span>Your details are protected</span></span>'
+            . '<span class="sf-meta-chip"><i class="fas fa-tag" aria-hidden="true"></i><span>Prices include VAT</span></span>',
+        'size' => 'sm',
+        'width' => 'narrow',
+    ]); ?>
+    <div class="sf-wrap sf-body is-narrow">
 
     <?php if ($orderPlaced): ?>
         <div class="ep-place-success" id="epPlaceSuccess" role="alertdialog" aria-labelledby="epPlaceSuccessTitle">
@@ -228,12 +229,12 @@ $showDeliveryNotice = in_array($addressMode, ['saved', 'custom'], true);
                 <?php endif; ?>
             </p>
             <div class="ep-place-success-actions">
-                <a href="user_dashboard.php?status=to_pay" class="ep-btn ep-btn-primary">View Shipping Details</a>
-                <a href="shop.php" class="ep-btn ep-btn-yellow">Shop More</a>
+                <a href="user_dashboard.php?status=to_pay" class="ep-btn ep-btn-primary">View my order</a>
+                <a href="shop.php" class="ep-btn ep-btn-yellow">Keep shopping</a>
             </div>
         </div>
         <div class="ep-panel ep-checkout-empty" id="epCheckoutEmpty" hidden>
-            <p class="ep-info-note" style="margin:0;">Checkout is empty.</p>
+            <p class="ep-info-note">Checkout is empty.</p>
         </div>
     <?php else: ?>
     <?php /* How ordering works, for first-time shoppers (survey feedback). */ ?>
@@ -244,30 +245,30 @@ $showDeliveryNotice = in_array($addressMode, ['saved', 'custom'], true);
     </ol>
     <form method="POST" class="ep-checkout-grid" id="epCheckoutForm">
         <div class="ep-panel">
-            <h3 class="ep-panel-title"><i class="fas fa-map-marker-alt"></i> Shipping Details</h3>
+            <h2 class="ep-panel-title"><i class="fas fa-map-marker-alt" aria-hidden="true"></i> Shipping details</h2>
             <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
             <input type="hidden" name="checkout_token" value="<?php echo h($_SESSION['checkout_token']); ?>">
             <input type="hidden" name="total" value="<?php echo htmlspecialchars((string)$total, ENT_QUOTES); ?>">
             <input type="hidden" name="checkout_action" id="epCheckoutAction" value="">
 
             <?php if ($checkoutError !== ''): ?>
-                <div class="ep-info-note" style="color:#c0392b; border-color:#c0392b;">
+                <p class="sf-note is-error" role="alert"><i class="fas fa-exclamation-circle" aria-hidden="true"></i><span>
                     <?php echo h($checkoutError); ?>
-                </div>
+                </span></p>
             <?php endif; ?>
 
             <?php if (!empty($_GET['error'])): ?>
-                <div class="ep-info-note" style="color:#c0392b; border-color:#c0392b;">
+                <p class="sf-note is-error" role="alert"><i class="fas fa-exclamation-circle" aria-hidden="true"></i><span>
                     <?php
                     $epPayErrors = [
                         'duplicate' => 'This order was already submitted. Check My Profile for your order status.',
                     ];
                     echo h($epPayErrors[$_GET['error']] ?? 'Something went wrong. Please try again.');
                     ?>
-                </div>
+                </span></p>
             <?php endif; ?>
 
-            <label class="ep-form-label" for="checkoutPhone">Phone Number</label>
+            <label class="ep-form-label" for="checkoutPhone">Phone number</label>
             <input class="ep-form-control" id="checkoutPhone" type="tel" name="phone" placeholder="09123456789" required
                    autocomplete="tel" maxlength="30" value="<?php echo h($phoneValue); ?>">
 
@@ -280,7 +281,7 @@ $showDeliveryNotice = in_array($addressMode, ['saved', 'custom'], true);
                            data-delivery="1">
                     <span class="ep-deliver-radio" aria-hidden="true"></span>
                     <span class="ep-deliver-body">
-                        <strong><i class="fas fa-home"></i> My Saved Address</strong>
+                        <strong><i class="fas fa-home" aria-hidden="true"></i> My saved address</strong>
                         <?php if ($addressComplete): ?>
                             <span><?php echo h(ep_address_format($savedAddress)); ?></span>
                             <a href="user_dashboard.php?settings=1#delivery" class="ep-deliver-edit">Edit in profile</a>
@@ -295,7 +296,7 @@ $showDeliveryNotice = in_array($addressMode, ['saved', 'custom'], true);
                     <input type="radio" name="address_mode" value="custom" <?php echo $addressMode === 'custom' ? 'checked' : ''; ?> data-delivery="1">
                     <span class="ep-deliver-radio" aria-hidden="true"></span>
                     <span class="ep-deliver-body">
-                        <strong><i class="fas fa-map-signs"></i> Deliver to a Different Address</strong>
+                        <strong><i class="fas fa-map-signs" aria-hidden="true"></i> Deliver to a different address</strong>
                         <span>For this order only. Your saved address won't change.</span>
                     </span>
                 </label>
@@ -303,7 +304,7 @@ $showDeliveryNotice = in_array($addressMode, ['saved', 'custom'], true);
                     <input type="radio" name="address_mode" value="pickup" <?php echo $addressMode === 'pickup' ? 'checked' : ''; ?> data-delivery="0">
                     <span class="ep-deliver-radio" aria-hidden="true"></span>
                     <span class="ep-deliver-body">
-                        <strong><i class="fas fa-store"></i> Pick Up Order</strong>
+                        <strong><i class="fas fa-store" aria-hidden="true"></i> Pick up at the store</strong>
                         <span>Pick up at EasyPC One Oasis Branch, Rosario, Pasig.</span>
                     </span>
                 </label>
@@ -326,7 +327,7 @@ $showDeliveryNotice = in_array($addressMode, ['saved', 'custom'], true);
         </div>
 
         <div class="ep-panel">
-            <h3 class="ep-panel-title"><i class="fas fa-shopping-bag"></i> Order Summary</h3>
+            <h2 class="ep-panel-title"><i class="fas fa-shopping-bag" aria-hidden="true"></i> Order summary</h2>
             <?php foreach ($items as $item): ?>
                 <div class="ep-order-line">
                     <span><strong><?php echo h($item['name']); ?></strong> (×<?php echo (int)$item['qty']; ?>)</span>
@@ -335,17 +336,18 @@ $showDeliveryNotice = in_array($addressMode, ['saved', 'custom'], true);
             <?php endforeach; ?>
 
             <div class="ep-order-total">
-                <span>Total Amount</span>
+                <span>Total amount</span>
                 <strong>₱<?php echo number_format($total, 2); ?></strong>
             </div>
 
             <div class="ep-checkout-actions">
-                <button type="submit" name="place_order" id="epPlaceOrderBtn" class="ep-btn ep-btn-primary ep-btn-block">Place Order</button>
-                <button type="submit" name="add_to_cart_checkout" id="epAddCartBtn" class="ep-btn ep-btn-yellow ep-btn-block" formnovalidate>Add to Cart</button>
+                <button type="submit" name="place_order" id="epPlaceOrderBtn" class="ep-btn ep-btn-primary ep-btn-block">Place order</button>
+                <button type="submit" name="add_to_cart_checkout" id="epAddCartBtn" class="ep-btn ep-btn-yellow ep-btn-block" formnovalidate>Add to cart instead</button>
             </div>
         </div>
     </form>
     <?php endif; ?>
+    </div>
 </main>
 <?php if (!$orderPlaced): ?>
 <script src="../assets/js/ph-address.js"></script>

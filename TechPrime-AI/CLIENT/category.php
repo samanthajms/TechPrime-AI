@@ -12,10 +12,8 @@ $currentCategory = $type;
 $activePage = '';
 $pageTitle  = h($type);
 $searchQuery = '';
-$bodyClass = 'ep-category-layout';
+$bodyClass = '';
 
-// The big green title shown above the nav (matches CATEGORY.png), rendered by ep_header.php
-$categoryHeroTitle = $type;
 
 /* ------------------------------------------------------------------ *
  * Pull the full, display-safe set of products for this category once,
@@ -64,7 +62,7 @@ if ($selectedMaxPrice > $categoryMaxPrice) $selectedMaxPrice = $categoryMaxPrice
 $sort = (isset($_GET['sort']) && in_array($_GET['sort'], ['price_asc', 'price_desc', 'rating'], true))
     ? $_GET['sort'] : 'price_asc';
 
-$perPage = 9; // 3x3 grid, matching CATEGORY.png
+$perPage = 12;
 
 // ---- Apply filters ----
 $filteredProducts = array_values(array_filter($baseProducts, function ($p) use ($selectedBrand, $selectedAvailability, $selectedMaxPrice) {
@@ -106,192 +104,144 @@ function ep_cat_url(array $overrides = []): string
     return 'category.php?' . http_build_query($params);
 }
 
-function ep_pagination_range(int $current, int $total): array
-{
-    if ($total <= 1) return [1];
-    $delta = 1;
-    $range = [];
-    for ($i = 1; $i <= $total; $i++) {
-        if ($i === 1 || $i === $total || ($i >= $current - $delta && $i <= $current + $delta)) {
-            $range[] = $i;
-        }
-    }
-    $withDots = [];
-    $last = null;
-    foreach ($range as $i) {
-        if ($last !== null) {
-            if ($i - $last === 2) {
-                $withDots[] = $last + 1;
-            } elseif ($i - $last > 1) {
-                $withDots[] = '...';
-            }
-        }
-        $withDots[] = $i;
-        $last = $i;
-    }
-    return $withDots;
-}
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main">
-    <section class="ep-category-hero">
-        <h1><?php echo h($type); ?></h1>
-    </section>
-    <div class="ep-page-inner">
+<?php
+$catCsrf = generateCsrfToken();
+$catReturn = 'category.php?' . http_build_query(['type' => $type]);
+$catSorts = ['price_asc' => 'Price: low to high', 'price_desc' => 'Price: high to low', 'rating' => 'Newest'];
+$catPct = $categoryMaxPrice > $categoryMinPrice
+    ? ($selectedMaxPrice - $categoryMinPrice) / ($categoryMaxPrice - $categoryMinPrice) * 100
+    : 100;
+?>
+<main class="ep-main sf-main" id="main">
+    <?php echo sf_page_hero([
+        'crumbs' => [['Home', 'index.php'], ['Shop', 'shop.php'], [$type, '']],
+        'eyebrow' => 'Category',
+        'title' => $type,
+        'sub' => count($baseProducts) > 0
+            ? number_format(count($baseProducts)) . ' product' . (count($baseProducts) === 1 ? '' : 's') . ' from EasyPC One Oasis. Prices include VAT.'
+            : 'Nothing is listed in this category right now.',
+    ]); ?>
 
-        <div class="ep-category-body">
+    <div class="sf-wrap sf-body">
+        <div class="ep-shop-layout">
 
-            <!-- ============ Sidebar filters ============ -->
-            <aside class="ep-filters">
-                <form method="GET" action="category.php" id="epFilterForm">
+            <aside class="ep-shop-sidebar" aria-label="Product filters">
+                <form method="GET" action="category.php" id="epFilterForm" class="ep-shop-filter-card">
                     <input type="hidden" name="type" value="<?php echo h($type); ?>">
                     <input type="hidden" name="sort" value="<?php echo h($sort); ?>">
 
-                    <div class="ep-filter-group">
-                        <button type="button" class="ep-filter-head" onclick="epToggleFilterGroup(this)">
-                            Brands <i class="fas fa-chevron-up"></i>
-                        </button>
-                        <div class="ep-filter-body">
-                            <label class="ep-filter-option">
+                    <div class="ep-shop-filter-head">
+                        <h3><i class="fas fa-sliders-h" aria-hidden="true"></i> Filters</h3>
+                        <p>Changes apply as soon as you pick an option.</p>
+                    </div>
+
+                    <fieldset class="ep-shop-filter-group sf-fieldset">
+                        <legend class="sf-legend">Brands</legend>
+                        <div class="ep-shop-brand-list">
+                            <label class="ep-shop-brand-option">
                                 <input type="radio" name="brand" value="" onchange="this.form.submit()" <?php echo $selectedBrand === '' ? 'checked' : ''; ?>>
-                                All Brands
+                                <span>All brands</span>
                             </label>
                             <?php foreach ($availableBrands as $brand): ?>
-                                <label class="ep-filter-option">
+                                <label class="ep-shop-brand-option">
                                     <input type="radio" name="brand" value="<?php echo h($brand); ?>" onchange="this.form.submit()" <?php echo $selectedBrand === $brand ? 'checked' : ''; ?>>
-                                    <?php echo h($brand); ?>
+                                    <span><?php echo h($brand); ?></span>
                                 </label>
                             <?php endforeach; ?>
                             <?php if (empty($availableBrands)): ?>
-                                <p style="font-size:12.5px;color:#999;margin:0;">No sellers yet.</p>
+                                <p class="sf-filter-none">No sellers yet.</p>
                             <?php endif; ?>
                         </div>
-                    </div>
+                    </fieldset>
 
-                    <div class="ep-filter-group">
-                        <button type="button" class="ep-filter-head" onclick="epToggleFilterGroup(this)">
-                            Price <i class="fas fa-chevron-down"></i>
-                        </button>
-                        <div class="ep-filter-body">
-                            <div class="ep-price-range">
-                                <div class="ep-price-range-label">
-                                    <span>₱<?php echo number_format($categoryMinPrice); ?></span>
-                                    <span id="epPriceMaxLabel">₱<?php echo number_format($selectedMaxPrice); ?></span>
-                                </div>
-                                <input type="range" name="price_max" id="epPriceMaxRange"
+                    <div class="ep-shop-filter-group">
+                        <label for="epPriceMaxRange">Maximum price</label>
+                        <div class="ep-shop-price-current" id="epPriceMaxLabel">₱<?php echo number_format($selectedMaxPrice); ?></div>
+                        <input type="range" class="sf-range" name="price_max" id="epPriceMaxRange"
+                               min="<?php echo (int) $categoryMinPrice; ?>"
+                               max="<?php echo (int) $categoryMaxPrice; ?>"
+                               value="<?php echo (int) $selectedMaxPrice; ?>"
+                               style="--sf-range-pct: <?php echo h(number_format($catPct, 2, '.', '')); ?>%"
+                               oninput="document.getElementById('epPriceMaxLabel').textContent = '₱' + Number(this.value).toLocaleString(); document.getElementById('epPriceMaxBox').value = this.value; this.style.setProperty('--sf-range-pct', ((this.value - this.min) / ((this.max - this.min) || 1) * 100) + '%');"
+                               onchange="this.form.submit()">
+                        <div class="ep-shop-price-bounds">
+                            <span>₱<?php echo number_format($categoryMinPrice); ?></span>
+                            <span>₱<?php echo number_format($categoryMaxPrice); ?></span>
+                        </div>
+                        <?php /* Typed max price (unnamed): copies into the slider, which is what gets submitted. */ ?>
+                        <div class="ep-shop-price-inputs">
+                            <div class="ep-shop-price-field">
+                                <span aria-hidden="true">Max ₱</span>
+                                <input type="number" id="epPriceMaxBox" inputmode="numeric"
                                        min="<?php echo (int) $categoryMinPrice; ?>"
-                                       max="<?php echo (int) $categoryMaxPrice; ?>"
+                                       max="<?php echo (int) $categoryMaxPrice; ?>" step="1"
                                        value="<?php echo (int) $selectedMaxPrice; ?>"
-                                       oninput="document.getElementById('epPriceMaxLabel').textContent = '₱' + Number(this.value).toLocaleString(); document.getElementById('epPriceMaxBox').value = this.value;"
-                                       onchange="this.form.submit()">
-                                <?php /* Typed max price (unnamed): copies into the slider, which is what gets submitted. */ ?>
-                                <div class="ep-shop-price-inputs">
-                                    <div class="ep-shop-price-field">
-                                        <span aria-hidden="true">Max ₱</span>
-                                        <input type="number" id="epPriceMaxBox" inputmode="numeric"
-                                               min="<?php echo (int) $categoryMinPrice; ?>"
-                                               max="<?php echo (int) $categoryMaxPrice; ?>" step="1"
-                                               value="<?php echo (int) $selectedMaxPrice; ?>"
-                                               aria-label="Maximum price in pesos"
-                                               onchange="epApplyMaxPrice(this)"
-                                               onkeydown="if (event.key === 'Enter') { event.preventDefault(); epApplyMaxPrice(this); }">
-                                    </div>
-                                </div>
+                                       aria-label="Maximum price in pesos"
+                                       onchange="epApplyMaxPrice(this)"
+                                       onkeydown="if (event.key === 'Enter') { event.preventDefault(); epApplyMaxPrice(this); }">
                             </div>
                         </div>
                     </div>
 
-                    <div class="ep-filter-group">
-                        <button type="button" class="ep-filter-head" onclick="epToggleFilterGroup(this)">
-                            Availability <i class="fas fa-chevron-down"></i>
-                        </button>
-                        <div class="ep-filter-body">
-                            <label class="ep-filter-option">
-                                <input type="radio" name="availability" value="" onchange="this.form.submit()" <?php echo $selectedAvailability === '' ? 'checked' : ''; ?>>
-                                All
-                            </label>
-                            <label class="ep-filter-option">
-                                <input type="radio" name="availability" value="in_stock" onchange="this.form.submit()" <?php echo $selectedAvailability === 'in_stock' ? 'checked' : ''; ?>>
-                                In Stock
-                            </label>
-                            <label class="ep-filter-option">
-                                <input type="radio" name="availability" value="out_of_stock" onchange="this.form.submit()" <?php echo $selectedAvailability === 'out_of_stock' ? 'checked' : ''; ?>>
-                                Out of Stock
-                            </label>
+                    <fieldset class="ep-shop-filter-group sf-fieldset">
+                        <legend class="sf-legend">Availability</legend>
+                        <div class="ep-shop-brand-list">
+                            <?php foreach (['' => 'All', 'in_stock' => 'In stock', 'out_of_stock' => 'Out of stock'] as $av => $avLabel): ?>
+                                <label class="ep-shop-brand-option">
+                                    <input type="radio" name="availability" value="<?php echo h($av); ?>" onchange="this.form.submit()" <?php echo $selectedAvailability === $av ? 'checked' : ''; ?>>
+                                    <span><?php echo h($avLabel); ?></span>
+                                </label>
+                            <?php endforeach; ?>
                         </div>
-                    </div>
+                    </fieldset>
 
-                    <button type="submit" class="ep-filter-apply">APPLY FILTERS</button>
-                    <a href="category.php?type=<?php echo urlencode($type); ?>" class="ep-filter-clear">Clear all</a>
+                    <div class="ep-shop-filter-actions">
+                        <a href="category.php?type=<?php echo urlencode($type); ?>" class="ep-btn ep-shop-reset">Clear all</a>
+                        <button type="submit" class="ep-btn ep-btn-primary sf-filter-apply">Apply</button>
+                    </div>
                 </form>
             </aside>
 
-            <!-- ============ Products + sort + pagination ============ -->
-            <section class="ep-products-section">
-                <div class="ep-toolbar">
-                    <a class="ep-sort-btn<?php echo $sort === 'price_asc' ? ' active' : ''; ?>" href="<?php echo h(ep_cat_url(['sort' => 'price_asc', 'page' => 1])); ?>">
-                        <?php if ($sort === 'price_asc'): ?><i class="fas fa-check"></i><?php endif; ?> Price ascending
-                    </a>
-                    <a class="ep-sort-btn<?php echo $sort === 'price_desc' ? ' active' : ''; ?>" href="<?php echo h(ep_cat_url(['sort' => 'price_desc', 'page' => 1])); ?>">
-                        <?php if ($sort === 'price_desc'): ?><i class="fas fa-check"></i><?php endif; ?> Price descending
-                    </a>
-                    <a class="ep-sort-btn<?php echo $sort === 'rating' ? ' active' : ''; ?>" href="<?php echo h(ep_cat_url(['sort' => 'rating', 'page' => 1])); ?>">
-                        <?php if ($sort === 'rating'): ?><i class="fas fa-check"></i><?php endif; ?> Rating
-                    </a>
+            <section class="ep-shop-products" aria-label="Products">
+                <div class="sf-results-bar">
+                    <p class="sf-results-count">
+                        <?php if ($totalCount > 0): ?>
+                            Showing <strong class="sf-num"><?php echo number_format(($page - 1) * $perPage + 1); ?>&ndash;<?php echo number_format(($page - 1) * $perPage + count($displayProducts)); ?></strong>
+                            of <strong class="sf-num"><?php echo number_format($totalCount); ?></strong>
+                        <?php else: ?>
+                            No products
+                        <?php endif; ?>
+                    </p>
+                    <nav aria-label="Sort products">
+                        <ul class="sf-chips">
+                            <?php foreach ($catSorts as $sortKey => $sortLabel): ?>
+                                <li>
+                                    <a class="sf-chip" href="<?php echo h(ep_cat_url(['sort' => $sortKey, 'page' => 1])); ?>"
+                                       <?php echo $sort === $sortKey ? 'aria-current="true"' : ''; ?>>
+                                        <?php if ($sort === $sortKey): ?><i class="fas fa-check" aria-hidden="true"></i><?php endif; ?>
+                                        <?php echo h($sortLabel); ?>
+                                    </a>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </nav>
                 </div>
 
                 <?php if (!empty($displayProducts)): ?>
-                    <div class="ep-products-grid">
+                    <ul class="sf-grid">
                         <?php foreach ($displayProducts as $p): ?>
-                            <div class="ep-product-card ep-grid-card">
-                                <a href="products.php?id=<?php echo (int)$p['id']; ?>">
-                                <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                     class="ep-product-img" alt="<?php echo h($p['name']); ?>"
-                                     loading="lazy" decoding="async">
-                                </a>
-                                <a class="ep-product-name" href="products.php?id=<?php echo (int)$p['id']; ?>"><?php echo h($p['name']); ?></a>
-                                <div class="ep-product-cat">Store: <?php echo h($p['seller_name']); ?></div>
-                                <div class="ep-product-price">₱<?php echo number_format($p['price'], 2); ?></div>
-                            <div class="ep-card-actions">
-                                <form action="products.php" method="POST" class="ep-buy-form">
-                                    <input type="hidden" name="product_id" value="<?php echo (int) $p['id']; ?>">
-                                    <input type="hidden" name="return_to" value="<?php echo h('category.php?' . http_build_query(['type' => $type])); ?>">
-                                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                    <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
-                                    <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
-                                </form>
-                            </div>
-                            </div>
+                            <li><?php echo sf_product_card($p, $catReturn, $catCsrf, ['cat' => $type]); ?></li>
                         <?php endforeach; ?>
-                    </div>
-
-                    <?php if ($totalPages > 1): ?>
-                        <nav class="ep-pagination" aria-label="Pagination">
-                            <a class="ep-page-link ep-page-nav<?php echo $page <= 1 ? ' disabled' : ''; ?>"
-                               href="<?php echo h(ep_cat_url(['page' => max(1, $page - 1)])); ?>">
-                                <i class="fas fa-arrow-left"></i> Previous
-                            </a>
-                            <?php foreach (ep_pagination_range($page, $totalPages) as $item): ?>
-                                <?php if ($item === '...'): ?>
-                                    <span class="ep-page-ellipsis">…</span>
-                                <?php else: ?>
-                                    <a class="ep-page-link<?php echo $item === $page ? ' active' : ''; ?>"
-                                       href="<?php echo h(ep_cat_url(['page' => $item])); ?>"><?php echo (int) $item; ?></a>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                            <a class="ep-page-link ep-page-nav<?php echo $page >= $totalPages ? ' disabled' : ''; ?>"
-                               href="<?php echo h(ep_cat_url(['page' => min($totalPages, $page + 1)])); ?>">
-                                Next <i class="fas fa-arrow-right"></i>
-                            </a>
-                        </nav>
-                    <?php endif; ?>
+                    </ul>
+                    <?php echo sf_pagination($page, $totalPages, fn($n) => ep_cat_url(['page' => $n])); ?>
                 <?php else: ?>
-                    <div class="ep-empty-state">
-                        <i class="fas fa-box-open" style="font-size:48px;color:#ccc;margin-bottom:14px;"></i>
-                        <h3>No products found in <?php echo h($type); ?>.</h3>
-                        <p>Try adjusting your filters, or check back later for new arrivals!</p>
-                    </div>
+                    <?php echo sf_empty_state('fa-box-open', 'No products found in ' . $type,
+                        'Try adjusting your filters, or check back later for new arrivals.',
+                        '<a href="category.php?type=' . h(urlencode($type)) . '" class="sf-btn sf-btn-outline">Clear filters</a>'
+                        . '<a href="shop.php" class="sf-btn sf-btn-primary">Browse all products</a>'); ?>
                 <?php endif; ?>
             </section>
 
@@ -300,10 +250,6 @@ function ep_pagination_range(int $current, int $total): array
 </main>
 
 <script>
-    function epToggleFilterGroup(btn) {
-        var group = btn.closest('.ep-filter-group');
-        if (group) group.classList.toggle('collapsed');
-    }
     // Typed max price: clamp to the category's range, copy into the slider and filter.
     function epApplyMaxPrice(box) {
         var range = document.getElementById('epPriceMaxRange');

@@ -611,19 +611,22 @@ if ($showSettings) {
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<main class="ep-main">
-    <div class="dashboard-wrapper pf-page">
-        <?php if ($profileFlash !== ''): ?>
-            <div class="ep-info-note" style="margin-bottom:16px;"><?php echo h($profileFlash); ?></div>
-        <?php endif; ?>
-        <?php if ($profileFlashErr !== ''): ?>
-            <div class="ep-info-note" style="margin-bottom:16px;color:#c0392b;border-color:#c0392b;"><?php echo h($profileFlashErr); ?></div>
-        <?php endif; ?>
-        <?php if ($alertMsg !== ''): ?>
-            <div class="ep-info-note" style="margin-bottom:16px;"><?php echo h($alertMsg); ?></div>
-        <?php endif; ?>
-
-        <section class="pf-hero">
+<main class="ep-main sf-main" id="main">
+    <?php /* Page header: breadcrumb + profile summary card (same light header as every inner page). */ ?>
+    <div class="sf-pagehead sf-account-head">
+    <div class="sf-wrap sf-pagehead-inner">
+        <nav class="sf-crumbs" aria-label="Breadcrumb">
+            <ol>
+                <li><a href="index.php">Home</a></li>
+                <?php if ($showSettings): ?>
+                    <li><a href="user_dashboard.php">My account</a></li>
+                    <li><span aria-current="page">Profile settings</span></li>
+                <?php else: ?>
+                    <li><span aria-current="page">My account</span></li>
+                <?php endif; ?>
+            </ol>
+        </nav>
+        <section class="pf-hero" aria-label="Your profile">
             <div class="pf-avatar">
                 <?php if ($profileImageUrl !== ''): ?>
                     <img class="pf-avatar-img" src="<?php echo h($profileImageUrl); ?>" alt="Profile picture">
@@ -675,11 +678,25 @@ if ($showSettings) {
                 </a>
             </div>
         </section>
+    </div>
+    </div>
+
+    <div class="sf-wrap sf-body">
+    <div class="dashboard-wrapper pf-page">
+        <?php if ($profileFlash !== ''): ?>
+            <p class="sf-note sf-flash" role="status"><i class="fas fa-check-circle" aria-hidden="true"></i><span><?php echo h($profileFlash); ?></span></p>
+        <?php endif; ?>
+        <?php if ($profileFlashErr !== ''): ?>
+            <p class="sf-note sf-flash is-error" role="alert"><i class="fas fa-exclamation-circle" aria-hidden="true"></i><span><?php echo h($profileFlashErr); ?></span></p>
+        <?php endif; ?>
+        <?php if ($alertMsg !== ''): ?>
+            <p class="sf-note sf-flash" role="status"><i class="fas fa-info-circle" aria-hidden="true"></i><span><?php echo h($alertMsg); ?></span></p>
+        <?php endif; ?>
 
         <?php if ($showSettings): ?>
         <section class="panel profile-settings-panel">
             <div class="panel-header">
-                <h3><i class="fas fa-user-cog"></i> Profile Settings</h3>
+                <h2><i class="fas fa-user-cog" aria-hidden="true"></i> Profile settings</h2>
             </div>
             <form method="post" class="profile-settings-form">
                 <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
@@ -713,7 +730,7 @@ if ($showSettings) {
                     </div>
                     <?php endif; ?>
                     <div class="profile-settings-full" id="delivery">
-                        <h4 class="ep-address-heading"><i class="fas fa-map-marker-alt"></i> Default delivery address</h4>
+                        <h3 class="ep-address-heading"><i class="fas fa-map-marker-alt" aria-hidden="true"></i> Default delivery address</h3>
                         <p class="ep-address-hint">Used automatically at checkout. You can still send a single order somewhere else.</p>
                         <?php if (!$addressComplete && $savedAddress['full'] !== ''): ?>
                             <div class="ep-address-legacy">
@@ -983,6 +1000,7 @@ if ($showSettings) {
             </aside>
         </div>
         <?php endif; ?>
+    </div>
     </div>
 </main>
 
