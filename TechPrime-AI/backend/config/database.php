@@ -24,7 +24,7 @@ function getDbConnection(): PDO
     } catch (PDOException $e) {
         // Details (host, user) go to the server log only — never to the visitor.
         error_log('Database connection failed: ' . $e->getMessage());
-        http_response_code(503);
-        die('Service temporarily unavailable. Please try again later.');
+        require_once __DIR__ . '/../../includes/service_unavailable.php';
+        ias_service_unavailable(ias_service_unavailable_reason($e->getMessage()));
     }
 }
