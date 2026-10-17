@@ -14,7 +14,7 @@
                 <p class="sf-footer-tagline">Laptops, PC parts and accessories from EasyPC One Oasis in Rosario, Pasig City.</p>
                 <ul class="sf-footer-contact">
                     <li><i class="fas fa-phone-alt" aria-hidden="true"></i><a href="tel:+639176255078">0917 625 5078</a></li>
-                    <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>One Oasis, Rosario, Pasig City</span></li>
+                    <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><a href="https://maps.app.goo.gl/ygnCyGTcDvdcJZxJ9" target="_blank" rel="noopener">One Oasis, Rosario, Pasig City<span class="sf-sr"> (opens Google Maps in a new tab)</span></a></li>
                     <li><i class="fab fa-facebook-f" aria-hidden="true"></i><a href="https://www.facebook.com/EASYPCOneOasisPasigBranch" target="_blank" rel="noopener">EasyPC One Oasis on Facebook<span class="sf-sr"> (opens in a new tab)</span></a></li>
                 </ul>
             </div>
