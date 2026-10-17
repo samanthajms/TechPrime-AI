@@ -363,7 +363,34 @@ staff_page_start([
     font-size: 13px;
     background: #fff;
 }
-.price-tag { color: var(--ep-green-dark); font-weight: 800; }
+/* Flex children default to min-width:auto, which stops Chart.js's canvas from shrinking */
+.orders-page > * { min-width: 0; }
+.price-tag { color: var(--text-main); font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.order-id { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.order-date { white-space: nowrap; }
+.customer-name { font-weight: 600; color: var(--text-main); }
+.customer-meta { max-width: 280px; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.customer-addr,
+.order-products {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 1.45;
+}
+.customer-addr { -webkit-line-clamp: 1; max-width: 280px; color: var(--slate-500); }
+.order-products { -webkit-line-clamp: 2; min-width: 160px; max-width: 240px; color: var(--text-main); }
+.orders-table .action-row { flex-wrap: nowrap; }
+.orders-table .action-row form[style*="flex"] { flex-wrap: nowrap !important; }
+.cancel-reason { margin-top: 4px; font-size: 12px; color: #b91c1c; }
+.order-status { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.order-status .badge i { margin-right: 5px; font-size: 9.5px; }
+.badge-ship { background: #fff4e6; color: #c2410c; }
+.badge-courier { background: #eef4ff; color: #2452c9; }
+.badge-done { background: var(--slate-100); color: var(--slate-600); }
+.badge-muted { background: var(--slate-100); color: var(--slate-500); }
+.pickup-tag { font-size: 11px; font-weight: 600; color: var(--slate-500); }
+.pickup-tag i { margin-right: 4px; }
 .bulk-col { width: 34px; text-align: center; }
 .bulk-check { width: 17px; height: 17px; accent-color: var(--ep-green); cursor: pointer; }
 .bulk-check:disabled { cursor: not-allowed; opacity: .35; }
@@ -528,11 +555,11 @@ EXTRA
                             <thead>
                                 <tr>
                                     <th class="bulk-col" aria-label="Select"></th>
-                                    <th>Order ID</th>
+                                    <th>Order</th>
                                     <th>Customer</th>
-                                    <th>Product</th>
+                                    <th>Products</th>
                                     <th>Total</th>
-                                    <th>Date</th>
+                                    <th>Status</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -549,6 +576,24 @@ EXTRA
                                     $cancelReason = trim((string)($r['cancel_reason'] ?? ''));
                                     // Bulk-selectable: waiting for Accept, or To Ship / To Receive.
                                     $bulkEligible = !$cancelRequested && ($canAccept || in_array($ost, ['to_ship', 'to_receive'], true));
+                                    if ($cancelRequested) {
+                                        $statusBadge = ['badge-locked', 'fa-ban', 'Cancel requested'];
+                                    } elseif ($awaitingPayment) {
+                                        $statusBadge = ['badge-unverified', 'fa-hourglass-half', 'Awaiting payment'];
+                                    } elseif ($canAccept) {
+                                        $statusBadge = ['badge-active', 'fa-check', 'Paid · to accept'];
+                                    } elseif ($ost === 'to_ship') {
+                                        $statusBadge = ['badge-ship', 'fa-box', 'To ship'];
+                                    } elseif ($ost === 'to_receive') {
+                                        $statusBadge = ['badge-courier', 'fa-truck', 'With courier'];
+                                    } elseif ($ost === 'to_review') {
+                                        $statusBadge = ['badge-done', 'fa-check-circle', 'Completed'];
+                                    } elseif ($ost === 'cancelled') {
+                                        $statusBadge = ['badge-muted', 'fa-times', 'Cancelled'];
+                                    } else {
+                                        $statusBadge = ['badge-muted', 'fa-circle', $orderStatusFilters[$ost] ?? ucfirst(str_replace('_', ' ', $ost))];
+                                    }
+                                    $contact = array_filter([(string)($r['email'] ?? ''), trim((string)($r['customer_phone'] ?? ''))], 'strlen');
                                 ?>
                                 <tr>
                                     <td class="bulk-col">
@@ -558,19 +603,26 @@ EXTRA
                                                aria-label="Select order #<?php echo (int)$r['id']; ?>">
                                         <?php endif; ?>
                                     </td>
-                                    <td><strong>#<?php echo (int)$r['id']; ?></strong></td>
+                                    <td>
+                                        <strong class="order-id">#<?php echo (int)$r['id']; ?></strong>
+                                        <div class="text-muted text-small order-date"><?php echo date('M d, Y', strtotime($r['created_at'])); ?></div>
+                                    </td>
                                     <td class="customer-cell">
-                                        <div style="font-weight:700;"><?php echo h($r['name'] . ' ' . $r['surname']); ?></div>
-                                        <div class="text-muted text-small"><?php echo h($r['email']); ?></div>
-                                        <div class="text-muted text-small"><?php echo h($r['customer_phone'] ?? ''); ?></div>
-                                        <div class="text-small"><?php echo h($addr); ?></div>
+                                        <div class="customer-name"><?php echo h($r['name'] . ' ' . $r['surname']); ?></div>
+                                        <div class="customer-meta" title="<?php echo h(implode(' · ', $contact)); ?>"><?php echo h(implode(' · ', $contact)); ?></div>
+                                        <div class="customer-addr" title="<?php echo h($addr); ?>"><?php echo h($addr); ?></div>
                                         <?php if ($cancelRequested && $cancelReason !== ''): ?>
-                                            <div class="text-muted text-small" style="margin-top:4px;"><strong>Cancel reason:</strong> <?php echo h($cancelReason); ?></div>
+                                            <div class="cancel-reason"><strong>Cancel reason:</strong> <?php echo h($cancelReason); ?></div>
                                         <?php endif; ?>
                                     </td>
-                                    <td><small><?php echo h($r['products'] ?? ''); ?></small></td>
+                                    <td><div class="order-products" title="<?php echo h($r['products'] ?? ''); ?>"><?php echo h($r['products'] ?? ''); ?></div></td>
                                     <td class="price-tag">₱<?php echo number_format((float)$r['total'], 2); ?></td>
-                                    <td class="text-muted text-small"><?php echo date('M d, Y', strtotime($r['created_at'])); ?></td>
+                                    <td>
+                                        <div class="order-status">
+                                            <span class="badge <?php echo $statusBadge[0]; ?>"><i class="fas <?php echo $statusBadge[1]; ?>"></i><?php echo h($statusBadge[2]); ?></span>
+                                            <?php if (ep_order_is_pickup($r)): ?><span class="pickup-tag"><i class="fas fa-store"></i>Store pickup</span><?php endif; ?>
+                                        </div>
+                                    </td>
                                     <td>
                                         <div class="action-row">
                                             <a href="inventory_details.php?id=<?php echo (int)$r['id']; ?>" class="btn btn-outline btn-sm">View</a>
@@ -585,10 +637,10 @@ EXTRA
                                                     <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                                                     <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
                                                     <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
-                                                    <button type="submit" class="btn btn-primary btn-sm">Accept Cancel Order</button>
+                                                    <button type="submit" class="btn btn-primary btn-sm">Accept cancel</button>
                                                 </form>
                                             <?php elseif ($awaitingPayment): ?>
-                                                <span class="text-muted text-small" style="font-weight:700;">Awaiting Payment</span>
+                                                <?php /* Nothing to do until the customer pays; the Status column says so. */ ?>
                                             <?php elseif ($canAccept): ?>
                                                 <form method="post" style="display:inline;margin:0;">
                                                     <input type="hidden" name="action" value="accept_order">
@@ -599,7 +651,7 @@ EXTRA
                                                     <button type="submit" class="btn btn-primary btn-sm">Accept</button>
                                                 </form>
                                             <?php elseif (in_array($ost, ['to_review', 'cancelled'], true)): ?>
-                                                <span class="text-muted text-small" style="font-weight:700;"><?php echo $ost === 'to_review' ? 'Completed' : 'Cancelled'; ?></span>
+                                                <?php /* Final state: shown in the Status column, nothing to act on. */ ?>
                                             <?php else: ?>
                                             <form method="post" style="display:flex;gap:6px;margin:0;align-items:center;flex-wrap:wrap;">
                                                 <input type="hidden" name="action" value="update_status">

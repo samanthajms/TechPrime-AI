@@ -246,12 +246,19 @@ staff_page_start([
 .inv-chg.chg-plus { background: #f0fdf4; color: #15803d; }
 .inv-chg.chg-minus { background: #fef2f2; color: #b91c1c; }
 .inv-chg.chg-updated { background: #f3f4f6; color: #4b5563; }
+.inv-chg.chg-order { min-width: 0; background: transparent; padding: 0; font-weight: 600; color: var(--text-main); white-space: nowrap; }
+.inv-chg.chg-order i { margin-right: 5px; font-size: 10px; color: var(--slate-400); }
+/* "Completed" is the normal outcome, so it stays quiet; only an adjustment gets a pill */
 .inv-status-pill {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
-    background: #eef8e6; color: var(--ep-green-dark); border: 1px solid var(--teal-light);
+    font-size: 12.5px; font-weight: 500; color: var(--text-muted); white-space: nowrap;
 }
-.inv-status-pill.adj { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.inv-status-pill i { font-size: 10.5px; color: var(--ep-green); }
+.inv-status-pill.adj {
+    padding: 5px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+    background: #fffbeb; color: #b45309; border: 1px solid #fde68a;
+}
+.inv-status-pill.adj i { color: inherit; }
 .inv-audit-empty {
     text-align: center; padding: 56px 24px; color: var(--text-muted);
 }
@@ -351,6 +358,18 @@ EXTRA
                             elseif ($action === 'update_order_status') $actClass = 'act-order';
                             elseif ($action === 'complete_order' || $action === 'accept_order') $actClass = 'act-order';
                             $statusClass = ($parsed['status'] === 'Adjusted') ? 'adj' : '';
+                            // Order rows: show the status the order moved to instead of a generic "Updated".
+                            $orderTarget = '';
+                            // update_order_status logs "Order #N -> to_ship"; accept_order logs "Order #N accepted → to_receive".
+                            if (in_array($action, ['update_order_status', 'accept_order'], true)
+                                && preg_match('/(?:->|→)\s*([a-z_]+)/iu', $details, $tm)) {
+                                $orderTarget = [
+                                    'to_pay' => 'To pay', 'to_ship' => 'To ship', 'to_receive' => 'With courier',
+                                    'to_review' => 'Completed', 'cancelled' => 'Cancelled',
+                                ][strtolower($tm[1])] ?? ucfirst(str_replace('_', ' ', $tm[1]));
+                            } elseif ($action === 'complete_order') {
+                                $orderTarget = 'Completed';
+                            }
                             $oInfo = null;
                             if (in_array($action, ['update_order_status', 'complete_order', 'accept_order'], true)
                                 && preg_match('/Order\s*#\s*(\d+)/i', $details, $om)) {
@@ -388,7 +407,11 @@ EXTRA
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <span class="inv-chg <?php echo h($parsed['change_class']); ?>"><?php echo h($parsed['change']); ?></span>
+                                    <?php if ($orderTarget !== ''): ?>
+                                        <span class="inv-chg chg-order"><i class="fas fa-arrow-right" aria-hidden="true"></i><?php echo h($orderTarget); ?></span>
+                                    <?php else: ?>
+                                        <span class="inv-chg <?php echo h($parsed['change_class']); ?>"><?php echo h($parsed['change']); ?></span>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <span class="inv-status-pill <?php echo h($statusClass); ?>">

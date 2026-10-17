@@ -460,6 +460,9 @@ staff_page_start([
     border: 1px solid var(--ep-border); border-radius: 999px; padding: 6px 14px; background: #fff; cursor: pointer;
 }
 .select-chip.active { border-color: var(--ep-green); color: var(--ep-green-dark); background: var(--ep-green-light); }
+/* The "N selected" chip only means something once a row is picked */
+#selectedChip:not(.active) { display: none; }
+#selectedCount { font-variant-numeric: tabular-nums; }
 .select-chip input { width: 16px; height: 16px; }
 .selection-bar { display: none; align-items: center; gap: 10px; margin-left: auto; }
 .selection-bar.show { display: flex; }
@@ -571,7 +574,7 @@ staff_page_start([
 }
 .stocks-qty.warn { color: #b45309; }
 .stocks-qty.out { color: #c0392b; }
-.price-tag { color: var(--ep-green-dark); font-weight: 800; white-space: nowrap; }
+.price-tag { color: var(--ep-text); font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .stock-status-pill {
     display: inline-flex;
@@ -801,11 +804,11 @@ EXTRA
                 <div class="select-row">
                     <label class="select-chip" id="selectedChip">
                         <input type="checkbox" id="selectedIndicator" checked disabled>
-                        Selected (<span id="selectedCount">0</span>)
+                        <span><span id="selectedCount">0</span> selected</span>
                     </label>
                     <label class="select-chip" for="selectAll">
                         <input type="checkbox" id="selectAll">
-                        Select All (<span id="pageCount">0</span>)
+                        <span>Select all on this page (<span id="pageCount">0</span>)</span>
                     </label>
                     <div class="selection-bar" id="selectionBar">
                         <?php if ($hasBarcode): ?>
@@ -1152,7 +1155,9 @@ var state = {
     selected: {}
 };
 
-function peso(n) { return '₱' + Number(n).toFixed(2); }
+function peso(n) {
+    return '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 function statusLabel(s) {
     if (s === 'out') return 'Out of Stock';
@@ -1589,6 +1594,25 @@ document.getElementById('gridViewBtn').addEventListener('click', function () {
     document.getElementById('listViewBtn').classList.remove('active');
     render();
 });
+
+// Deep links from the dashboard: ?status=outofstock|instock, ?alert=low|critical
+(function () {
+    var params = new URLSearchParams(window.location.search);
+    var urlStatus = params.get('status');
+    var urlAlert = params.get('alert');
+    if (urlStatus === 'instock' || urlStatus === 'outofstock') {
+        state.status = urlStatus;
+        document.querySelectorAll('.status-btn').forEach(function (b) {
+            b.classList.toggle('active', b.dataset.status === urlStatus);
+        });
+    }
+    if (urlAlert === 'low' || urlAlert === 'critical') {
+        state.alert = urlAlert;
+        document.getElementById('stockAlert').value = urlAlert;
+        state.sort = 'stock_asc';
+        document.getElementById('sortBy').value = 'stock_asc';
+    }
+})();
 
 updateFilterBtnState();
 render();

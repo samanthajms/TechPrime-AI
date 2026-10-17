@@ -21,14 +21,18 @@ $productRows = $products ? $products->fetchAll(PDO::FETCH_ASSOC) : [];
 
 $productCount = count($productRows);
 $totalStock = 0;
+$criticalStockCount = 0;
 $lowStockCount = 0;
 $outOfStockCount = 0;
+// Same bands as inventory_stocks.php: critical 1–5, low 6–15
 foreach ($productRows as &$row) {
     $stock = (int)($row['stock'] ?? 0);
     $totalStock += $stock;
     if ($stock <= 0) {
         $outOfStockCount++;
     } elseif ($stock <= 5) {
+        $criticalStockCount++;
+    } elseif ($stock <= 15) {
         $lowStockCount++;
     }
     $tax = ep_shop_classify_product($row);
@@ -40,6 +44,7 @@ foreach (ep_shop_taxonomy() as $info) {
     $categoryTabs[] = (string)$info['label'];
 }
 $completionRate = $total > 0 ? (int)round(($done / $total) * 100) : 0;
+$runningLowCount = $criticalStockCount + $lowStockCount;
 
 $stockYear = (int)date('Y');
 
@@ -54,9 +59,6 @@ $jsStockProducts = array_map(static function ($p) {
 }, $productRows);
 $stockProductsJson = json_encode($jsStockProducts, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
-$chartLabels = json_encode(['Total Deliveries', 'Completed Deliveries', 'Products in Catalog']);
-$chartValues = json_encode([(int)$total, (int)$done, (int)$productCount]);
-
 logActivity($db, $uid, 'view_dashboard', 'Inventory Custodian viewed dashboard');
 
 staff_page_start([
@@ -69,132 +71,63 @@ staff_page_start([
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 .inv-dash { display: flex; flex-direction: column; gap: 22px; }
+/* Flex children default to min-width:auto, which stops Chart.js's canvas from shrinking */
+.inv-dash > * { min-width: 0; }
 
-.inv-hero {
-    display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
-    padding: 24px 28px;
-    background: linear-gradient(135deg, #eef8e6 0%, #ffffff 55%, #f7fbf3 100%);
-    border: 1px solid var(--teal-light, #c6e6b3);
-    border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(75, 139, 42, 0.08);
-    position: relative; overflow: hidden;
-}
-.inv-hero::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
-    background: linear-gradient(180deg, var(--ep-green), var(--ep-green-dark));
-}
-.inv-hero-text { position: relative; z-index: 1; max-width: 640px; padding-left: 8px; }
-.inv-hero-kicker {
-    font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
-    color: var(--ep-green-dark); margin-bottom: 6px;
-}
-.inv-hero h1 { margin: 0 0 8px; font-size: 22px; font-weight: 800; line-height: 1.2; color: var(--text-main); }
-.inv-hero p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text-muted); font-weight: 500; }
-
-.inv-chart-panel, .inv-panel, .inv-stat-card, .inv-overview-chip {
-    background: linear-gradient(180deg, #ffffff 0%, #f8fbf6 100%);
-    border: 1px solid var(--border);
-    box-shadow: 0 8px 22px rgba(75, 139, 42, 0.07);
-}
-.inv-chart-panel {
-    border-radius: 16px; overflow: hidden;
-    border-color: var(--teal-light, #c6e6b3);
-}
-.inv-chart-header {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-    padding: 18px 24px; border-bottom: 1px solid var(--border);
-    background: linear-gradient(to bottom, #fff 0%, #eef8e6 100%);
-}
-.inv-chart-header h3 {
-    margin: 0; font-size: 15px; font-weight: 700; color: var(--text-main);
-    display: flex; align-items: center; gap: 10px;
-}
-.inv-chart-header .card-icon { width: 34px; height: 34px; border-radius: 10px; }
-.inv-chart-meta { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-.inv-chart-body {
-    padding: 18px 22px 22px;
-    display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 18px; align-items: center;
-}
-.inv-chart-canvas-wrap { position: relative; height: 220px; width: 100%; }
-.inv-chart-summary { display: flex; flex-direction: column; gap: 10px; }
-.inv-chart-metric {
-    display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px;
-    border: 1px solid var(--border); background: #fff;
-}
-.inv-chart-metric strong { font-size: 20px; font-weight: 800; color: var(--text-main); line-height: 1.1; }
-.inv-chart-metric span {
-    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted);
-}
-.inv-chart-metric.m-total { border-left: 3px solid var(--ep-green); }
-.inv-chart-metric.m-done { border-left: 3px solid #16a34a; }
-.inv-chart-metric.m-catalog { border-left: 3px solid var(--ep-green-dark); }
-
-.inv-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
-.inv-stat-card {
-    border-radius: 14px; padding: 20px 22px; position: relative; overflow: hidden;
-}
-.inv-stat-card::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
-    background: var(--stat-accent, var(--ep-green));
-}
-.inv-stat-card.stat-deliveries { --stat-accent: var(--ep-green); }
-.inv-stat-card.stat-pending { --stat-accent: var(--ep-yellow); }
-.inv-stat-card.stat-completed { --stat-accent: #16a34a; }
-.inv-stat-card.stat-products { --stat-accent: var(--ep-green-dark); }
-.inv-stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.inv-stat-icon {
-    width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center;
-    font-size: 17px; background: var(--ep-green-light); color: var(--ep-green-dark);
-    border: 1px solid var(--teal-light); flex-shrink: 0;
-}
-.inv-stat-card.stat-pending .inv-stat-icon {
-    background: var(--yellow-pale); color: var(--ep-yellow-dark); border-color: #fde68a;
-}
-.inv-stat-card.stat-completed .inv-stat-icon {
-    background: #f0fdf4; color: #16a34a; border-color: #bbf7d0;
-}
-.inv-stat-label {
-    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.85px;
-    color: var(--text-muted); margin-bottom: 4px;
-}
-.inv-stat-num { font-size: 32px; font-weight: 800; color: var(--text-main); line-height: 1; font-variant-numeric: tabular-nums; }
-.inv-stat-foot {
-    font-size: 12px; color: var(--text-muted); font-weight: 500; margin-top: 10px; padding-top: 10px;
-    border-top: 1px solid var(--border);
-}
-
-.inv-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.inv-overview-chip {
+/* Needs attention: the numbers a custodian acts on, each one a link to the filtered list */
+.inv-attn { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.inv-attn-card {
     display: flex; align-items: center; gap: 14px;
-    padding: 20px 22px;
+    padding: 18px 20px;
     border-radius: 14px;
-    min-height: 148px;
-    box-sizing: border-box;
+    background: #fff;
+    border: 1px solid var(--border);
+    box-shadow: var(--card-shadow);
+    color: inherit; text-decoration: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 160ms var(--ease-out);
 }
-.inv-overview-chip i {
-    width: 42px; height: 42px; border-radius: 11px;
+.inv-attn-card:active { transform: scale(0.98); }
+.inv-attn-card:focus-visible { outline: 2px solid var(--ep-green); outline-offset: 2px; }
+.inv-attn-icon {
+    width: 44px; height: 44px; flex-shrink: 0;
+    border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 17px; background: var(--ep-green-light); color: var(--ep-green-dark);
-    border: 1px solid var(--teal-light); flex-shrink: 0;
+    font-size: 18px;
+    background: var(--ep-green-light); color: var(--ep-green-dark);
 }
-.inv-overview-chip.chip-warn i { background: var(--yellow-pale); color: #b45309; border-color: #fde68a; }
-.inv-overview-chip.chip-danger i { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
-.inv-overview-chip strong {
-    display: block;
-    font-size: 32px;
-    font-weight: 800;
-    color: var(--text-main);
-    line-height: 1;
+.inv-attn-body { flex: 1; min-width: 0; }
+.inv-attn-body > span { display: block; }
+.inv-attn-num { font-size: 28px; font-weight: 800; line-height: 1; color: var(--text-main); font-variant-numeric: tabular-nums; }
+.inv-attn-label { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text-main); }
+.inv-attn-label small { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.inv-attn-hint { margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+.inv-attn-go { flex-shrink: 0; font-size: 13px; color: var(--slate-300); transition: color 150ms ease, transform 160ms var(--ease-out); }
+/* Tones apply only when there is something to do; a zero stays calm */
+.inv-attn-card.tone-danger { border-color: #fecaca; }
+.inv-attn-card.tone-danger .inv-attn-icon { background: #fef2f2; color: #dc2626; }
+.inv-attn-card.tone-danger .inv-attn-num { color: #dc2626; }
+.inv-attn-card.tone-warn { border-color: #fed7aa; }
+.inv-attn-card.tone-warn .inv-attn-icon { background: #fff7ed; color: #c2410c; }
+.inv-attn-card.tone-warn .inv-attn-num { color: #c2410c; }
+.inv-attn-card.tone-info .inv-attn-icon { background: var(--yellow-pale); color: #a16207; }
+
+/* At a glance */
+.inv-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.inv-kpi { padding: 16px 20px; border-radius: 14px; background: #fff; border: 1px solid var(--border); box-shadow: var(--card-shadow); }
+.inv-kpi-label { font-size: 11px; font-weight: 700; letter-spacing: 0.85px; text-transform: uppercase; color: var(--text-muted); }
+.inv-kpi-num { margin-top: 6px; font-size: 24px; font-weight: 800; line-height: 1; color: var(--ep-green-dark); font-variant-numeric: tabular-nums; }
+.inv-kpi-num small { font-size: 14px; font-weight: 700; color: var(--text-muted); }
+.inv-kpi-hint { margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+.inv-progress { margin-top: 10px; height: 6px; border-radius: 999px; background: var(--slate-100); overflow: hidden; }
+.inv-progress span { display: block; height: 100%; border-radius: inherit; background: var(--ep-green); }
+
+@media (hover: hover) and (pointer: fine) {
+    .inv-attn-card:hover { border-color: var(--slate-300); box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08); }
+    .inv-attn-card:hover .inv-attn-go { color: var(--text-main); transform: translateX(2px); }
 }
-.inv-overview-chip span {
-    display: block;
-    margin-top: 4px;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.85px;
-    color: var(--text-muted);
-    line-height: 1.3;
+@media (prefers-reduced-motion: reduce) {
+    .inv-attn-card:active,
+    .inv-attn-card:hover .inv-attn-go { transform: none; }
 }
 
 /* Products Stocked Per Month */
@@ -290,29 +223,18 @@ staff_page_start([
 .inv-stockin-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
 @media (max-width: 1100px) {
-    .inv-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .inv-overview { grid-template-columns: minmax(0, 1fr); }
-    .inv-chart-body { grid-template-columns: minmax(0, 1fr); }
-    .inv-chart-summary { flex-direction: row; flex-wrap: wrap; }
-    .inv-chart-metric { flex: 1 1 140px; }
+    .inv-attn, .inv-kpis { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
-    .inv-stats-grid { grid-template-columns: minmax(0, 1fr); }
-    .inv-hero { padding: 18px; }
-    .inv-hero h1 { font-size: 18px; }
     .inv-stockin-canvas-wrap { height: 260px; }
     .inv-cat-tab { padding: 8px 14px; font-size: 12.5px; }
 }
 .report-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 @media print {
-    .main > .inv-page-banner, .inv-hero, .inv-category-nav, .inv-stockin-tools { display: none !important; }
+    .main > .inv-page-banner, .inv-category-nav, .inv-stockin-tools, .inv-attn-go { display: none !important; }
     .inv-dash { gap: 14px; }
-    .inv-chart-panel, .inv-panel, .inv-stat-card, .inv-overview-chip, .inv-stockin-panel { box-shadow: none !important; break-inside: avoid; }
-    .inv-stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
-    .inv-overview { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
-    .inv-overview-chip { min-height: 0; }
-    .inv-chart-body { grid-template-columns: minmax(0, 1fr) 200px !important; }
-    .inv-chart-canvas-wrap { height: 220px !important; }
+    .inv-attn-card, .inv-kpi, .inv-stockin-panel { box-shadow: none !important; break-inside: avoid; }
+    .inv-attn, .inv-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
     .inv-stockin-canvas-wrap { height: 300px !important; }
 }
 </style>
@@ -336,114 +258,60 @@ EXTRA
 
         <div class="inv-dash">
 
-            <section class="inv-chart-panel" aria-label="Delivery and catalog overview">
-                <div class="inv-chart-header">
-                    <div>
-                        <h3><span class="card-icon"><i class="fas fa-chart-bar"></i></span> Status Overview</h3>
-                        <div class="inv-chart-meta">Total deliveries, completed deliveries, and catalog size</div>
-                    </div>
-                </div>
-                <div class="inv-chart-body">
-                    <div class="inv-chart-canvas-wrap">
-                        <canvas id="invStatusChart" aria-label="Status overview chart"></canvas>
-                    </div>
-                    <div class="inv-chart-summary">
-                        <div class="inv-chart-metric m-total">
-                            <strong><?php echo (int)$total; ?></strong>
-                            <span>Total Deliveries</span>
-                        </div>
-                        <div class="inv-chart-metric m-done">
-                            <strong><?php echo (int)$done; ?></strong>
-                            <span>Completed Deliveries</span>
-                        </div>
-                        <div class="inv-chart-metric m-catalog">
-                            <strong><?php echo (int)$productCount; ?></strong>
-                            <span>Products in Catalog</span>
-                        </div>
-                    </div>
-                </div>
+            <section class="inv-attn" aria-label="Needs attention">
+                <a class="inv-attn-card<?php echo $outOfStockCount > 0 ? ' tone-danger' : ''; ?>" href="inventory_stocks.php?status=outofstock">
+                    <span class="inv-attn-icon" aria-hidden="true"><i class="fas <?php echo $outOfStockCount > 0 ? 'fa-times-circle' : 'fa-check-circle'; ?>"></i></span>
+                    <span class="inv-attn-body">
+                        <span class="inv-attn-num"><?php echo $outOfStockCount; ?></span>
+                        <span class="inv-attn-label">Out of stock</span>
+                        <span class="inv-attn-hint"><?php echo $outOfStockCount > 0 ? 'Cannot be sold until restocked' : 'Every product has stock'; ?></span>
+                    </span>
+                    <i class="fas fa-chevron-right inv-attn-go" aria-hidden="true"></i>
+                </a>
+                <a class="inv-attn-card<?php echo $runningLowCount > 0 ? ' tone-warn' : ''; ?>" href="inventory_stocks.php?alert=low">
+                    <span class="inv-attn-icon" aria-hidden="true"><i class="fas fa-exclamation-triangle"></i></span>
+                    <span class="inv-attn-body">
+                        <span class="inv-attn-num"><?php echo $runningLowCount; ?></span>
+                        <span class="inv-attn-label">Running low <small>(15 or fewer)</small></span>
+                        <span class="inv-attn-hint"><?php echo $criticalStockCount; ?> critical with 5 or fewer left</span>
+                    </span>
+                    <i class="fas fa-chevron-right inv-attn-go" aria-hidden="true"></i>
+                </a>
+                <a class="inv-attn-card<?php echo $pending > 0 ? ' tone-info' : ''; ?>" href="inventory_orders.php">
+                    <span class="inv-attn-icon" aria-hidden="true"><i class="fas fa-truck"></i></span>
+                    <span class="inv-attn-body">
+                        <span class="inv-attn-num"><?php echo $pending; ?></span>
+                        <span class="inv-attn-label">Pending shipments</span>
+                        <span class="inv-attn-hint"><?php echo $pending > 0 ? 'Not yet delivered' : 'All shipments delivered'; ?></span>
+                    </span>
+                    <i class="fas fa-chevron-right inv-attn-go" aria-hidden="true"></i>
+                </a>
             </section>
 
-            <section class="inv-hero">
-                <div class="inv-hero-text">
-                    <div class="inv-hero-kicker">Inventory Control Center</div>
-                    <h1>Operations Overview</h1>
-                    <p>Monitor deliveries, track stock levels, and manage your warehouse inventory from one centralized dashboard.</p>
+            <section class="inv-kpis" aria-label="At a glance">
+                <div class="inv-kpi">
+                    <div class="inv-kpi-label">Products in catalog</div>
+                    <div class="inv-kpi-num"><?php echo number_format($productCount); ?></div>
+                    <div class="inv-kpi-hint">Across <?php echo count($categoryTabs); ?> shop categories</div>
+                </div>
+                <div class="inv-kpi">
+                    <div class="inv-kpi-label">Units in stock</div>
+                    <div class="inv-kpi-num"><?php echo number_format($totalStock); ?></div>
+                    <div class="inv-kpi-hint"><?php echo $productCount > 0 ? number_format($totalStock / $productCount, 1) : '0'; ?> units per product on average</div>
+                </div>
+                <div class="inv-kpi">
+                    <div class="inv-kpi-label">Deliveries completed</div>
+                    <div class="inv-kpi-num"><?php echo $done; ?> <small>of <?php echo $total; ?></small></div>
+                    <div class="inv-progress" role="progressbar" aria-valuenow="<?php echo $completionRate; ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Delivery completion"><span style="width: <?php echo $completionRate; ?>%;"></span></div>
+                    <div class="inv-kpi-hint"><?php echo $completionRate; ?>% completion rate</div>
                 </div>
             </section>
-
-            <div class="inv-stats-grid">
-                <div class="inv-stat-card stat-deliveries">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Total Deliveries</div>
-                            <div class="inv-stat-num"><?php echo $total; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-truck"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">All shipment records</div>
-                </div>
-                <div class="inv-stat-card stat-pending">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Pending Shipments</div>
-                            <div class="inv-stat-num"><?php echo $pending; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-clock"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">Awaiting delivery</div>
-                </div>
-                <div class="inv-stat-card stat-completed">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Completed Deliveries</div>
-                            <div class="inv-stat-num"><?php echo $done; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-check-circle"></i></div>
-                    </div>
-                    <div class="inv-stat-foot"><?php echo $completionRate; ?>% completion rate</div>
-                </div>
-                <div class="inv-stat-card stat-products">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Products in Catalog</div>
-                            <div class="inv-stat-num"><?php echo $productCount; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-cubes"></i></div>
-                    </div>
-                    <div class="inv-stat-foot"><?php echo number_format($totalStock); ?> total units in stock</div>
-                </div>
-            </div>
-
-            <div class="inv-overview">
-                <div class="inv-overview-chip">
-                    <i class="fas fa-warehouse"></i>
-                    <div>
-                        <strong><?php echo number_format($totalStock); ?></strong>
-                        <span>Total stock units</span>
-                    </div>
-                </div>
-                <div class="inv-overview-chip chip-warn">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <div>
-                        <strong><?php echo $lowStockCount; ?></strong>
-                        <span>Low stock items (≤ 5)</span>
-                    </div>
-                </div>
-                <div class="inv-overview-chip chip-danger">
-                    <i class="fas fa-times-circle"></i>
-                    <div>
-                        <strong><?php echo $outOfStockCount; ?></strong>
-                        <span>Out of stock items</span>
-                    </div>
-                </div>
-            </div>
 
             <section class="inv-stockin-panel" aria-label="Products stocked per month">
                 <div class="inv-stockin-header">
                     <div>
                         <h3><span class="card-icon"><i class="fas fa-chart-area"></i></span> Products Stocked Per Month</h3>
-                        <div class="inv-stockin-meta">Total number of products stocked each month · based on real catalog data</div>
+                        <div class="inv-stockin-meta">Products added to the catalog each month, by the date they were added</div>
                     </div>
                     <div class="inv-stockin-tools">
                         <label class="sr-only" for="invPeriodSelect">Time period</label>
@@ -485,56 +353,6 @@ EXTRA
 $chartScript = <<<SCRIPT
 <script>
 (function () {
-    var statusCanvas = document.getElementById('invStatusChart');
-    if (statusCanvas && typeof Chart !== 'undefined') {
-        new Chart(statusCanvas.getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: {$chartLabels},
-                datasets: [{
-                    label: 'Count',
-                    data: {$chartValues},
-                    backgroundColor: [
-                        'rgba(75, 139, 42, 0.85)',
-                        'rgba(22, 163, 74, 0.85)',
-                        'rgba(45, 90, 39, 0.85)'
-                    ],
-                    borderColor: [
-                        'rgba(75, 139, 42, 1)',
-                        'rgba(22, 163, 74, 1)',
-                        'rgba(45, 90, 39, 1)'
-                    ],
-                    borderWidth: 1,
-                    borderRadius: 8,
-                    maxBarThickness: 64
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function (ctx) { return ctx.parsed.y + ' records'; }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        ticks: { font: { size: 11, weight: '600' }, color: '#4b5563', maxRotation: 0, autoSkip: false }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        ticks: { precision: 0, font: { size: 11 }, color: '#6b7280' },
-                        grid: { color: 'rgba(0,0,0,0.06)' }
-                    }
-                }
-            }
-        });
-    }
-
     var STOCK_PRODUCTS = {$stockProductsJson};
     var STOCK_YEAR = {$stockYear};
     var MONTH_LABELS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -638,7 +456,7 @@ $chartScript = <<<SCRIPT
                 plugins: {
                     legend: { display: false },
                     title: {
-                        display: true,
+                        display: false, // the panel header already names the chart
                         text: 'Products Stocked Per Month',
                         color: '#2f5d1a',
                         font: { size: 14, weight: '700' },

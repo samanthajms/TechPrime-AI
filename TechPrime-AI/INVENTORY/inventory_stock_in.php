@@ -145,7 +145,7 @@ EXTRA
                         <div class="pos-scan-bar" id="scanBar">
                             <i class="fas fa-barcode" aria-hidden="true"></i>
                             <input type="text" id="scanInput" maxlength="20" aria-label="Scan or type a barcode"
-                                   placeholder="Scan a barcode, or type it and press Enter">
+                                   placeholder="Scan or enter a barcode">
                             <span class="scan-state" id="scanState">Ready to scan</span>
                         </div>
                         <div id="scanStatus" hidden></div>

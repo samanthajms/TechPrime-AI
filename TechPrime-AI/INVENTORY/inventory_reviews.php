@@ -104,26 +104,56 @@ staff_page_start([
     display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 0 8px; border-radius: 8px;
     font-size: 13px; cursor: pointer;
 }
-.inv-filter-list label:hover, .inv-filter-images:hover { background: #f4faef; }
+@media (hover: hover) and (pointer: fine) {
+    .inv-filter-list label:hover, .inv-filter-images:hover { background: #f4faef; }
+}
+.inv-filter-list label:has(input:checked) { background: var(--ep-green-light); font-weight: 600; }
 .inv-filter-stars { color: #e3a008; letter-spacing: 1px; }
 .inv-filter-panel .btn { width: 100%; justify-content: center; margin-top: 4px; padding: 7px 10px; font-size: 12.5px; }
-.inv-reviews-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.inv-reviews-table th, .inv-reviews-table td {
-    text-align: left; vertical-align: middle; padding: 6px 8px; border-bottom: 1px solid rgba(75, 139, 42, 0.12);
-    font-size: 13px;
+.inv-filter-panel .btn[hidden] { display: none; }
+/* ── Review cards ── */
+.rv-list { display: flex; flex-direction: column; gap: 12px; }
+.rv-card {
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 16px 18px;
+    border: 1px solid var(--border); border-radius: 12px; background: #fff;
 }
-.inv-reviews-table .inv-col-order { width: 132px; }
-.inv-reviews-table .inv-col-date { width: 108px; }
-.inv-reviews-table .inv-col-rating { width: 96px; }
-.inv-reviews-table td.inv-order,
-.inv-reviews-table td.inv-date,
-.inv-reviews-table td.inv-stars { white-space: nowrap; overflow-wrap: normal; }
-.inv-reviews-table td { overflow-wrap: break-word; }
-.inv-reviews-table th {
-    font-size: 12px; letter-spacing: .03em; text-transform: uppercase; color: var(--text-muted, #667085); background: #f6fbf3;
+.rv-head { display: flex; align-items: center; gap: 11px; }
+.rv-avatar {
+    width: 36px; height: 36px; flex-shrink: 0;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--ep-green-light); color: var(--ep-green-dark);
+    font-size: 14px; font-weight: 700;
 }
-.inv-review-block td.inv-media-cell { background: #fff; }
-.inv-review-gap td { height: 6px; padding: 0; border: 0; background: transparent; }
+.rv-avatar.is-anon { background: var(--slate-100); color: var(--slate-500); }
+.rv-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.rv-who strong { font-size: 14px; color: var(--text-main); }
+.rv-who span { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.rv-stars { font-size: 16px; }
+.rv-product { display: flex; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-main); }
+.rv-product i { font-size: 11px; color: var(--slate-400); }
+.rv-comment { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text-main); overflow-wrap: anywhere; }
+.rv-comment.is-empty { color: var(--text-muted); font-style: italic; }
+.rv-card .inv-tags { margin-bottom: 0; }
+.rv-reply {
+    padding: 10px 12px;
+    border-left: 3px solid var(--ep-green);
+    border-radius: 0 10px 10px 0;
+    background: var(--slate-50);
+}
+.rv-reply-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.rv-reply-head span { font-size: 12px; font-weight: 700; color: var(--ep-green-dark); }
+.rv-reply p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-main); overflow-wrap: anywhere; }
+.rv-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.rv-awaiting { margin-right: auto; font-size: 12px; font-weight: 600; color: #b45309; }
+.rv-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 16px; text-align: center; color: var(--text-muted); }
+.rv-empty p { margin: 0; font-size: 13.5px; }
+.rv-empty-icon {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--slate-100); color: var(--slate-400); font-size: 17px;
+}
 .inv-stars { color: #e3a008; letter-spacing: 1px; font-size: 14px; white-space: nowrap; }
 .inv-stars span { color: #d1d5db; }
 .inv-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
@@ -148,9 +178,19 @@ staff_page_start([
     background: rgba(17, 24, 39, 0.28); padding: 16px;
 }
 .inv-reply-pop-card {
-    position: relative; width: min(380px, 100%); max-height: min(70vh, 420px); overflow: auto;
+    position: relative; width: min(420px, 100%); max-height: min(70vh, 460px); overflow: auto;
     background: #fff; border: 1px solid #d7e8c4; border-radius: 14px;
-    box-shadow: 0 16px 40px rgba(17, 24, 39, 0.16); padding: 14px 14px 12px;
+    box-shadow: 0 16px 40px rgba(17, 24, 39, 0.16); padding: 16px 16px 14px;
+    transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+.inv-reply-pop { transition: opacity 200ms var(--ease-out); }
+/* Enter: scrim fades, card scales up from 0.96 (centred: a dialog is not anchored to its trigger) */
+@starting-style {
+    .inv-reply-pop:not([hidden]) { opacity: 0; }
+    .inv-reply-pop:not([hidden]) .inv-reply-pop-card { opacity: 0; transform: scale(0.96) translateY(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+    @starting-style { .inv-reply-pop:not([hidden]) .inv-reply-pop-card { transform: none; } }
 }
 .inv-reply-pop-card h3 { margin: 0 28px 2px 0; font-size: 15px; color: var(--ep-green-dark, #2f6b16); }
 .inv-reply-pop-order { margin: 0 0 10px; font-size: 12px; color: #667085; }
@@ -214,95 +254,79 @@ CSS
 
     <div class="inv-reviews-layout">
     <section class="card inv-reviews-main">
-        <p class="inv-reviews-count"><?php echo (int) $total; ?> review<?php echo $total === 1 ? '' : 's'; ?></p>
-        <div class="table-wrap">
-            <table class="inv-reviews-table">
-                <colgroup>
-                    <col>
-                    <col class="inv-col-order">
-                    <col class="inv-col-date">
-                    <col class="inv-col-rating">
-                </colgroup>
-                <tbody>
-                <?php if ($rows === []): ?>
-                    <tr><td class="inv-reviews-empty"><?php echo ($stars >= 1 || $imagesOnly) ? 'No reviews match this filter.' : 'No client reviews yet. Completed orders can be reviewed from the client Order History.'; ?></td></tr>
+        <p class="inv-reviews-count"><?php echo (int) $total; ?> review<?php echo $total === 1 ? '' : 's'; ?><?php echo ($stars >= 1 || $imagesOnly) ? ' match this filter' : ''; ?></p>
+        <?php if ($rows === []): ?>
+            <div class="rv-empty">
+                <span class="rv-empty-icon" aria-hidden="true"><i class="far fa-star"></i></span>
+                <p><?php echo ($stars >= 1 || $imagesOnly) ? 'No reviews match this filter.' : 'No client reviews yet. Completed orders can be reviewed from the client Order History.'; ?></p>
+            </div>
+        <?php endif; ?>
+        <div class="rv-list">
+        <?php
+        $replyPayload = [];
+        foreach ($rows as $row):
+            $rating = (int) $row['rating'];
+            $when = !empty($row['created_at']) ? date('M d, Y', strtotime((string) $row['created_at'])) : '';
+            $isAnon = !empty($row['is_anonymous']);
+            $clientName = $isAnon ? 'Anonymous' : (string) $row['client_name'];
+            // Tags show as chips, so drop the lines in the comment that only repeat a tag.
+            $tagList = array_values(array_filter(array_map('trim', array_map('strval', (array) $row['tag_list'])), 'strlen'));
+            $tagKeys = array_map('mb_strtolower', $tagList);
+            $commentLines = array_filter(
+                preg_split('/\R/u', trim((string) $row['comment'])) ?: [],
+                static fn($line) => trim($line) !== '' && !in_array(mb_strtolower(trim($line)), $tagKeys, true)
+            );
+            $commentText = implode("\n", $commentLines);
+            $replyText = ep_review_text_with_tags((string) $row['reply_text'], $row['reply_tag_list']);
+            $replyPayload[(string) $row['id']] = [
+                'order' => (int) $row['order_id'],
+                'reply' => $replyText,
+            ];
+            $images = array_values(array_filter($row['media'], static fn($media) => ($media['kind'] ?? '') === 'image'));
+            ?>
+            <article class="rv-card">
+                <header class="rv-head">
+                    <span class="rv-avatar<?php echo $isAnon ? ' is-anon' : ''; ?>" aria-hidden="true"><?php echo $isAnon ? '<i class="fas fa-user-secret"></i>' : h(mb_strtoupper(mb_substr($clientName, 0, 1))); ?></span>
+                    <div class="rv-who">
+                        <strong><?php echo h($clientName); ?></strong>
+                        <span>#ORD-<?php echo (int) $row['order_id']; ?><?php echo $when !== '' ? ' · ' . h($when) : ''; ?></span>
+                    </div>
+                    <span class="inv-stars rv-stars" role="img" aria-label="<?php echo $rating; ?> out of 5 stars"><?php for ($i = 1; $i <= 5; $i++): ?><?php if ($i <= $rating): ?>★<?php else: ?><span>★</span><?php endif; ?><?php endfor; ?></span>
+                </header>
+                <div class="rv-product"><i class="fas fa-box" aria-hidden="true"></i><span><?php echo h((string) ($row['product_names'] ?? 'Product')); ?></span></div>
+                <?php if ($commentText !== ''): ?>
+                    <p class="rv-comment"><?php echo nl2br(h($commentText)); ?></p>
+                <?php elseif ($tagList === []): ?>
+                    <p class="rv-comment is-empty">No written comment</p>
                 <?php endif; ?>
-                <?php
-                $replyPayload = [];
-                foreach ($rows as $row):
-                    $rating = (int) $row['rating'];
-                    $when = !empty($row['created_at']) ? date('M d, Y', strtotime((string) $row['created_at'])) : '';
-                    ?>
-                    <tr class="inv-review-block">
-                        <th colspan="4">Client</th>
-                    </tr>
-                    <tr>
-                        <td colspan="4"><?php echo !empty($row['is_anonymous']) ? 'Anonymous' : h((string) $row['client_name']); ?></td>
-                    </tr>
-                    <tr>
-                        <th colspan="4">Image</th>
-                    </tr>
-                    <tr>
-                        <td colspan="4" class="inv-media-cell">
-                            <?php
-                            $images = array_values(array_filter($row['media'], static fn($media) => ($media['kind'] ?? '') === 'image'));
+                <?php if ($tagList !== []): ?>
+                    <div class="inv-tags"><?php foreach ($tagList as $tag): ?><span><?php echo h($tag); ?></span><?php endforeach; ?></div>
+                <?php endif; ?>
+                <?php if ($images !== []): ?>
+                    <div class="inv-media">
+                        <?php foreach ($images as $media):
+                            $src = '../backend/api/review_media.php?id=' . (int) $media['id'];
                             ?>
-                            <?php if ($images === []): ?>
-                                <span>No image</span>
-                            <?php else: ?>
-                                <div class="inv-media">
-                                    <?php foreach ($images as $media):
-                                        $src = '../backend/api/review_media.php?id=' . (int) $media['id'];
-                                        ?>
-                                        <a href="<?php echo h($src); ?>" target="_blank" rel="noopener"><img src="<?php echo h($src); ?>" alt=""></a>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>Product</th>
-                        <th>Order</th>
-                        <th>Date</th>
-                        <th>Rating</th>
-                    </tr>
-                    <tr>
-                        <td><?php echo h((string) ($row['product_names'] ?? 'Product')); ?></td>
-                        <td class="inv-order"><strong>#ORD-<?php echo (int) $row['order_id']; ?></strong></td>
-                        <td class="inv-date"><?php echo h($when); ?></td>
-                        <td class="inv-stars" aria-label="<?php echo $rating; ?> out of 5">
-                            <?php for ($i = 1; $i <= 5; $i++): ?>
-                                <?php if ($i <= $rating): ?>★<?php else: ?><span>★</span><?php endif; ?>
-                            <?php endfor; ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th colspan="4">Review</th>
-                    </tr>
-                    <tr>
-                        <td colspan="4">
-                            <?php
-                            $reviewText = ep_review_text_with_tags((string) $row['comment'], $row['tag_list']);
-                            $replyText = ep_review_text_with_tags((string) $row['reply_text'], $row['reply_tag_list']);
-                            $replyPayload[(string) $row['id']] = [
-                                'order' => (int) $row['order_id'],
-                                'reply' => $replyText,
-                            ];
-                            ?>
-                            <div class="inv-review-box">
-                                <div class="inv-review-copy"><?php echo $reviewText !== '' ? nl2br(h($reviewText)) : 'No written comment'; ?></div>
-                                <div class="inv-reply-actions">
-                                    <?php if ($replyText !== ''): ?><span class="inv-reply-state">Replied</span><?php endif; ?>
-                                    <button type="button" class="btn btn-primary" data-send-reply="<?php echo (int) $row['id']; ?>">Send reply</button>
-                                    <button type="button" class="btn btn-outline" data-view-reply="<?php echo (int) $row['id']; ?>">View reply</button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr class="inv-review-gap"><td colspan="4"></td></tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
+                            <a href="<?php echo h($src); ?>" target="_blank" rel="noopener"><img src="<?php echo h($src); ?>" alt="Photo from <?php echo h($clientName); ?>'s review" loading="lazy"></a>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+                <?php if ($replyText !== ''): ?>
+                    <div class="rv-reply">
+                        <div class="rv-reply-head">
+                            <span><i class="fas fa-reply" aria-hidden="true"></i> Your reply</span>
+                            <button type="button" class="btn btn-outline btn-xs" data-send-reply="<?php echo (int) $row['id']; ?>"><i class="fas fa-pen"></i> Edit</button>
+                        </div>
+                        <p><?php echo nl2br(h($replyText)); ?></p>
+                    </div>
+                <?php else: ?>
+                    <div class="rv-actions">
+                        <span class="rv-awaiting">Not replied yet</span>
+                        <button type="button" class="btn btn-primary btn-sm" data-send-reply="<?php echo (int) $row['id']; ?>"><i class="fas fa-reply"></i> Reply</button>
+                    </div>
+                <?php endif; ?>
+            </article>
+        <?php endforeach; ?>
         </div>
         <?php if ($total > 0): ?>
             <nav class="orders-pagination" aria-label="Reviews pagination">
@@ -398,6 +422,8 @@ CSS
     try { replies = JSON.parse(dataEl.textContent || '{}') || {}; } catch (e) { replies = {}; }
     var currentId = '';
     var savedText = '';
+    var lastFocus = null;
+    var pressedOnScrim = false;
 
     function setLine(text, phrase, on) {
         var lines = String(text || '').split('\n');
@@ -438,11 +464,18 @@ CSS
         orderLabel.textContent = row.order ? 'Order #ORD-' + row.order : '';
         if (editing) showEdit();
         else showView();
+        lastFocus = document.activeElement;
         pop.hidden = false;
+        requestAnimationFrame(function () {
+            var target = editing ? area : document.getElementById('invReplyEdit');
+            if (target) target.focus({ preventScroll: true });
+            if (editing) area.setSelectionRange(area.value.length, area.value.length);
+        });
     }
 
     function closeReply() {
         pop.hidden = true;
+        if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus({ preventScroll: true });
     }
 
     document.addEventListener('click', function (e) {
@@ -456,8 +489,22 @@ CSS
             openReply(sendBtn.getAttribute('data-send-reply'), true);
             return;
         }
-        if (e.target.id === 'invReplyClose' || e.target === pop) closeReply();
+        // Scrim closes only when the press also started on it, so a text selection
+        // dragged out of the textarea never throws the draft away.
+        if (e.target.id === 'invReplyClose' || (e.target === pop && pressedOnScrim)) closeReply();
     });
+    pop.addEventListener('mousedown', function (e) { pressedOnScrim = e.target === pop; });
+
+    // Filters apply as soon as they change; Apply stays only as a no-JS fallback.
+    var filterForm = document.querySelector('.inv-filter-panel form');
+    if (filterForm) {
+        var applyBtn = filterForm.querySelector('button[type="submit"]');
+        if (applyBtn) applyBtn.hidden = true;
+        filterForm.addEventListener('change', function () {
+            if (typeof filterForm.requestSubmit === 'function') filterForm.requestSubmit();
+            else filterForm.submit();
+        });
+    }
     document.getElementById('invReplyEdit').addEventListener('click', showEdit);
     document.getElementById('invReplyCancel').addEventListener('click', function () {
         if (savedText === '') closeReply();
