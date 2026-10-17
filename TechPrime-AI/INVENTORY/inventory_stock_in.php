@@ -14,215 +14,115 @@ $supplierCatalog = pos_supplier_catalog($db);
 
 staff_page_start([
     'role' => 'inventory_custodian',
-    'title' => 'Add New Product',
+    'title' => 'Stock In',
     'active' => 'stocks',
     'active_child' => 'add_product',
-    'heading' => 'Add New Product',
+    'heading' => 'Stock In',
     'subtitle' => 'Receive deliveries by scanning each item',
-    'extra_head' => <<<'EXTRA'
-<style>
-/* Panel / table / pill values match inventory_stocks.php; the scan bar matches the Cashier POS. */
-.cash-page { display: flex; flex-direction: column; gap: 22px; }
-/* staff_shared.css gives .alert display:flex, which would override the hidden attribute */
-[hidden] { display: none !important; }
-.cash-panel {
-    background: linear-gradient(180deg, #ffffff 0%, #f7faf5 100%);
-    border: 1px solid var(--ep-border); border-radius: 16px; box-shadow: var(--card-shadow);
-}
-.cash-panel-header {
-    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-    background: linear-gradient(to bottom, #fff 0%, #f4f9f0 100%);
-    border-bottom: 1px solid var(--ep-border); padding: 16px 20px; border-radius: 16px 16px 0 0;
-}
-.cash-panel-header h3 {
-    margin: 0; font-size: 17px; font-weight: 800; color: var(--ep-green-dark);
-    display: flex; align-items: center; gap: 10px;
-}
-.cash-panel-header .card-icon { width: 32px; height: 32px; border-radius: 9px; }
-.cash-panel-header .card-subtitle { margin: 2px 0 0; font-size: 12px; color: var(--ep-muted); font-weight: 500; }
-.cash-panel-body { padding: 18px 22px 22px; }
-
-.stocks-table-wrap { width: 100%; overflow-x: auto; background: #fff; border: 1px solid var(--ep-border); border-radius: 14px; }
-.stocks-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.stocks-table thead tr { background: var(--ep-green-light); border-bottom: 2px solid var(--teal-light, #c6e6b3); }
-.stocks-table th {
-    padding: 13px 16px; text-align: left; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.75px; color: var(--teal-deeper, var(--ep-green-dark)); white-space: nowrap;
-}
-.stocks-table td { padding: 12px 16px; border-bottom: 1px solid var(--ep-border); vertical-align: middle; }
-.stocks-table tbody tr:last-child td { border-bottom: none; }
-.stocks-table tbody tr:hover { background: rgba(238, 248, 230, 0.75); }
-.stocks-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.stocks-pname { font-weight: 700; color: var(--ep-text); line-height: 1.4; overflow-wrap: anywhere; }
-.stocks-pcat { display: block; margin-top: 3px; font-size: 11.5px; color: var(--ep-muted); font-weight: 600; }
-.stocks-qty { font-weight: 800; font-size: 15px; color: var(--ep-text); font-variant-numeric: tabular-nums; }
-.mono { font-family: var(--font-mono); font-size: 12.5px; }
-.empty-state-row {
-    text-align: center; padding: 40px 16px; color: var(--ep-muted); font-weight: 500;
-    background: #fff; border: 1px dashed var(--ep-border); border-radius: 14px;
-}
-.stock-status-pill {
-    display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 100px;
-    font-size: 11.5px; font-weight: 700; white-space: nowrap; border: 1px solid transparent;
-}
-.stock-status-pill.ok { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
-.stock-status-pill.low { background: #fffbeb; color: #b45309; border-color: #fde68a; }
-.stock-status-pill.critical { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
-.stock-status-pill.out { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-
-.pos-scan-bar {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--ep-gray-bg); border: 2px solid var(--ep-green); border-radius: 999px;
-    padding: 6px 8px 6px 18px; box-shadow: 0 0 0 4px rgba(97, 179, 55, 0.12);
-}
-.pos-scan-bar > i { color: var(--ep-green-dark); font-size: 18px; }
-.pos-scan-bar input {
-    flex: 1; min-width: 0; border: none; background: transparent; outline: none; box-shadow: none;
-    font-family: var(--font-base); font-size: 18px; font-weight: 700; letter-spacing: 1px; padding: 8px 4px;
-    font-variant-numeric: tabular-nums; color: var(--ep-text);
-}
-.pos-scan-bar input::placeholder { font-size: 14px; font-weight: 500; letter-spacing: 0; color: var(--ep-muted); }
-.pos-scan-bar .scan-state {
-    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
-    font-size: 11.5px; font-weight: 700; background: var(--ep-green-light); color: var(--ep-green-dark); white-space: nowrap;
-}
-.pos-scan-bar .scan-state::before {
-    content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ep-green);
-    animation: pos-pulse 1.6s ease-in-out infinite;
-}
-.pos-scan-bar.is-idle .scan-state { background: #fff8db; color: #854d0e; }
-.pos-scan-bar.is-idle .scan-state::before { background: var(--ep-yellow-dark); animation: none; }
-.pos-scan-bar.is-idle { border-color: var(--ep-border); box-shadow: none; }
-@keyframes pos-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-.pos-scan-status { display: flex; align-items: flex-start; gap: 12px; margin: 14px 0 0; font-size: 13.5px; }
-.pos-scan-status > i { font-size: 20px; margin-top: 1px; }
-.pos-scan-status strong { display: block; font-size: 14px; }
-.pos-scan-status span { display: block; font-weight: 500; margin-top: 2px; }
-.pos-flash { animation: pos-flash 200ms var(--ease-out); }
-@media (prefers-reduced-motion: reduce) { .pos-flash { animation: none; } }
-@keyframes pos-flash { from { transform: scale(0.98); opacity: 0.55; } to { transform: none; opacity: 1; } }
-.pos-line-flash { animation: pos-line-flash 0.9s ease; }
-@keyframes pos-line-flash { from { background: #d4efc4; } to { background: transparent; } }
-.btn:disabled, .btn[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-.si-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
-.si-product {
-    display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 14px;
-    border: 1.5px dashed var(--ep-border); background: #fff; min-height: 120px; justify-content: center;
-}
-.si-product.has-product { border-style: solid; border-color: var(--teal-light); background: var(--ep-green-light); }
-.si-product .si-name { font-size: 16px; font-weight: 800; color: var(--ep-text); }
-.si-product .si-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12.5px; color: var(--ep-muted); }
-.si-product .si-stock { font-size: 28px; font-weight: 800; color: var(--ep-green-dark); }
-.si-required { color: #dc2626; }
-
-@media (max-width: 1100px) {
-    /* minmax(0, …): a wide table or the scan bar must not stretch the column past the screen */
-    .si-layout { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 640px) {
-    .cash-page { gap: 16px; }
-    .cash-panel-header { padding: 14px 16px; }
-    .cash-panel-body { padding: 14px 16px 18px; }
-    .pos-scan-bar { padding: 4px 6px 4px 14px; }
-    .pos-scan-bar input { font-size: 16px; }   /* 16px+ keeps iOS from zooming on focus */
-    .pos-scan-bar .scan-state { display: none; }
-}
-</style>
-EXTRA
+    'actions' => '<a class="cx-btn cx-btn-outline" href="inventory_stocks.php"><i class="ph ph-package" aria-hidden="true"></i> View inventory</a>',
 ]);
 ?>
-        <div class="cash-page">
+        <div class="inv-stack">
             <div class="si-layout">
-                <section class="cash-panel" aria-label="Scan item">
-                    <div class="cash-panel-header">
+                <section class="cx-card si-step" aria-labelledby="siScanTitle">
+                    <div class="cx-card-head">
                         <div>
-                            <h3><span class="card-icon"><i class="fas fa-barcode"></i></span> 1. Scan Item</h3>
-                            <div class="card-subtitle">Scan the product barcode to receive it</div>
+                            <h2 id="siScanTitle"><span class="si-num" aria-hidden="true">1</span> Scan item</h2>
+                            <p>Scan the product barcode to receive it</p>
                         </div>
                     </div>
-                    <div class="cash-panel-body">
+                    <div class="si-body">
+                        <label class="cx-sr" for="scanInput">Scan or enter a barcode</label>
                         <div class="pos-scan-bar" id="scanBar">
-                            <i class="fas fa-barcode" aria-hidden="true"></i>
-                            <input type="text" id="scanInput" maxlength="20" aria-label="Scan or type a barcode"
-                                   placeholder="Scan or enter a barcode">
+                            <span class="pos-scan-icon" aria-hidden="true"><i class="ph ph-barcode"></i></span>
+                            <input type="text" id="scanInput" maxlength="20" autocomplete="off"
+                                   placeholder="Waiting for scanner, or type digits and press Enter">
                             <span class="scan-state" id="scanState">Ready to scan</span>
                         </div>
-                        <div id="scanStatus" hidden></div>
-                        <div class="si-product" id="siProduct" style="margin-top:16px;">
-                            <div class="text-muted" style="text-align:center;color:var(--ep-muted);font-weight:500;">
-                                <i class="fas fa-box-open"></i> No item scanned yet.
+                        <p class="si-hint">UPC-A, UPC-E, EAN-13 and EAN-8. Scanning the same item again adds one more. <span class="si-keys"><kbd>Enter</kbd> look up</span></p>
+                        <div id="scanStatus" role="status" aria-live="polite" hidden></div>
+                        <div class="si-product" id="siProduct">
+                            <div class="si-product-empty">
+                                <span class="cx-empty-icon" aria-hidden="true"><i class="ph ph-package"></i></span>
+                                <span>No item scanned yet.</span>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                <section class="cash-panel" aria-label="Receive quantity">
-                    <div class="cash-panel-header">
+                <section class="cx-card si-step" aria-labelledby="siConfirmTitle">
+                    <div class="cx-card-head">
                         <div>
-                            <h3><span class="card-icon"><i class="fas fa-dolly"></i></span> 2. Confirm Receiving</h3>
-                            <div class="card-subtitle">Stock updates immediately and is logged</div>
+                            <h2 id="siConfirmTitle"><span class="si-num" aria-hidden="true">2</span> Confirm receiving</h2>
+                            <p>Stock updates immediately and the movement is logged</p>
                         </div>
                     </div>
-                    <div class="cash-panel-body">
-                        <form id="siForm" autocomplete="off">
+                    <div class="si-body">
+                        <form id="siForm" autocomplete="off" class="inv-form">
                             <div class="form-group">
                                 <label class="form-label" for="siQty">Quantity received</label>
-                                <input type="number" id="siQty" class="form-control" min="1" max="<?php echo (int)POS_MAX_STOCK_IN_QTY; ?>" step="1" value="1" required disabled>
+                                <input type="number" id="siQty" class="form-control cx-num si-qty" min="1" max="<?php echo (int)POS_MAX_STOCK_IN_QTY; ?>" step="1" value="1" required disabled>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="siSupplier">Supplier <span class="si-required" aria-hidden="true">*</span></label>
-                                <select id="siSupplier" class="form-control" required disabled>
+                                <label class="form-label" for="siSupplier">Supplier <span class="si-required" aria-hidden="true">*</span><span class="cx-sr">(required)</span></label>
+                                <select id="siSupplier" class="form-control" required disabled aria-describedby="siSupplierHint">
                                     <option value="">Select a supplier…</option>
                                 </select>
                                 <div class="form-hint" id="siSupplierHint">Scan an item to see its supplier.</div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="siRef">Delivery / reference no. (optional)</label>
-                                <input type="text" id="siRef" class="form-control" maxlength="64" placeholder="e.g. DR-10234" disabled>
+                                <input type="text" id="siRef" class="form-control cx-mono" maxlength="64" placeholder="e.g. DR-10234" disabled>
                             </div>
-                            <button type="submit" id="siSubmit" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px;" disabled>
-                                <i class="fas fa-check"></i> Confirm Stock In
-                            </button>
-                            <button type="button" id="siCancel" class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px;" disabled>
-                                Cancel
-                            </button>
+                            <div class="si-actions">
+                                <button type="submit" id="siSubmit" class="cx-btn cx-btn-primary cx-btn-xl" disabled>
+                                    <i class="ph ph-check-circle" aria-hidden="true"></i> Confirm Stock In
+                                </button>
+                                <button type="button" id="siCancel" class="cx-btn cx-btn-ghost" disabled>Cancel</button>
+                            </div>
                         </form>
-                        <div id="siResult" hidden style="margin-top:14px;"></div>
+                        <div id="siResult" role="status" aria-live="polite" hidden></div>
                     </div>
                 </section>
             </div>
 
-            <section class="cash-panel" aria-label="Recent stock-ins">
-                <div class="cash-panel-header">
+            <section class="cx-card" aria-labelledby="siRecentTitle">
+                <div class="cx-card-head">
                     <div>
-                        <h3><span class="card-icon"><i class="fas fa-history"></i></span> My Recent Stock-Ins</h3>
-                        <div class="card-subtitle">Last 10 receiving entries you recorded</div>
+                        <h2 id="siRecentTitle"><i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i> My recent stock-ins</h2>
+                        <p>The last 10 receiving entries you recorded</p>
                     </div>
                 </div>
-                <div class="cash-panel-body">
-                    <?php if (!$recent): ?>
-                        <div class="empty-state-row" id="siEmpty"><i class="fas fa-dolly"></i> No stock-ins recorded yet.</div>
-                    <?php endif; ?>
-                    <div class="stocks-table-wrap" id="siTableWrap"<?php echo $recent ? '' : ' hidden'; ?>>
-                        <table class="stocks-table">
-                            <thead><tr>
-                                <th>Date / Time</th><th>Product</th><th class="num">Qty</th><th class="num">Stock</th><th>Supplier</th><th>Reference</th>
-                            </tr></thead>
-                            <tbody id="siRows">
-                            <?php foreach ($recent as $r): ?>
-                                <tr>
-                                    <td><?php echo h(pos_format_datetime($r['created_at'])); ?></td>
-                                    <td><div class="stocks-pname"><?php echo h((string)$r['product_name']); ?></div></td>
-                                    <td class="num"><span class="stocks-qty">+<?php echo (int)$r['quantity']; ?></span></td>
-                                    <td class="num"><?php echo (int)$r['stock_before']; ?> → <strong><?php echo (int)$r['stock_after']; ?></strong></td>
-                                    <td><?php echo h((string)($r['supplier'] ?? '')) ?: '—'; ?></td>
-                                    <td><?php echo h((string)($r['reference_no'] ?? '')) ?: '—'; ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                <?php if (!$recent): ?>
+                    <div class="cx-empty" id="siEmpty">
+                        <span class="cx-empty-icon" aria-hidden="true"><i class="ph ph-truck"></i></span>
+                        <strong>No stock-ins recorded yet</strong>
+                        <span>Items you receive will be listed here.</span>
                     </div>
+                <?php endif; ?>
+                <div class="cx-table-wrap" id="siTableWrap"<?php echo $recent ? '' : ' hidden'; ?>>
+                    <table class="cx-table si-table">
+                        <thead><tr>
+                            <th scope="col">Date / Time</th>
+                            <th scope="col">Product</th>
+                            <th scope="col" class="num">Qty</th>
+                            <th scope="col" class="num">Stock</th>
+                            <th scope="col">Supplier</th>
+                            <th scope="col">Reference</th>
+                        </tr></thead>
+                        <tbody id="siRows">
+                        <?php foreach ($recent as $r): ?>
+                            <tr>
+                                <td data-label="When" class="si-when cx-num"><?php echo h(pos_format_datetime($r['created_at'])); ?></td>
+                                <td data-label="Product"><div class="stocks-pname"><?php echo h((string)$r['product_name']); ?></div></td>
+                                <td data-label="Qty" class="num"><span class="si-plus cx-num">+<?php echo (int)$r['quantity']; ?></span></td>
+                                <td data-label="Stock" class="num cx-num"><?php echo (int)$r['stock_before']; ?> → <strong><?php echo (int)$r['stock_after']; ?></strong></td>
+                                <td data-label="Supplier"><?php echo h((string)($r['supplier'] ?? '')) ?: '—'; ?></td>
+                                <td data-label="Reference" class="cx-mono"><?php echo h((string)($r['reference_no'] ?? '')) ?: '—'; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             </section>
         </div>
@@ -258,7 +158,19 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
     var product = null;
     var submitting = false;
 
-    var STATUS = { ok: ['ok', 'In Stock'], low: ['low', 'Low Stock'], critical: ['critical', 'Critical Stock'], out: ['out', 'Out of Stock'] };
+    var STATUS = { ok: ['ok', 'In Stock', 'ph-check-circle'], low: ['low', 'Low Stock', 'ph-warning'], critical: ['critical', 'Critical Stock', 'ph-warning-circle'], out: ['out', 'Out of Stock', 'ph-x-circle'] };
+
+    /* Inline feedback (same contract as EP_Scanner.status, with the app shell's icons + .pos-status styles) */
+    var STATUS_ICONS = { success: 'ph-check-circle', error: 'ph-x-circle', info: 'ph-info', warn: 'ph-warning' };
+    function status(box, type, title, detail) {
+        box.className = 'pos-status pos-status-' + type;
+        box.innerHTML = '<i class="ph-fill ' + (STATUS_ICONS[type] || STATUS_ICONS.info) + '" aria-hidden="true"></i>' +
+            '<div><strong>' + esc(title) + '</strong>' + (detail ? '<span>' + esc(detail) + '</span>' : '') + '</div>';
+        box.hidden = false;
+        box.classList.remove('pos-flash');
+        void box.offsetWidth; // restart the flash animation
+        box.classList.add('pos-flash');
+    }
 
     function readJson(r) {
         return r.json().catch(function () {
@@ -274,6 +186,7 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
     function setScanState(text) {
         var focused = document.activeElement === scanInput;
         scanBar.classList.toggle('is-idle', !focused && !text);
+        scanBar.classList.toggle('is-busy', !!text);
         scanState.textContent = text || (focused ? 'Ready to scan' : 'Click here to scan');
     }
     function setFormEnabled(on) {
@@ -299,18 +212,20 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         product = p;
         if (!p) {
             siProduct.className = 'si-product';
-            siProduct.innerHTML = '<div style="text-align:center;color:var(--ep-muted);font-weight:500;"><i class="fas fa-box-open"></i> No item scanned yet.</div>';
+            siProduct.innerHTML = '<div class="si-product-empty"><span class="cx-empty-icon" aria-hidden="true"><i class="ph ph-package"></i></span><span>No item scanned yet.</span></div>';
             setFormEnabled(false);
             return;
         }
         var st = STATUS[p.status] || STATUS.ok;
         siProduct.className = 'si-product has-product';
         siProduct.innerHTML =
-            '<div class="si-name">' + esc(p.name) + '</div>' +
-            '<div class="si-meta"><span>' + esc(p.category || '') + '</span>' +
-            '<span class="mono">' + esc(p.barcode) + '</span>' +
-            '<span class="stock-status-pill ' + st[0] + '">' + st[1] + '</span></div>' +
-            '<div><span class="stocks-pcat">Current stock</span><span class="si-stock">' + p.stock + '</span></div>';
+            '<div class="si-product-info">' +
+                '<div class="si-name">' + esc(p.name) + '</div>' +
+                '<div class="si-meta"><span>' + esc(p.category || '') + '</span>' +
+                '<span class="barcode-code">' + esc(p.barcode) + '</span></div>' +
+                '<span class="stock-status-pill ' + st[0] + '"><i class="ph-fill ' + st[2] + '" aria-hidden="true"></i> ' + st[1] + '</span>' +
+            '</div>' +
+            '<div class="si-stock-box"><span>Current stock</span><strong class="cx-num">' + p.stock + '</strong></div>';
         setFormEnabled(true);
     }
 
@@ -322,7 +237,7 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         }).then(readJson).then(function (d) {
             if (!d || !d.ok) {
                 EP_Scanner.beep(false);
-                EP_Scanner.status(scanStatus, 'error', d && d.error === 'not_found' ? 'Product not found' : 'Scan rejected', (d && d.message) || 'Unknown error.');
+                status(scanStatus, 'error', d && d.error === 'not_found' ? 'Product not found' : 'Scan rejected', (d && d.message) || 'Unknown error.');
                 return;
             }
             if (product && product.id === d.product.id) {
@@ -334,18 +249,22 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
             showProduct(d.product);
             result.hidden = true;
             EP_Scanner.beep(true);
-            EP_Scanner.status(scanStatus, 'success', 'Scanned: ' + d.product.name,
+            status(scanStatus, 'success', 'Scanned: ' + d.product.name,
                 'Current stock ' + d.product.stock + ' · receiving ' + qty.value + ' (scan again to add one more, or edit the quantity)');
         }).catch(function () {
             EP_Scanner.beep(false);
-            EP_Scanner.status(scanStatus, 'error', 'Connection problem', 'Could not reach the server. Scan again.');
+            status(scanStatus, 'error', 'Connection problem', 'Could not reach the server. Scan again.');
         }).then(function () { setScanState(null); });
     }
 
     var scanner = EP_Scanner.attach(scanInput, {
         onScan: onScan,
-        onInvalid: function (res) { EP_Scanner.status(scanStatus, 'error', 'Invalid barcode', res.message); }
+        onInvalid: function (res) { status(scanStatus, 'error', 'Invalid barcode', res.message); },
+        canRefocus: function () {
+            return !submitting && !document.querySelector('.cx-user.is-open, .cx-notif.is-open, .cx-sheet:not([hidden]), #cwFab[aria-expanded="true"]');
+        }
     });
+    scanBar.addEventListener('click', function () { scanInput.focus(); });
     scanInput.addEventListener('focus', function () { setScanState(null); });
     scanInput.addEventListener('blur', function () { setTimeout(function () { setScanState(null); }, 10); });
 
@@ -357,12 +276,12 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         var now = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
         var tr = document.createElement('tr');
         tr.className = 'pos-line-flash';
-        tr.innerHTML = '<td>' + esc(now) + '</td>' +
-            '<td><div class="stocks-pname">' + esc(d.product.name) + '</div></td>' +
-            '<td class="num"><span class="stocks-qty">+' + d.quantity + '</span></td>' +
-            '<td class="num">' + d.stock_before + ' → <strong>' + d.stock_after + '</strong></td>' +
-            '<td>' + (esc(supplier.value) || '—') + '</td>' +
-            '<td>' + (esc(ref.value.trim()) || '—') + '</td>';
+        tr.innerHTML = '<td data-label="When" class="si-when cx-num">' + esc(now) + '</td>' +
+            '<td data-label="Product"><div class="stocks-pname">' + esc(d.product.name) + '</div></td>' +
+            '<td data-label="Qty" class="num"><span class="si-plus cx-num">+' + d.quantity + '</span></td>' +
+            '<td data-label="Stock" class="num cx-num">' + d.stock_before + ' → <strong>' + d.stock_after + '</strong></td>' +
+            '<td data-label="Supplier">' + (esc(supplier.value) || '—') + '</td>' +
+            '<td data-label="Reference" class="cx-mono">' + (esc(ref.value.trim()) || '—') + '</td>';
         tbody.insertBefore(tr, tbody.firstChild);
         while (tbody.children.length > 10) tbody.removeChild(tbody.lastChild);
     }
@@ -373,18 +292,18 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         var q = qty.value.trim();
         if (!/^\d+$/.test(q) || +q < 1 || +q > SI_CONFIG.maxQty) {
             EP_Scanner.beep(false);
-            EP_Scanner.status(result, 'error', 'Invalid quantity', 'Enter a whole number from 1 to ' + SI_CONFIG.maxQty + '.');
+            status(result, 'error', 'Invalid quantity', 'Enter a whole number from 1 to ' + SI_CONFIG.maxQty + '.');
             return;
         }
         if (!supplier.value) {
             EP_Scanner.beep(false);
-            EP_Scanner.status(result, 'error', 'Supplier required', 'Choose the supplier of this delivery.');
+            status(result, 'error', 'Supplier required', 'Choose the supplier of this delivery.');
             supplier.focus();
             return;
         }
         submitting = true;
         submit.disabled = true;
-        submit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+        submit.innerHTML = '<i class="ph ph-spinner-gap cx-spin" aria-hidden="true"></i> Saving…';
         fetch(API + 'stock_in.php', {
             method: 'POST',
             credentials: 'same-origin',
@@ -399,7 +318,7 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
         }).then(readJson).then(function (d) {
             if (d && d.ok) {
                 EP_Scanner.beep(true);
-                EP_Scanner.status(result, 'success', 'Stock updated: ' + d.product.name,
+                status(result, 'success', 'Stock updated: ' + d.product.name,
                     'Stock ' + d.stock_before + ' → ' + d.stock_after + ' (+' + d.quantity + '). The movement was logged.');
                 addRecentRow(d);
                 showProduct(null);
@@ -409,13 +328,13 @@ $script = '<script src="../includes/barcode_scanner.js?v=1"></script>'
                 return;
             }
             EP_Scanner.beep(false);
-            EP_Scanner.status(result, 'error', 'Stock-in failed', (d && d.message) || 'No changes were saved.');
+            status(result, 'error', 'Stock-in failed', (d && d.message) || 'No changes were saved.');
         }).catch(function () {
             EP_Scanner.beep(false);
-            EP_Scanner.status(result, 'error', 'Connection problem', 'Could not confirm the stock-in. Check the Recent Stock-Ins list before retrying.');
+            status(result, 'error', 'Connection problem', 'Could not confirm the stock-in. Check the Recent Stock-Ins list before retrying.');
         }).then(function () {
             submitting = false;
-            submit.innerHTML = '<i class="fas fa-check"></i> Confirm Stock In';
+            submit.innerHTML = '<i class="ph ph-check-circle" aria-hidden="true"></i> Confirm Stock In';
             setFormEnabled(!!product);
             scanner.refocus();
         });

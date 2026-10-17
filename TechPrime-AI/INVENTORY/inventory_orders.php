@@ -299,447 +299,244 @@ staff_page_start([
     'active' => 'orders',
     'heading' => 'Orders',
     'subtitle' => 'Customer orders and status updates',
-    'extra_head' => <<<'EXTRA'
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-.orders-page { display: flex; flex-direction: column; gap: 22px; }
-
-.orders-chart-panel {
-    background: var(--card-bg, #fff);
-    border-radius: 16px;
-    border: 1px solid var(--ep-border, var(--border));
-    box-shadow: var(--card-shadow);
-    overflow: hidden;
-}
-.orders-chart-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 18px 24px;
-    border-bottom: 1px solid var(--ep-border, var(--border));
-    background: linear-gradient(to bottom, #fff 0%, var(--slate-50, #f8fafc) 100%);
-}
-.orders-chart-header h3 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--ep-text, var(--text-main));
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.orders-chart-header .card-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-}
-.orders-chart-meta {
-    font-size: 12px;
-    color: var(--ep-muted, var(--text-muted));
-    font-weight: 500;
-}
-.orders-chart-body { padding: 16px 22px 22px; }
-.orders-chart-canvas-wrap {
-    position: relative;
-    height: 240px;
-    width: 100%;
-}
-
-.orders-card-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-.orders-status-select {
-    min-width: 180px;
-    height: 40px;
-    border-radius: 10px !important;
-    border: 1px solid var(--ep-border);
-    font-weight: 600;
-    font-size: 13px;
-    background: #fff;
-}
-/* Flex children default to min-width:auto, which stops Chart.js's canvas from shrinking */
-.orders-page > * { min-width: 0; }
-.price-tag { color: var(--text-main); font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.order-id { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.order-date { white-space: nowrap; }
-.customer-name { font-weight: 600; color: var(--text-main); }
-.customer-meta { max-width: 280px; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.customer-addr,
-.order-products {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    font-size: 12px;
-    line-height: 1.45;
-}
-.customer-addr { -webkit-line-clamp: 1; max-width: 280px; color: var(--slate-500); }
-.order-products { -webkit-line-clamp: 2; min-width: 160px; max-width: 240px; color: var(--text-main); }
-.orders-table .action-row { flex-wrap: nowrap; }
-.orders-table .action-row form[style*="flex"] { flex-wrap: nowrap !important; }
-.cancel-reason { margin-top: 4px; font-size: 12px; color: #b91c1c; }
-.order-status { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-.order-status .badge i { margin-right: 5px; font-size: 9.5px; }
-.badge-ship { background: #fff4e6; color: #c2410c; }
-.badge-courier { background: #eef4ff; color: #2452c9; }
-.badge-done { background: var(--slate-100); color: var(--slate-600); }
-.badge-muted { background: var(--slate-100); color: var(--slate-500); }
-.pickup-tag { font-size: 11px; font-weight: 600; color: var(--slate-500); }
-.pickup-tag i { margin-right: 4px; }
-.bulk-col { width: 34px; text-align: center; }
-.bulk-check { width: 17px; height: 17px; accent-color: var(--ep-green); cursor: pointer; }
-.bulk-check:disabled { cursor: not-allowed; opacity: .35; }
-.bulk-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 0 4px; }
-.bulk-tools-label { font-size: 12.5px; font-weight: 700; color: var(--ep-muted, var(--text-muted)); }
-.bulk-chip { border: 1px solid var(--ep-border, var(--border)); background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--ep-text, var(--text-main)); }
-.bulk-chip span { margin-left: 4px; background: var(--ep-green-light); color: var(--ep-green-dark); border-radius: 999px; padding: 1px 7px; font-size: 11.5px; }
-.bulk-chip:hover { border-color: var(--ep-green); background: var(--ep-green-light); }
-.bulk-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 4px; padding: 10px 14px; border-radius: 12px; background: var(--ep-green-light); border: 1px solid var(--teal-light, #c6e6b3); }
-.bulk-bar[hidden] { display: none !important; }
-.bulk-bar-count { font-size: 13px; font-weight: 600; }
-.customer-cell div { line-height: 1.35; }
-.action-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.orders-table th, .orders-table td { vertical-align: middle; }
-.orders-table tbody tr { transition: background 0.15s ease; }
-.orders-table tbody tr:hover { background: rgba(238, 248, 230, 0.7); }
-.orders-empty {
-    text-align: center;
-    padding: 48px 20px;
-    color: var(--ep-muted, var(--text-muted));
-    font-weight: 500;
-}
-.orders-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    padding: 18px 20px 8px;
-    border-top: 1px solid var(--ep-border, var(--border));
-    margin-top: 8px;
-}
-.orders-page-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 36px;
-    height: 36px;
-    padding: 0 12px;
-    border-radius: 10px;
-    border: 1px solid var(--ep-border, var(--border));
-    background: #fff;
-    color: var(--ep-text, var(--text-main));
-    font-size: 13px;
-    font-weight: 600;
-    text-decoration: none;
-    font-variant-numeric: tabular-nums;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 160ms var(--ease-out);
-}
-.orders-page-link:active:not(.disabled) { transform: scale(0.95); }
-@media (prefers-reduced-motion: reduce) { .orders-page-link:active:not(.disabled) { transform: none; } }
-.orders-page-link:hover:not(.disabled):not(.active) {
-    border-color: var(--ep-green);
-    color: var(--ep-green-dark);
-    background: var(--ep-green-light);
-}
-.orders-page-link.active {
-    background: var(--ep-green);
-    border-color: var(--ep-green);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(75, 139, 42, 0.28);
-}
-.orders-page-link.disabled {
-    opacity: 0.45;
-    pointer-events: none;
-}
-.orders-page-summary {
-    width: 100%;
-    text-align: center;
-    font-size: 12px;
-    color: var(--ep-muted, var(--text-muted));
-    font-weight: 500;
-    margin-top: 6px;
-}
-.orders-count-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 100px;
-    font-size: 12px;
-    font-weight: 600;
-    background: var(--ep-green-light);
-    color: var(--ep-green-dark);
-    border: 1px solid var(--teal-light, #c6e6b3);
-    margin-right: 8px;
-}
-@media (max-width: 640px) {
-    .orders-chart-canvas-wrap { height: 200px; }
-    .orders-status-select { width: 100%; min-width: 0; }
-}
-</style>
-EXTRA
+    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>',
 ]);
 ?>
 
-        <div class="orders-page">
+        <div class="inv-stack">
 
-            <div class="card">
-                <div class="card-header orders-card-header">
+            <section class="cx-card orders-card" aria-labelledby="ordersTitle">
+                <div class="cx-card-head">
                     <div>
-                        <h3><span class="card-icon"><i class="fas fa-shopping-cart"></i></span> Customer Orders</h3>
-                        <div class="card-subtitle">
+                        <h2 id="ordersTitle"><i class="ph ph-shopping-cart-simple" aria-hidden="true"></i> Customer orders</h2>
+                        <p>
                             <?php if ($selectedStatus !== ''): ?>
-                                Filtered by <?php echo h($orderStatusFilters[$selectedStatus]); ?>
+                                Filtered by <?php echo h($orderStatusFilters[$selectedStatus]); ?> · <a class="cx-link" href="inventory_orders.php">Show all</a>
                             <?php else: ?>
-                                All customer orders
+                                All customer orders · cancel requests first, then newest
                             <?php endif; ?>
-                        </div>
+                        </p>
                     </div>
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                        <span class="orders-count-badge"><i class="fas fa-list"></i> <?php echo (int)$filteredCount; ?> order<?php echo $filteredCount === 1 ? '' : 's'; ?></span>
-                        <form method="get" action="inventory_orders.php" id="statusFilterForm" style="margin:0;">
-                            <label for="statusFilter" class="sr-only" style="position:absolute;left:-9999px;">Status</label>
-                            <select name="status" id="statusFilter" class="form-control orders-status-select" aria-label="Filter by status" onchange="this.form.submit()">
-                                <option value="">All Statuses</option>
-                                <?php foreach ($orderStatusFilters as $val => $lbl): ?>
-                                <option value="<?php echo h($val); ?>"<?php echo $selectedStatus === $val ? ' selected' : ''; ?>><?php echo h($lbl); ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                    <div class="cx-card-tools">
+                        <span class="cx-count"><i class="ph ph-list-bullets" aria-hidden="true"></i> <?php echo number_format($filteredCount); ?> order<?php echo $filteredCount === 1 ? '' : 's'; ?></span>
+                        <form method="get" action="inventory_orders.php" id="statusFilterForm">
+                            <label class="sort-wrap" for="statusFilter">
+                                <span>Status</span>
+                                <select name="status" id="statusFilter" onchange="this.form.submit()">
+                                    <option value="">All Statuses</option>
+                                    <?php foreach ($orderStatusFilters as $val => $lbl): ?>
+                                    <option value="<?php echo h($val); ?>"<?php echo $selectedStatus === $val ? ' selected' : ''; ?>><?php echo h($lbl); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <noscript><button type="submit" class="cx-btn cx-btn-outline">Apply</button></noscript>
                         </form>
                     </div>
                 </div>
-                <div class="card-body" style="padding-top:0;">
-                    <?php
-                    $bulkCounts = ['to_pay' => 0, 'to_ship' => 0, 'to_receive' => 0];
-                    foreach ($pagedRows as $br) {
-                        $bs = (string)($br['status'] ?? '');
-                        $bCancel = !empty($br['cancel_requested']) && $bs !== 'cancelled';
-                        $bPaid = strtolower((string)($br['payment_status'] ?? 'unpaid')) === 'paid';
-                        if ($bCancel) {
-                            continue;
-                        }
-                        if ($bs === 'to_pay' && $bPaid) {
-                            $bulkCounts['to_pay']++;
-                        } elseif (isset($bulkCounts[$bs]) && $bs !== 'to_pay') {
-                            $bulkCounts[$bs]++;
-                        }
+                <?php
+                $bulkCounts = ['to_pay' => 0, 'to_ship' => 0, 'to_receive' => 0];
+                foreach ($pagedRows as $br) {
+                    $bs = (string)($br['status'] ?? '');
+                    $bCancel = !empty($br['cancel_requested']) && $bs !== 'cancelled';
+                    $bPaid = strtolower((string)($br['payment_status'] ?? 'unpaid')) === 'paid';
+                    if ($bCancel) {
+                        continue;
                     }
-                    ?>
-                    <div class="bulk-tools" id="bulkTools">
-                        <?php foreach (['to_pay' => 'To Pay (Accept)', 'to_ship' => 'To Ship', 'to_receive' => 'To Receive'] as $bk => $bl): ?>
-                            <?php if ($bulkCounts[$bk] > 0): ?>
-                            <button type="button" class="bulk-chip" data-select-status="<?php echo h($bk); ?>"><?php echo h($bl); ?> <span><?php echo (int)$bulkCounts[$bk]; ?></span></button>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                        <span class="text-muted text-small">Bulk updates per order status.</span>
+                    if ($bs === 'to_pay' && $bPaid) {
+                        $bulkCounts['to_pay']++;
+                    } elseif (isset($bulkCounts[$bs]) && $bs !== 'to_pay') {
+                        $bulkCounts[$bs]++;
+                    }
+                }
+                ?>
+                <?php if (array_sum($bulkCounts) > 0): ?>
+                <div class="bulk-tools" id="bulkTools">
+                    <span class="bulk-tools-label">Select all on this page:</span>
+                    <?php foreach (['to_pay' => 'To Pay (Accept)', 'to_ship' => 'To Ship', 'to_receive' => 'To Receive'] as $bk => $bl): ?>
+                        <?php if ($bulkCounts[$bk] > 0): ?>
+                        <button type="button" class="bulk-chip" data-select-status="<?php echo h($bk); ?>"><?php echo h($bl); ?> <span class="cx-num"><?php echo (int)$bulkCounts[$bk]; ?></span></button>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                    <span class="bulk-tools-hint">Bulk updates work on one order status at a time.</span>
+                </div>
+                <?php endif; ?>
+                <form method="post" id="bulkForm" class="bulk-bar" hidden>
+                    <input type="hidden" name="action" value="bulk_update">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                    <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
+                    <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
+                    <span class="bulk-bar-count" role="status"><strong id="bulkCount" class="cx-num">0</strong> selected</span>
+                    <label class="sort-wrap" for="bulkTarget">
+                        <span>Move to</span>
+                        <select name="bulk_target" id="bulkTarget"></select>
+                    </label>
+                    <button type="submit" class="cx-btn cx-btn-primary" id="bulkApply"><i class="ph ph-check" aria-hidden="true"></i> Update selected</button>
+                    <button type="button" class="cx-btn cx-btn-ghost" id="bulkClear">Clear</button>
+                </form>
+                <?php if (empty($pagedRows)): ?>
+                    <div class="cx-empty">
+                        <span class="cx-empty-icon" aria-hidden="true"><i class="ph ph-shopping-cart-simple"></i></span>
+                        <strong>No orders found<?php echo $selectedStatus !== '' ? ' for this status' : ' yet'; ?></strong>
+                        <span><?php echo $selectedStatus !== '' ? 'Pick another status, or show all orders.' : 'Customer orders will be listed here.'; ?></span>
+                        <?php if ($selectedStatus !== ''): ?><a class="cx-btn cx-btn-outline" href="inventory_orders.php">Show all orders</a><?php endif; ?>
                     </div>
-                    <form method="post" id="bulkForm" class="bulk-bar" hidden>
-                        <input type="hidden" name="action" value="bulk_update">
-                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                        <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
-                        <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
-                        <span class="bulk-bar-count"><strong id="bulkCount">0</strong> selected</span>
-                        <label class="sr-only" for="bulkTarget" style="position:absolute;left:-9999px;">Update selected to</label>
-                        <select name="bulk_target" id="bulkTarget" class="form-control" style="width:auto;min-width:160px;"></select>
-                        <button type="submit" class="btn btn-primary btn-sm" id="bulkApply">Update selected</button>
-                        <button type="button" class="btn btn-outline btn-sm" id="bulkClear">Clear</button>
-                    </form>
-                    <div class="table-wrap">
-                        <table class="ias-table orders-table">
-                            <thead>
-                                <tr>
-                                    <th class="bulk-col" aria-label="Select"></th>
-                                    <th>Order</th>
-                                    <th>Customer</th>
-                                    <th>Products</th>
-                                    <th>Total</th>
-                                    <th>Status</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($pagedRows as $r):
-                                    $ost = (string)($r['status'] ?? '');
-                                    $payStatus = strtolower((string)($r['payment_status'] ?? 'unpaid'));
-                                    $isPaid = ($payStatus === 'paid');
-                                    $cancelRequested = !empty($r['cancel_requested']) && $ost !== 'cancelled';
-                                    $canAcceptCancel = $cancelRequested;
-                                    $canAccept = ($ost === 'to_pay' && $isPaid && !$cancelRequested);
-                                    $awaitingPayment = ($ost === 'to_pay' && !$isPaid && !$cancelRequested);
-                                    $addr = $r['shipping_address'] ?: ($r['user_address'] ?? '');
-                                    $cancelReason = trim((string)($r['cancel_reason'] ?? ''));
-                                    // Bulk-selectable: waiting for Accept, or To Ship / To Receive.
-                                    $bulkEligible = !$cancelRequested && ($canAccept || in_array($ost, ['to_ship', 'to_receive'], true));
-                                    if ($cancelRequested) {
-                                        $statusBadge = ['badge-locked', 'fa-ban', 'Cancel requested'];
-                                    } elseif ($awaitingPayment) {
-                                        $statusBadge = ['badge-unverified', 'fa-hourglass-half', 'Awaiting payment'];
-                                    } elseif ($canAccept) {
-                                        $statusBadge = ['badge-active', 'fa-check', 'Paid · to accept'];
-                                    } elseif ($ost === 'to_ship') {
-                                        $statusBadge = ['badge-ship', 'fa-box', 'To ship'];
-                                    } elseif ($ost === 'to_receive') {
-                                        $statusBadge = ['badge-courier', 'fa-truck', 'With courier'];
-                                    } elseif ($ost === 'to_review') {
-                                        $statusBadge = ['badge-done', 'fa-check-circle', 'Completed'];
-                                    } elseif ($ost === 'cancelled') {
-                                        $statusBadge = ['badge-muted', 'fa-times', 'Cancelled'];
-                                    } else {
-                                        $statusBadge = ['badge-muted', 'fa-circle', $orderStatusFilters[$ost] ?? ucfirst(str_replace('_', ' ', $ost))];
-                                    }
-                                    $contact = array_filter([(string)($r['email'] ?? ''), trim((string)($r['customer_phone'] ?? ''))], 'strlen');
-                                ?>
-                                <tr>
-                                    <td class="bulk-col">
-                                        <?php if ($bulkEligible): ?>
-                                        <input type="checkbox" class="bulk-check" value="<?php echo (int)$r['id']; ?>"
-                                               data-status="<?php echo h($ost); ?>"
-                                               aria-label="Select order #<?php echo (int)$r['id']; ?>">
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <strong class="order-id">#<?php echo (int)$r['id']; ?></strong>
-                                        <div class="text-muted text-small order-date"><?php echo date('M d, Y', strtotime($r['created_at'])); ?></div>
-                                    </td>
-                                    <td class="customer-cell">
-                                        <div class="customer-name"><?php echo h($r['name'] . ' ' . $r['surname']); ?></div>
-                                        <div class="customer-meta" title="<?php echo h(implode(' · ', $contact)); ?>"><?php echo h(implode(' · ', $contact)); ?></div>
-                                        <div class="customer-addr" title="<?php echo h($addr); ?>"><?php echo h($addr); ?></div>
-                                        <?php if ($cancelRequested && $cancelReason !== ''): ?>
-                                            <div class="cancel-reason"><strong>Cancel reason:</strong> <?php echo h($cancelReason); ?></div>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><div class="order-products" title="<?php echo h($r['products'] ?? ''); ?>"><?php echo h($r['products'] ?? ''); ?></div></td>
-                                    <td class="price-tag">₱<?php echo number_format((float)$r['total'], 2); ?></td>
-                                    <td>
-                                        <div class="order-status">
-                                            <span class="badge <?php echo $statusBadge[0]; ?>"><i class="fas <?php echo $statusBadge[1]; ?>"></i><?php echo h($statusBadge[2]); ?></span>
-                                            <?php if (ep_order_is_pickup($r)): ?><span class="pickup-tag"><i class="fas fa-store"></i>Store pickup</span><?php endif; ?>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="action-row">
-                                            <a href="inventory_details.php?id=<?php echo (int)$r['id']; ?>" class="btn btn-outline btn-sm">View</a>
-                                            <?php if ($canAcceptCancel): ?>
-                                                <form method="post" style="display:inline;margin:0;"
-                                                      data-confirm="Accept this cancellation?"
-                                                      data-confirm-title="Accept cancel?"
-                                                      data-confirm-ok="Accept Cancel"
-                                                      data-confirm-type="danger">
-                                                    <input type="hidden" name="action" value="accept_cancel">
-                                                    <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
-                                                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                                    <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
-                                                    <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
-                                                    <button type="submit" class="btn btn-primary btn-sm">Accept cancel</button>
-                                                </form>
-                                            <?php elseif ($awaitingPayment): ?>
-                                                <?php /* Nothing to do until the customer pays; the Status column says so. */ ?>
-                                            <?php elseif ($canAccept): ?>
-                                                <form method="post" style="display:inline;margin:0;">
-                                                    <input type="hidden" name="action" value="accept_order">
-                                                    <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
-                                                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                                    <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
-                                                    <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
-                                                    <button type="submit" class="btn btn-primary btn-sm">Accept</button>
-                                                </form>
-                                            <?php elseif (in_array($ost, ['to_review', 'cancelled'], true)): ?>
-                                                <?php /* Final state: shown in the Status column, nothing to act on. */ ?>
-                                            <?php else: ?>
-                                            <form method="post" style="display:flex;gap:6px;margin:0;align-items:center;flex-wrap:wrap;">
-                                                <input type="hidden" name="action" value="update_status">
+                <?php else: ?>
+                <div class="cx-table-wrap">
+                    <table class="cx-table orders-table">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="bulk-col"><span class="cx-sr">Select</span></th>
+                                <th scope="col">Order</th>
+                                <th scope="col">Customer</th>
+                                <th scope="col">Products</th>
+                                <th scope="col" class="num">Total</th>
+                                <th scope="col">Status</th>
+                                <th scope="col" class="col-actions">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($pagedRows as $r):
+                                $ost = (string)($r['status'] ?? '');
+                                $payStatus = strtolower((string)($r['payment_status'] ?? 'unpaid'));
+                                $isPaid = ($payStatus === 'paid');
+                                $cancelRequested = !empty($r['cancel_requested']) && $ost !== 'cancelled';
+                                $canAcceptCancel = $cancelRequested;
+                                $canAccept = ($ost === 'to_pay' && $isPaid && !$cancelRequested);
+                                $awaitingPayment = ($ost === 'to_pay' && !$isPaid && !$cancelRequested);
+                                $addr = $r['shipping_address'] ?: ($r['user_address'] ?? '');
+                                $cancelReason = trim((string)($r['cancel_reason'] ?? ''));
+                                // Bulk-selectable: waiting for Accept, or To Ship / To Receive.
+                                $bulkEligible = !$cancelRequested && ($canAccept || in_array($ost, ['to_ship', 'to_receive'], true));
+                                if ($cancelRequested) {
+                                    $statusBadge = ['is-cancelreq', 'ph-prohibit', 'Cancel requested'];
+                                } elseif ($awaitingPayment) {
+                                    $statusBadge = ['is-pay', 'ph-hourglass-medium', 'Awaiting payment'];
+                                } elseif ($canAccept) {
+                                    $statusBadge = ['is-accept', 'ph-check-circle', 'Paid · to accept'];
+                                } elseif ($ost === 'to_ship') {
+                                    $statusBadge = ['is-ship', 'ph-package', 'To ship'];
+                                } elseif ($ost === 'to_receive') {
+                                    $statusBadge = ['is-courier', 'ph-truck', 'With courier'];
+                                } elseif ($ost === 'to_review') {
+                                    $statusBadge = ['is-done', 'ph-seal-check', 'Completed'];
+                                } elseif ($ost === 'cancelled') {
+                                    $statusBadge = ['is-cancel', 'ph-x-circle', 'Cancelled'];
+                                } else {
+                                    $statusBadge = ['is-cancel', 'ph-circle', $orderStatusFilters[$ost] ?? ucfirst(str_replace('_', ' ', $ost))];
+                                }
+                                $contact = array_filter([(string)($r['email'] ?? ''), trim((string)($r['customer_phone'] ?? ''))], 'strlen');
+                            ?>
+                            <tr class="<?php echo h($statusBadge[0]); ?>">
+                                <td class="bulk-col">
+                                    <?php if ($bulkEligible): ?>
+                                    <input type="checkbox" class="bulk-check" value="<?php echo (int)$r['id']; ?>"
+                                           data-status="<?php echo h($ost); ?>"
+                                           aria-label="Select order #<?php echo (int)$r['id']; ?>">
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Order" class="col-order">
+                                    <strong class="order-id cx-mono">#<?php echo (int)$r['id']; ?></strong>
+                                    <span class="order-date cx-num"><?php echo date('M d, Y', strtotime($r['created_at'])); ?></span>
+                                </td>
+                                <td data-label="Customer" class="customer-cell">
+                                    <div class="customer-name"><?php echo h($r['name'] . ' ' . $r['surname']); ?></div>
+                                    <div class="customer-meta" title="<?php echo h(implode(' · ', $contact)); ?>"><?php echo h(implode(' · ', $contact)); ?></div>
+                                    <div class="customer-addr" title="<?php echo h($addr); ?>"><?php echo h($addr); ?></div>
+                                    <?php if ($cancelRequested && $cancelReason !== ''): ?>
+                                        <div class="cancel-reason"><i class="ph ph-chat-text" aria-hidden="true"></i> <span><strong>Cancel reason:</strong> <?php echo h($cancelReason); ?></span></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Products"><div class="order-products" title="<?php echo h($r['products'] ?? ''); ?>"><?php echo h($r['products'] ?? ''); ?></div></td>
+                                <td data-label="Total" class="num cx-num"><span class="price-tag">₱<?php echo number_format((float)$r['total'], 2); ?></span></td>
+                                <td data-label="Status">
+                                    <div class="order-status">
+                                        <span class="ord-badge <?php echo h($statusBadge[0]); ?>"><i class="ph-fill <?php echo h($statusBadge[1]); ?>" aria-hidden="true"></i> <?php echo h($statusBadge[2]); ?></span>
+                                        <?php if (ep_order_is_pickup($r)): ?><span class="pickup-tag"><i class="ph ph-storefront" aria-hidden="true"></i> Store pickup</span><?php endif; ?>
+                                    </div>
+                                </td>
+                                <td class="col-actions">
+                                    <div class="action-row">
+                                        <a href="inventory_details.php?id=<?php echo (int)$r['id']; ?>" class="cx-btn cx-btn-outline cx-btn-sm" aria-label="View order #<?php echo (int)$r['id']; ?>"><i class="ph ph-eye" aria-hidden="true"></i> View</a>
+                                        <?php if ($canAcceptCancel): ?>
+                                            <form method="post" class="action-form"
+                                                  data-confirm="Accept this cancellation?"
+                                                  data-confirm-title="Accept cancel?"
+                                                  data-confirm-ok="Accept Cancel"
+                                                  data-confirm-type="danger">
+                                                <input type="hidden" name="action" value="accept_cancel">
                                                 <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
                                                 <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                                                 <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
                                                 <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
-                                                <select name="order_status" class="form-control" style="width:auto;min-width:130px;" aria-label="Update order status">
-                                                    <?php
-                                                    $opts = [
-                                                        'to_pay' => 'To Pay',
-                                                        'to_ship' => 'To Ship',
-                                                        'to_receive' => 'To Receive',
-                                                        'to_review' => 'Completed',
-                                                    ];
-                                                    if (ep_order_is_pickup($r)) {
-                                                        // Store pickup: no shipping step.
-                                                        unset($opts['to_pay'], $opts['to_ship']);
-                                                    }
-                                                    // Forward only: hide statuses before the current one.
-                                                    $rankMap = ['to_pay' => 0, 'to_ship' => 1, 'to_receive' => 2, 'to_review' => 3];
-                                                    foreach (array_keys($opts) as $k) {
-                                                        if (($rankMap[$k] ?? 0) < ($rankMap[$ost] ?? 0)) {
-                                                            unset($opts[$k]);
-                                                        }
-                                                    }
-                                                    foreach ($opts as $val => $lbl):
-                                                    ?>
-                                                    <option value="<?php echo h($val); ?>"<?php echo $ost === $val ? ' selected' : ''; ?>><?php echo h($lbl); ?></option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                                <button type="submit" class="btn btn-primary btn-sm">Update</button>
+                                                <button type="submit" class="cx-btn cx-btn-sm act-danger"><i class="ph ph-prohibit" aria-hidden="true"></i> Accept cancel</button>
                                             </form>
-                                            <?php endif; ?>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                                <?php if (empty($pagedRows)): ?>
-                                <tr><td colspan="7" class="orders-empty">No orders found<?php echo $selectedStatus !== '' ? ' for this status' : ' yet'; ?>.</td></tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <?php if ($filteredCount > 0): ?>
-                    <nav class="orders-pagination" aria-label="Orders pagination">
-                        <?php
-                        $prevPage = max(1, $currentPage - 1);
-                        $nextPage = min($totalPages, $currentPage + 1);
-                        ?>
-                        <a href="<?php echo h(inv_orders_page_url($prevPage, $selectedStatus)); ?>"
-                           class="orders-page-link<?php echo $currentPage <= 1 ? ' disabled' : ''; ?>"
-                           aria-disabled="<?php echo $currentPage <= 1 ? 'true' : 'false'; ?>">
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </a>
-                        <?php for ($p = 1; $p <= $totalPages; $p++): ?>
-                            <a href="<?php echo h(inv_orders_page_url($p, $selectedStatus)); ?>"
-                               class="orders-page-link<?php echo $p === $currentPage ? ' active' : ''; ?>"
-                               <?php echo $p === $currentPage ? 'aria-current="page"' : ''; ?>><?php echo $p; ?></a>
-                        <?php endfor; ?>
-                        <a href="<?php echo h(inv_orders_page_url($nextPage, $selectedStatus)); ?>"
-                           class="orders-page-link<?php echo $currentPage >= $totalPages ? ' disabled' : ''; ?>"
-                           aria-disabled="<?php echo $currentPage >= $totalPages ? 'true' : 'false'; ?>">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </a>
-                        <div class="orders-page-summary">
-                            Showing <?php echo $filteredCount === 0 ? 0 : (($currentPage - 1) * $perPage + 1); ?>–<?php echo min($currentPage * $perPage, $filteredCount); ?> of <?php echo $filteredCount; ?> orders
-                            (<?php echo (int)$perPage; ?> per page)
-                        </div>
-                    </nav>
-                    <?php endif; ?>
+                                        <?php elseif ($awaitingPayment): ?>
+                                            <?php /* Nothing to do until the customer pays; the Status column says so. */ ?>
+                                        <?php elseif ($canAccept): ?>
+                                            <form method="post" class="action-form">
+                                                <input type="hidden" name="action" value="accept_order">
+                                                <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
+                                                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                                <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
+                                                <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
+                                                <button type="submit" class="cx-btn cx-btn-primary cx-btn-sm"><i class="ph ph-check" aria-hidden="true"></i> Accept</button>
+                                            </form>
+                                        <?php elseif (in_array($ost, ['to_review', 'cancelled'], true)): ?>
+                                            <?php /* Final state: shown in the Status column, nothing to act on. */ ?>
+                                        <?php else: ?>
+                                        <form method="post" class="action-form status-form">
+                                            <input type="hidden" name="action" value="update_status">
+                                            <input type="hidden" name="order_id" value="<?php echo (int)$r['id']; ?>">
+                                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                            <input type="hidden" name="return_status" value="<?php echo h($selectedStatus); ?>">
+                                            <input type="hidden" name="return_page" value="<?php echo (int)$currentPage; ?>">
+                                            <select name="order_status" class="row-select" aria-label="New status for order #<?php echo (int)$r['id']; ?>">
+                                                <?php
+                                                $opts = [
+                                                    'to_pay' => 'To Pay',
+                                                    'to_ship' => 'To Ship',
+                                                    'to_receive' => 'To Receive',
+                                                    'to_review' => 'Completed',
+                                                ];
+                                                if (ep_order_is_pickup($r)) {
+                                                    // Store pickup: no shipping step.
+                                                    unset($opts['to_pay'], $opts['to_ship']);
+                                                }
+                                                // Forward only: hide statuses before the current one.
+                                                $rankMap = ['to_pay' => 0, 'to_ship' => 1, 'to_receive' => 2, 'to_review' => 3];
+                                                foreach (array_keys($opts) as $k) {
+                                                    if (($rankMap[$k] ?? 0) < ($rankMap[$ost] ?? 0)) {
+                                                        unset($opts[$k]);
+                                                    }
+                                                }
+                                                foreach ($opts as $val => $lbl):
+                                                ?>
+                                                <option value="<?php echo h($val); ?>"<?php echo $ost === $val ? ' selected' : ''; ?>><?php echo h($lbl); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <button type="submit" class="cx-btn cx-btn-primary cx-btn-sm">Update</button>
+                                        </form>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
-            </div>
+                <?php endif; ?>
+                <?php staff_pagination($currentPage, $totalPages, $filteredCount, $perPage, static fn(int $p): string => inv_orders_page_url($p, $selectedStatus), 'Orders pages'); ?>
+            </section>
 
-                    <section class="orders-chart-panel" aria-label="Weekly total deliveries">
-                        <div class="orders-chart-header">
-                            <div>
-                                <h3><span class="card-icon"><i class="fas fa-chart-line"></i></span> Weekly Total Deliveries</h3>
-                                <div class="orders-chart-meta">Shipment totals by week for the last 8 weeks</div>
-                            </div>
-                        </div>
-                        <div class="orders-chart-body">
-                            <div class="orders-chart-canvas-wrap">
-                                <canvas id="weeklyDeliveriesChart" aria-label="Weekly total deliveries chart"></canvas>
-                            </div>
-                        </div>
-                    </section>
+            <section class="cx-card" aria-labelledby="weeklyTitle">
+                <div class="cx-card-head">
+                    <div>
+                        <h2 id="weeklyTitle"><i class="ph ph-chart-bar" aria-hidden="true"></i> Weekly total deliveries</h2>
+                        <p>Shipments created per week, last 8 weeks</p>
+                    </div>
+                </div>
+                <div class="cx-chart cx-chart-sm"><canvas id="weeklyDeliveriesChart" role="img" aria-label="Weekly total deliveries chart, last 8 weeks"></canvas></div>
+            </section>
         </div>
 
 <?php
@@ -777,6 +574,8 @@ $chartScript = <<<SCRIPT
     if (!canvas || typeof Chart === 'undefined') return;
     var labels = {$weekLabelsJson};
     var values = {$weekCountsJson};
+    Chart.defaults.font.family = "'Fira Sans', 'Segoe UI', system-ui, sans-serif";
+    Chart.defaults.color = '#45514a';
     new Chart(canvas.getContext('2d'), {
         type: 'bar',
         data: {
@@ -784,9 +583,7 @@ $chartScript = <<<SCRIPT
             datasets: [{
                 label: 'Total Deliveries',
                 data: values,
-                backgroundColor: 'rgba(75, 139, 42, 0.8)',
-                borderColor: 'rgba(75, 139, 42, 1)',
-                borderWidth: 1,
+                backgroundColor: '#4b8b2a',
                 borderRadius: 6,
                 maxBarThickness: 48
             }]
@@ -811,12 +608,12 @@ $chartScript = <<<SCRIPT
             scales: {
                 x: {
                     grid: { display: false },
-                    ticks: { font: { size: 11, weight: '600' }, color: '#4b5563' }
+                    ticks: { font: { size: 12 } }
                 },
                 y: {
                     beginAtZero: true,
-                    ticks: { precision: 0, font: { size: 11 }, color: '#6b7280' },
-                    grid: { color: 'rgba(0,0,0,0.06)' }
+                    ticks: { precision: 0, font: { size: 12 } },
+                    grid: { color: '#e0e6dd' }
                 }
             }
         }

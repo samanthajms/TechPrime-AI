@@ -18,8 +18,11 @@
  *   actions   => string  HTML for the page-header action area
  *   hide_head => bool    no page header (an sr-only h1 is still printed)
  *
+ * The inventory custodian also gets the notifications bell (staff_app_notif_bell()).
+ *
  * Styles: includes/staff_app.css (tokens, shell, components) + the role's own
- * stylesheet (CASHIER/cashier.css, ADMIN/admin.css). staff_shared.css is still
+ * stylesheet (CASHIER/cashier.css, ADMIN/admin.css, RETAIL/retail.css,
+ * INVENTORY/inventory.css). staff_shared.css is still
  * loaded for the shared pieces rendered inside (cards, forms, alerts, dialogs).
  */
 
@@ -27,7 +30,7 @@ if (!function_exists('staff_app_shell_roles')) {
     /** Roles rendered with this shell; the others still use the legacy shell in staff_layout.php. */
     function staff_app_shell_roles(): array
     {
-        return ['cashier', 'admin'];
+        return ['cashier', 'admin', 'retail_officer', 'inventory_custodian'];
     }
 }
 
@@ -36,17 +39,93 @@ if (!function_exists('staff_app_role_css')) {
     function staff_app_role_css(string $role): string
     {
         $map = [
-            'cashier' => 'cashier.css?v=12',
+            'cashier' => 'cashier.css?v=13',
             'admin' => 'admin.css?v=1',
+            'retail_officer' => 'retail.css?v=1',
+            'inventory_custodian' => 'inventory.css?v=1',
         ];
         return $map[$role] ?? '';
+    }
+}
+
+if (!function_exists('staff_app_notif_bell')) {
+    /**
+     * Top-bar notifications (inventory custodian only): the latest stock notifications
+     * from inv_user_notifications(), marked read / removed through INVENTORY/inventory_notif_api.php.
+     */
+    function staff_app_notif_bell(string $role): void
+    {
+        if ($role !== 'inventory_custodian' || !function_exists('getDbConnection') || !isset($_SESSION['user_id'])) {
+            return;
+        }
+        if (!function_exists('inv_user_notifications')) {
+            require_once __DIR__ . '/inventory_alerts.php';
+        }
+        $items = [];
+        $unread = 0;
+        try {
+            $pack = inv_user_notifications(getDbConnection(), (int)$_SESSION['user_id'], 15);
+            $items = $pack['items'];
+            $unread = (int)$pack['unread'];
+        } catch (Throwable $e) {
+            $items = [];
+            $unread = 0;
+        }
+        $csrf = function_exists('generateCsrfToken') ? generateCsrfToken() : '';
+        $types = [
+            'low_stock' => ['ph-warning', 'Low Stock'],
+            'out_of_stock' => ['ph-x-circle', 'Out of Stock'],
+            'stock_updated' => ['ph-check-circle', 'Stock Updated'],
+        ];
+        ?>
+            <div class="cx-notif" id="cxNotif" data-csrf="<?php echo h($csrf); ?>">
+                <button type="button" class="cx-notif-btn" id="cxNotifBtn" aria-haspopup="true" aria-expanded="false" aria-controls="cxNotifPanel">
+                    <i class="ph ph-bell" aria-hidden="true"></i>
+                    <span class="cx-notif-badge" id="cxNotifBadge" aria-hidden="true"<?php echo $unread > 0 ? '' : ' hidden'; ?>><?php echo $unread > 99 ? '99+' : (int)$unread; ?></span>
+                    <span class="cx-sr" id="cxNotifLabel">Notifications, <?php echo $unread > 0 ? (int)$unread . ' unread' : 'none unread'; ?></span>
+                </button>
+                <div class="cx-notif-panel" id="cxNotifPanel" role="region" aria-label="Inventory notifications" hidden>
+                    <div class="cx-notif-head">
+                        <strong>Notifications</strong>
+                        <button type="button" class="cx-btn cx-btn-ghost cx-btn-sm" id="cxNotifMarkAll"><i class="ph ph-checks" aria-hidden="true"></i> Mark all read</button>
+                    </div>
+                    <ul class="cx-notif-list" id="cxNotifList">
+                        <?php if (!$items): ?>
+                        <li class="cx-notif-empty"><i class="ph ph-bell-slash" aria-hidden="true"></i><span>No inventory notifications yet.</span></li>
+                        <?php endif; ?>
+                        <?php foreach ($items as $n):
+                            $type = (string)($n['type'] ?? 'info');
+                            $isRead = (int)($n['is_read'] ?? 0) === 1;
+                            [$icon, $label] = $types[$type] ?? ['ph-info', 'Update'];
+                            $when = function_exists('inv_relative_time') ? inv_relative_time((string)$n['created_at']) : (string)$n['created_at'];
+                            $href = trim((string)($n['link'] ?? ''));
+                            if ($href === '') {
+                                $href = 'inventory_stocks.php';
+                            } ?>
+                        <li class="cx-notif-item<?php echo $isRead ? ' is-read' : ' is-unread'; ?>" data-id="<?php echo (int)$n['id']; ?>" data-href="<?php echo h($href); ?>">
+                            <button type="button" class="cx-notif-open">
+                                <span class="cx-notif-icon type-<?php echo h($type); ?>" aria-hidden="true"><i class="ph-fill <?php echo h($icon); ?>"></i></span>
+                                <span class="cx-notif-body">
+                                    <span class="cx-notif-type"><?php echo h($label); ?><?php if (!$isRead): ?><span class="cx-sr"> (unread)</span><?php endif; ?></span>
+                                    <span class="cx-notif-msg"><?php echo h((string)$n['message']); ?></span>
+                                    <span class="cx-notif-time"><?php echo h($when); ?></span>
+                                </span>
+                                <?php if (!$isRead): ?><span class="cx-notif-dot" aria-hidden="true"></span><?php endif; ?>
+                            </button>
+                            <button type="button" class="cx-notif-remove" data-notif-remove="<?php echo (int)$n['id']; ?>" aria-label="Remove notification"><i class="ph ph-x" aria-hidden="true"></i></button>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            </div>
+        <?php
     }
 }
 
 if (!function_exists('staff_app_css_href')) {
     function staff_app_css_href(): string
     {
-        return str_replace('staff_shared.css', 'staff_app.css', staff_css_href()) . '?v=1';
+        return str_replace('staff_shared.css', 'staff_app.css', staff_css_href()) . '?v=2';
     }
 }
 
@@ -233,6 +312,7 @@ try {
                 <span class="cx-clock-date" data-clock="date"></span>
                 <time class="cx-clock-time" data-clock="time"></time>
             </div>
+            <?php staff_app_notif_bell($role); ?>
             <div class="cx-user" id="cxUser">
                 <button type="button" class="cx-user-btn" id="cxUserBtn" aria-haspopup="true" aria-expanded="false" aria-controls="cxUserMenu">
                     <span class="cx-avatar<?php echo $userAvatarUrl !== '' ? ' has-img' : ''; ?>" aria-hidden="true"><?php echo $avatar; ?></span>
@@ -305,7 +385,7 @@ if (!function_exists('staff_app_shell_end')) {
 </main>
 </div><!-- /.cx-frame -->
 
-<nav class="cx-tabbar<?php echo $useMore ? ' has-more' : ''; ?>" aria-label="<?php echo h($roleLabel); ?> sections (bottom)">
+<nav class="cx-tabbar<?php echo $useMore ? ' has-more' : ''; ?>" style="--cx-tabs: <?php echo count($tabs) + ($useMore ? 1 : 0); ?>" aria-label="<?php echo h($roleLabel); ?> sections (bottom)">
     <?php foreach ($tabs as $item): $on = $item['key'] === $active; ?>
     <a href="<?php echo h($item['href']); ?>" class="cx-tab<?php echo $on ? ' is-active' : ''; ?>"<?php echo $on ? ' aria-current="page"' : ''; ?>>
         <i class="ph<?php echo $on ? '-fill' : ''; ?> <?php echo h($item['ph']); ?>" aria-hidden="true"></i>
@@ -452,6 +532,83 @@ if (!function_exists('staff_app_shell_end')) {
         }
     }
 
+<?php if ($role === 'inventory_custodian'): ?>
+    /* Notifications (inventory custodian): open, mark read, remove, mark all read */
+    var nWrap = document.getElementById('cxNotif');
+    if (nWrap) {
+        var nBtn = document.getElementById('cxNotifBtn');
+        var nPanel = document.getElementById('cxNotifPanel');
+        var nBadge = document.getElementById('cxNotifBadge');
+        var nLabel = document.getElementById('cxNotifLabel');
+        var nList = document.getElementById('cxNotifList');
+        var nCsrf = nWrap.getAttribute('data-csrf') || '';
+        var EMPTY = '<li class="cx-notif-empty"><i class="ph ph-bell-slash" aria-hidden="true"></i><span>No inventory notifications yet.</span></li>';
+        var setNotifOpen = function (open) {
+            nPanel.hidden = !open;
+            nBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            nWrap.classList.toggle('is-open', open);
+        };
+        var syncCount = function () {
+            var n = nList.querySelectorAll('.cx-notif-item.is-unread').length;
+            nBadge.hidden = n <= 0;
+            nBadge.textContent = n > 99 ? '99+' : String(n);
+            nLabel.textContent = 'Notifications, ' + (n > 0 ? n + ' unread' : 'none unread');
+        };
+        var markRead = function (item) {
+            item.classList.remove('is-unread');
+            item.classList.add('is-read');
+            Array.prototype.forEach.call(item.querySelectorAll('.cx-notif-dot, .cx-notif-type .cx-sr'), function (el) { el.remove(); });
+        };
+        var postNotif = function (action, id) {
+            var body = new URLSearchParams();
+            body.set('action', action);
+            body.set('csrf_token', nCsrf);
+            if (id) body.set('id', String(id));
+            return fetch('inventory_notif_api.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString()
+            }).then(function (r) { return r.json(); }).catch(function () { return null; });
+        };
+        nBtn.addEventListener('click', function () { setNotifOpen(nPanel.hidden); });
+        document.addEventListener('click', function (e) {
+            if (!nPanel.hidden && !nWrap.contains(e.target)) setNotifOpen(false);
+        }, true);
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !nPanel.hidden) { setNotifOpen(false); nBtn.focus(); }
+        });
+        nList.addEventListener('click', function (e) {
+            var rm = e.target.closest('[data-notif-remove]');
+            if (rm) {
+                var gone = rm.closest('.cx-notif-item');
+                postNotif('delete', rm.getAttribute('data-notif-remove')).then(function (d) {
+                    if (!d || !d.ok) return;
+                    var next = gone.nextElementSibling || gone.previousElementSibling;
+                    gone.remove();
+                    if (!nList.querySelector('.cx-notif-item')) nList.innerHTML = EMPTY;
+                    syncCount();
+                    (next ? next.querySelector('.cx-notif-open') : document.getElementById('cxNotifMarkAll')).focus();
+                });
+                return;
+            }
+            var open = e.target.closest('.cx-notif-open');
+            if (!open) return;
+            var item = open.closest('.cx-notif-item');
+            var go = function () { window.location.href = item.getAttribute('data-href') || 'inventory_stocks.php'; };
+            if (!item.classList.contains('is-unread')) { go(); return; }
+            postNotif('read', item.getAttribute('data-id')).then(function () { markRead(item); syncCount(); go(); });
+        });
+        document.getElementById('cxNotifMarkAll').addEventListener('click', function () {
+            postNotif('read_all').then(function (d) {
+                if (!d || !d.ok) return;
+                Array.prototype.forEach.call(nList.querySelectorAll('.cx-notif-item.is-unread'), markRead);
+                syncCount();
+            });
+        });
+    }
+
+<?php endif; ?>
     /* Account menu */
     var wrap = document.getElementById('cxUser');
     var btn = document.getElementById('cxUserBtn');

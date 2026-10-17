@@ -365,501 +365,157 @@ staff_page_start([
     'active' => 'stocks',
     'active_child' => 'inventory',
     'heading' => 'Inventory',
-    'subtitle' => 'Manage product inventory',
-    'extra_head' => <<<'EXTRA'
-<style>
-.stocks-page { display: flex; flex-direction: column; gap: 18px; }
-.stocks-shell {
-    display: flex; flex-direction: column; gap: 0;
-    background: linear-gradient(180deg, #ffffff 0%, #f7faf5 100%);
-    border: 1px solid var(--ep-border);
-    border-radius: 16px;
-    box-shadow: var(--card-shadow);
-    overflow: visible;
-}
-.stocks-shell > .card-body {
-    padding: 18px 24px 24px;
-    background: transparent;
-}
-
-.stocks-filter-wrap { position: relative; flex-shrink: 0; }
-.stocks-filter-btn {
-    display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px;
-    border-radius: 10px; border: 1px solid var(--ep-border); background: #fff;
-    color: var(--ep-text); font-size: 13px; font-weight: 700; cursor: pointer;
-    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease, color .15s ease;
-}
-.stocks-filter-btn:hover,
-.stocks-filter-btn.open {
-    border-color: var(--ep-green); background: var(--ep-green-light); color: var(--ep-green-dark);
-    box-shadow: 0 4px 12px rgba(75, 139, 42, 0.12);
-}
-.stocks-filter-btn .filter-dot {
-    width: 8px; height: 8px; border-radius: 50%; background: var(--ep-green); display: none;
-}
-.stocks-filter-btn.has-active .filter-dot { display: inline-block; }
-.stocks-filter-btn .fa-chevron-down { font-size: 11px; opacity: 0.7; margin-left: 2px; }
-
-.stocks-filter-panel {
-    display: none; position: absolute; right: 0; left: auto; top: calc(100% + 8px); z-index: 90;
-    width: min(360px, calc(100vw - 48px)); background: #fff; border: 1px solid var(--ep-border);
-    border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,0.12); padding: 16px;
-    transform-origin: top right;
-    transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
-}
-.stocks-filter-panel.open { display: flex; flex-direction: column; gap: 14px; }
-@starting-style {
-    .stocks-filter-panel.open { opacity: 0; transform: scale(0.96) translateY(-4px); }
-}
-.stocks-filter-panel-title {
-    margin: 0 0 2px; font-size: 14px; font-weight: 800; color: var(--ep-green-dark);
-}
-.filter-title {
-    font-size: 12px; font-weight: 700; color: var(--ep-text); margin-bottom: 8px; display: block;
-    text-transform: uppercase; letter-spacing: .04em;
-}
-.status-toggle { display: flex; flex-direction: column; gap: 6px; }
-.status-btn {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 8px 12px; border-radius: 8px; border: 1px solid var(--ep-border);
-    background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ep-text);
-    transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform 160ms var(--ease-out);
-}
-.status-btn:hover { border-color: var(--ep-green); }
-.status-btn:active { transform: scale(0.98); }
-.status-btn.active { background: var(--ep-green); border-color: var(--ep-green); color: #fff; }
-.status-btn .cnt { font-weight: 700; opacity: .85; }
-.price-range { display: flex; align-items: center; gap: 8px; }
-.price-range input { width: 100%; }
-.btn-reset { width: 100%; }
-
-.stocks-toolbar {
-    display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
-    margin: 0 0 16px; padding: 12px 14px; background: #fff; border: 1px solid var(--ep-border); border-radius: 14px;
-}
-.search-wrap {
-    flex: 1 1 280px; display: flex; align-items: center; gap: 6px;
-    background: var(--ep-gray-bg); border: 1px solid var(--ep-border); border-radius: 999px; padding: 4px 6px 4px 16px;
-}
-.search-wrap i.fa-search { color: var(--ep-muted); }
-.search-wrap input { flex: 1; border: none; background: transparent; box-shadow: none; padding: 8px 4px; }
-.search-wrap input:focus { outline: none; box-shadow: none; }
-.btn-scan {
-    white-space: nowrap; border-radius: 999px !important; background: var(--ep-green-light);
-    border: 1px solid var(--ep-green) !important; color: var(--ep-green-dark) !important; font-weight: 700;
-}
-.toolbar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.view-toggle { display: flex; border: 1px solid var(--ep-border); border-radius: 999px; overflow: hidden; background: #fff; }
-.view-toggle button { border: none; background: transparent; padding: 8px 12px; cursor: pointer; color: var(--ep-muted); }
-.view-toggle button.active { background: var(--ep-green); color: #fff; }
-#addProductBtn { border-radius: 10px; height: 40px; padding: 0 16px; font-weight: 700; }
-
-.select-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-.select-chip {
-    display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ep-text);
-    border: 1px solid var(--ep-border); border-radius: 999px; padding: 6px 14px; background: #fff; cursor: pointer;
-}
-.select-chip.active { border-color: var(--ep-green); color: var(--ep-green-dark); background: var(--ep-green-light); }
-/* The "N selected" chip only means something once a row is picked */
-#selectedChip:not(.active) { display: none; }
-#selectedCount { font-variant-numeric: tabular-nums; }
-.select-chip input { width: 16px; height: 16px; }
-.selection-bar { display: none; align-items: center; gap: 10px; margin-left: auto; }
-.selection-bar.show { display: flex; }
-
-/* Table-style product layout */
-.stocks-table-wrap {
-    width: 100%;
-    overflow-x: auto;
-    background: #fff;
-    border: 1px solid var(--ep-border);
-    border-radius: 14px;
-}
-.stocks-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13.5px;
-    min-width: 720px;
-}
-.stocks-table thead tr {
-    background: var(--ep-green-light);
-    border-bottom: 2px solid var(--teal-light, #c6e6b3);
-}
-.stocks-table th {
-    padding: 13px 16px;
-    text-align: left;
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.75px;
-    color: var(--teal-deeper, var(--ep-green-dark));
-    white-space: nowrap;
-}
-.stocks-table th.col-chk { width: 44px; }
-.stocks-table th.col-stock { width: 100px; }
-.stocks-table th.col-status { width: 150px; }
-.stocks-table th.col-price { width: 120px; }
-.stocks-table th.col-barcode { width: 150px; }
-.barcode-code {
-    font-family: var(--font-mono, monospace); font-size: 12.5px; font-weight: 700;
-    color: var(--ep-text); letter-spacing: 0.3px; white-space: nowrap;
-}
-.barcode-btn {
-    border: 1px solid var(--ep-border); background: #fff; color: var(--ep-green-dark); cursor: pointer;
-    border-radius: 8px; height: 28px; padding: 0 9px; margin-left: 6px; font-size: 11.5px; font-weight: 700;
-    display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; font-family: inherit;
-}
-.barcode-btn:hover { border-color: var(--ep-green); background: var(--ep-green-light); }
-.label-preview {
-    display: flex; justify-content: center; padding: 18px; margin-bottom: 16px;
-    background: var(--ep-gray-bg); border: 1px dashed var(--ep-border); border-radius: 12px;
-}
-.label-preview .ep-label { transform: scale(1.35); transform-origin: top center; margin-bottom: 12mm; }
-.label-options { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 10px; }
-.label-options .form-group { margin: 0; }
-.label-options input[type=number] { width: 100px; }
-.ep-label {
-    width: 62mm; box-sizing: border-box; padding: 2.5mm 2mm 2mm; background: #fff; color: #000;
-    border: 0.2mm dashed #b5b5b5; text-align: center; font-family: Arial, Helvetica, sans-serif;
-    break-inside: avoid; page-break-inside: avoid;
-}
-.ep-label-name { font-size: 7.5pt; font-weight: 700; line-height: 1.2; max-height: 2.45em; overflow: hidden; }
-.ep-label svg { display: block; margin: 1.2mm auto 0; }
-.ep-label-price { font-size: 9pt; font-weight: 800; margin-top: 0.8mm; }
-#labelPrintArea { display: none; }
-@media print {
-    body.printing-labels > *:not(#labelPrintArea) { display: none !important; }
-    body.printing-labels { background: #fff !important; }
-    body.printing-labels #labelPrintArea {
-        display: grid !important; grid-template-columns: repeat(3, 62mm); gap: 3mm; justify-content: center;
-    }
-    @page { margin: 8mm; }
-}
-.barcode-missing {
-    display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600;
-    color: var(--ep-muted); white-space: nowrap;
-}
-.stocks-table th.col-actions { width: 72px; text-align: center; }
-.stocks-table td {
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--ep-border);
-    vertical-align: middle;
-}
-.stocks-table tbody tr:last-child td { border-bottom: none; }
-.stocks-table tbody tr {
-    transition: background 0.15s ease;
-}
-.stocks-table tbody tr:hover { background: rgba(238, 248, 230, 0.75); }
-.stocks-table tbody tr.selected { background: rgba(238, 248, 230, 0.95); }
-.stocks-table .chk { width: 18px; height: 18px; accent-color: var(--ep-green); }
-.stocks-pname {
-    font-weight: 700;
-    color: var(--ep-text);
-    line-height: 1.4;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-}
-.stocks-pcat {
-    display: block;
-    margin-top: 3px;
-    font-size: 11.5px;
-    color: var(--ep-muted);
-    font-weight: 600;
-}
-.stocks-qty {
-    font-weight: 800;
-    font-size: 15px;
-    color: var(--ep-text);
-    font-variant-numeric: tabular-nums;
-}
-.stocks-qty.warn { color: #b45309; }
-.stocks-qty.out { color: #c0392b; }
-.price-tag { color: var(--ep-text); font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-.stock-status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 11px;
-    border-radius: 100px;
-    font-size: 11.5px;
-    font-weight: 700;
-    white-space: nowrap;
-    border: 1px solid transparent;
-}
-.stock-status-pill.ok {
-    background: #f0fdf4;
-    color: #15803d;
-    border-color: #bbf7d0;
-}
-.stock-status-pill.low {
-    background: #fffbeb;
-    color: #b45309;
-    border-color: #fde68a;
-}
-.stock-status-pill.critical {
-    background: #fff1f2;
-    color: #be123c;
-    border-color: #fecdd3;
-}
-.stock-status-pill.out {
-    background: #fef2f2;
-    color: #b91c1c;
-    border-color: #fecaca;
-}
-
-.ellipsis-wrap { position: relative; display: inline-flex; justify-content: center; width: 100%; }
-.ellipsis-btn {
-    border: none; background: none; font-size: 18px; color: var(--ep-muted); cursor: pointer;
-    width: 32px; height: 32px; border-radius: 999px;
-}
-.ellipsis-btn:hover { background: var(--ep-gray-bg); }
-.ellipsis-menu {
-    display: none; position: absolute; right: 0; top: 36px; background: #fff; border: 1px solid var(--ep-border);
-    border-radius: 8px; box-shadow: var(--card-shadow); z-index: 50; min-width: 150px; overflow: hidden;
-}
-.ellipsis-menu.open { display: block; }
-.ellipsis-menu button {
-    display: block; width: 100%; text-align: left; padding: 10px 14px; border: none; background: none;
-    cursor: pointer; font-size: 13px; color: var(--ep-text);
-}
-.ellipsis-menu button:hover { background: var(--ep-gray-bg); }
-.ellipsis-menu button.danger { color: #c0392b; }
-
-/* Grid view (preserved) */
-.product-list { display: flex; flex-direction: column; gap: 10px; }
-.product-list.grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
-.product-row {
-    display: flex; align-items: center; gap: 14px; padding: 14px 16px;
-    border: 1.5px solid var(--ep-border); border-radius: 14px; background: #fff;
-    transition: border-color .15s ease, box-shadow .15s ease;
-}
-.product-list.grid-view .product-row { flex-direction: column; align-items: stretch; text-align: center; position: relative; }
-.product-list.grid-view .thumb { width: 100%; height: 120px; margin: 0 auto; }
-.product-list.grid-view .product-main { text-align: left; margin-top: 6px; }
-.product-list.grid-view .product-price { text-align: left; margin-top: 6px; }
-.product-list.grid-view .chk { position: absolute; top: 10px; left: 10px; }
-.product-list.grid-view .ellipsis-wrap { position: absolute; top: 6px; right: 6px; width: auto; }
-.thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 10px; background: var(--ep-green-light); flex-shrink: 0; border: 1px solid var(--ep-border); }
-.product-main { flex: 1; min-width: 0; }
-.product-main .pname { font-weight: 700; color: var(--ep-text); }
-.product-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: 12px; color: var(--ep-muted); }
-.product-price { text-align: right; min-width: 100px; }
-.price-label { font-size: 11px; color: var(--ep-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
-.category-pill {
-    background: var(--ep-green-light); color: var(--ep-green-dark);
-    padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
-    border: 1px solid var(--teal-light, #c6e6b3);
-}
-
-.empty-state-row {
-    text-align: center; padding: 52px 16px; color: var(--ep-muted); font-weight: 500;
-    background: #fff; border: 1px dashed var(--ep-border); border-radius: 14px;
-}
-
-.pagination-bar {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px;
-    padding: 14px 4px 0; border-top: 1px solid var(--ep-border); flex-wrap: wrap;
-}
-.pagination-bar .pg-info { font-size: 13px; color: var(--ep-muted); font-weight: 500; }
-.pagination-bar .pg-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.pagination-bar button {
-    border: 1px solid var(--ep-border); background: #fff; border-radius: 10px; min-width: 36px; height: 36px;
-    padding: 0 12px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ep-text);
-    font-variant-numeric: tabular-nums;
-    transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform 160ms var(--ease-out);
-}
-.pagination-bar button:active:not(:disabled) { transform: scale(0.95); }
-.pagination-bar button:hover:not(:disabled):not(.active) {
-    border-color: var(--ep-green); color: var(--ep-green-dark); background: var(--ep-green-light);
-}
-.pagination-bar button.active {
-    background: var(--ep-green); border-color: var(--ep-green); color: #fff;
-    box-shadow: 0 4px 12px rgba(75, 139, 42, 0.22);
-}
-.pagination-bar button:disabled { opacity: .4; cursor: not-allowed; }
-
-.modal {
-    display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5);
-    z-index: 2000; align-items: center; justify-content: center;
-    transition: opacity 200ms var(--ease-out);
-}
-.modal.open { display: flex; }
-.modal-content {
-    background: #fff; padding: 28px; border-radius: 16px; width: 460px;
-    max-width: 92%; max-height: 90vh; overflow-y: auto; position: relative;
-    border: 1px solid var(--ep-border); box-shadow: 0 24px 60px rgba(15,23,42,0.22);
-    transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
-}
-@starting-style {
-    .modal.open { opacity: 0; }
-    .modal.open .modal-content { opacity: 0; transform: scale(0.96) translateY(6px); }
-}
-.modal-content.wide { width: 560px; }
-.modal .close {
-    position: absolute; right: 16px; top: 12px; font-size: 24px;
-    cursor: pointer; border: none; background: none; color: #888; line-height: 1;
-}
-.modal h3 { margin: 0 0 16px; color: var(--ep-green-dark); }
-.details-grid { display: grid; grid-template-columns: 120px 1fr; gap: 10px 14px; font-size: 13px; }
-.details-grid dt { color: var(--ep-muted); font-weight: 600; }
-.details-grid dd { margin: 0; color: var(--ep-text); font-weight: 600; }
-.details-img { width: 100%; max-height: 220px; object-fit: contain; background: var(--ep-green-light); border-radius: 10px; margin-bottom: 16px; }
-
-@media (prefers-reduced-motion: reduce) {
-    .status-btn:active, .pagination-bar button:active:not(:disabled) { transform: none; }
-    .stocks-filter-panel, .modal-content { transition: opacity 150ms ease; }
-    @starting-style {
-        .stocks-filter-panel.open, .modal.open .modal-content { transform: none; }
-    }
-}
-
-@media (max-width: 640px) {
-    .stocks-shell > .card-body { padding: 14px 14px 18px; }
-    .stocks-filter-panel { right: 0; left: auto; }
-    .stocks-toolbar { padding: 10px; }
-}
-</style>
-EXTRA
+    'subtitle' => 'Every product in the catalog: stock, price and barcode',
+    'actions' => '<a class="cx-btn cx-btn-outline" href="inventory_stock_in.php"><i class="ph ph-barcode" aria-hidden="true"></i> Receive stock</a>'
+        . '<button type="button" id="addProductBtn" class="cx-btn cx-btn-primary" onclick="openModal(\'addModal\')"><i class="ph ph-plus" aria-hidden="true"></i> Add Product</button>',
 ]);
 ?>
 
-        <div class="stocks-page">
-        <div class="card stocks-shell">
-            <div class="card-body">
-
-                <div class="stocks-toolbar">
-                    <div class="search-wrap">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="searchInput" class="form-control" placeholder="Search by name, category, SKU or barcode...">
-                        <button type="button" id="scanBtn" class="btn btn-outline btn-scan" title="Focus this field, then use a barcode scanner (acts as keyboard input ending in Enter)">
-                            <i class="fas fa-barcode"></i> Scan
-                        </button>
-                    </div>
-                    <div class="toolbar-actions">
-                        <div class="view-toggle">
-                            <button type="button" id="listViewBtn" class="active" title="List view"><i class="fas fa-list"></i></button>
-                            <button type="button" id="gridViewBtn" title="Larger picture view"><i class="fas fa-th-large"></i></button>
-                        </div>
-                        <div class="stocks-filter-wrap">
-                            <button type="button" id="filterToggleBtn" class="stocks-filter-btn" aria-expanded="false" aria-controls="stocksFilterPanel">
-                                <i class="fas fa-filter"></i> Filter <i class="fas fa-chevron-down"></i> <span class="filter-dot" aria-hidden="true"></span>
-                            </button>
-                            <div id="stocksFilterPanel" class="stocks-filter-panel" role="dialog" aria-label="Stock filters">
-                                <h4 class="stocks-filter-panel-title">Filter Stock</h4>
-                                <div>
-                                    <span class="filter-title">Product Status</span>
-                                    <div class="status-toggle" id="statusToggle">
-                                        <button type="button" class="status-btn active" data-status="all">All <span class="cnt"><?php echo (int)$totalCount; ?></span></button>
-                                        <button type="button" class="status-btn" data-status="instock">In stock <span class="cnt"><?php echo (int)$inStockCount; ?></span></button>
-                                        <button type="button" class="status-btn" data-status="outofstock">Out of Stock <span class="cnt"><?php echo (int)$outOfStockCount; ?></span></button>
-                                    </div>
-                                </div>
-                                <div>
-                                    <span class="filter-title">Sort By</span>
-                                    <select id="sortBy" class="form-control">
-                                        <option value="name_asc" selected>Alphabetical (A-Z)</option>
-                                        <option value="name_desc">Alphabetical (Z-A)</option>
-                                        <option value="price_asc">Price (Low to High)</option>
-                                        <option value="price_desc">Price (High to Low)</option>
-                                        <option value="stock_asc">Stock Quantity (Low to High)</option>
-                                        <option value="stock_desc">Stock Quantity (High to Low)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <span class="filter-title">Stock Alert</span>
-                                    <select id="stockAlert" class="form-control">
-                                        <option value="all" selected>All Stock</option>
-                                        <option value="low">Low Stock (&le; <?php echo LOW_STOCK_MAX; ?>)</option>
-                                        <option value="critical">Critical Stock (&le; <?php echo CRITICAL_STOCK_MAX; ?>)</option>
-                                    </select>
-                                </div>
-                                <?php if ($hasBarcode): ?>
-                                <div>
-                                    <span class="filter-title">Barcode</span>
-                                    <select id="barcodeFilter" class="form-control">
-                                        <option value="all" selected>All Products</option>
-                                        <option value="has">Has UPC/EAN barcode (<?php echo (int)$withBarcodeCount; ?>)</option>
-                                        <option value="missing">Missing barcode (<?php echo (int)($totalCount - $withBarcodeCount); ?>)</option>
-                                    </select>
-                                </div>
-                                <?php endif; ?>
-                                <div>
-                                    <span class="filter-title">Price Range</span>
-                                    <div class="price-range">
-                                        <input type="number" min="0" step="0.01" id="priceMin" class="form-control" placeholder="Min">
-                                        <span>&ndash;</span>
-                                        <input type="number" min="0" step="0.01" id="priceMax" class="form-control" placeholder="Max">
-                                    </div>
-                                </div>
-                                <button type="button" id="resetFilters" class="btn btn-outline btn-reset">Reset Filters</button>
-                            </div>
-                        </div>
-                        <button type="button" id="addProductBtn" class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">
-                            <i class="fas fa-plus"></i> Add Product
-                        </button>
-                    </div>
-                </div>
-
-                <div class="select-row">
-                    <label class="select-chip" id="selectedChip">
-                        <input type="checkbox" id="selectedIndicator" checked disabled>
-                        <span><span id="selectedCount">0</span> selected</span>
-                    </label>
-                    <label class="select-chip" for="selectAll">
-                        <input type="checkbox" id="selectAll">
-                        <span>Select all on this page (<span id="pageCount">0</span>)</span>
-                    </label>
-                    <div class="selection-bar" id="selectionBar">
-                        <?php if ($hasBarcode): ?>
-                        <button type="button" class="btn btn-outline btn-sm" id="bulkLabelBtn"><i class="fas fa-print"></i> Print Labels</button>
-                        <button type="button" class="btn btn-outline btn-sm" id="bulkGenerateBtn"><i class="fas fa-barcode"></i> Generate Barcodes</button>
-                        <?php endif; ?>
-                        <button type="button" class="btn btn-danger btn-sm" id="bulkDeleteBtn"><i class="fas fa-trash"></i> Delete</button>
-                    </div>
-                </div>
-
-                <div id="productList" class="stocks-table-wrap"><!-- rows injected by JS --></div>
-                <div id="emptyState" class="empty-state-row" style="display:none;">No products match your filters.</div>
-
-                <div class="pagination-bar">
-                    <div class="pg-info" id="pgInfo"></div>
-                    <div class="pg-controls" id="pgControls"></div>
+        <section class="cx-card stocks-card" aria-labelledby="stocksTitle">
+            <div class="cx-card-head">
+                <div>
+                    <h2 id="stocksTitle"><i class="ph ph-package" aria-hidden="true"></i> Product catalog</h2>
+                    <p>
+                        <span class="cx-num"><?php echo number_format($totalCount); ?></span> products
+                        · <span class="cx-num"><?php echo number_format($outOfStockCount); ?></span> out of stock
+                        · <span class="cx-num"><?php echo number_format($lowStockCount); ?></span> running low
+                    </p>
                 </div>
             </div>
-        </div>
-        </div>
+
+            <div class="alerts-toolbar stocks-toolbar">
+                <div class="search-wrap">
+                    <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+                    <label class="cx-sr" for="searchInput">Search products</label>
+                    <input type="search" id="searchInput" placeholder="Search by name, category, SKU or barcode" autocomplete="off">
+                    <button type="button" id="scanBtn" class="cx-btn cx-btn-outline cx-btn-sm" title="Focus this field, then use a barcode scanner (acts as keyboard input ending in Enter)">
+                        <i class="ph ph-barcode" aria-hidden="true"></i> Scan
+                    </button>
+                </div>
+                <div class="alerts-toolbar-side">
+                    <div class="cx-seg" role="group" aria-label="Layout">
+                        <button type="button" id="listViewBtn" class="active" aria-pressed="true"><i class="ph ph-list" aria-hidden="true"></i> List</button>
+                        <button type="button" id="gridViewBtn" aria-pressed="false"><i class="ph ph-squares-four" aria-hidden="true"></i> Pictures</button>
+                    </div>
+                    <div class="stocks-filter-wrap">
+                        <button type="button" id="filterToggleBtn" class="cx-btn cx-btn-outline stocks-filter-btn" aria-expanded="false" aria-controls="stocksFilterPanel">
+                            <i class="ph ph-funnel" aria-hidden="true"></i> Filter <span class="filter-dot" aria-hidden="true"></span><span class="cx-sr" id="filterActiveText"></span>
+                            <i class="ph ph-caret-down stocks-filter-caret" aria-hidden="true"></i>
+                        </button>
+                        <div id="stocksFilterPanel" class="stocks-filter-panel" role="region" aria-labelledby="stocksFilterTitle">
+                            <h3 class="stocks-filter-title" id="stocksFilterTitle">Filter stock</h3>
+                            <div>
+                                <span class="filter-title" id="statusTitle">Product status</span>
+                                <div class="status-toggle" id="statusToggle" role="group" aria-labelledby="statusTitle">
+                                    <button type="button" class="status-btn active" data-status="all" aria-pressed="true">All <span class="cnt cx-num"><?php echo (int)$totalCount; ?></span></button>
+                                    <button type="button" class="status-btn" data-status="instock" aria-pressed="false">In stock <span class="cnt cx-num"><?php echo (int)$inStockCount; ?></span></button>
+                                    <button type="button" class="status-btn" data-status="outofstock" aria-pressed="false">Out of stock <span class="cnt cx-num"><?php echo (int)$outOfStockCount; ?></span></button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="filter-title" for="sortBy">Sort by</label>
+                                <select id="sortBy" class="form-control">
+                                    <option value="name_asc" selected>Alphabetical (A-Z)</option>
+                                    <option value="name_desc">Alphabetical (Z-A)</option>
+                                    <option value="price_asc">Price (Low to High)</option>
+                                    <option value="price_desc">Price (High to Low)</option>
+                                    <option value="stock_asc">Stock Quantity (Low to High)</option>
+                                    <option value="stock_desc">Stock Quantity (High to Low)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="filter-title" for="stockAlert">Stock alert</label>
+                                <select id="stockAlert" class="form-control">
+                                    <option value="all" selected>All Stock</option>
+                                    <option value="low">Low Stock (&le; <?php echo LOW_STOCK_MAX; ?>)</option>
+                                    <option value="critical">Critical Stock (&le; <?php echo CRITICAL_STOCK_MAX; ?>)</option>
+                                </select>
+                            </div>
+                            <?php if ($hasBarcode): ?>
+                            <div>
+                                <label class="filter-title" for="barcodeFilter">Barcode</label>
+                                <select id="barcodeFilter" class="form-control">
+                                    <option value="all" selected>All Products</option>
+                                    <option value="has">Has UPC/EAN barcode (<?php echo (int)$withBarcodeCount; ?>)</option>
+                                    <option value="missing">Missing barcode (<?php echo (int)($totalCount - $withBarcodeCount); ?>)</option>
+                                </select>
+                            </div>
+                            <?php endif; ?>
+                            <div>
+                                <span class="filter-title" id="priceTitle">Price range</span>
+                                <div class="price-range" role="group" aria-labelledby="priceTitle">
+                                    <input type="number" min="0" step="0.01" id="priceMin" class="form-control" placeholder="Min" aria-label="Minimum price">
+                                    <span aria-hidden="true">&ndash;</span>
+                                    <input type="number" min="0" step="0.01" id="priceMax" class="form-control" placeholder="Max" aria-label="Maximum price">
+                                </div>
+                            </div>
+                            <button type="button" id="resetFilters" class="cx-btn cx-btn-outline btn-reset"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i> Reset filters</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="select-row">
+                <label class="select-chip" id="selectedChip">
+                    <input type="checkbox" id="selectedIndicator" checked disabled>
+                    <span><span id="selectedCount">0</span> selected</span>
+                </label>
+                <label class="select-chip" for="selectAll">
+                    <input type="checkbox" id="selectAll">
+                    <span>Select all on this page (<span id="pageCount">0</span>)</span>
+                </label>
+                <div class="selection-bar" id="selectionBar">
+                    <?php if ($hasBarcode): ?>
+                    <button type="button" class="cx-btn cx-btn-outline cx-btn-sm" id="bulkLabelBtn"><i class="ph ph-printer" aria-hidden="true"></i> Print labels</button>
+                    <button type="button" class="cx-btn cx-btn-outline cx-btn-sm" id="bulkGenerateBtn"><i class="ph ph-barcode" aria-hidden="true"></i> Generate barcodes</button>
+                    <?php endif; ?>
+                    <button type="button" class="cx-btn cx-btn-ghost-danger cx-btn-sm" id="bulkDeleteBtn"><i class="ph ph-trash" aria-hidden="true"></i> Delete</button>
+                </div>
+            </div>
+
+            <div id="productList" class="cx-table-wrap stocks-table-wrap"><!-- rows injected by JS --></div>
+            <div id="emptyState" class="cx-empty" hidden>
+                <span class="cx-empty-icon" aria-hidden="true"><i class="ph ph-magnifying-glass"></i></span>
+                <strong>No products match your filters</strong>
+                <span>Try another search, or reset the filters.</span>
+            </div>
+
+            <div class="pagination-bar">
+                <div class="pg-info" id="pgInfo" aria-live="polite"></div>
+                <div class="pg-controls" id="pgControls"></div>
+            </div>
+        </section>
 
         <!-- ============================== ADD PRODUCT MODAL ============================== -->
-        <div id="addModal" class="modal">
+        <div id="addModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
             <div class="modal-content">
-                <button type="button" class="close" onclick="document.getElementById('addModal').classList.remove('open')">&times;</button>
-                <h3><i class="fas fa-plus"></i> Add New Product</h3>
-                <form method="post" enctype="multipart/form-data">
+                <button type="button" class="close" onclick="closeModal('addModal')" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button>
+                <h3 id="addModalTitle"><i class="ph ph-plus-circle" aria-hidden="true"></i> Add new product</h3>
+                <form method="post" enctype="multipart/form-data" class="inv-form">
                     <div class="form-group">
-                        <label class="form-label">SKU / Item Code (optional)</label>
+                        <label class="form-label" for="add_sku">SKU / Item Code (optional)</label>
                         <input type="text" name="sku" id="add_sku" class="form-control" placeholder="e.g. 11510">
                         <?php if (!$hasSku): ?>
-                        <p class="text-small text-muted" style="margin:6px 0 0;">SKU is optional; apply SKU migration to persist item codes.</p>
+                        <p class="form-hint">SKU is optional; apply SKU migration to persist item codes.</p>
                         <?php endif; ?>
                     </div>
                     <?php if ($hasBarcode): ?>
                     <div class="form-group">
-                        <label class="form-label">UPC / EAN Barcode (optional)</label>
-                        <div class="barcode-input-row" style="display:flex;gap:8px;align-items:center;">
-                            <input type="text" name="barcode" id="add_barcode" class="form-control" maxlength="14" inputmode="numeric" placeholder="Scan or type barcode" onkeydown="if (event.key === 'Enter') event.preventDefault();">
-                            <button type="button" class="btn btn-outline btn-scan" onclick="focusBarcodeField('add_barcode')"><i class="fas fa-barcode"></i> Scan</button>
+                        <label class="form-label" for="add_barcode">UPC / EAN Barcode (optional)</label>
+                        <div class="barcode-input-row">
+                            <input type="text" name="barcode" id="add_barcode" class="form-control cx-mono" maxlength="14" inputmode="numeric" placeholder="Scan or type barcode" onkeydown="if (event.key === 'Enter') event.preventDefault();" aria-describedby="addBarcodeHint">
+                            <button type="button" class="cx-btn cx-btn-outline" onclick="focusBarcodeField('add_barcode')"><i class="ph ph-barcode" aria-hidden="true"></i> Scan</button>
                         </div>
-                        <p class="text-small text-muted" style="margin:6px 0 0;">UPC-A, UPC-E, EAN-13 or EAN-8 printed on the box. Used by the Cashier scanner.</p>
+                        <p class="form-hint" id="addBarcodeHint">UPC-A, UPC-E, EAN-13 or EAN-8 printed on the box. Used by the Cashier scanner.</p>
                     </div>
                     <?php endif; ?>
                     <div class="form-group">
-                        <label class="form-label">Product Name</label>
-                        <input type="text" name="name" class="form-control" placeholder="e.g. Wireless Keyboard" required>
+                        <label class="form-label" for="add_name">Product Name</label>
+                        <input type="text" name="name" id="add_name" class="form-control" placeholder="e.g. Wireless Keyboard" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Category</label>
-                        <select name="category" class="form-control" required>
+                        <label class="form-label" for="add_category">Category</label>
+                        <select name="category" id="add_category" class="form-control" required>
                             <option value="" disabled selected>Select a category...</option>
                             <?php foreach ($categoryGroups as $groupLabel => $groupValues): ?>
                             <optgroup label="<?php echo h($groupLabel); ?>">
@@ -870,55 +526,60 @@ EXTRA
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Price</label>
-                        <input type="number" step="0.01" min="0.01" name="price" class="form-control" required>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label class="form-label" for="add_price">Price (₱)</label>
+                            <input type="number" step="0.01" min="0.01" name="price" id="add_price" class="form-control cx-num" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="add_stock">Stock</label>
+                            <input type="number" min="0" name="stock" id="add_stock" class="form-control cx-num" required>
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Stock</label>
-                        <input type="number" min="0" name="stock" class="form-control" required>
+                        <label class="form-label" for="add_desc">Description</label>
+                        <textarea name="description" id="add_desc" class="form-control" rows="3" placeholder="Describe your product..."></textarea>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Description</label>
-                        <textarea name="description" class="form-control" rows="3" placeholder="Describe your product..."></textarea>
+                        <label class="form-label" for="add_image">Product Image (JPG, JPEG, PNG)</label>
+                        <input type="file" name="product_image" id="add_image" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Product Image (JPG, JPEG, PNG)</label>
-                        <input type="file" name="product_image" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+                    <div class="modal-actions">
+                        <button type="button" class="cx-btn cx-btn-ghost" onclick="closeModal('addModal')">Cancel</button>
+                        <button type="submit" name="add_product" class="cx-btn cx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i> Add Product</button>
                     </div>
-                    <button type="submit" name="add_product" class="btn btn-primary" style="width:100%;">Add Product</button>
                 </form>
             </div>
         </div>
 
         <!-- ============================== EDIT PRODUCT MODAL ============================== -->
-        <div id="editModal" class="modal">
+        <div id="editModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
             <div class="modal-content">
-                <button type="button" class="close" onclick="closeEditModal()">&times;</button>
-                <h3>Edit Product</h3>
-                <form method="post" enctype="multipart/form-data">
+                <button type="button" class="close" onclick="closeEditModal()" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button>
+                <h3 id="editModalTitle"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit product</h3>
+                <form method="post" enctype="multipart/form-data" class="inv-form">
                     <input type="hidden" name="product_id" id="edit_id">
                     <?php if ($hasSku): ?>
                     <div class="form-group">
-                        <label class="form-label">SKU / Item Code (optional)</label>
+                        <label class="form-label" for="edit_sku">SKU / Item Code (optional)</label>
                         <input type="text" name="sku" id="edit_sku" class="form-control">
                     </div>
                     <?php endif; ?>
                     <?php if ($hasBarcode): ?>
                     <div class="form-group">
-                        <label class="form-label">UPC / EAN Barcode (optional)</label>
-                        <div class="barcode-input-row" style="display:flex;gap:8px;align-items:center;">
-                            <input type="text" name="barcode" id="edit_barcode" class="form-control" maxlength="14" inputmode="numeric" placeholder="Scan or type barcode" onkeydown="if (event.key === 'Enter') event.preventDefault();">
-                            <button type="button" class="btn btn-outline btn-scan" onclick="focusBarcodeField('edit_barcode')"><i class="fas fa-barcode"></i> Scan</button>
+                        <label class="form-label" for="edit_barcode">UPC / EAN Barcode (optional)</label>
+                        <div class="barcode-input-row">
+                            <input type="text" name="barcode" id="edit_barcode" class="form-control cx-mono" maxlength="14" inputmode="numeric" placeholder="Scan or type barcode" onkeydown="if (event.key === 'Enter') event.preventDefault();">
+                            <button type="button" class="cx-btn cx-btn-outline" onclick="focusBarcodeField('edit_barcode')"><i class="ph ph-barcode" aria-hidden="true"></i> Scan</button>
                         </div>
                     </div>
                     <?php endif; ?>
                     <div class="form-group">
-                        <label class="form-label">Product Name</label>
+                        <label class="form-label" for="edit_name">Product Name</label>
                         <input type="text" name="name" id="edit_name" class="form-control" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Category</label>
+                        <label class="form-label" for="edit_category">Category</label>
                         <select name="category" id="edit_category" class="form-control" required>
                             <?php foreach ($categoryGroups as $groupLabel => $groupValues): ?>
                             <optgroup label="<?php echo h($groupLabel); ?>">
@@ -929,42 +590,47 @@ EXTRA
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Price</label>
-                        <input type="number" step="0.01" min="0.01" name="price" id="edit_price" class="form-control" required>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label class="form-label" for="edit_price">Price (₱)</label>
+                            <input type="number" step="0.01" min="0.01" name="price" id="edit_price" class="form-control cx-num" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="edit_stock">Stock</label>
+                            <input type="number" min="0" name="stock" id="edit_stock" class="form-control cx-num" required>
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Stock</label>
-                        <input type="number" min="0" name="stock" id="edit_stock" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Description</label>
+                        <label class="form-label" for="edit_desc">Description</label>
                         <textarea name="description" id="edit_desc" class="form-control" rows="3"></textarea>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Replace Image (optional)</label>
-                        <input type="file" name="product_image" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+                        <label class="form-label" for="edit_image">Replace Image (optional)</label>
+                        <input type="file" name="product_image" id="edit_image" class="form-control" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
                     </div>
-                    <button type="submit" name="edit_product" class="btn btn-primary" style="width:100%;">Update Product</button>
+                    <div class="modal-actions">
+                        <button type="button" class="cx-btn cx-btn-ghost" onclick="closeEditModal()">Cancel</button>
+                        <button type="submit" name="edit_product" class="cx-btn cx-btn-primary"><i class="ph ph-check" aria-hidden="true"></i> Update Product</button>
+                    </div>
                 </form>
             </div>
         </div>
 
         <!-- ============================== VIEW DETAILS MODAL ============================== -->
-        <div id="detailsModal" class="modal">
+        <div id="detailsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="detailsModalTitle">
             <div class="modal-content wide">
-                <button type="button" class="close" onclick="document.getElementById('detailsModal').classList.remove('open')">&times;</button>
-                <h3>Product Details</h3>
+                <button type="button" class="close" onclick="closeModal('detailsModal')" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button>
+                <h3 id="detailsModalTitle"><i class="ph ph-info" aria-hidden="true"></i> Product details</h3>
                 <img id="d_img" class="details-img" src="" alt="" style="display:none;">
                 <dl class="details-grid">
                     <dt>Name</dt><dd id="d_name"></dd>
                     <dt>Category</dt><dd id="d_category"></dd>
-                    <dt>Stock</dt><dd id="d_stock"></dd>
+                    <dt>Stock</dt><dd id="d_stock" class="cx-num"></dd>
                     <dt>Status</dt><dd id="d_status"></dd>
-                    <dt>Price</dt><dd id="d_price"></dd>
-                    <?php if ($hasSku): ?><dt>SKU / Item Code</dt><dd id="d_sku"></dd><?php endif; ?>
-                    <?php if ($hasBarcode): ?><dt>UPC / EAN</dt><dd id="d_barcode"></dd><?php endif; ?>
-                    <dt>Date Added</dt><dd id="d_created"></dd>
+                    <dt>Price</dt><dd id="d_price" class="cx-num"></dd>
+                    <?php if ($hasSku): ?><dt>SKU / Item Code</dt><dd id="d_sku" class="cx-mono"></dd><?php endif; ?>
+                    <?php if ($hasBarcode): ?><dt>UPC / EAN</dt><dd id="d_barcode" class="cx-mono"></dd><?php endif; ?>
+                    <dt>Date Added</dt><dd id="d_created" class="cx-num"></dd>
                     <dt>Description</dt><dd id="d_desc"></dd>
                 </dl>
             </div>
@@ -972,26 +638,26 @@ EXTRA
 
         <?php if ($hasBarcode): ?>
         <!-- ============================== BARCODE LABEL MODAL ============================== -->
-        <div id="labelModal" class="modal">
+        <div id="labelModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="labelModalTitle">
             <div class="modal-content wide">
-                <button type="button" class="close" onclick="closeLabelModal()">&times;</button>
-                <h3><i class="fas fa-barcode"></i> Barcode Label</h3>
+                <button type="button" class="close" onclick="closeLabelModal()" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button>
+                <h3 id="labelModalTitle"><i class="ph ph-barcode" aria-hidden="true"></i> Barcode label</h3>
                 <div class="label-preview" id="labelPreview"></div>
                 <div class="label-options">
                     <div class="form-group">
                         <label class="form-label" for="labelCopies">Copies</label>
-                        <input type="number" id="labelCopies" class="form-control" min="1" max="60" value="1">
+                        <input type="number" id="labelCopies" class="form-control cx-num" min="1" max="60" value="1">
                     </div>
-                    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;padding-bottom:10px;">
+                    <label class="label-check">
                         <input type="checkbox" id="labelShowPrice" checked> Show price
                     </label>
                 </div>
-                <p class="text-small text-muted" style="margin:0 0 14px;">
+                <p class="form-hint label-hint">
                     Print at <strong>100% scale</strong> (turn off "Fit to page") so the bars keep their true size.
                     3 labels per row on A4/Letter; cut along the dashed lines.
                 </p>
-                <button type="button" class="btn btn-primary" id="labelPrintBtn" style="width:100%;justify-content:center;">
-                    <i class="fas fa-print"></i> Print Labels
+                <button type="button" class="cx-btn cx-btn-primary cx-btn-lg label-print-btn" id="labelPrintBtn">
+                    <i class="ph ph-printer" aria-hidden="true"></i> Print labels
                 </button>
             </div>
         </div>
@@ -1061,15 +727,15 @@ var OPEN_LABEL_ID = {$openLabelId};
 function barcodeCellHtml(p) {
     return p.barcode
         ? '<span class="barcode-code">' + escapeHtml(barcodeLabel(p.barcode)) + '</span>' +
-          '<button type="button" class="barcode-btn" data-label-id="' + p.id + '" title="Print barcode label"><i class="fas fa-print"></i></button>'
-        : '<span class="barcode-missing"><i class="fas fa-minus-circle"></i> None</span>' +
-          '<button type="button" class="barcode-btn" data-generate-id="' + p.id + '" title="Generate an in-store barcode"><i class="fas fa-plus"></i> Generate</button>';
+          '<button type="button" class="barcode-btn" data-label-id="' + p.id + '" title="Print barcode label" aria-label="Print barcode label for ' + escapeHtml(p.name) + '"><i class="ph ph-printer" aria-hidden="true"></i></button>'
+        : '<span class="barcode-missing"><i class="ph ph-minus-circle" aria-hidden="true"></i> None</span>' +
+          '<button type="button" class="barcode-btn" data-generate-id="' + p.id + '" title="Generate an in-store barcode"><i class="ph ph-plus" aria-hidden="true"></i> Generate</button>';
 }
 function barcodeMenuItem(p) {
     if (!HAS_BARCODE) return '';
     return p.barcode
-        ? '<button type="button" onclick="openLabelModal([' + p.id + '])"><i class="fas fa-print"></i> Print Barcode</button>'
-        : '<button type="button" onclick="generateBarcodes([' + p.id + '])"><i class="fas fa-barcode"></i> Generate Barcode</button>';
+        ? '<button type="button" role="menuitem" onclick="openLabelModal([' + p.id + '])"><i class="ph ph-printer" aria-hidden="true"></i> Print Barcode</button>'
+        : '<button type="button" role="menuitem" onclick="generateBarcodes([' + p.id + '])"><i class="ph ph-barcode" aria-hidden="true"></i> Generate Barcode</button>';
 }
 
 /* ---- Barcode labels ---- */
@@ -1086,13 +752,13 @@ function openLabelModal(ids) {
     if (!labelIds.length) return;
     document.getElementById('labelCopies').value = 1;
     renderLabelPreview();
-    document.getElementById('labelModal').classList.add('open');
+    openModal('labelModal');
 }
-function closeLabelModal() { document.getElementById('labelModal').classList.remove('open'); }
+function closeLabelModal() { closeModal('labelModal'); }
 function renderLabelPreview() {
     var showPrice = document.getElementById('labelShowPrice').checked;
     var first = findProduct(labelIds[0]);
-    var more = labelIds.length > 1 ? '<p class="text-small text-muted" style="margin:8px 0 0;text-align:center;">+ ' + (labelIds.length - 1) + ' more product(s)</p>' : '';
+    var more = labelIds.length > 1 ? '<p class="form-hint label-more">+ ' + (labelIds.length - 1) + ' more product(s)</p>' : '';
     document.getElementById('labelPreview').innerHTML = '<div>' + labelHtml(first, showPrice) + more + '</div>';
 }
 function printLabels() {
@@ -1216,25 +882,25 @@ function render() {
 
     if (pageItems.length === 0) {
         listEl.innerHTML = '';
-        listEl.className = state.view === 'grid' ? 'product-list grid-view' : 'stocks-table-wrap';
-        emptyEl.style.display = 'block';
+        listEl.className = state.view === 'grid' ? 'product-list grid-view' : 'cx-table-wrap stocks-table-wrap';
+        emptyEl.hidden = false;
     } else {
-        emptyEl.style.display = 'none';
+        emptyEl.hidden = true;
         if (state.view === 'grid') {
             listEl.className = 'product-list grid-view';
             listEl.innerHTML = pageItems.map(cardHtml).join('');
         } else {
-            listEl.className = 'stocks-table-wrap';
+            listEl.className = 'cx-table-wrap stocks-table-wrap';
             listEl.innerHTML =
-                '<table class="stocks-table">' +
+                '<table class="cx-table stocks-table">' +
                     '<thead><tr>' +
-                        '<th class="col-chk"></th>' +
-                        '<th>Product Name</th>' +
-                        (HAS_BARCODE ? '<th class="col-barcode">Barcode</th>' : '') +
-                        '<th class="col-stock">Stock</th>' +
-                        '<th class="col-status">Status</th>' +
-                        '<th class="col-price">Price</th>' +
-                        '<th class="col-actions">Action</th>' +
+                        '<th scope="col" class="col-chk"><span class="cx-sr">Select</span></th>' +
+                        '<th scope="col">Product</th>' +
+                        (HAS_BARCODE ? '<th scope="col" class="col-barcode">Barcode</th>' : '') +
+                        '<th scope="col" class="col-stock num">Stock</th>' +
+                        '<th scope="col" class="col-status">Status</th>' +
+                        '<th scope="col" class="col-price num">Price</th>' +
+                        '<th scope="col" class="col-actions"><span class="cx-sr">Actions</span></th>' +
                     '</tr></thead>' +
                     '<tbody>' + pageItems.map(rowHtml).join('') + '</tbody>' +
                 '</table>';
@@ -1255,68 +921,60 @@ function render() {
 function statusPillHtml(status) {
     var label = statusLabel(status);
     var cls = status === 'out' ? 'out' : (status === 'critical' ? 'critical' : (status === 'low' ? 'low' : 'ok'));
-    var icon = status === 'out' ? 'fa-times-circle' : (status === 'critical' ? 'fa-exclamation-circle' : (status === 'low' ? 'fa-exclamation-triangle' : 'fa-check-circle'));
-    return '<span class="stock-status-pill ' + cls + '"><i class="fas ' + icon + '"></i> ' + label + '</span>';
+    var icon = status === 'out' ? 'ph-x-circle' : (status === 'critical' ? 'ph-warning-circle' : (status === 'low' ? 'ph-warning' : 'ph-check-circle'));
+    return '<span class="stock-status-pill ' + cls + '"><i class="ph-fill ' + icon + '" aria-hidden="true"></i> ' + label + '</span>';
+}
+
+function actionMenuHtml(p) {
+    return '' +
+        '<div class="ellipsis-wrap">' +
+            '<button type="button" class="ellipsis-btn" id="menuBtn-' + p.id + '" onclick="toggleMenu(event, ' + p.id + ')" aria-haspopup="true" aria-expanded="false" aria-controls="menu-' + p.id + '" aria-label="Actions for ' + escapeHtml(p.name) + '"><i class="ph ph-dots-three" aria-hidden="true"></i></button>' +
+            '<div class="ellipsis-menu" id="menu-' + p.id + '" role="menu">' +
+                '<button type="button" role="menuitem" onclick="viewDetails(' + p.id + ')"><i class="ph ph-eye" aria-hidden="true"></i> View Details</button>' +
+                '<button type="button" role="menuitem" onclick="openEditModal(' + p.id + ')"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit</button>' +
+                barcodeMenuItem(p) +
+                '<button type="button" role="menuitem" class="danger" onclick="deleteOne(' + p.id + ')"><i class="ph ph-trash" aria-hidden="true"></i> Delete</button>' +
+            '</div>' +
+        '</div>';
 }
 
 function rowHtml(p) {
     var checked = state.selected[p.id] ? 'checked' : '';
     var qtyClass = p.status === 'out' ? ' out' : ((p.status === 'low' || p.status === 'critical') ? ' warn' : '');
     return '' +
-    '<tr class="' + (checked ? 'selected' : '') + '" data-id="' + p.id + '">' +
-        '<td><input type="checkbox" class="chk row-chk" data-id="' + p.id + '" ' + checked + '></td>' +
-        '<td>' +
-            '<div class="stocks-pname" title="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</div>' +
-            '<span class="stocks-pcat">' + escapeHtml(p.category) + '</span>' +
+    '<tr class="is-' + p.status + (checked ? ' selected' : '') + '" data-id="' + p.id + '">' +
+        '<td class="col-chk"><input type="checkbox" class="chk row-chk" data-id="' + p.id + '" ' + checked + ' aria-label="Select ' + escapeHtml(p.name) + '"></td>' +
+        '<td data-label="Product" class="col-product">' +
+            '<div class="stocks-pname">' + escapeHtml(p.name) + '</div>' +
+            '<span class="stocks-pcat">' + escapeHtml(p.category) + (p.sku ? ' · <span class="cx-mono">' + escapeHtml(p.sku) + '</span>' : '') + '</span>' +
         '</td>' +
-        (HAS_BARCODE ? '<td>' + barcodeCellHtml(p) + '</td>' : '') +
-        '<td><span class="stocks-qty' + qtyClass + '">' + p.stock + '</span></td>' +
-        '<td>' + statusPillHtml(p.status) + '</td>' +
-        '<td class="price-tag">' + peso(p.price) + '</td>' +
-        '<td>' +
-            '<div class="ellipsis-wrap">' +
-                '<button type="button" class="ellipsis-btn" onclick="toggleMenu(event, ' + p.id + ')"><i class="fas fa-ellipsis-h"></i></button>' +
-                '<div class="ellipsis-menu" id="menu-' + p.id + '">' +
-                    '<button type="button" onclick="viewDetails(' + p.id + ')"><i class="fas fa-eye"></i> View Details</button>' +
-                    '<button type="button" onclick="openEditModal(' + p.id + ')"><i class="fas fa-edit"></i> Edit</button>' +
-                    barcodeMenuItem(p) +
-                    '<button type="button" class="danger" onclick="deleteOne(' + p.id + ')"><i class="fas fa-trash"></i> Delete</button>' +
-                '</div>' +
-            '</div>' +
-        '</td>' +
+        (HAS_BARCODE ? '<td data-label="Barcode" class="col-barcode">' + barcodeCellHtml(p) + '</td>' : '') +
+        '<td data-label="Stock" class="num"><span class="stocks-qty' + qtyClass + '">' + p.stock + '</span></td>' +
+        '<td data-label="Status">' + statusPillHtml(p.status) + '</td>' +
+        '<td data-label="Price" class="num cx-num"><span class="price-tag">' + peso(p.price) + '</span></td>' +
+        '<td class="col-actions">' + actionMenuHtml(p) + '</td>' +
     '</tr>';
 }
 
 function cardHtml(p) {
     var checked = state.selected[p.id] ? 'checked' : '';
-    var img = p.img ? '<img src="' + escapeHtml(p.img) + '" class="thumb" alt="">' : '<div class="thumb"></div>';
+    var qtyClass = p.status === 'out' ? ' out' : ((p.status === 'low' || p.status === 'critical') ? ' warn' : '');
+    var img = p.img ? '<img src="' + escapeHtml(p.img) + '" class="thumb" alt="" loading="lazy">' : '<div class="thumb thumb-empty"><i class="ph ph-image" aria-hidden="true"></i></div>';
     return '' +
-    '<div class="product-row' + (checked ? ' selected' : '') + '" data-id="' + p.id + '">' +
-        '<input type="checkbox" class="chk row-chk" data-id="' + p.id + '" ' + checked + '>' +
+    '<div class="product-row is-' + p.status + (checked ? ' selected' : '') + '" data-id="' + p.id + '">' +
+        '<input type="checkbox" class="chk row-chk" data-id="' + p.id + '" ' + checked + ' aria-label="Select ' + escapeHtml(p.name) + '">' +
         img +
         '<div class="product-main">' +
-            '<div class="pname">' + escapeHtml(p.name) + '</div>' +
-            '<div class="product-meta">' +
-                '<span class="category-pill">' + escapeHtml(p.category) + '</span>' +
-                statusPillHtml(p.status) +
-            '</div>' +
+            '<div class="stocks-pname">' + escapeHtml(p.name) + '</div>' +
+            '<span class="stocks-pcat">' + escapeHtml(p.category) + '</span>' +
+            '<div class="product-meta">' + statusPillHtml(p.status) + '</div>' +
             (HAS_BARCODE ? '<div class="product-meta">' + barcodeCellHtml(p) + '</div>' : '') +
         '</div>' +
-        '<div class="product-price">' +
-            '<div class="price-label">Stock</div>' +
-            '<div class="stocks-qty">' + p.stock + '</div>' +
-            '<div class="price-label" style="margin-top:6px;">Price</div>' +
-            '<div class="price-tag">' + peso(p.price) + '</div>' +
+        '<div class="product-figures">' +
+            '<div><span class="price-label">Stock</span><span class="stocks-qty' + qtyClass + '">' + p.stock + '</span></div>' +
+            '<div><span class="price-label">Price</span><span class="price-tag cx-num">' + peso(p.price) + '</span></div>' +
         '</div>' +
-        '<div class="ellipsis-wrap">' +
-            '<button type="button" class="ellipsis-btn" onclick="toggleMenu(event, ' + p.id + ')"><i class="fas fa-ellipsis-h"></i></button>' +
-            '<div class="ellipsis-menu" id="menu-' + p.id + '">' +
-                '<button type="button" onclick="viewDetails(' + p.id + ')"><i class="fas fa-eye"></i> View Details</button>' +
-                '<button type="button" onclick="openEditModal(' + p.id + ')"><i class="fas fa-edit"></i> Edit</button>' +
-                barcodeMenuItem(p) +
-                '<button type="button" class="danger" onclick="deleteOne(' + p.id + ')"><i class="fas fa-trash"></i> Delete</button>' +
-            '</div>' +
-        '</div>' +
+        actionMenuHtml(p) +
     '</div>';
 }
 
@@ -1328,30 +986,75 @@ function renderPagination(totalPages) {
     var end = Math.min(start + WINDOW - 1, totalPages);
     var html = '';
     if (start > 1) {
-        html += '<button type="button" title="Previous page set" onclick="goToPage(' + (start - 1) + ')">&lt;</button>';
+        html += '<button type="button" aria-label="Previous page set" onclick="goToPage(' + (start - 1) + ')"><i class="ph ph-caret-double-left" aria-hidden="true"></i></button>';
     }
-    html += '<button type="button" ' + (state.page <= 1 ? 'disabled' : '') + ' onclick="goToPage(' + (state.page - 1) + ')">Prev</button>';
+    html += '<button type="button" ' + (state.page <= 1 ? 'disabled' : '') + ' onclick="goToPage(' + (state.page - 1) + ')"><i class="ph ph-caret-left" aria-hidden="true"></i> Prev</button>';
     for (var i = start; i <= end; i++) {
-        html += '<button type="button" class="' + (i === state.page ? 'active' : '') + '" onclick="goToPage(' + i + ')">' + i + '</button>';
+        html += '<button type="button" class="' + (i === state.page ? 'active' : '') + '"' + (i === state.page ? ' aria-current="page"' : '') + ' onclick="goToPage(' + i + ')">' + i + '</button>';
     }
-    html += '<button type="button" ' + (state.page >= totalPages ? 'disabled' : '') + ' onclick="goToPage(' + (state.page + 1) + ')">Next</button>';
+    html += '<button type="button" ' + (state.page >= totalPages ? 'disabled' : '') + ' onclick="goToPage(' + (state.page + 1) + ')">Next <i class="ph ph-caret-right" aria-hidden="true"></i></button>';
     if (end < totalPages) {
-        html += '<button type="button" title="Next page set" onclick="goToPage(' + (end + 1) + ')">&gt;</button>';
+        html += '<button type="button" aria-label="Next page set" onclick="goToPage(' + (end + 1) + ')"><i class="ph ph-caret-double-right" aria-hidden="true"></i></button>';
     }
     el.innerHTML = html;
 }
 
 function goToPage(p) { state.page = p; render(); }
 
+function closeMenus(except) {
+    document.querySelectorAll('.ellipsis-menu.open').forEach(function (m) {
+        if (m.id === except) return;
+        m.classList.remove('open');
+        var b = document.getElementById(m.id.replace('menu-', 'menuBtn-'));
+        if (b) b.setAttribute('aria-expanded', 'false');
+    });
+}
 function toggleMenu(evt, id) {
     evt.stopPropagation();
-    document.querySelectorAll('.ellipsis-menu.open').forEach(function (m) {
-        if (m.id !== 'menu-' + id) m.classList.remove('open');
-    });
-    document.getElementById('menu-' + id).classList.toggle('open');
+    closeMenus('menu-' + id);
+    var menu = document.getElementById('menu-' + id);
+    var open = menu.classList.toggle('open');
+    var btn = document.getElementById('menuBtn-' + id);
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+        var first = menu.querySelector('button');
+        if (first) first.focus({ preventScroll: true });
+    }
 }
-document.addEventListener('click', function () {
-    document.querySelectorAll('.ellipsis-menu.open').forEach(function (m) { m.classList.remove('open'); });
+document.addEventListener('click', function () { closeMenus(''); });
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var open = document.querySelector('.ellipsis-menu.open');
+    if (!open) return;
+    var btn = document.getElementById(open.id.replace('menu-', 'menuBtn-'));
+    closeMenus('');
+    if (btn) btn.focus();
+});
+
+/* ---- Dialogs: open/close, Escape, focus returns to the control that opened them ---- */
+var modalReturn = {};
+function openModal(id) {
+    var m = document.getElementById(id);
+    if (!m) return;
+    var from = document.activeElement;
+    var fromMenu = from && from.closest ? from.closest('.ellipsis-menu') : null;
+    /* An item of a row menu disappears with the menu: give focus back to that row's menu button */
+    modalReturn[id] = fromMenu ? document.getElementById(fromMenu.id.replace('menu-', 'menuBtn-')) : from;
+    m.classList.add('open');
+    var first = m.querySelector('input:not([type=hidden]):not([disabled]), select, textarea, .modal-content button:not(.close)');
+    setTimeout(function () { (first || m.querySelector('.close')).focus({ preventScroll: true }); }, 30);
+}
+function closeModal(id) {
+    var m = document.getElementById(id);
+    if (!m || !m.classList.contains('open')) return;
+    m.classList.remove('open');
+    var back = modalReturn[id];
+    if (back && document.contains(back) && typeof back.focus === 'function') back.focus({ preventScroll: true });
+}
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || document.querySelector('.ellipsis-menu.open')) return;
+    var open = document.querySelector('.modal.open');
+    if (open) closeModal(open.id);
 });
 
 function findProduct(id) {
@@ -1375,7 +1078,7 @@ function viewDetails(id) {
     if (barcodeEl) barcodeEl.textContent = p.barcode ? barcodeLabel(p.barcode) : '—';
     document.getElementById('d_created').textContent = p.created_at || '—';
     document.getElementById('d_desc').textContent = p.description || '—';
-    document.getElementById('detailsModal').classList.add('open');
+    openModal('detailsModal');
 }
 
 function openEditModal(id) {
@@ -1391,12 +1094,12 @@ function openEditModal(id) {
     if (skuField) skuField.value = p.sku || '';
     var barcodeField = document.getElementById('edit_barcode');
     if (barcodeField) barcodeField.value = p.barcode || '';
-    document.getElementById('editModal').classList.add('open');
+    openModal('editModal');
 }
-function closeEditModal() { document.getElementById('editModal').classList.remove('open'); }
+function closeEditModal() { closeModal('editModal'); }
 document.getElementById('editModal').addEventListener('click', function (e) { if (e.target === this) closeEditModal(); });
-document.getElementById('addModal').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('open'); });
-document.getElementById('detailsModal').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('open'); });
+document.getElementById('addModal').addEventListener('click', function (e) { if (e.target === this) closeModal('addModal'); });
+document.getElementById('detailsModal').addEventListener('click', function (e) { if (e.target === this) closeModal('detailsModal'); });
 
 function deleteOne(id) {
     var p = findProduct(id);
@@ -1489,6 +1192,10 @@ function updateFilterBtnState() {
     var active = state.status !== 'all' || state.alert !== 'all' || state.barcode !== 'all' || state.sort !== 'name_asc'
         || state.priceMin !== null || state.priceMax !== null;
     btn.classList.toggle('has-active', active);
+    document.getElementById('filterActiveText').textContent = active ? ' (filters on)' : '';
+    document.querySelectorAll('.status-btn').forEach(function (b) {
+        b.setAttribute('aria-pressed', b.classList.contains('active') ? 'true' : 'false');
+    });
 }
 
 var filterBtn = document.getElementById('filterToggleBtn');
@@ -1504,6 +1211,13 @@ document.addEventListener('click', function () {
     filterPanel.classList.remove('open');
     filterBtn.classList.remove('open');
     filterBtn.setAttribute('aria-expanded', 'false');
+});
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !filterPanel.classList.contains('open')) return;
+    filterPanel.classList.remove('open');
+    filterBtn.classList.remove('open');
+    filterBtn.setAttribute('aria-expanded', 'false');
+    filterBtn.focus();
 });
 
 /* ---- Filter/sort/search controls ---- */
@@ -1585,13 +1299,17 @@ document.getElementById('resetFilters').addEventListener('click', function () {
 document.getElementById('listViewBtn').addEventListener('click', function () {
     state.view = 'list';
     this.classList.add('active');
+    this.setAttribute('aria-pressed', 'true');
     document.getElementById('gridViewBtn').classList.remove('active');
+    document.getElementById('gridViewBtn').setAttribute('aria-pressed', 'false');
     render();
 });
 document.getElementById('gridViewBtn').addEventListener('click', function () {
     state.view = 'grid';
     this.classList.add('active');
+    this.setAttribute('aria-pressed', 'true');
     document.getElementById('listViewBtn').classList.remove('active');
+    document.getElementById('listViewBtn').setAttribute('aria-pressed', 'false');
     render();
 });
 

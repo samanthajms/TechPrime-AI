@@ -16,24 +16,14 @@ $fc = ias_forecast_selection($categories);
 
 logActivity($db, $retailId, 'view_forecast', 'Retail Officer viewed sales forecast');
 
-$forecastCss = <<<'CSS'
-.card-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.filter-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:3000; align-items:center; justify-content:center; padding:20px; }
-.filter-modal.open { display:flex; }
-.filter-modal-card { background:#fff; border-radius:12px; padding:22px; width:min(460px,100%); max-height:90vh; overflow-y:auto; border:2px solid var(--ep-green); }
-.filter-modal-card h4 { margin:0 0 14px; color:var(--ep-green-dark); }
-.detail-panel { display:none; margin-top:14px; }
-.detail-panel.open { display:block; }
-@media print { .sidebar, .topbar, .no-print, .filter-modal { display:none !important; } .main { margin:0 !important; } .detail-panel { display:block !important; } }
-CSS;
-
+// Card, dialog and print styles: includes/staff_app.css (§10, §11)
 staff_page_start([
     'role' => 'retail_officer',
     'title' => 'Sales Forecast',
     'active' => 'forecast',
     'heading' => 'Sales Forecast',
     'subtitle' => 'Projected sales, 1–3 months ahead',
-    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><style>' . $forecastCss . '</style>',
+    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>',
 ]);
 
 ias_forecast_cards_render($fc, $categories, 'sales');

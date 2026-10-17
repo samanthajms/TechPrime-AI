@@ -25,25 +25,25 @@ if (!function_exists('staff_nav_for_role')) {
                 ];
             case 'retail_officer':
                 return [
-                    ['key' => 'dashboard', 'href' => 'retail_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'History', 'icon' => '	fa fa-history'],
-                    ['key' => 'forecast', 'href' => 'retail_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line'],
-                    ['key' => 'messages', 'href' => 'retail_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
-                    ['key' => 'profile', 'href' => 'retail_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
+                    ['key' => 'dashboard', 'href' => 'retail_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt', 'ph' => 'ph-squares-four', 'short' => 'Home'],
+                    ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'Sales History', 'icon' => 'fa-history', 'ph' => 'ph-clock-counter-clockwise', 'short' => 'History'],
+                    ['key' => 'forecast', 'href' => 'retail_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'ph' => 'ph-chart-line-up', 'short' => 'Forecast'],
+                    ['key' => 'messages', 'href' => 'retail_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments', 'ph' => 'ph-chats-circle', 'short' => 'Messages'],
+                    ['key' => 'profile', 'href' => 'retail_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user', 'ph' => 'ph-user-circle', 'short' => 'Profile', 'section' => 'Account'],
                 ];
             case 'inventory_custodian':
                 return [
-                    ['key' => 'dashboard', 'href' => 'inventory_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt'],
-                    ['key' => 'orders', 'href' => 'inventory_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart'],
-                    ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes', 'children' => [
+                    ['key' => 'dashboard', 'href' => 'inventory_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt', 'ph' => 'ph-squares-four', 'short' => 'Home', 'tab' => true],
+                    ['key' => 'orders', 'href' => 'inventory_orders.php', 'label' => 'Orders', 'icon' => 'fa-shopping-cart', 'ph' => 'ph-shopping-cart-simple', 'short' => 'Orders', 'tab' => true],
+                    ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes', 'ph' => 'ph-package', 'short' => 'Stocks', 'tab' => true, 'children' => [
                         ['slug' => 'inventory', 'href' => 'inventory_stocks.php', 'label' => 'Inventory'],
-                        ['slug' => 'add_product', 'href' => 'inventory_stock_in.php', 'label' => 'Add New Product'],
+                        ['slug' => 'add_product', 'href' => 'inventory_stock_in.php', 'label' => 'Stock In'],
                     ]],
-                    ['key' => 'forecast', 'href' => 'inventory_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line'],
-                    ['key' => 'reviews', 'href' => 'inventory_reviews.php', 'label' => 'Reviews', 'icon' => 'fa-star'],
-                    ['key' => 'messages', 'href' => 'inventory_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments'],
-                    ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list'],
-                    ['key' => 'profile', 'href' => 'inventory_profile.php', 'label' => 'Profile', 'icon' => 'fa-user'],
+                    ['key' => 'messages', 'href' => 'inventory_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments', 'ph' => 'ph-chats-circle', 'short' => 'Messages'],
+                    ['key' => 'forecast', 'href' => 'inventory_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'ph' => 'ph-chart-line-up', 'short' => 'Forecast', 'section' => 'Insights'],
+                    ['key' => 'reviews', 'href' => 'inventory_reviews.php', 'label' => 'Reviews', 'icon' => 'fa-star', 'ph' => 'ph-star', 'short' => 'Reviews'],
+                    ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list', 'ph' => 'ph-clipboard-text', 'short' => 'Activity', 'tab' => true],
+                    ['key' => 'profile', 'href' => 'inventory_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user', 'ph' => 'ph-user-circle', 'short' => 'Profile', 'section' => 'Account'],
                 ];
             case 'cashier':
                 return [

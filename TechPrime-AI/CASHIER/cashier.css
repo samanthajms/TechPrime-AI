@@ -121,58 +121,12 @@ body.cx-page-pos .cx-main { padding-top: 20px; }
     font-size: 13px; font-weight: 600; color: var(--cx-text-2);
 }
 .pos-scan-label i { font-size: 18px; color: var(--cx-green-700); }
-.pos-scan-bar {
-    display: flex; align-items: center; gap: 12px; min-height: 66px; padding: 8px 10px 8px 8px;
-    border-radius: 14px; background: var(--cx-surface); cursor: text;
-    border: 2px solid var(--cx-green-500); box-shadow: var(--cx-ring);
-    transition: border-color var(--cx-fast) ease, box-shadow var(--cx-fast) ease;
-}
-.pos-scan-icon {
-    width: 48px; height: 48px; flex-shrink: 0; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--cx-green-700); color: #fff; font-size: 26px;
-    transition: background-color var(--cx-fast) ease, color var(--cx-fast) ease;
-}
-.pos-scan-bar input {
-    flex: 1; min-width: 0; height: 48px; padding: 0 2px; border: none; outline: none; background: transparent;
-    font-family: var(--cx-font-num); font-size: 22px; font-weight: 600; letter-spacing: 0.06em; color: var(--cx-text);
-}
-.pos-scan-bar input:focus-visible { outline: none; }
-.pos-scan-bar input::placeholder { font-family: var(--cx-font); font-size: 15px; font-weight: 400; letter-spacing: 0; color: var(--cx-muted); }
-.scan-state {
-    display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; white-space: nowrap;
-    font-size: 12.5px; font-weight: 600; background: var(--cx-green-50); color: var(--cx-green-700);
-}
-.scan-state::before {
-    content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--cx-green-500);
-    animation: cx-pulse 1.6s ease-in-out infinite;
-}
-.pos-scan-bar.is-idle { border-color: var(--cx-border-strong); box-shadow: none; }
-.pos-scan-bar.is-idle .pos-scan-icon { background: var(--cx-surface-2); color: var(--cx-muted); }
-.pos-scan-bar.is-idle .scan-state { background: var(--cx-yellow-50); color: var(--cx-yellow-700); }
-.pos-scan-bar.is-idle .scan-state::before { background: #c49a00; animation: none; }
-.pos-scan-bar.is-busy .scan-state::before { animation-duration: 0.6s; }
 .pos-scan-hint {
     display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap;
     margin: 10px 2px 0; font-size: 12.5px; color: var(--cx-muted);
 }
 .pos-keys { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-
-.pos-status {
-    display: flex; align-items: flex-start; gap: 12px; margin-top: 14px; padding: 12px 14px;
-    border-radius: var(--cx-r); border: 1px solid transparent; font-size: 14px; line-height: 1.45;
-}
-.pos-status > i { font-size: 22px; flex-shrink: 0; }
-.pos-status strong { display: block; font-weight: 600; overflow-wrap: anywhere; }
-.pos-status span { display: block; margin-top: 1px; color: var(--cx-text-2); }
-.pos-status-success { background: var(--cx-green-50); border-color: var(--cx-green-200); color: var(--cx-green-800); }
-.pos-status-success > i { color: var(--cx-green-600); }
-.pos-status-error { background: var(--cx-red-50); border-color: var(--cx-red-100); color: var(--cx-red-700); }
-.pos-status-info { background: var(--cx-surface-2); border-color: var(--cx-border); color: var(--cx-text); }
-.pos-status-info > i { color: var(--cx-green-700); }
-.pos-status-warn { background: var(--cx-yellow-50); border-color: #f5df8a; color: var(--cx-yellow-700); }
-.pos-flash { animation: pos-flash 220ms var(--cx-ease); }
-@keyframes pos-flash { from { transform: translateY(-3px); opacity: 0.5; } to { transform: none; opacity: 1; } }
+/* The scan bar itself and the .pos-status feedback are shared with receiving: includes/staff_app.css §11 */
 
 .pos-cart {
     border-radius: var(--cx-r-lg); background: var(--cx-surface);

@@ -1,0 +1,108 @@
+/*
+ * EasyPC Retail Officer — page styles for the RETAIL/ pages (dashboard, sales
+ * history, forecast). Tokens, the app shell and the shared components (buttons,
+ * cards, tables, pills, KPI panel, segmented control, category chips, chart frame,
+ * pager, dialogs) are in includes/staff_app.css, which loads first.
+ */
+
+/* =========================================================================
+   1. Page stack
+   ========================================================================= */
+.rt-dash { display: flex; flex-direction: column; gap: 20px; }
+.rt-dash > * { min-width: 0; } /* lets Chart.js canvases shrink inside the flex column */
+.rt-inline-form { margin: 0; }
+.print-only { display: none; }
+
+/* =========================================================================
+   2. Dashboard: monthly sales table
+   ========================================================================= */
+.ms-table strong { font-weight: 600; }
+
+/* =========================================================================
+   3. Sales history: deliveries with a detail row
+   ========================================================================= */
+.deliv-table { min-width: 860px; }
+.deliv-table .col-caret { width: 52px; padding-right: 0; }
+.deliv-table tr.drill-toggle { cursor: pointer; }
+.deliv-table tr.drill-toggle.is-open { background: var(--cx-green-50); }
+.deliv-table tr.drill-toggle.is-open td { border-bottom-color: transparent; }
+.deliv-customer { font-weight: 600; color: var(--cx-text); }
+.deliv-when { white-space: nowrap; font-size: 13px; color: var(--cx-text-2); }
+.drill-btn {
+    width: 36px; height: 36px; border-radius: var(--cx-r-sm); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--cx-border); background: var(--cx-surface); color: var(--cx-text-2); font-size: 16px;
+    transition: background-color var(--cx-fast) ease, border-color var(--cx-fast) ease, color var(--cx-fast) ease;
+}
+.drill-btn i { transition: transform 180ms var(--cx-ease); }
+.drill-btn:hover { border-color: var(--cx-green-500); background: var(--cx-green-50); color: var(--cx-green-700); }
+.drill-btn[aria-expanded="true"] { background: var(--cx-green-700); border-color: var(--cx-green-700); color: #fff; }
+.drill-btn[aria-expanded="true"] i { transform: rotate(90deg); }
+.deliv-table tr.drill-row td { padding: 0 16px 16px 68px; background: var(--cx-green-50); }
+.drill-grid {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; margin: 0;
+    padding: 14px 16px; border-radius: var(--cx-r); background: var(--cx-surface); border: 1px solid var(--cx-green-200);
+}
+.drill-grid .drill-wide { grid-column: 1 / -1; }
+.drill-grid dt { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--cx-muted); }
+.drill-grid dd { margin: 2px 0 0; font-size: 14px; color: var(--cx-text); overflow-wrap: anywhere; }
+
+/* =========================================================================
+   4. Responsive: tables become stacked rows on phones
+   ========================================================================= */
+@media (max-width: 720px) {
+    .ms-table thead { display: none; }
+    .ms-table tbody tr {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px;
+        padding: 14px 16px; border-bottom: 1px solid var(--cx-border);
+    }
+    .ms-table tbody tr:last-child { border-bottom: none; }
+    .ms-table td { padding: 0 !important; border: none; text-align: left !important; }
+    .ms-table td[data-label="Month"] { grid-column: 1 / -1; font-size: 15px; }
+    .ms-table td:not([data-label="Month"])::before {
+        content: attr(data-label); display: block; font-size: 11.5px; font-weight: 600; color: var(--cx-muted);
+    }
+
+    .deliv-table { min-width: 0; }
+    .deliv-table thead { display: none; }
+    .deliv-table tbody tr.drill-toggle {
+        position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center;
+        padding: 14px 16px; border-top: 1px solid var(--cx-border);
+    }
+    .deliv-table tbody tr.drill-toggle:first-child { border-top: none; }
+    .deliv-table td { padding: 0 !important; border: none !important; }
+    .deliv-table td.col-caret { grid-column: 1; grid-row: 1 / span 5; align-self: start; width: auto; }
+    .deliv-table td[data-label="Customer"] { grid-column: 2; grid-row: 1; }
+    .deliv-table td[data-label="Total"] { grid-column: 3; grid-row: 1; }
+    .deliv-table td[data-label="Status"] { grid-column: 3; grid-row: 2 / span 2; justify-self: end; align-self: start; }
+    .deliv-table td[data-label="Shipment"] { grid-column: 2; grid-row: 2; }
+    .deliv-table td[data-label="Order"] { grid-column: 2; grid-row: 3; }
+    .deliv-table td[data-label="Carrier"] { grid-column: 2 / -1; grid-row: 4; }
+    .deliv-table td[data-label="Delivered"] { grid-column: 2 / -1; grid-row: 5; }
+    .deliv-table td[data-label="Shipment"], .deliv-table td[data-label="Order"],
+    .deliv-table td[data-label="Carrier"], .deliv-table td[data-label="Delivered"] { font-size: 12.5px; color: var(--cx-text-2); }
+    .deliv-table td[data-label="Shipment"]::before, .deliv-table td[data-label="Order"]::before,
+    .deliv-table td[data-label="Carrier"]::before, .deliv-table td[data-label="Delivered"]::before {
+        content: attr(data-label) ' '; font-family: var(--cx-font); font-weight: 600; color: var(--cx-muted);
+    }
+    .deliv-table tr.drill-row { display: block; }
+    .deliv-table tr.drill-row[hidden] { display: none; }
+    .deliv-table tr.drill-row td { display: block; padding: 0 16px 14px !important; }
+    .drill-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* =========================================================================
+   5. Print + reduced motion
+   ========================================================================= */
+@media print {
+    .print-only { display: inline !important; }
+    /* Print always shows the Monthly Sales table, whichever view is active on screen */
+    #msDetailView { display: block !important; }
+    #msGraphView { display: none !important; }
+    .drill-btn { display: none; }
+    .deliv-table { min-width: 0; }
+    .rt-dash { gap: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .drill-btn i { transition: none; }
+}
