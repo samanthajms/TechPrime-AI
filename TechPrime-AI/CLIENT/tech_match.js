@@ -21,7 +21,8 @@
     ];
     var TOTAL_SLOTS = SLOTS.length;
     /* Build Summary line order (matches the EasyPC website summary). */
-    var SUMMARY_ORDER = ['processor', 'cooler', 'motherboard', 'memory', 'gpu', 'ssd', 'ssd_sata', 'hdd', 'psu', 'case', 'case_fan'];
+    var PSU_SAFE_LOAD = 0.8; // keep the build under 80% of the PSU's rated wattage
+    var SUMMARY_ORDER =['processor', 'cooler', 'motherboard', 'memory', 'gpu', 'ssd', 'ssd_sata', 'hdd', 'psu', 'case', 'case_fan'];
 
     var STEPS = [
         { id: 1, label: 'Core' },
@@ -45,6 +46,16 @@
     var editingBuildId = 0;
     var pendingBuildName = '';
     var budget = DEFAULT_BUDGET;
+    /* False until the shopper picks a budget; the button then reads "Change budget". */
+    var budgetSet = false;
+    /* Suggested budgets from tech_match_api.php (action=budget_guide), fetched once. */
+    var budgetGuide = null;
+    /* Build purpose chip (keys from includes/pc_purpose.php); steers the recommendations. */
+    var purpose = 'balanced';
+    /* Last build check from tech_match_api.php (action=review); rating = Build Score + Performance Balance (pc_rating.php). */
+    var review = { key: '', gpuNeeded: false, warnings: [], notes: [], rating: null, pending: false };
+    var reviewTimer = null;
+    var lastPower = null;
     var pickerProducts = [];
     var pickerToken = 0;
     var brandFilter = {};
@@ -85,7 +96,9 @@
                 components: build,
                 editId: editingBuildId,
                 name: pendingBuildName,
-                budget: budget
+                budget: budget,
+                budgetSet: budgetSet,
+                purpose: purpose
             }));
         } catch (e) {}
     }
@@ -106,6 +119,8 @@
             editingBuildId = Number(d.editId) > 0 ? Number(d.editId) : 0;
             pendingBuildName = String(d.name || '');
             if (Number(d.budget) > 0) budget = Number(d.budget);
+            budgetSet = !!d.budgetSet || (Number(d.budget) > 0 && Number(d.budget) !== DEFAULT_BUDGET);
+            applyPurpose(d.purpose);
             applyComponents(d.components);
         } catch (e) {
             build = {};
@@ -137,11 +152,17 @@
         return !!(comps.ssd || comps.ssd_sata || comps.hdd);
     }
 
+    /* A graphics card is required for Gaming / Content Creation, or when the CPU has no built-in graphics. */
+    function gpuNeeded() {
+        return purpose === 'gaming' || purpose === 'creation' || review.gpuNeeded;
+    }
+
     /* Required parts still missing; any one drive covers storage. */
     function missingEssentials() {
         var out = [];
         ['processor', 'motherboard', 'memory'].forEach(function (id) { if (!build[id]) out.push(slotMeta(id)); });
         if (!hasStorage()) out.push(slotMeta('ssd'));
+        if (!build.gpu && gpuNeeded()) out.push(slotMeta('gpu'));
         ['psu', 'case'].forEach(function (id) { if (!build[id]) out.push(slotMeta(id)); });
         return out;
     }
@@ -150,22 +171,29 @@
         return missingEssentials().map(function (m) { return m.id === 'ssd' ? 'Storage' : m.name; });
     }
 
-    function buildScore(comps) {
-        comps = comps || build;
-        var base = Math.round((filledCount(comps) / TOTAL_SLOTS) * 70);
-        var bonus = 0;
-        if (comps.processor && comps.motherboard) bonus += 8;
-        if (comps.memory) bonus += 6;
-        if (comps.gpu) bonus += 8;
-        if (comps.psu) bonus += 4;
-        if (comps['case']) bonus += 4;
-        return Math.min(100, base + bonus);
+    /* Build Score of the current build for the chosen purpose, rated on the server (pc_rating.php). */
+    function buildScore() {
+        return review.rating ? Number(review.rating.score) || 0 : 0;
     }
 
-    function axisScore(keys) {
-        var hit = 0;
-        keys.forEach(function (k) { if (build[k]) hit++; });
-        return keys.length ? hit / keys.length : 0;
+    /* Rates any build for a purpose with the same server check (used by Compare). */
+    function fetchRating(components, forPurpose) {
+        var parts = {};
+        SLOTS.forEach(function (s) {
+            var it = components && components[s.id];
+            if (it && typeof it === 'object') {
+                parts[s.id] = { id: it.id, name: it.name, price: it.price, category: it.category || '', description: it.description || '' };
+            }
+        });
+        if (!Object.keys(parts).length) return Promise.resolve(null);
+        return fetch('tech_match_api.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'review', csrf_token: window.EP_CSRF || '', build: parts, purpose: forPurpose })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) { return data && data.ok ? data.rating || null : null; });
     }
 
     /* ---------- Compatibility (mirror of includes/pc_compatibility.php) ---------- */
@@ -326,6 +354,8 @@
     function stepDone(stepId) {
         var related = SLOTS.filter(function (s) { return s.step === stepId; });
         if (stepId === 4) return hasStorage();
+        /* Graphics: done once a card is picked, or once the processor is in and the purpose does not need one. */
+        if (stepId === 3) return !!build.gpu || (!!build.processor && !gpuNeeded());
         return related.every(function (s) { return !!build[s.id] || s.optional; }) &&
             related.some(function (s) { return !!build[s.id]; });
     }
@@ -363,7 +393,8 @@
             html += '<div class="' + cls + '" id="tm-slot-' + s.id + '" data-pick="' + s.id + '" role="button" tabindex="0">' +
                 '<span class="tm-slot-icon">' + icon + '</span>' +
                 '<span class="tm-slot-text">' +
-                '<span class="tm-slot-name">' + escapeHtml(s.label) + (s.optional && !item ? '<em class="tm-tag">Optional</em>' : '') + '</span>' +
+                '<span class="tm-slot-name">' + escapeHtml(s.label) + ((s.optional || (s.id === 'gpu' && !gpuNeeded())) && !item ? '<em class="tm-tag">Optional</em>' : '') +
+                (item && item.auto ? '<em class="tm-tag tm-tag-auto" title="Picked by Build it for me">Auto</em>' : '') + '</span>' +
                 (item
                     ? '<span class="tm-slot-hint" title="' + escapeHtml(item.name) + '">' + escapeHtml(item.name) + '</span>' +
                       '<span class="tm-slot-price">' + peso(item.price) + '</span>' +
@@ -383,23 +414,40 @@
         if ($('tmComponentCount')) $('tmComponentCount').innerHTML = '<b>' + count + '</b> / ' + TOTAL_SLOTS + ' components';
         if ($('tmComponentBar')) $('tmComponentBar').style.width = Math.round((count / TOTAL_SLOTS) * 100) + '%';
 
+        /* Power meter: the scale is the selected PSU's wattage, with a marker at the
+           80% safe-load point (520W on a 650W unit), as on the EasyPC website builder. */
         var watts = powerDraw();
         var psu = tagsFor('psu');
+        var capacity = psu && psu.watts ? psu.watts : 0;
+        var safeLoad = Math.round(capacity * PSU_SAFE_LOAD);
         var recommended = watts > 0 ? Math.max(450, Math.ceil((watts * 1.5) / 50) * 50) : 0;
         var hint = $('tmPowerHint');
         var bar = $('tmPowerBar');
-        if ($('tmPowerDraw')) $('tmPowerDraw').textContent = '~' + watts + 'W';
-        var pct;
-        if (psu && psu.watts) {
-            pct = Math.round((watts / psu.watts) * 100);
-            if (hint) hint.textContent = 'About ' + pct + '% of your ' + psu.watts + 'W power supply.';
-        } else {
-            pct = Math.round((watts / 650) * 100);
-            if (hint) hint.textContent = recommended ? ('Recommended power supply: ' + recommended + 'W or higher.') : '';
+        var track = $('tmPowerTrack');
+        var pct = Math.round((watts / (capacity || 650)) * 100);
+        var level = !capacity ? '' : (watts > capacity ? 'over' : (watts > safeLoad ? 'high' : 'ok'));
+        if ($('tmPowerDraw')) $('tmPowerDraw').textContent = '~' + watts + 'W' + (capacity ? ' / ' + capacity + 'W' : '');
+        if (hint) {
+            if (level === 'over') hint.textContent = 'Exceeds your ' + capacity + 'W power supply. Choose at least ' + recommended + 'W.';
+            else if (level === 'high') hint.textContent = 'Above the ' + Math.round(PSU_SAFE_LOAD * 100) + '% safe load (' + safeLoad + 'W). A ' + recommended + 'W or higher power supply is recommended.';
+            else if (level === 'ok') hint.textContent = 'About ' + pct + '% of your ' + capacity + 'W power supply — within the safe load.';
+            else if (psu) hint.textContent = 'The wattage of this power supply is not listed. Recommended: ' + recommended + 'W or higher.';
+            else hint.textContent = recommended ? ('Recommended power supply: ' + recommended + 'W or higher.') : '';
         }
         if (bar) {
             bar.style.width = Math.min(100, pct) + '%';
-            bar.parentNode.classList.toggle('is-high', !!(psu && psu.watts && pct > 80));
+            bar.parentNode.classList.toggle('is-high', level === 'high' || level === 'over');
+        }
+        if (track) {
+            track.setAttribute('aria-valuemax', String(capacity || 650));
+            track.setAttribute('aria-valuenow', String(Math.min(watts, capacity || 650)));
+            track.setAttribute('aria-valuetext', watts + ' watts' + (capacity ? ' of ' + capacity + ' watts' : ''));
+        }
+        if ($('tmPowerMark')) $('tmPowerMark').hidden = !capacity;
+        if ($('tmPowerScale')) $('tmPowerScale').hidden = !capacity;
+        if (capacity) {
+            if ($('tmPowerScaleMark')) $('tmPowerScaleMark').textContent = safeLoad + 'W (' + Math.round(PSU_SAFE_LOAD * 100) + '%)';
+            if ($('tmPowerScaleMax')) $('tmPowerScaleMax').textContent = capacity + 'W';
         }
         return { pct: pct, psu: psu };
     }
@@ -426,7 +474,19 @@
         var total = totalPrice();
         var score = buildScore();
         var issues = validateCurrentBuild();
-        if ($('tmBuildScore')) $('tmBuildScore').textContent = String(score);
+        var rating = count ? review.rating : null;
+        if ($('tmBuildScore')) $('tmBuildScore').textContent = String(count ? score : 0);
+        var scoreCard = document.querySelector('.tm-score-card');
+        if (scoreCard) scoreCard.classList.toggle('is-pending', !!(count && review.pending));
+        if ($('tmScoreVerdict')) {
+            $('tmScoreVerdict').textContent = rating ? rating.verdict : 'Rated for ' + (purpose === 'balanced' ? 'everyday use' : purposeLabel()) + ' as you add parts';
+        }
+        var scoreNotes = $('tmScoreNotes');
+        if (scoreNotes) {
+            var noteList = rating && rating.notes ? rating.notes.slice(0, 2) : [];
+            scoreNotes.hidden = !noteList.length;
+            scoreNotes.innerHTML = noteList.map(function (n) { return '<li>' + escapeHtml(n) + '</li>'; }).join('');
+        }
         if ($('tmSummaryCount')) $('tmSummaryCount').textContent = count + ' / ' + TOTAL_SLOTS;
         if ($('tmSummaryBar')) $('tmSummaryBar').style.width = Math.round((count / TOTAL_SLOTS) * 100) + '%';
         if ($('tmSummaryTotal')) $('tmSummaryTotal').textContent = peso(total);
@@ -435,7 +495,8 @@
         if ($('tmMobileCount')) $('tmMobileCount').textContent = count + ' / ' + TOTAL_SLOTS + ' components';
 
         /* Score badges: score / compatibility / power */
-        setBadge('tmScoreBadgeScore', score >= 70 ? 'good' : '', 'Build score: ' + score + '/100');
+        setBadge('tmScoreBadgeScore', rating ? (score >= 70 ? 'good' : (score < 50 && rating.complete ? 'bad' : '')) : '',
+            rating ? ('Build score: ' + score + '/100 · ' + rating.verdict) : 'Build score: no parts yet');
         setBadge('tmScoreBadgeCompat', issues.length ? 'bad' : (count ? 'good' : ''),
             issues.length ? (issues.length + ' compatibility issue(s)') : (count ? 'All selected parts are compatible' : 'Compatibility: no parts yet'));
         var p = power || {};
@@ -452,6 +513,15 @@
             } else if (count > 0) {
                 html += '<div class="tm-compat-line is-ok"><i class="fas fa-check-circle" aria-hidden="true"></i><span>All selected parts are compatible.</span></div>';
             }
+            /* Build check for the chosen purpose: no-display warning, then parts that are not a good fit. */
+            review.warnings.forEach(function (msg) {
+                html += '<div class="tm-compat-line is-warn"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>' + escapeHtml(msg) + '</span></div>';
+            });
+            review.notes.slice(0, 3).forEach(function (n) {
+                var meta = slotMeta(n.slot);
+                html += '<div class="tm-compat-line is-tip"><i class="fas fa-lightbulb" aria-hidden="true"></i><span><strong>' +
+                    escapeHtml(meta ? meta.name : n.slot) + ':</strong> ' + escapeHtml(n.text) + '</span></div>';
+            });
             var missing = missingNames();
             if (count > 0 && missing.length) {
                 html += '<div class="tm-compat-line is-todo"><i class="fas fa-list-ul" aria-hidden="true"></i><span>Still needed: ' + escapeHtml(missing.join(', ')) + '</span></div>';
@@ -491,7 +561,9 @@
     function renderBudget(total) {
         var wrap = document.querySelector('.bp-budget');
         if ($('tmBudgetUsed')) $('tmBudgetUsed').textContent = peso(total);
-        if ($('tmBudgetEdit')) $('tmBudgetEdit').textContent = peso(budget);
+        if ($('tmBudgetAmount')) $('tmBudgetAmount').textContent = peso(budget);
+        if ($('tmBudgetEditLabel')) $('tmBudgetEditLabel').textContent = budgetSet ? 'Change budget' : 'Set budget';
+        if ($('tmBudgetEdit')) $('tmBudgetEdit').classList.toggle('is-unset', !budgetSet);
         if ($('tmBudgetBar')) $('tmBudgetBar').style.width = Math.min(100, budget > 0 ? (total / budget) * 100 : 0) + '%';
         if (wrap) wrap.classList.toggle('is-over', total > budget);
     }
@@ -499,36 +571,65 @@
     function renderRadar() {
         var svg = $('tmRadarSvg');
         if (!svg) return;
+        /*
+         * Green fill = absolute strength of each picked part (1 = top of the range), dashed outline =
+         * what the chosen purpose needs on the same scale (pc_rating.php). Where the fill reaches the
+         * outline the part is enough; amber dots mark parts that fall short.
+         */
+        var need = purpose === 'balanced' ? 'everyday use' : purposeLabel();
+        var rated = filledCount() && review.rating ? review.rating.axes || [] : [];
+        var preset = (window.EP_TM_TARGETS && window.EP_TM_TARGETS[purpose]) || {};
+        function clamp(n) { return Math.max(0, Math.min(1, Number(n) || 0)); }
         var axes = [
-            { label: 'CPU', v: axisScore(['processor', 'motherboard', 'cooler']) },
-            { label: 'RAM', v: axisScore(['memory']) },
-            { label: 'GPU', v: axisScore(['gpu']) },
-            { label: 'SSD', v: hasStorage() ? 1 : 0 },
-            { label: 'PSU', v: axisScore(['psu', 'case']) }
-        ];
+            { key: 'cpu', label: 'CPU' },
+            { key: 'ram', label: 'RAM' },
+            { key: 'gpu', label: 'GPU' },
+            { key: 'storage', label: 'Storage' },
+            { key: 'psu', label: 'PSU' }
+        ].map(function (a) {
+            var r = rated.find(function (x) { return x.key === a.key; });
+            var power = r ? clamp(r.power) : 0;
+            var target = clamp(r ? r.target : preset[a.key]);
+            var tip = a.label + ': ' + (r ? r.text : 'not picked yet') + '. ' +
+                (power > 0 ? 'Strength ' + Math.round(power * 100) + '% · ' : '') + need + ' needs ' + Math.round(target * 100) + '%';
+            return { label: a.label, power: power, target: target, short: !!r && power > 0 && Number(r.value) < 0.85, tip: tip };
+        });
+        svg.setAttribute('aria-label', 'Performance balance. Your parts compared with what ' + need + ' needs: ' +
+            axes.map(function (a) { return a.label + ' ' + Math.round(a.power * 100) + '% of ' + Math.round(a.target * 100) + '% needed'; }).join(', '));
+        if ($('tmRadarNeed')) $('tmRadarNeed').textContent = need;
+
         var cx = 90, cy = 90, r = 58;
         function pt(i, rr) {
             var ang = (-Math.PI / 2) + (i * 2 * Math.PI / axes.length);
             return [cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr];
         }
+        function poly(values) {
+            return axes.map(function (a, i) { return pt(i, r * values(a)).map(function (n) { return n.toFixed(1); }).join(','); }).join(' ');
+        }
         var grid = '';
         for (var ring = 1; ring <= 4; ring++) {
-            grid += '<polygon points="' + axes.map(function (_, i) { return pt(i, r * ring / 4).join(','); }).join(' ') +
-                '" fill="none" stroke="#d7dbe0" stroke-width="1"/>';
+            grid += '<polygon class="tm-radar-grid" points="' + poly(function () { return ring / 4; }) + '"/>';
         }
         var spokes = axes.map(function (_, i) {
             var p = pt(i, r);
-            return '<line x1="' + cx + '" y1="' + cy + '" x2="' + p[0] + '" y2="' + p[1] + '" stroke="#e5e7eb" stroke-width="1"/>';
+            return '<line class="tm-radar-spoke" x1="' + cx + '" y1="' + cy + '" x2="' + p[0] + '" y2="' + p[1] + '"/>';
         }).join('');
-        var data = axes.map(function (a, i) { return pt(i, r * Math.max(0.04, a.v)).join(','); }).join(' ');
+        var fill = rated.length
+            ? '<polygon class="tm-radar-fill" points="' + poly(function (a) { return Math.max(0.03, a.power); }) + '"/>'
+            : '';
+        var target = '<polygon class="tm-radar-target" points="' + poly(function (a) { return Math.max(0.03, a.target); }) + '"/>';
+        var dots = axes.map(function (a, i) {
+            if (a.power <= 0) return '';
+            var p = pt(i, r * a.power);
+            return '<circle class="tm-radar-dot' + (a.short ? ' is-short' : '') + '" cx="' + p[0] + '" cy="' + p[1] + '" r="' + (a.short ? 3.2 : 2.6) + '">' +
+                '<title>' + escapeHtml(a.tip) + '</title></circle>';
+        }).join('');
         var labels = axes.map(function (a, i) {
             var p = pt(i, r + 15);
-            return '<text x="' + p[0] + '" y="' + p[1] + '" text-anchor="middle" dominant-baseline="middle" fill="#1f2328" font-size="9" font-weight="500">' + a.label + '</text>';
+            return '<text class="tm-radar-label' + (a.short ? ' is-short' : '') + '" x="' + p[0] + '" y="' + p[1] + '" text-anchor="middle" dominant-baseline="middle">' +
+                '<title>' + escapeHtml(a.tip) + '</title>' + a.label + '</text>';
         }).join('');
-        svg.innerHTML = grid + spokes +
-            '<polygon points="' + data + '" fill="rgba(98,178,54,0.22)" stroke="#62b236" stroke-width="1.5"/>' +
-            '<circle cx="' + cx + '" cy="' + cy + '" r="2.5" fill="#62b236"/>' +
-            labels;
+        svg.innerHTML = grid + spokes + fill + target + dots + labels;
     }
 
     function renderEditBanner() {
@@ -542,9 +643,103 @@
         renderSteps();
         renderSlots();
         var power = renderCenter();
+        lastPower = power;
         renderRight(power);
         renderEditBanner();
         saveDraft();
+        scheduleReview();
+    }
+
+    /* ---------- Build purpose + build check ---------- */
+
+    /* Picked parts as sent to tech_match_api.php, leaving out one slot (the one being picked). */
+    function pickedParts(except) {
+        var picked = {};
+        Object.keys(build).forEach(function (k) {
+            if (k === except || !build[k]) return;
+            picked[k] = {
+                id: build[k].id,
+                name: build[k].name,
+                price: build[k].price,
+                category: build[k].category || '',
+                description: build[k].description || ''
+            };
+        });
+        return picked;
+    }
+
+    /* Selects a purpose chip without re-rendering; unknown keys fall back to "Not sure yet". */
+    function applyPurpose(key) {
+        var chips = document.querySelectorAll('[data-purpose]');
+        if (!chips.length) return;
+        var found = null;
+        chips.forEach(function (c) { if (c.getAttribute('data-purpose') === key) found = c; });
+        if (!found) found = chips[0];
+        purpose = found.getAttribute('data-purpose');
+        chips.forEach(function (c) {
+            var on = c === found;
+            c.setAttribute('aria-checked', on ? 'true' : 'false');
+            c.tabIndex = on ? 0 : -1;
+        });
+        if ($('bpPurposeHint')) $('bpPurposeHint').textContent = found.getAttribute('data-hint') || '';
+        if ($('bpPurposeName')) $('bpPurposeName').textContent = (found.getAttribute('data-label') || '') + ':';
+    }
+
+    function setPurpose(key) {
+        if (key === purpose) return;
+        applyPurpose(key);
+        refresh();
+        if (activeSlot) loadProducts(activeSlot);
+    }
+
+    function purposeLabel(key) {
+        var chip = document.querySelector('[data-purpose="' + (key || purpose) + '"]');
+        return chip ? chip.getAttribute('data-label') : '';
+    }
+
+    /* Asks the server which picked parts suit the purpose; re-renders the build check when it answers. */
+    function scheduleReview() {
+        var key = purpose + '|' + Object.keys(build).sort().map(function (k) { return k + ':' + (build[k] ? build[k].id : ''); }).join(',');
+        if (key === review.key) return;
+        review.key = key;
+        review.warnings = [];
+        review.notes = [];
+        clearTimeout(reviewTimer);
+        if (!filledCount()) {
+            review.gpuNeeded = false;
+            review.rating = null;
+            review.pending = false;
+            return;
+        }
+        /* The last score stays on screen (dimmed) until the new rating arrives. */
+        review.pending = true;
+        var card = document.querySelector('.tm-score-card');
+        if (card) card.classList.add('is-pending');
+        reviewTimer = setTimeout(function () {
+            fetch('tech_match_api.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'review', csrf_token: window.EP_CSRF || '', build: pickedParts(''), purpose: purpose })
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (review.key !== key) return;
+                    if (!data || !data.ok) throw new Error('review failed');
+                    review.gpuNeeded = !!data.gpu_needed;
+                    review.warnings = data.warnings || [];
+                    review.notes = data.notes || [];
+                    review.rating = data.rating || null;
+                    review.pending = false;
+                    renderSlots();
+                    renderRight(lastPower);
+                })
+                .catch(function () {
+                    if (review.key !== key) return;
+                    review.pending = false;
+                    renderRight(lastPower);
+                });
+        }, 250);
     }
 
     /* Scroll so a slot row is visible, and highlight it. */
@@ -552,8 +747,14 @@
         var row = $('tm-slot-' + slotId);
         if (!row) return;
         var rect = row.getBoundingClientRect();
-        if (rect.top < 110 || rect.bottom > window.innerHeight) {
-            window.scrollTo({ top: rect.top + window.pageYOffset - 140, behavior: 'smooth' });
+        // Keep the row clear of the fixed header and, when it is sticky, the budget/steps bar.
+        var offset = 140;
+        var top = document.querySelector('.bp-top');
+        if (top && getComputedStyle(top).position === 'sticky') {
+            offset = (parseInt(getComputedStyle(top).top, 10) || 0) + top.offsetHeight + 16;
+        }
+        if (rect.top < offset - 30 || rect.bottom > window.innerHeight) {
+            window.scrollTo({ top: rect.top + window.pageYOffset - offset, behavior: 'smooth' });
         }
         row.classList.add('is-flash');
         setTimeout(function () { row.classList.remove('is-flash'); }, 1300);
@@ -849,7 +1050,7 @@
         if ($('tmPickerTitle')) $('tmPickerTitle').textContent = meta.select;
         if ($('tmPickerSearch')) $('tmPickerSearch').value = '';
         var hasParts = Object.keys(build).some(function (k) { return k !== slotId && build[k]; });
-        if ($('tmPickerSort')) $('tmPickerSort').value = hasParts ? 'recommended' : 'price-asc';
+        if ($('tmPickerSort')) $('tmPickerSort').value = hasParts || purpose !== 'balanced' ? 'recommended' : 'price-asc';
         if ($('tmPickerInStock')) $('tmPickerInStock').checked = true;
         if ($('tmPickerCompatOnly')) $('tmPickerCompatOnly').checked = true;
         setFiltersOpen(false);
@@ -902,22 +1103,17 @@
         pickerProducts = [];
         if ($('tmPickerCount')) $('tmPickerCount').textContent = '';
         list.innerHTML = '<div class="tm-picker-loading">Loading products…</div>';
-        var picked = {};
-        Object.keys(build).forEach(function (k) {
-            if (k === slotId || !build[k]) return;
-            picked[k] = {
-                id: build[k].id,
-                name: build[k].name,
-                price: build[k].price,
-                category: build[k].category || '',
-                description: build[k].description || ''
-            };
-        });
         fetch('tech_match_api.php', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slot: slotId, csrf_token: window.EP_CSRF || '', build: picked })
+            body: JSON.stringify({
+                slot: slotId,
+                csrf_token: window.EP_CSRF || '',
+                build: pickedParts(slotId),
+                purpose: purpose,
+                budget: budget
+            })
         })
             .then(function (r) { return r.json(); })
             .then(function (data) {
@@ -1014,16 +1210,20 @@
             else if (out) btn = '<button type="button" class="tm-select-btn" disabled>Out of stock</button>';
             else btn = '<button type="button" class="tm-select-btn" data-select="' + pid + '">Select</button>';
             var recommended = !x.reason && p.recommended && p.recommend_reason;
+            /* Good fits outside the top picks: same reason, lighter "Good fit" label. */
+            var goodFit = !x.reason && !p.recommended && p.recommend_reason;
             return '<article class="tm-product-card' + (x.reason ? ' is-incompatible' : '') + (recommended ? ' is-recommended' : '') + (isCurrent ? ' is-current' : '') + '">' +
                 img +
                 '<div class="tm-product-body">' +
                 (recommended ? '<span class="tm-recommend">Recommended</span>' : '') +
+                (goodFit ? '<span class="tm-recommend tm-recommend-fit">Good fit</span>' : '') +
                 (p.brand ? '<span class="tm-product-brand">' + escapeHtml(p.brand) + '</span>' : '') +
                 '<h4 title="' + escapeHtml(p.name || '') + '">' +
                 (pid > 0 ? '<a href="products.php?id=' + pid + '" target="_blank" rel="noopener">' + escapeHtml(p.name || '') + '</a>' : escapeHtml(p.name || '')) +
                 '</h4>' +
                 specChips(p, false) +
-                (recommended ? '<p class="tm-recommend-why">' + escapeHtml(p.recommend_reason) + '</p>' : '') +
+                (recommended || goodFit ? '<p class="tm-recommend-why">' + escapeHtml(p.recommend_reason) + '</p>' : '') +
+                (!recommended && !goodFit && !x.reason && p.recommend_note ? '<p class="tm-recommend-note">' + escapeHtml(p.recommend_note) + '</p>' : '') +
                 (x.reason ? '<p class="tm-compat-warn">' + escapeHtml(x.reason) + '</p>' : '') +
                 '</div>' +
                 '<div class="tm-product-side">' +
@@ -1207,6 +1407,7 @@
             action: 'save',
             build_name: name,
             components: build,
+            purpose: purpose,
             csrf_token: window.EP_CSRF || ''
         };
         if (editingBuildId > 0) payload.id = editingBuildId;
@@ -1395,6 +1596,7 @@
                                 editingBuildId = Number(b.id);
                                 pendingBuildName = String(b.name || '');
                                 var dropped = applyComponents(b.components);
+                                applyPurpose((b.components || {})._purpose);
                                 activeStep = 1;
                                 refresh();
                                 noticeDropped(dropped);
@@ -1450,11 +1652,11 @@
                             if (!item) return;
                             var id = item.getAttribute('data-build-id');
                             if (id === 'current') {
-                                compare[index] = { name: 'Current build', components: JSON.parse(JSON.stringify(build)) };
+                                compare[index] = { name: 'Current build', components: JSON.parse(JSON.stringify(build)), purpose: purpose };
                             } else {
                                 var b = builds.find(function (x) { return String(x.id) === id; });
                                 if (!b) return;
-                                compare[index] = { name: b.name, components: b.components || {} };
+                                compare[index] = { name: b.name, components: b.components || {}, purpose: (b.components || {})._purpose || 'balanced' };
                             }
                             close();
                             renderCompareSlots();
@@ -1483,11 +1685,22 @@
             '<table class="tm-compare-table"><thead><tr><th></th><th>' + escapeHtml(a.name) + '</th><th>' + escapeHtml(b.name) + '</th></tr></thead>' +
             '<tbody>' + (rows || '<tr><td colspan="3" class="is-empty">Both builds are empty.</td></tr>') + '</tbody>' +
             '<tfoot>' +
-            '<tr><th>Score</th><td>' + buildScore(a.components) + '/100</td><td>' + buildScore(b.components) + '/100</td></tr>' +
+            '<tr><th>Built for</th><td>' + escapeHtml(purposeLabel(a.purpose)) + '</td><td>' + escapeHtml(purposeLabel(b.purpose)) + '</td></tr>' +
+            '<tr><th>Score</th><td id="tmCmpScoreA">…</td><td id="tmCmpScoreB">…</td></tr>' +
             '<tr><th>Total</th><td>' + peso(ta) + '</td><td>' + peso(tb) + '</td></tr>' +
             '</tfoot></table>' +
             (ta !== tb ? '<p class="tm-save-lead" style="margin-top:12px">' + escapeHtml(ta < tb ? a.name : b.name) + ' is ' + peso(Math.abs(ta - tb)) + ' cheaper.</p>' : ''),
-            null,
+            function () {
+                /* Each build is scored for its own purpose (pc_rating.php). */
+                [[a, 'tmCmpScoreA'], [b, 'tmCmpScoreB']].forEach(function (pair) {
+                    fetchRating(pair[0].components, pair[0].purpose || 'balanced')
+                        .then(function (r) {
+                            var td = $(pair[1]);
+                            if (td) td.innerHTML = r ? r.score + '/100<small>' + escapeHtml(r.verdict) + '</small>' : '—';
+                        })
+                        .catch(function () { var td = $(pair[1]); if (td) td.textContent = '—'; });
+                });
+            },
             true
         );
     }
@@ -1496,6 +1709,7 @@
 
     function buildSummaryText() {
         var lines = ['My EasyPC Build (' + filledCount() + ' / ' + TOTAL_SLOTS + ' components)'];
+        if (purpose !== 'balanced') lines.push('Built for: ' + purposeLabel());
         SLOTS.forEach(function (s) {
             if (build[s.id]) lines.push('• ' + s.name + ': ' + build[s.id].name + ' — ' + peso(build[s.id].price));
         });
@@ -1510,8 +1724,13 @@
             return;
         }
         var text = buildSummaryText();
-        if (navigator.share) {
-            navigator.share({ title: 'My EasyPC Build', text: text }).catch(function () {});
+        /* The system share sheet on phones and tablets; desktops copy the summary instead
+           (desktop share sheets are unreliable). A failed share falls back to the copy dialog. */
+        var touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+        if (navigator.share && touch) {
+            navigator.share({ title: 'My EasyPC Build', text: text }).catch(function (err) {
+                if (!err || err.name !== 'AbortError') showShareText(text);
+            });
             return;
         }
         if (navigator.clipboard && window.isSecureContext) {
@@ -1559,10 +1778,12 @@
             'th,td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;}th{background:#f7f8fa;}.r{text-align:right;white-space:nowrap;}' +
             'tfoot td{font-weight:700;font-size:14px;}.ok{color:#3d7422;}.bad{color:#b91c1c;}small{color:#8a93a0;}</style></head><body>' +
             '<h1>EasyPC Build Report' + (pendingBuildName ? ': ' + escapeHtml(pendingBuildName) : '') + '</h1>' +
-            '<p>Generated ' + escapeHtml(now) + ' · EasyPC One Oasis</p>' +
+            '<p>Generated ' + escapeHtml(now) + ' · EasyPC One Oasis' +
+            (purpose !== 'balanced' ? ' · Built for: ' + escapeHtml(purposeLabel()) : '') + '</p>' +
             '<table><thead><tr><th>Component</th><th>Product</th><th class="r">Price</th></tr></thead><tbody>' + rows + '</tbody>' +
             '<tfoot><tr><td colspan="2">Total</td><td class="r">' + peso(totalPrice()) + '</td></tr></tfoot></table>' +
-            '<p>Build score: <strong>' + buildScore() + '/100</strong> · Components: ' + filledCount() + ' / ' + TOTAL_SLOTS +
+            '<p>Build score: <strong>' + buildScore() + '/100</strong>' +
+            (review.rating && review.rating.verdict ? ' (' + escapeHtml(review.rating.verdict) + ')' : '') + ' · Components: ' + filledCount() + ' / ' + TOTAL_SLOTS +
             ' · Estimated power draw: ~' + powerDraw() + 'W</p>' +
             '<p class="' + (issues.length ? 'bad' : 'ok') + '">' + (issues.length ? 'Compatibility issues: ' + escapeHtml(issues.join(' | ')) : 'All selected parts are compatible.') + '</p>' +
             (missing.length ? '<p>Still needed: ' + escapeHtml(missing.join(', ')) + '</p>' : '') +
@@ -1578,10 +1799,47 @@
         w.document.close();
     }
 
+    /* Suggested budgets for each purpose, from current catalog prices; fetched once and reused. */
+    function loadBudgetGuide() {
+        if (!budgetGuide) {
+            budgetGuide = fetch('tech_match_api.php?action=budget_guide', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data || !data.ok) throw new Error('budget_guide');
+                    return data;
+                })
+                .catch(function (err) {
+                    budgetGuide = null;
+                    throw err;
+                });
+        }
+        return budgetGuide;
+    }
+
+    /* Least it costs to finish the current build: parts so far plus the cheapest of each required part still missing. */
+    function finishBuildMinimum(cheapest) {
+        var sum = totalPrice();
+        missingEssentials().forEach(function (m) {
+            if (m.id === 'ssd') {
+                var drives = ['ssd', 'ssd_sata', 'hdd'].map(function (k) { return Number(cheapest[k] || 0); }).filter(function (v) { return v > 0; });
+                sum += drives.length ? Math.min.apply(null, drives) : 0;
+            } else {
+                sum += Number(cheapest[m.id] || 0);
+            }
+        });
+        return Math.ceil(sum / 1000) * 1000;
+    }
+
     function editBudget() {
+        var label = purposeLabel();
         openDialog(
             '<h3 id="tmDialogTitle">Set Your Budget</h3>' +
-            '<p class="tm-save-lead">The budget bar shows how much of it your build uses.</p>' +
+            '<p class="tm-save-lead">Pick a suggested amount' + (purpose !== 'balanced' ? ' for <strong>' + escapeHtml(label) + '</strong>' : '') +
+            ', or type your own. Recommended parts will fit inside it.</p>' +
+            '<div class="tm-budget-presets" id="tmBudgetPresets" role="group" aria-label="Suggested budgets">' +
+            '<p class="tm-budget-loading">Loading suggestions…</p></div>' +
+            '<div class="tm-budget-finish" id="tmBudgetFinish" hidden></div>' +
+            '<label class="tm-budget-own" for="tmBudgetInput">Your budget (₱)</label>' +
             '<input type="number" id="tmBudgetInput" class="tm-save-input" min="1000" step="1000" value="' + budget + '">' +
             '<div class="tm-save-error" id="tmBudgetError" hidden>Enter an amount of at least ₱1,000.</div>' +
             '<div class="tm-save-actions">' +
@@ -1592,6 +1850,12 @@
                 var input = $('tmBudgetInput');
                 input.focus();
                 input.select();
+                var markPicked = function () {
+                    var v = Math.round(Number(input.value));
+                    overlay.querySelectorAll('[data-amount]').forEach(function (b) {
+                        b.setAttribute('aria-pressed', Number(b.getAttribute('data-amount')) === v ? 'true' : 'false');
+                    });
+                };
                 var save = function () {
                     var v = Math.round(Number(input.value));
                     if (!(v >= 1000)) {
@@ -1599,12 +1863,245 @@
                         return;
                     }
                     budget = v;
+                    budgetSet = true;
                     close();
                     refresh();
                 };
+                overlay.addEventListener('click', function (e) {
+                    var preset = e.target.closest('[data-amount]');
+                    if (!preset) return;
+                    input.value = preset.getAttribute('data-amount');
+                    $('tmBudgetError').hidden = true;
+                    markPicked();
+                });
+                input.addEventListener('input', markPicked);
                 $('tmBudgetSave').onclick = save;
                 input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+
+                loadBudgetGuide()
+                    .then(function (guide) {
+                        var tiers = (guide.purposes || {})[purpose] || (guide.purposes || {}).balanced;
+                        var box = $('tmBudgetPresets');
+                        if (!box || !tiers) return;
+                        var forWhat = purpose !== 'balanced' ? label.toLowerCase() : 'most uses';
+                        var options = [
+                            { key: 'starter', name: 'Starter', text: 'Basic parts that do the job.' },
+                            { key: 'recommended', name: 'Recommended', text: 'Good balance of price and performance for ' + forWhat + '.', tag: true },
+                            { key: 'high', name: 'High-end', text: 'Faster parts and more room to upgrade.' }
+                        ];
+                        box.innerHTML = options.map(function (o) {
+                            return '<button type="button" class="tm-budget-preset" data-amount="' + Number(tiers[o.key]) + '" aria-pressed="false">' +
+                                '<span class="tm-budget-preset-name">' + o.name + (o.tag ? ' <em>Suggested</em>' : '') + '</span>' +
+                                '<strong>' + peso(tiers[o.key]) + '</strong>' +
+                                '<small>' + escapeHtml(o.text) + '</small></button>';
+                        }).join('') +
+                            '<p class="tm-budget-note">Based on current EasyPC prices for a complete PC' +
+                            (purpose === 'gaming' || purpose === 'creation' ? ' with a graphics card' : '') + '.</p>';
+                        if (filledCount() > 0 && $('tmBudgetFinish')) {
+                            var least = finishBuildMinimum(guide.cheapest || {});
+                            $('tmBudgetFinish').hidden = false;
+                            $('tmBudgetFinish').innerHTML = '<span>Your parts so far: <strong>' + peso(totalPrice()) + '</strong>. ' +
+                                (missingEssentials().length ? 'Finishing this build costs at least <strong>' + peso(least) + '</strong>.' : 'Your build has every required part.') +
+                                '</span>' +
+                                (missingEssentials().length ? '<button type="button" class="tm-budget-use" data-amount="' + least + '">Use ' + peso(least) + '</button>' : '');
+                        }
+                        markPicked();
+                    })
+                    .catch(function () {
+                        var box = $('tmBudgetPresets');
+                        if (box) box.hidden = true;
+                    });
+            },
+            true
+        );
+    }
+
+    /* ---------- Build it for me (tech_match_api.php action=auto_build) ---------- */
+
+    function buildSnapshot() {
+        return { build: JSON.parse(JSON.stringify(build)), budget: budget, budgetSet: budgetSet, purpose: purpose };
+    }
+
+    function restoreSnapshot(snap) {
+        build = snap.build;
+        budget = snap.budget;
+        budgetSet = snap.budgetSet;
+        applyPurpose(snap.purpose);
+        refresh();
+        if (activeSlot) loadProducts(activeSlot);
+    }
+
+    /* Always builds from an empty PC: the parts already in the build are not sent. */
+    function requestAutoBuild(amount) {
+        return fetch('tech_match_api.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'auto_build', csrf_token: window.EP_CSRF || '', build: {}, purpose: purpose, budget: amount })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data || !data.ok) throw new Error('auto_build');
+                return data;
+            });
+    }
+
+    /* Replaces the whole build with the server's picks. */
+    function mergeAutoBuild(data) {
+        build = {};
+        var added = data.added || {};
+        Object.keys(added).forEach(function (slot) {
+            var p = added[slot];
+            if (!slotMeta(slot) || !p) return;
+            build[slot] = {
+                id: p.id,
+                name: p.name,
+                price: p.price,
+                image: p.image,
+                category: p.category,
+                description: p.description || '',
+                compat: p.compat || null,
+                auto: true
+            };
+        });
+    }
+
+    /* Drops each listed part into the case preview one after another. */
+    function installParts(slots) {
+        SUMMARY_ORDER.filter(function (slot) { return slots.indexOf(slot) !== -1; }).forEach(function (slot, i) {
+            setTimeout(function () { pcxInstall(slot); }, 160 * i);
+        });
+    }
+
+    function openAutoBuildDialog() {
+        var label = purposeLabel();
+        /* Builds from scratch: every part already in the build is replaced (Undo brings them back). */
+        var parts = filledCount();
+        openDialog(
+            '<h3 id="tmDialogTitle"><i class="fas fa-magic" aria-hidden="true"></i> Build it for me</h3>' +
+            '<p class="tm-save-lead">EasyPC\'s recommendation model picks a complete ' +
+            (purpose !== 'balanced' ? '<strong>' + escapeHtml(label) + '</strong> ' : '') +
+            'PC within your budget, one part at a time, and checks every part for compatibility. You can change any part afterwards.</p>' +
+            (purpose === 'balanced' ? '<p class="tm-autobuild-tip"><i class="fas fa-info-circle" aria-hidden="true"></i> Tip: choose what the PC is for (School, Office, Gaming…) first for better picks.</p>' : '') +
+            '<label class="tm-budget-own" for="tmAutoBudget">Budget (₱)</label>' +
+            '<input type="number" id="tmAutoBudget" class="tm-save-input" min="1000" step="1000" value="' + budget + '">' +
+            '<p class="tm-budget-note" id="tmAutoBudgetHint"></p>' +
+            (parts > 0 ? '<p class="tm-autobuild-tip"><i class="fas fa-info-circle" aria-hidden="true"></i> This starts a new build and replaces the ' + parts +
+                ' part' + (parts === 1 ? '' : 's') + ' you picked. You can Undo afterwards.</p>' : '') +
+            '<div class="tm-save-error" id="tmAutoError" hidden></div>' +
+            '<div class="tm-save-actions">' +
+            '<button type="button" class="tm-save-cancel" data-dialog-cancel>Cancel</button>' +
+            '<button type="button" class="tm-save-confirm" id="tmAutoGo"><i class="fas fa-magic" aria-hidden="true"></i> Build it for me</button>' +
+            '</div>',
+            function (overlay, close) {
+                var input = $('tmAutoBudget');
+                var go = $('tmAutoGo');
+                /* Least a complete PC for this purpose costs (budget guide); smaller budgets are refused. */
+                var minimum = 0;
+                input.focus();
+                /* No budget picked yet: wait for the suggested amount before building. */
+                if (!budgetSet) go.disabled = true;
+                loadBudgetGuide()
+                    .then(function (guide) {
+                        minimum = Number((guide.minimum || {})[purpose]) || 0;
+                        var tiers = (guide.purposes || {})[purpose];
+                        if (!tiers) return;
+                        if (!budgetSet) input.value = tiers.recommended;
+                        if ($('tmAutoBudgetHint')) {
+                            $('tmAutoBudgetHint').textContent = 'Suggested for ' + (purpose !== 'balanced' ? label : 'most uses') + ': ' +
+                                peso(tiers.starter) + ' – ' + peso(tiers.high) + ' (recommended ' + peso(tiers.recommended) + ').';
+                        }
+                    })
+                    .catch(function () {})
+                    .then(function () { go.disabled = false; });
+                go.onclick = function () {
+                    var v = Math.round(Number(input.value));
+                    var err = $('tmAutoError');
+                    if (!(v >= 1000)) {
+                        err.textContent = 'Enter a budget of at least ₱1,000.';
+                        err.hidden = false;
+                        return;
+                    }
+                    if (minimum && v < minimum) {
+                        err.innerHTML = 'The cheapest complete ' + (purpose !== 'balanced' ? escapeHtml(label) + ' ' : '') + 'PC in stock costs about <strong>' + peso(minimum) + '</strong>. ' +
+                            '<button type="button" class="tm-budget-use" data-amount="' + minimum + '">Use ' + peso(minimum) + '</button>';
+                        err.hidden = false;
+                        err.querySelector('[data-amount]').onclick = function () {
+                            input.value = minimum;
+                            err.hidden = true;
+                            input.focus();
+                        };
+                        return;
+                    }
+                    err.hidden = true;
+                    go.disabled = true;
+                    go.textContent = 'Building…';
+                    requestAutoBuild(v)
+                        .then(function (data) {
+                            close();
+                            applyAutoBuild(data, v);
+                        })
+                        .catch(function () {
+                            go.disabled = false;
+                            go.innerHTML = '<i class="fas fa-magic" aria-hidden="true"></i> Build it for me';
+                            err.textContent = 'Could not build a PC right now. Please try again.';
+                            err.hidden = false;
+                        });
+                };
+                input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go.click(); } });
             }
+        );
+    }
+
+    function applyAutoBuild(data, newBudget) {
+        var before = buildSnapshot();
+        mergeAutoBuild(data);
+        budget = newBudget;
+        budgetSet = true;
+        activeStep = 1;
+        refresh();
+        installParts(Object.keys(data.added || {}));
+        showAutoBuildResult(data, before);
+    }
+
+    function showAutoBuildResult(data, before) {
+        var added = data.added || {};
+        var reasons = data.reasons || {};
+        var fallback = data.fallback || [];
+        var slots = SUMMARY_ORDER.filter(function (slot) { return added[slot]; });
+        var total = totalPrice();
+        var rows = slots.map(function (slot) {
+            var meta = slotMeta(slot);
+            var p = added[slot];
+            var picked = fallback.indexOf(slot) === -1;
+            return '<li class="' + (picked ? '' : 'is-fallback') + '">' +
+                '<span class="tm-autobuild-slot">' + escapeHtml(meta ? meta.name : slot) + '</span>' +
+                '<span class="tm-autobuild-part"><strong title="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</strong>' +
+                '<small><i class="fas ' + (picked ? 'fa-check-circle' : 'fa-info-circle') + '" aria-hidden="true"></i> ' + escapeHtml(reasons[slot] || '') + '</small></span>' +
+                '<em>' + peso(p.price) + '</em></li>';
+        }).join('');
+        var missing = (data.missing || []).map(function (slot) { var m = slotMeta(slot); return m ? m.name : slot; });
+        var title = purpose !== 'balanced' ? 'Your ' + purposeLabel() + ' build is ready' : 'Your build is ready';
+        openDialog(
+            '<h3 id="tmDialogTitle">' + escapeHtml(title) + '</h3>' +
+            '<p class="tm-save-lead">Total <strong>' + peso(total) + '</strong> of your ' + peso(budget) + ' budget. ' +
+            (slots.length ? 'Each part was picked by the recommendation model for this build and checked for compatibility. ' +
+                'For a different use or budget, change them and click Build it for me again.' : 'No parts could be added.') + '</p>' +
+            (rows ? '<ul class="tm-autobuild-list">' + rows + '</ul>' : '') +
+            (fallback.length ? '<p class="tm-budget-note"><i class="fas fa-info-circle" aria-hidden="true"></i> Parts marked with ⓘ are the closest options in stock; a bigger budget allows recommended picks.</p>' : '') +
+            (missing.length ? '<div class="tm-save-error">Not available in stock for this build: ' + escapeHtml(missing.join(', ')) + '.</div>' : '') +
+            (total > budget ? '<div class="tm-save-error">This build is over your budget.</div>' : '') +
+            '<div class="tm-save-actions">' +
+            '<button type="button" class="tm-save-cancel" id="tmAutoUndo"><i class="fas fa-undo" aria-hidden="true"></i> Undo</button>' +
+            '<button type="button" class="tm-save-confirm" data-dialog-cancel>Looks good</button>' +
+            '</div>',
+            function (overlay, close) {
+                $('tmAutoUndo').onclick = function () {
+                    close();
+                    restoreSnapshot(before);
+                };
+            },
+            true
         );
     }
 
@@ -1631,6 +2128,8 @@
                 description: item.description || '',
                 compat: item.compat || null
             };
+            /* Picked by "Build it for me" (kept in the draft only; saved builds drop it). */
+            if (item.auto) build[k].auto = true;
         });
         return dropped;
     }
@@ -1644,6 +2143,7 @@
 
     function applyLoadedBuild(components) {
         var dropped = applyComponents(components);
+        applyPurpose((components || {})._purpose);
         refresh();
         noticeDropped(dropped);
     }
@@ -1771,6 +2271,29 @@
         if ($('tmLoadBuild')) $('tmLoadBuild').addEventListener('click', openLoadDialog);
         if ($('tmReportBuild')) $('tmReportBuild').addEventListener('click', reportBuild);
         if ($('tmBudgetEdit')) $('tmBudgetEdit').addEventListener('click', editBudget);
+        if ($('tmAutoBuild')) $('tmAutoBuild').addEventListener('click', openAutoBuildDialog);
+        var purposeChips = $('bpPurposeChips');
+        if (purposeChips) {
+            purposeChips.addEventListener('click', function (e) {
+                var chip = e.target.closest('[data-purpose]');
+                if (chip) setPurpose(chip.getAttribute('data-purpose'));
+            });
+            /* Radio group keys: arrows move and select, Home / End jump to the ends. */
+            purposeChips.addEventListener('keydown', function (e) {
+                var chips = Array.prototype.slice.call(purposeChips.querySelectorAll('[data-purpose]'));
+                var i = chips.indexOf(document.activeElement);
+                if (i === -1) return;
+                var next = null;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = chips[(i + 1) % chips.length];
+                else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = chips[(i - 1 + chips.length) % chips.length];
+                else if (e.key === 'Home') next = chips[0];
+                else if (e.key === 'End') next = chips[chips.length - 1];
+                if (!next) return;
+                e.preventDefault();
+                next.focus();
+                setPurpose(next.getAttribute('data-purpose'));
+            });
+        }
         if ($('tmCompareGo')) $('tmCompareGo').addEventListener('click', openCompareDialog);
         if ($('tmClearBuild')) {
             $('tmClearBuild').addEventListener('click', function () {
@@ -1791,6 +2314,8 @@
         bind();
         pcxBind();
         if (!loadPendingBuild()) refresh();
+        /* Fetch budget suggestions in the background so the budget dialog opens with them ready. */
+        setTimeout(function () { loadBudgetGuide().catch(function () {}); }, 1500);
     }
 
     if (document.readyState === 'loading') {

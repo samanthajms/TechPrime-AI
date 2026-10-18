@@ -8,6 +8,8 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/client_helpers.php';
+require_once __DIR__ . '/../includes/pc_purpose.php';
+require_once __DIR__ . '/../includes/pc_rating.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -21,22 +23,13 @@ $isHomePage = false;
 $pageTitle = 'Build a PC';
 $csrf = generateCsrfToken();
 
-$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-15">';
+$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-30">';
 
 include __DIR__ . '/ep_header.php';
 ?>
 
 <main class="ep-main sf-main" id="main">
-    <?php echo sf_page_hero([
-        'crumbs' => [['Home', 'index.php'], ['Build a PC', '']],
-        'eyebrow' => 'Build a PC',
-        'title' => 'Build your PC',
-        'sub' => 'Pick parts from what is in stock. We flag parts that do not fit together and keep a running total.',
-        'icon' => 'fa-microchip',
-        'actions' => '<button type="button" class="sf-btn sf-btn-outline bp-help-btn" id="bpGuideOpen" aria-controls="bpGuide">'
-            . '<i class="far fa-question-circle" aria-hidden="true"></i> How it works</button>'
-            . ($canSaveBuilds ? '<a href="saved_builds.php" class="sf-btn sf-btn-outline"><i class="fas fa-folder-open" aria-hidden="true"></i> Saved builds</a>' : ''),
-    ]); ?>
+    <h1 class="sf-sr">Build your PC</h1>
     <div class="sf-wrap sf-body">
     <div class="bp-page">
     <div class="bp-top">
@@ -44,9 +37,34 @@ include __DIR__ . '/ep_header.php';
             <span class="bp-budget-label">Budget</span>
             <div class="bp-budget-bar" aria-hidden="true"><span id="tmBudgetBar"></span></div>
             <span class="bp-budget-value">
-                <strong id="tmBudgetUsed">₱0</strong> /
-                <button type="button" id="tmBudgetEdit" title="Change budget">₱200,000</button>
+                <strong id="tmBudgetUsed">₱0</strong> / <span id="tmBudgetAmount">₱200,000</span>
             </span>
+            <button type="button" class="bp-budget-edit is-unset" id="tmBudgetEdit" aria-haspopup="dialog">
+                <i class="fas fa-wallet" aria-hidden="true"></i><span id="tmBudgetEditLabel">Set budget</span>
+            </button>
+        </div>
+        <?php /* Build purpose: steers which parts get the Recommended badge (tech_match.js keeps the choice). */ ?>
+        <div class="bp-purpose">
+            <div class="bp-purpose-head">
+                <span class="bp-purpose-label" id="bpPurposeLabel">What will you use this PC for?</span>
+                <span class="bp-purpose-sub">Choose one and we'll recommend parts that fit.</span>
+            </div>
+            <div class="bp-purpose-chips" id="bpPurposeChips" role="radiogroup" aria-labelledby="bpPurposeLabel" aria-describedby="bpPurposeHint">
+                <?php $first = true; foreach (pc_purposes() as $key => $purpose): ?>
+                <button type="button" class="bp-purpose-chip" role="radio" data-purpose="<?php echo h($key); ?>"
+                        data-label="<?php echo h($purpose['label']); ?>" data-hint="<?php echo h($purpose['hint']); ?>"
+                        aria-checked="<?php echo $first ? 'true' : 'false'; ?>" tabindex="<?php echo $first ? '0' : '-1'; ?>">
+                    <span class="bp-purpose-icon" aria-hidden="true"><i class="fas <?php echo h($purpose['icon']); ?>"></i></span>
+                    <span class="bp-purpose-text"><strong><?php echo h($purpose['label']); ?></strong><small><?php echo h($purpose['short']); ?></small></span>
+                    <span class="bp-purpose-radio" aria-hidden="true"></span>
+                </button>
+                <?php $first = false; endforeach; ?>
+            </div>
+            <p class="bp-purpose-hint"><i class="fas fa-check-circle" aria-hidden="true"></i><span><strong id="bpPurposeName"><?php echo h(pc_purposes()['balanced']['label']); ?>:</strong> <span id="bpPurposeHint"><?php echo h(pc_purposes()['balanced']['hint']); ?></span></span></p>
+            <?php /* "Build it for me": fills a whole build with the recommender's picks (tech_match.js -> action=auto_build). */ ?>
+            <button type="button" class="bp-autobuild" id="tmAutoBuild" aria-haspopup="dialog">
+                <i class="fas fa-magic" aria-hidden="true"></i>Build it for me
+            </button>
         </div>
         <nav class="tm-steps" id="tmSteps" aria-label="Build stages"></nav>
     </div>
@@ -165,12 +183,24 @@ include __DIR__ . '/ep_header.php';
                     <span><i class="fas fa-bolt" aria-hidden="true"></i> Estimated Power Draw</span>
                     <strong id="tmPowerDraw">~0W</strong>
                 </div>
-                <div class="tm-bar tm-bar-power"><span id="tmPowerBar"></span></div>
+                <div class="tm-power-track" id="tmPowerTrack" role="meter" aria-label="Estimated power draw" aria-valuemin="0" aria-valuemax="650" aria-valuenow="0">
+                    <div class="tm-bar tm-bar-power"><span id="tmPowerBar"></span></div>
+                    <span class="tm-power-mark" id="tmPowerMark" aria-hidden="true" hidden></span>
+                </div>
+                <div class="tm-power-scale" id="tmPowerScale" aria-hidden="true" hidden>
+                    <span>0W</span>
+                    <span class="tm-power-scale-mark" id="tmPowerScaleMark"></span>
+                    <span id="tmPowerScaleMax"></span>
+                </div>
                 <small class="tm-power-hint" id="tmPowerHint"></small>
             </div>
             <div class="tm-disclaimer">
                 <i class="fas fa-info-circle" aria-hidden="true"></i>
                 <span>Compatibility checks are for guidance only and may not cover all scenarios. Please verify component specifications before purchasing.</span>
+            </div>
+            <div class="tm-disclaimer">
+                <i class="fas fa-magic" aria-hidden="true"></i>
+                <span><strong>Build it for me</strong> suggests parts from EasyPC's current stock using the recommendation model. It fills the required parts first; optional parts (CPU cooler, case fans, and a graphics card for School or Office builds) are added only when they suit your purpose and budget, so some slots may stay empty. A required part can also be left out if no compatible one is in stock. Prices and stock may change, so review each part before checkout.</span>
             </div>
         </section>
 
@@ -180,6 +210,8 @@ include __DIR__ . '/ep_header.php';
                 <div class="tm-score">
                     <span class="tm-score-num" id="tmBuildScore">0</span><span class="tm-score-den">/100</span>
                 </div>
+                <p class="tm-score-verdict" id="tmScoreVerdict" aria-live="polite"></p>
+                <ul class="tm-score-notes" id="tmScoreNotes" hidden></ul>
                 <div class="tm-score-actions">
                     <span id="tmScoreBadgeScore" title="Score"><i class="fas fa-star" aria-hidden="true"></i></span>
                     <span id="tmScoreBadgeCompat" title="Compatibility"><i class="fas fa-microchip" aria-hidden="true"></i></span>
@@ -191,6 +223,10 @@ include __DIR__ . '/ep_header.php';
                 <div class="tm-radar-wrap">
                     <svg id="tmRadarSvg" viewBox="0 0 180 180" role="img" aria-label="Performance radar chart"></svg>
                 </div>
+                <ul class="tm-radar-legend">
+                    <li class="is-parts"><span aria-hidden="true"></span>Your parts</li>
+                    <li class="is-need"><span aria-hidden="true"></span>Needed for <strong id="tmRadarNeed">everyday use</strong></li>
+                </ul>
             </div>
             <div class="tm-card tm-summary-card">
                 <h3>Build Summary</h3>
@@ -290,10 +326,12 @@ include __DIR__ . '/ep_header.php';
 <script>
 window.EP_CSRF = <?php echo json_encode($csrf); ?>;
 window.EP_TM_USER = <?php echo (int)($_SESSION['user_id'] ?? 0); ?>;
+/* What each purpose needs, for the radar's dashed outline before any part is picked (pc_rating.php). */
+window.EP_TM_TARGETS = <?php echo json_encode(pc_rating_all_targets()); ?>;
 window.EP_TM_CAN_SAVE = <?php echo $canSaveBuilds ? 'true' : 'false'; ?>;
 window.EP_TM_LOGIN_URL = <?php echo json_encode($buildLoginUrl); ?>;
 </script>
-<script src="tech_match.js?v=pcx-14" defer></script>
+<script src="tech_match.js?v=pcx-28" defer></script>
 
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>

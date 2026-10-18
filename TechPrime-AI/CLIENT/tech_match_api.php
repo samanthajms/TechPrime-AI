@@ -1,7 +1,11 @@
 <?php
 /**
- * Build a PC — fetch real products for a build slot (JSON).
- * Used by the in-page component picker (tech_match.js).
+ * Build a PC — fetch real products for a build slot (JSON), scored for the customer's
+ * purpose and budget. action=review checks the parts already picked instead and
+ * rates them for the purpose (Build Score + Performance Balance, pc_rating.php);
+ * action=budget_guide returns suggested budgets for the budget dialog;
+ * action=auto_build fills a whole build for the purpose and budget ("Build it for me").
+ * Used by the in-page component picker and build check (tech_match.js).
  */
 session_start();
 require_once __DIR__ . '/../includes/security.php';
@@ -10,6 +14,7 @@ require_once __DIR__ . '/../includes/client_helpers.php';
 require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
 require_once __DIR__ . '/../includes/pc_compatibility.php';
 require_once __DIR__ . '/../includes/pc_recommend.php';
+require_once __DIR__ . '/../includes/pc_rating.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -29,6 +34,31 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
 $slot = trim((string)($payload['slot'] ?? $_GET['slot'] ?? ''));
 $q = trim((string)($payload['q'] ?? $_GET['q'] ?? ''));
+$ctx = pc_recommend_context($payload);
+/* One connection for the whole request. */
+$db = getDbConnection();
+
+if (($payload['action'] ?? $_GET['action'] ?? '') === 'budget_guide') {
+    echo json_encode(['ok' => true] + pc_recommend_budget_guide($db), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if (($payload['action'] ?? '') === 'auto_build') {
+    pc_recommend_catalog($db);
+    $keep = pc_recommend_build_map($db, is_array($payload['build'] ?? null) ? $payload['build'] : []);
+    echo json_encode(['ok' => true] + pc_recommend_auto_build($db, $ctx, $keep), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if (($payload['action'] ?? '') === 'review') {
+    pc_recommend_catalog($db);
+    $buildMap = pc_recommend_build_map($db, is_array($payload['build'] ?? null) ? $payload['build'] : []);
+    echo json_encode(
+        ['ok' => true] + pc_recommend_review($buildMap, $ctx) + ['rating' => pc_build_rating($buildMap, $ctx['purpose'])],
+        JSON_UNESCAPED_UNICODE
+    );
+    exit;
+}
 
 /*
  * Slot lists use the shop taxonomy. products.category is too coarse, so each
@@ -43,7 +73,6 @@ if ($slot === '' || !isset($slotMap[$slot])) {
 }
 
 $meta = $slotMap[$slot];
-$db = getDbConnection();
 $products = pc_recommend_products_for_slot($db, $slot);
 if ($q !== '') {
     $products = array_values(array_filter($products, static function (array $p) use ($q): bool {
@@ -53,18 +82,7 @@ if ($q !== '') {
 }
 
 $buildMap = pc_recommend_build_map($db, is_array($payload['build'] ?? null) ? $payload['build'] : []);
-foreach ($products as &$product) {
-    $scored = pc_recommend_score($slot, $product, $buildMap);
-    if ($scored === null) {
-        continue;
-    }
-    $product['recommend_score'] = $scored['score'];
-    if ($scored['recommended']) {
-        $product['recommended'] = true;
-        $product['recommend_reason'] = $scored['reason'];
-    }
-}
-unset($product);
+$products = pc_recommend_apply($slot, $products, $buildMap, $ctx);
 
 echo json_encode([
     'ok' => true,

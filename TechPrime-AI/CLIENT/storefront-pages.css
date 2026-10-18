@@ -1071,6 +1071,44 @@
 .ep-body.sf-page .bp-page .tm-progress-meta,
 .ep-body.sf-page .bp-page .tm-power-hint { color: var(--sf-muted); font-size: 12.5px; }
 .ep-body.sf-page .bp-page .tm-bar { background: var(--sf-border); }
+/* Power meter: scale = selected PSU wattage, tick at the 80% safe load */
+.ep-body.sf-page .bp-page .tm-power-track { position: relative; }
+.ep-body.sf-page .bp-page .tm-bar-power { height: 8px; }
+.ep-body.sf-page .bp-page .tm-bar-power > span { background: var(--sf-green-500); }
+.ep-body.sf-page .bp-page .tm-bar-power.is-high > span { background: var(--sf-danger-text); }
+.ep-body.sf-page .bp-page .tm-power-mark {
+    position: absolute;
+    top: -3px;
+    left: 80%;
+    width: 2px;
+    height: 14px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--sf-star);
+}
+.ep-body.sf-page .bp-page .tm-power-scale {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: var(--sf-muted);
+    font-variant-numeric: tabular-nums;
+    container-type: inline-size;
+}
+.ep-body.sf-page .bp-page .tm-power-scale-mark {
+    position: absolute;
+    left: 80%;
+    transform: translateX(-50%);
+    color: var(--sf-warn-text);
+    font-weight: 600;
+    white-space: nowrap;
+}
+@container (max-width: 380px) {
+    .ep-body.sf-page .bp-page .tm-power-scale-mark { transform: translateX(-100%); margin-left: 4px; }
+}
+.ep-body.sf-page .bp-page .tm-power-scale[hidden],
+.ep-body.sf-page .bp-page .tm-power-mark[hidden] { display: none; }
 .ep-body.sf-page .bp-page .tm-disclaimer { color: var(--sf-text-2); }
 /* Build actions: same buttons as the storefront */
 .ep-body.sf-page .bp-page .tm-btn-primary,

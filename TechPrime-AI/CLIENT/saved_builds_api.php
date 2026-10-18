@@ -7,6 +7,7 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/pc_compatibility.php';
+require_once __DIR__ . '/../includes/pc_purpose.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -167,6 +168,11 @@ if ($action === 'save' && $method === 'POST') {
         sb_json(['ok' => false, 'error' => 'incompatible', 'message' => $msg, 'issues' => $compat['issues']], 400);
     }
 
+    /* The purpose the customer picked rides along as a plain string; readers skip non-part entries. */
+    $purpose = pc_purpose_key($payload['purpose'] ?? '');
+    if ($purpose !== 'balanced') {
+        $clean['_purpose'] = $purpose;
+    }
     $json = json_encode($clean, JSON_UNESCAPED_UNICODE);
 
     /* Update existing owned build when editing. */
