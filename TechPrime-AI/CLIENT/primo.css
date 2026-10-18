@@ -1,8 +1,18 @@
 /**
- * Primo — EasyPC AI Product Assistant mascot (visual prototype only)
+ * Primo — EasyPC AI Product Assistant (robot mascot, launcher and chat panel).
  * CSS-shaped robot + panel. No images.
+ *
+ * Follows the storefront design (storefront.css): every colour comes from the --sf-* tokens
+ * through the --p-* aliases below, so the panel matches the shop in both themes. Dark mode is
+ * token-only — scripts/build_client_dark_css.py skips .primo selectors, nothing to regenerate.
+ * The robot itself keeps its own fixed colours (it is a character, not a surface).
+ *
+ * §1 Tokens   §2 Mascot (homepage robot)   §3 Greeting bubble   §4 Panel shell + header
+ * §5 Messages  §6 Quick replies + product cards   §7 Composer   §8 Recent chats
+ * §9 Avatars   §10 Keyframes   §11 Responsive   §12 Compact launcher   §13 Reduced motion
  */
 
+/* ---- §1 Tokens -------------------------------------------------------- */
 .primo-root .sr-only,
 .primo-panel .sr-only {
     position: absolute;
@@ -17,17 +27,42 @@
 }
 
 .primo-root {
-    color-scheme: light;
-    color: #171717;
-    --ep-border: #e4e8ea;
-    --ep-green-light: #eef8e6;
+    /* Storefront tokens (fallbacks = light theme, for a page without .sf-page) */
+    --p-bg: var(--sf-bg, #f4f6f3);
+    --p-surface: var(--sf-surface, #ffffff);
+    --p-surface-2: var(--sf-surface-2, #f7f9f6);
+    --p-border: var(--sf-border, #e0e6dd);
+    --p-border-strong: var(--sf-border-strong, #c9d3c4);
+    --p-text: var(--sf-text, #16201a);
+    --p-text-2: var(--sf-text-2, #45514a);
+    --p-muted: var(--sf-muted, #5c6862);
+    --p-accent-text: var(--sf-accent-text, #3d7422);
+    --p-accent-soft: var(--sf-accent-soft, #eef8e6);
+    --p-action: var(--sf-action, #3d7422);
+    --p-action-hover: var(--sf-action-hover, #2c5618);
+    --p-on-action: var(--sf-on-action, #ffffff);
+    --p-focus: var(--sf-focus, #3d7422);
+    --p-warn-text: var(--sf-warn-text, #7a5c00);
+    --p-warn-soft: var(--sf-warn-soft, #fff8d6);
+    --p-danger-text: var(--sf-danger-text, #b42318);
+    --p-danger-soft: var(--sf-danger-soft, #fef3f2);
+    --p-photo-plate: var(--sf-photo-plate, #f4f6f3);
+    --p-chrome: var(--sf-hero-bg, #0a1307);          /* same bar as the site header */
+    --p-shadow-sm: var(--sf-shadow-sm, 0 1px 2px rgba(22, 32, 26, 0.06));
+    --p-shadow-md: var(--sf-shadow-md, 0 14px 28px -12px rgba(22, 32, 26, 0.22));
+    --p-shadow-panel: 0 28px 56px -18px rgba(10, 19, 7, 0.38), 0 2px 8px rgba(10, 19, 7, 0.08);
+    --p-ease: var(--sf-ease, cubic-bezier(0.23, 1, 0.32, 1));
+
+    /* Brand (fills and icons only) + the robot's own colours */
     --primo-green: #62b236;
     --primo-green-dark: #4b8b2a;
-    --primo-green-light: #eef8e6;
     --primo-yellow: #fed700;
     --primo-black: #171717;
     --primo-soft: #1e1f26;
     --primo-size: 108px;
+
+    color-scheme: light;
+    color: var(--p-text);
     position: fixed;
     left: auto;
     right: 0;
@@ -39,6 +74,12 @@
     font-family: 'Poppins', 'Inter', Arial, sans-serif;
 }
 
+html[data-theme="dark"] .primo-root {
+    color-scheme: dark;
+    --p-shadow-panel: 0 28px 56px -18px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* ---- §2 Mascot (homepage robot) -------------------------------------- */
 .primo-stage {
     position: relative;
     pointer-events: auto;
@@ -63,10 +104,11 @@
     gap: 6px;
     filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.22));
     outline: none;
+    touch-action: manipulation;
 }
 
 .primo-mascot:focus-visible {
-    outline: 3px solid var(--primo-green);
+    outline: 2px solid var(--p-focus);
     outline-offset: 4px;
     border-radius: 16px;
 }
@@ -82,19 +124,17 @@
 
 .primo-label {
     font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.6px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #fff;
-    background: var(--primo-green-dark);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: var(--p-on-action);
+    background: var(--p-action);
     border-radius: 999px;
-    padding: 3px 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
-    opacity: 0.92;
+    padding: 4px 11px;
+    box-shadow: var(--p-shadow-md);
 }
 
-/* ---- Robot parts ---- */
+/* Robot parts */
 .primo-antenna {
     position: absolute;
     top: 0;
@@ -158,46 +198,6 @@
     transform-origin: center;
     animation: primo-blink 4.6s ease-in-out infinite;
     transition: height 0.18s ease, opacity 0.18s ease;
-}
-
-.primo-greet {
-    position: absolute;
-    right: calc(100% + 2px);
-    bottom: 118px;
-    width: max-content;
-    max-width: 168px;
-    margin: 0;
-    padding: 8px 12px;
-    background: #62b236;
-    color: #fff;
-    border: 1px solid #4b8b2a;
-    border-radius: 18px;
-    box-shadow: 0 8px 16px rgba(23, 33, 18, 0.14);
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1.35;
-    pointer-events: auto;
-    z-index: 2;
-    transition: opacity 0.18s ease;
-}
-
-.primo-greet::after {
-    content: "";
-    position: absolute;
-    right: -5px;
-    bottom: 9px;
-    border-width: 5px 0 5px 6px;
-    border-style: solid;
-    border-color: transparent transparent transparent #62b236;
-}
-
-.primo-greet.is-swap {
-    opacity: 0;
-}
-
-.primo-root.is-chat-open .primo-greet,
-.primo-root.is-greet-away .primo-greet {
-    visibility: hidden;
 }
 
 .primo-mouth {
@@ -306,7 +306,7 @@
 .primo-foot-l { left: 2px; }
 .primo-foot-r { right: 2px; }
 
-/* ---- Expressions ---- */
+/* Expressions */
 .primo-figure.is-winking .primo-eye-r {
     height: 2px;
     border-radius: 2px;
@@ -324,31 +324,84 @@
     left: -10px;
     right: auto;
     transform: translateY(-50%);
-    width: 22px;
-    height: 36px;
-    border: 1px solid var(--ep-border, #e4e8ea);
+    width: 24px;
+    height: 40px;
+    border: 1px solid var(--p-border);
     border-radius: 10px 0 0 10px;
-    background: #fff;
-    color: var(--primo-green-dark);
+    background: var(--p-surface);
+    color: var(--p-accent-text);
     cursor: pointer;
     display: grid;
     place-items: center;
     font-size: 11px;
-    box-shadow: -2px 4px 10px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--p-shadow-sm);
     pointer-events: auto;
     padding: 0;
     z-index: 3;
 }
 
-.primo-tuck:hover {
-    background: var(--primo-green-light);
+.primo-tuck:hover { background: var(--p-accent-soft); }
+.primo-tuck:focus-visible { outline: 2px solid var(--p-focus); outline-offset: 2px; }
+
+.primo-root.is-collapsed .primo-tuck { display: none; }
+
+/* ---- §3 Greeting bubble ----------------------------------------------- */
+.primo-greet {
+    position: absolute;
+    right: calc(100% + 6px);
+    bottom: 118px;
+    width: max-content;
+    max-width: 200px;
+    margin: 0;
+    padding: 9px 13px 9px 28px;
+    background: var(--p-surface);
+    color: var(--p-text);
+    border: 1px solid var(--p-border);
+    border-radius: 14px;
+    box-shadow: var(--p-shadow-md);
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.4;
+    pointer-events: auto;
+    z-index: 2;
+    transition: opacity 0.18s ease;
 }
 
-.primo-root.is-collapsed .primo-tuck {
-    display: none;
+/* Live dot: Primo is online */
+.primo-greet::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    top: 15px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primo-green);
+    box-shadow: 0 0 0 3px var(--p-accent-soft);
 }
 
-/* ---- Chat panel ----
+/* Tail: a rotated square that shares the bubble's border */
+.primo-greet::after {
+    content: "";
+    position: absolute;
+    right: -6px;
+    bottom: 12px;
+    width: 10px;
+    height: 10px;
+    background: var(--p-surface);
+    border-top: 1px solid var(--p-border);
+    border-right: 1px solid var(--p-border);
+    transform: rotate(45deg);
+}
+
+.primo-greet.is-swap { opacity: 0; }
+
+.primo-root.is-chat-open .primo-greet,
+.primo-root.is-greet-away .primo-greet {
+    visibility: hidden;
+}
+
+/* ---- §4 Panel shell + header ------------------------------------------
  * Desktop/tablet: a docked, non-blocking panel beside the mascot (page stays usable).
  * Phones: a full-screen sheet. "Expand" (is-wide) grows it to the full available height.
  * Layout is a 3-row grid; history slides over rows 2–3, the jump pill overlays row 2.
@@ -356,7 +409,7 @@
 .primo-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(23, 23, 23, 0.32);
+    background: rgba(10, 19, 7, 0.45);
     z-index: 1200;
     pointer-events: auto;
     opacity: 0;
@@ -364,9 +417,7 @@
     display: none;
 }
 
-.primo-root.is-chat-open .primo-backdrop {
-    opacity: 1;
-}
+.primo-root.is-chat-open .primo-backdrop { opacity: 1; }
 
 .primo-panel {
     --primo-top: 96px;
@@ -376,13 +427,14 @@
     right: calc(var(--primo-size) + 20px);
     top: auto;
     bottom: 20px;
-    width: min(392px, calc(100vw - var(--primo-size) - 48px));
-    height: min(620px, calc(100vh - var(--primo-top) - 32px));
-    height: min(620px, calc(100dvh - var(--primo-top) - 32px));
+    width: min(400px, calc(100vw - var(--primo-size) - 48px));
+    height: min(640px, calc(100vh - var(--primo-top) - 32px));
+    height: min(640px, calc(100dvh - var(--primo-top) - 32px));
     min-height: 360px;
-    background: #fff;
-    border-radius: 18px;
-    box-shadow: 0 24px 56px -12px rgba(23, 33, 18, 0.32), 0 4px 14px rgba(23, 33, 18, 0.08);
+    background: var(--p-surface);
+    border: 1px solid var(--p-border);
+    border-radius: 20px;
+    box-shadow: var(--p-shadow-panel);
     z-index: 1201;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
@@ -405,7 +457,7 @@
 }
 
 .primo-root.is-wide .primo-panel {
-    width: min(620px, calc(100vw - var(--primo-size) - 48px));
+    width: min(640px, calc(100vw - var(--primo-size) - 48px));
     height: calc(100vh - var(--primo-top) - 32px);
     height: calc(100dvh - var(--primo-top) - 32px);
 }
@@ -415,11 +467,9 @@
     display: none !important;
 }
 
-.primo-panel ::selection {
-    background: rgba(98, 178, 54, 0.28);
-}
+.primo-panel ::selection { background: rgba(98, 178, 54, 0.28); }
 
-/* Header */
+/* Header: the site's dark header bar, so the panel reads as part of the store */
 .primo-panel-header {
     grid-row: 1;
     grid-column: 1;
@@ -427,9 +477,11 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    padding: 12px 12px 12px 16px;
-    background: linear-gradient(120deg, var(--primo-green) 0%, var(--primo-green-dark) 100%);
-    color: #fff;
+    min-height: 68px;
+    padding: 12px 12px 12px 14px;
+    background: var(--p-chrome);
+    color: #ffffff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     position: relative;
     z-index: 6;
 }
@@ -437,142 +489,137 @@
 .primo-panel-identity {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     min-width: 0;
 }
 
-.primo-panel-titles {
-    min-width: 0;
-}
+.primo-panel-titles { min-width: 0; }
 
 .primo-panel-identity h2 {
     margin: 0;
     font-size: 16px;
-    font-weight: 800;
-    line-height: 1.2;
-    color: #fff;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 0.01em;
+    color: #ffffff;
 }
 
 .primo-status {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin: 2px 0 0;
-    font-size: 11.5px;
-    font-weight: 500;
-    color: #f1fae9;
+    gap: 7px;
+    margin: 3px 0 0;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.74);   /* 9.6:1 on the header */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .primo-status-dot {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
-    background: #d4f7a8;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.22);
+    background: var(--primo-green);
+    box-shadow: 0 0 0 3px rgba(98, 178, 54, 0.22);
 }
 
 .primo-panel.is-busy .primo-status-dot {
     background: var(--primo-yellow);
+    box-shadow: 0 0 0 3px rgba(254, 215, 0, 0.2);
     animation: primo-pulse 1.2s ease-in-out infinite;
 }
 
 .primo-panel-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     flex-shrink: 0;
 }
 
 .primo-icon-btn {
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 40px;
     border: 0;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.14);
-    color: #fff;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.82);
     cursor: pointer;
     display: inline-grid;
     place-items: center;
     flex-shrink: 0;
     padding: 0;
-    font-size: 13px;
-    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    font-size: 15px;
+    touch-action: manipulation;
+    transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--p-ease);
 }
 
 .primo-icon-btn:hover {
-    background: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
 }
 
-.primo-icon-btn:active {
-    transform: scale(0.94);
-}
+.primo-icon-btn:active { transform: scale(0.94); }
 
 .primo-icon-btn[aria-expanded="true"],
 .primo-icon-btn[aria-pressed="true"] {
-    background: #fff;
-    color: var(--primo-green-dark);
+    background: rgba(98, 178, 54, 0.2);
+    color: #a8e07f;
 }
 
-.primo-icon-btn:focus-visible,
+/* Focus: yellow on the dark header (like the hero), green everywhere else */
+.primo-icon-btn:focus-visible {
+    outline: 2px solid var(--primo-yellow);
+    outline-offset: 1px;
+}
+
 .primo-chip:focus-visible,
 .primo-product:focus-visible,
+.primo-link:focus-visible,
 .primo-history-back:focus-visible,
 .primo-history-open:focus-visible,
 .primo-history-del:focus-visible,
 .primo-history-new:focus-visible,
 .primo-retry:focus-visible,
 .primo-jump:focus-visible,
-.primo-send-btn:focus-visible {
-    outline: 2px solid var(--primo-yellow);
+.primo-send-btn:focus-visible,
+.primo-tm-btn:focus-visible {
+    outline: 2px solid var(--p-focus);
     outline-offset: 2px;
 }
 
-.primo-chip:focus-visible,
-.primo-product:focus-visible,
-.primo-history-back:focus-visible,
-.primo-history-open:focus-visible,
-.primo-history-del:focus-visible,
-.primo-history-new:focus-visible,
-.primo-retry:focus-visible,
-.primo-jump:focus-visible,
-.primo-send-btn:focus-visible {
-    outline-color: var(--primo-green-dark);
-}
-
-/* Message log */
+/* ---- §5 Messages ------------------------------------------------------- */
 .primo-panel-body {
     grid-row: 2;
     grid-column: 1;
     position: relative; /* offsetParent for revealReply() */
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: 18px 16px 12px;
-    background: #f5f7f3;
+    padding: 20px 16px 14px;
+    background: var(--p-bg);
     display: flex;
     flex-direction: column;
     gap: 4px;
     scrollbar-width: thin;
-    scrollbar-color: #c9d3c2 transparent;
+    scrollbar-color: var(--p-border-strong) transparent;
     outline: none;
 }
 
 .primo-panel-body::-webkit-scrollbar { width: 8px; }
 .primo-panel-body::-webkit-scrollbar-thumb {
-    background: #c9d3c2;
+    background: var(--p-border-strong);
     border-radius: 8px;
-    border: 2px solid #f5f7f3;
+    border: 2px solid var(--p-bg);
 }
 
 .primo-msg {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     max-width: 88%;
     align-items: flex-end;
-    margin-top: 10px;
+    margin-top: 14px;
 }
 
 .primo-msg:first-child { margin-top: 0; }
@@ -589,14 +636,12 @@
 }
 
 .primo-msg-avatar {
-    width: 28px;
+    width: 30px;
     flex-shrink: 0;
 }
 
 /* Avatar marks the start of a run of Primo messages; the time marks its end. */
-.primo-msg.is-grouped .primo-msg-avatar {
-    visibility: hidden;
-}
+.primo-msg.is-grouped .primo-msg-avatar { visibility: hidden; }
 
 .primo-msg-content {
     min-width: 0;
@@ -608,13 +653,14 @@
 .primo-msg-user .primo-msg-content { align-items: flex-end; }
 
 .primo-msg-bubble {
-    background: #fff;
-    border: 1px solid #e2e7de;
+    background: var(--p-surface);
+    border: 1px solid var(--p-border);
     border-radius: 16px 16px 16px 6px;
-    padding: 10px 13px;
-    font-size: 13.5px;
-    line-height: 1.5;
-    color: #1f241c;
+    padding: 10px 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--p-text);
+    box-shadow: var(--p-shadow-sm);
     overflow-wrap: anywhere;
 }
 
@@ -622,6 +668,7 @@
 .primo-msg-bubble p + p,
 .primo-msg-bubble p + .primo-list,
 .primo-msg-bubble .primo-list + p { margin-top: 8px; }
+.primo-msg-bubble strong { font-weight: 600; }
 
 .primo-list {
     margin: 0;
@@ -633,42 +680,51 @@
 
 .primo-list li {
     position: relative;
-    padding-left: 14px;
+    padding-left: 15px;
 }
 
 .primo-list li::before {
     content: '';
     position: absolute;
     left: 2px;
-    top: 0.62em;
-    width: 5px;
-    height: 5px;
+    top: 0.65em;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: var(--primo-green);
 }
 
+/* The shopper's own messages: filled with the action green, like the store's primary buttons */
 .primo-msg-user .primo-msg-bubble {
-    background: var(--primo-green-light);
-    border-color: rgba(98, 178, 54, 0.35);
+    background: var(--p-action);
+    border-color: var(--p-action);
     border-radius: 16px 16px 6px 16px;
-    color: #335f1c;
-    font-weight: 500;
+    color: var(--p-on-action);
+    box-shadow: none;
     white-space: pre-wrap;
 }
 
 .primo-msg.is-error .primo-msg-bubble {
-    background: #fff8f1;
-    border-color: #f3d3b0;
-    color: #6b3a10;
+    background: var(--p-warn-soft);
+    border-color: color-mix(in srgb, var(--p-warn-text) 28%, transparent);
+    color: var(--p-text);
+}
+
+.primo-msg.is-error .primo-msg-bubble::before {
+    content: "\f071";   /* Font Awesome exclamation-triangle */
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    margin-right: 8px;
+    color: var(--p-warn-text);
 }
 
 .primo-msg-meta {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 10.5px;
-    font-weight: 500;
-    color: #6a7366;
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--p-muted);
     padding: 0 4px;
     font-variant-numeric: tabular-nums;
 }
@@ -678,20 +734,21 @@
 .primo-retry {
     border: 0;
     background: transparent;
-    padding: 2px 4px;
-    margin: -2px 0;
-    border-radius: 6px;
+    min-height: 32px;
+    padding: 0 8px;
+    margin: -6px 0;
+    border-radius: 8px;
     font-family: inherit;
-    font-size: 11.5px;
-    font-weight: 700;
-    color: #9a4d0b;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--p-accent-text);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
 }
 
-.primo-retry:hover { background: #fdecd9; }
+.primo-retry:hover { background: var(--p-accent-soft); }
 
 /* Arrival: messages rise into place (the one authored motion moment). */
 .primo-msg.is-new {
@@ -706,7 +763,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 13px 15px;
+    padding: 14px 16px;
 }
 
 .primo-typing-dot {
@@ -721,84 +778,83 @@
 .primo-typing-dot:nth-child(2) { animation-delay: 0.15s; }
 .primo-typing-dot:nth-child(3) { animation-delay: 0.3s; }
 
-.primo-typing-note {
-    font-size: 11.5px;
-    line-height: 1.4;
-    color: #5f6a5a;
-    padding: 0 4px;
-    max-width: 260px;
-}
-
+.primo-typing-note,
 .primo-msg-note {
     margin: 0;
-    font-size: 12px;
-    line-height: 1.45;
-    color: #5f6a5a;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--p-muted);
     padding: 0 4px;
 }
 
+.primo-typing-note { max-width: 270px; }
+
 .primo-link {
-    color: #3a6e20;
+    color: var(--p-accent-text);
     font-weight: 600;
     text-decoration: underline;
-    text-decoration-color: rgba(98, 178, 54, 0.5);
-    text-underline-offset: 2px;
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+    text-underline-offset: 3px;
+    border-radius: 3px;
 }
 
-.primo-link:hover {
-    text-decoration-color: currentColor;
-}
+.primo-msg-user .primo-link { color: inherit; }
+.primo-link:hover { text-decoration-color: currentColor; }
 
-/* Quick replies */
+/* ---- §6 Quick replies + product cards ---------------------------------- */
 .primo-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin: 10px 0 2px 36px;
+    gap: 8px;
+    margin: 12px 0 2px 40px;
 }
 
 .primo-chips.is-new {
     animation: primo-msg-in 0.42s var(--primo-ease, ease-out) 0.08s both;
 }
 
+/* Same pill as the storefront's .sf-chip */
 .primo-chip {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    border: 1px solid #cfe3c2;
-    background: #fff;
-    color: #2f5a19;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 15px;
+    border: 1px solid var(--p-border-strong);
+    background: var(--p-surface);
+    color: var(--p-text);
     border-radius: 999px;
-    padding: 7px 12px;
     font-family: inherit;
-    font-size: 12.5px;
-    font-weight: 600;
+    font-size: 13.5px;
+    font-weight: 500;
     line-height: 1.2;
     cursor: pointer;
-    transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+    touch-action: manipulation;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms var(--p-ease);
 }
 
 .primo-chip i {
-    font-size: 11px;
-    color: var(--primo-green-dark);
+    font-size: 12px;
+    color: var(--p-accent-text);
 }
 
-.primo-chip:hover {
-    background: var(--primo-green-light);
-    border-color: var(--primo-green);
+.primo-chip:hover:not(:disabled) {
+    border-color: var(--p-accent-text);
+    color: var(--p-accent-text);
+    background: var(--p-accent-soft);
 }
 
-.primo-chip:active { transform: scale(0.97); }
+.primo-chip:active:not(:disabled) { transform: scale(0.97); }
 
 .primo-chip:disabled {
-    opacity: 0.55;
+    opacity: 0.5;
     cursor: default;
 }
 
-/* Product results */
+/* Product results: a compact version of the storefront product card */
 .primo-products {
     display: grid;
-    gap: 6px;
+    gap: 8px;
     width: 100%;
     min-width: 0;
 }
@@ -809,57 +865,62 @@
 
 .primo-product {
     display: grid;
-    grid-template-columns: 52px minmax(0, 1fr) auto;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 11px;
-    padding: 8px 10px 8px 8px;
-    background: #fff;
-    border: 1px solid #e2e7de;
-    border-radius: 14px;
-    color: #1f241c;
+    gap: 12px;
+    padding: 8px 12px 8px 8px;
+    background: var(--p-surface);
+    border: 1px solid var(--p-border);
+    border-radius: 12px;
+    box-shadow: var(--p-shadow-sm);
+    color: var(--p-text);
     text-decoration: none;
-    transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
-}
-
-.primo-product:hover {
-    border-color: var(--primo-green);
-    background: #fbfdf9;
+    transition: border-color 180ms ease, box-shadow 220ms ease, transform 220ms var(--p-ease);
 }
 
 .primo-product:active { transform: scale(0.99); }
 
 .primo-product-thumb {
-    width: 52px;
-    height: 52px;
+    width: 64px;
+    height: 64px;
     border-radius: 10px;
-    background: #f1f4ee;
+    background: var(--p-photo-plate);
     display: grid;
     place-items: center;
     overflow: hidden;
-    color: #9aa596;
-    font-size: 18px;
+    color: #6b756f;   /* the plate stays light in both themes */
+    font-size: 20px;
 }
 
 .primo-product-thumb img {
-    width: 100%;
-    height: 100%;
+    width: 86%;
+    height: 86%;
     object-fit: contain;
-    padding: 4px;
-    box-sizing: border-box;
-    background: #fff;
+    mix-blend-mode: multiply;   /* white photo backgrounds melt into the plate */
 }
 
 .primo-product-info {
     min-width: 0;
     display: grid;
-    gap: 3px;
+    gap: 2px;
+}
+
+/* Category above the name, like the storefront card */
+.primo-product-cat {
+    order: -1;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--p-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .primo-product-name {
-    font-size: 12.5px;
+    font-size: 13.5px;
     font-weight: 600;
-    line-height: 1.35;
-    color: #1f241c;
+    line-height: 1.38;
+    color: var(--p-text);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -868,54 +929,58 @@
 
 .primo-product-meta {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     flex-wrap: wrap;
-    gap: 4px 8px;
+    gap: 2px 10px;
+    margin-top: 4px;
 }
 
 .primo-product-price {
-    font-size: 13.5px;
-    font-weight: 800;
-    color: #3a6e20;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--p-text);
     font-variant-numeric: tabular-nums;
 }
 
+/* Stock: icon + text in the status colour (same as .sf-stock) */
 .primo-product-stock {
-    font-size: 10.5px;
-    font-weight: 700;
-    color: #3a6e20;
-    background: var(--primo-green-light);
-    border-radius: 999px;
-    padding: 2px 7px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--p-accent-text);
 }
 
-.primo-product-stock.is-low {
-    color: #8a4b00;
-    background: #fff1d6;
-}
-
-.primo-product-stock.is-out {
-    color: #9b1c1c;
-    background: #fdecec;
-}
-
-.primo-product-cat {
+.primo-product-stock::before {
+    content: "\f058";   /* check-circle */
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
     font-size: 11px;
-    color: #5f6a5a;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
+
+.primo-product-stock.is-low { color: var(--p-warn-text); }
+.primo-product-stock.is-low::before { content: "\f06a"; }   /* exclamation-circle */
+.primo-product-stock.is-out { color: var(--p-danger-text); }
+.primo-product-stock.is-out::before { content: "\f057"; }   /* times-circle */
 
 .primo-product-go {
-    color: #9aa596;
-    font-size: 11px;
-    transition: color 0.16s ease, transform 0.16s ease;
+    color: var(--p-muted);
+    font-size: 12px;
+    transition: color 150ms ease, transform 160ms var(--p-ease);
 }
 
-.primo-product:hover .primo-product-go {
-    color: var(--primo-green-dark);
-    transform: translateX(2px);
+@media (hover: hover) and (pointer: fine) {
+    .primo-product:hover {
+        border-color: var(--p-border-strong);
+        box-shadow: var(--p-shadow-md);
+        transform: translateY(-1px);
+    }
+    .primo-product:hover .primo-product-name { color: var(--p-accent-text); }
+    .primo-product:hover .primo-product-go {
+        color: var(--p-accent-text);
+        transform: translateX(2px);
+    }
 }
 
 /* Jump to latest */
@@ -924,26 +989,28 @@
     grid-column: 1;
     align-self: end;
     justify-self: center;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     z-index: 3;
     border: 0;
     border-radius: 999px;
-    padding: 7px 13px;
-    background: #1f241c;
-    color: #fff;
+    min-height: 36px;
+    padding: 0 14px;
+    background: var(--p-chrome);
+    color: #ffffff;
     font-family: inherit;
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 600;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     cursor: pointer;
-    box-shadow: 0 6px 16px rgba(23, 33, 18, 0.24);
+    box-shadow: var(--p-shadow-md);
 }
 
+.primo-jump i { color: var(--primo-green); }
 .primo-jump[hidden] { display: none; }
 
-/* Composer */
+/* ---- §7 Composer ------------------------------------------------------- */
 .primo-panel-input {
     grid-row: 3;
     grid-column: 1;
@@ -951,9 +1018,9 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
     gap: 8px;
-    padding: 10px 12px 8px;
-    border-top: 1px solid #e6eae3;
-    background: #fff;
+    padding: 12px 12px 10px;
+    border-top: 1px solid var(--p-border);
+    background: var(--p-surface);
 }
 
 .primo-compose {
@@ -966,73 +1033,69 @@
     width: 100%;
     box-sizing: border-box;
     resize: none;
-    min-height: 44px;
+    min-height: 46px;
     max-height: 132px;
-    border: 1px solid #dde3d9;
-    border-radius: 14px;
-    padding: 11px 14px;
+    border: 1px solid var(--p-border-strong);
+    border-radius: 12px;
+    padding: 12px 14px;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 14.5px;
     line-height: 1.45;
-    background: #f8faf6;
-    color: var(--primo-black);
-    caret-color: var(--primo-green-dark);
+    background: var(--p-surface-2);
+    color: var(--p-text);
+    caret-color: var(--p-accent-text);
     overflow-y: auto;
     scrollbar-width: thin;
-    transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
 
-.primo-panel-input textarea::placeholder {
-    color: #6c7568;
-}
+.primo-panel-input textarea::placeholder { color: var(--p-muted); opacity: 1; }
 
 .primo-panel-input textarea:focus {
     outline: none;
-    border-color: var(--primo-green);
-    box-shadow: 0 0 0 3px rgba(98, 178, 54, 0.18);
-    background: #fff;
+    border-color: var(--p-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--p-focus) 20%, transparent);
+    background: var(--p-surface);
 }
 
-.primo-compose.has-count textarea { padding-right: 52px; }
+.primo-compose.has-count textarea { padding-right: 56px; }
 
 .primo-count {
     position: absolute;
     right: 12px;
-    bottom: 12px;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: #6a7366;
+    bottom: 13px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--p-muted);
     font-variant-numeric: tabular-nums;
     pointer-events: none;
 }
 
-.primo-count.is-limit { color: #b42318; }
+.primo-count.is-limit { color: var(--p-danger-text); }
 
 .primo-send-btn {
-    width: 44px;
-    height: 44px;
+    width: 46px;
+    height: 46px;
     border: 0;
     border-radius: 12px;
-    background: var(--primo-green);
-    color: #fff;
+    background: var(--p-action);
+    color: var(--p-on-action);
     cursor: pointer;
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    font-size: 15px;
-    transition: background 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+    font-size: 16px;
+    touch-action: manipulation;
+    transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--p-ease);
 }
 
-.primo-send-btn:hover:not(:disabled) {
-    background: var(--primo-green-dark);
-}
-
-.primo-send-btn:active:not(:disabled) {
-    transform: scale(0.94);
-}
+.primo-send-btn:hover:not(:disabled) { background: var(--p-action-hover); }
+.primo-send-btn:active:not(:disabled) { transform: scale(0.94); }
 
 .primo-send-btn:disabled {
-    background: #c7d3bf;
+    background: var(--p-surface-2);
+    color: var(--p-muted);
+    box-shadow: inset 0 0 0 1px var(--p-border);
     cursor: default;
 }
 
@@ -1040,16 +1103,16 @@
     grid-column: 1 / -1;
     margin: 0;
     padding: 0 4px;
-    font-size: 10.5px;
-    color: #6a7366;
+    font-size: 11.5px;
+    color: var(--p-muted);
 }
 
 @media (hover: none) {
     .primo-compose-hint { display: none; }
-    .primo-panel-input { padding-bottom: 10px; }
+    .primo-panel-input { padding-bottom: 12px; }
 }
 
-/* Recent chats (slides over the log + composer) */
+/* ---- §8 Recent chats (slides over the log + composer) ------------------ */
 .primo-history {
     grid-row: 2 / 4;
     grid-column: 1;
@@ -1057,7 +1120,7 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: #f5f7f3;
+    background: var(--p-bg);
     transform: translateX(100%);
     visibility: hidden;
     transition: transform 0.34s var(--primo-ease), visibility 0s linear 0.34s;
@@ -1073,27 +1136,28 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 12px 12px 10px;
-    background: #fff;
+    padding: 12px 12px 12px 8px;
+    background: var(--p-surface);
 }
 
 .primo-history-back {
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 40px;
     flex-shrink: 0;
     border: 0;
     border-radius: 10px;
     background: transparent;
-    color: #3a6e20;
-    font-size: 14px;
+    color: var(--p-text);
+    font-size: 15px;
     cursor: pointer;
     display: grid;
     place-items: center;
-    transition: background 0.16s ease;
+    transition: background-color 150ms ease, color 150ms ease;
 }
 
 .primo-history-back:hover {
-    background: var(--primo-green-light);
+    background: var(--p-accent-soft);
+    color: var(--p-accent-text);
 }
 
 .primo-history-titles {
@@ -1104,73 +1168,76 @@
 }
 
 .primo-history-titles strong {
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 600;
     line-height: 1.25;
-    color: #1f241c;
+    color: var(--p-text);
 }
 
 .primo-history-titles span {
-    font-size: 11.5px;
-    color: #5f6a5a;
+    font-size: 12px;
+    color: var(--p-muted);
     font-variant-numeric: tabular-nums;
 }
 
+/* Primary action, like .sf-btn-primary (sm) */
 .primo-history-new {
     flex-shrink: 0;
     border: 0;
-    border-radius: 10px;
-    padding: 8px 12px;
-    background: var(--primo-green);
-    color: #fff;
+    border-radius: 8px;
+    min-height: 40px;
+    padding: 0 14px;
+    background: var(--p-action);
+    color: var(--p-on-action);
     font-family: inherit;
-    font-size: 12.5px;
-    font-weight: 700;
+    font-size: 13.5px;
+    font-weight: 600;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     cursor: pointer;
-    transition: background 0.16s ease, transform 0.16s ease;
+    touch-action: manipulation;
+    transition: background-color 150ms ease, transform 160ms var(--p-ease);
 }
 
-.primo-history-new:hover { background: var(--primo-green-dark); }
-.primo-history-new:active { transform: scale(0.96); }
+.primo-history-new:hover { background: var(--p-action-hover); }
+.primo-history-new:active { transform: scale(0.97); }
 
 .primo-history-search {
     position: relative;
     padding: 0 12px 12px;
-    background: #fff;
-    border-bottom: 1px solid #e6eae3;
+    background: var(--p-surface);
+    border-bottom: 1px solid var(--p-border);
 }
 
 .primo-history-search[hidden] { display: none; }
 
 .primo-history-search i {
     position: absolute;
-    left: 25px;
+    left: 26px;
     top: 50%;
     margin-top: -6px;
     transform: translateY(-50%);
-    font-size: 12px;
-    color: #6a7366;
+    font-size: 13px;
+    color: var(--p-muted);
     pointer-events: none;
 }
 
 .primo-history-search input {
     width: 100%;
     box-sizing: border-box;
-    height: 38px;
-    border: 1px solid #dde3d9;
+    height: 42px;
+    border: 1px solid var(--p-border-strong);
     border-radius: 10px;
-    padding: 0 12px 0 34px;
+    padding: 0 12px 0 38px;
     font-family: inherit;
-    font-size: 13px;
-    background: #f8faf6;
-    color: var(--primo-black);
-    caret-color: var(--primo-green-dark);
+    font-size: 14px;
+    background: var(--p-surface-2);
+    color: var(--p-text);
+    caret-color: var(--p-accent-text);
 }
 
-.primo-history-search input::placeholder { color: #6c7568; }
+.primo-history-search input::placeholder { color: var(--p-muted); opacity: 1; }
 
 .primo-history-search input::-webkit-search-cancel-button {
     -webkit-appearance: none;
@@ -1178,20 +1245,20 @@
     width: 14px;
     height: 14px;
     cursor: pointer;
-    background: #6a7366;
+    background: var(--p-muted);
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 3l8 8M11 3l-8 8' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 3l8 8M11 3l-8 8' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .primo-history-search input:focus {
     outline: none;
-    border-color: var(--primo-green);
-    box-shadow: 0 0 0 3px rgba(98, 178, 54, 0.18);
-    background: #fff;
+    border-color: var(--p-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--p-focus) 20%, transparent);
+    background: var(--p-surface);
 }
 
 .primo-history-search[hidden] + .primo-history-body {
-    border-top: 1px solid #e6eae3;
+    border-top: 1px solid var(--p-border);
 }
 
 .primo-history-body {
@@ -1201,92 +1268,96 @@
     overscroll-behavior: contain;
     padding: 4px 10px 12px;
     scrollbar-width: thin;
-    scrollbar-color: #c9d3c2 transparent;
+    scrollbar-color: var(--p-border-strong) transparent;
 }
 
 .primo-history-note {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 8px;
     margin: 0;
-    padding: 10px 16px 12px;
-    font-size: 11px;
-    line-height: 1.4;
-    color: #5f6a5a;
-    border-top: 1px solid #e6eae3;
-    background: #fff;
+    padding: 11px 16px 13px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--p-muted);
+    border-top: 1px solid var(--p-border);
+    background: var(--p-surface);
 }
 
-.primo-history-note i { color: #7d8a77; }
+.primo-history-note i { color: var(--p-accent-text); }
 
 .primo-history-group-label {
     position: sticky;
     top: 0;
     z-index: 1;
     margin: 0 -10px;
-    padding: 12px 16px 6px;
-    background: #f5f7f3;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    padding: 14px 16px 6px;
+    background: var(--p-bg);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #5f6a5a;
+    color: var(--p-accent-text);   /* same as .sf-eyebrow */
 }
 
 .primo-history-list {
     display: grid;
-    gap: 4px;
+    gap: 6px;
 }
 
 .primo-history-item {
     position: relative;
     display: flex;
     align-items: stretch;
+    border: 1px solid transparent;
     border-radius: 12px;
     background: transparent;
-    transition: background 0.16s ease;
+    transition: background-color 150ms ease, border-color 150ms ease;
 }
 
 .primo-history-item:hover,
 .primo-history-item:focus-within {
-    background: #fff;
+    background: var(--p-surface);
+    border-color: var(--p-border);
 }
 
 .primo-history-item.is-active {
-    background: #fff;
-    box-shadow: inset 0 0 0 1px var(--primo-green);
+    background: var(--p-surface);
+    border-color: var(--p-accent-text);
+    box-shadow: inset 3px 0 0 var(--p-accent-text);
 }
 
 .primo-history-open {
     flex: 1;
     min-width: 0;
     display: grid;
-    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-columns: 38px minmax(0, 1fr);
     align-items: center;
-    gap: 11px;
+    gap: 12px;
     border: 0;
     border-radius: 12px;
     background: transparent;
+    color: inherit;
     text-align: left;
     cursor: pointer;
     font-family: inherit;
-    padding: 10px 44px 10px 10px;
+    padding: 10px 48px 10px 10px;
 }
 
 .primo-history-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: var(--primo-green-light);
-    color: var(--primo-green-dark);
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    background: var(--p-accent-soft);
+    color: var(--p-accent-text);
     display: grid;
     place-items: center;
     font-size: 14px;
 }
 
 .primo-history-item.is-active .primo-history-icon {
-    background: var(--primo-green);
-    color: #fff;
+    background: var(--p-action);
+    color: var(--p-on-action);
 }
 
 .primo-history-text {
@@ -1305,9 +1376,9 @@
 .primo-history-title {
     flex: 1;
     min-width: 0;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
-    color: #1f241c;
+    color: var(--p-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1315,14 +1386,14 @@
 
 .primo-history-time {
     flex-shrink: 0;
-    font-size: 11px;
-    color: #6a7366;
+    font-size: 11.5px;
+    color: var(--p-muted);
     font-variant-numeric: tabular-nums;
 }
 
 .primo-history-preview {
-    font-size: 12px;
-    color: #5f6a5a;
+    font-size: 12.5px;
+    color: var(--p-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1331,13 +1402,13 @@
 .primo-history-tag {
     display: inline-block;
     margin-right: 6px;
-    padding: 0 6px;
+    padding: 0 7px;
     border-radius: 999px;
-    background: var(--primo-green);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 16px;
+    background: var(--p-accent-soft);
+    color: var(--p-accent-text);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 17px;
     vertical-align: 1px;
 }
 
@@ -1346,18 +1417,18 @@
     right: 6px;
     top: 50%;
     transform: translateY(-50%);
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border: 0;
     background: transparent;
-    color: #8a948a;
-    border-radius: 9px;
+    color: var(--p-muted);
+    border-radius: 8px;
     cursor: pointer;
     display: grid;
     place-items: center;
-    font-size: 12px;
+    font-size: 13px;
     opacity: 0;
-    transition: opacity 0.16s ease, background 0.16s ease, color 0.16s ease;
+    transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
 }
 
 .primo-history-item:hover .primo-history-del,
@@ -1371,8 +1442,8 @@
 }
 
 .primo-history-del:hover {
-    background: #fdecec;
-    color: #b42318;
+    background: var(--p-danger-soft);
+    color: var(--p-danger-text);
 }
 
 .primo-history-item.is-removing {
@@ -1380,12 +1451,12 @@
     pointer-events: none;
 }
 
-/* Empty / loading / no-results states */
+/* Empty / loading / no-results states (same shape as .sf-empty.is-center) */
 .primo-history-empty {
     margin: 32px 12px;
     text-align: center;
-    color: #5f6a5a;
-    font-size: 13px;
+    color: var(--p-muted);
+    font-size: 13.5px;
     line-height: 1.5;
 }
 
@@ -1398,55 +1469,50 @@
 }
 
 .primo-history-state-icon {
-    width: 52px;
-    height: 52px;
-    margin-bottom: 6px;
-    border-radius: 16px;
-    background: var(--primo-green-light);
-    color: var(--primo-green-dark);
+    width: 60px;
+    height: 60px;
+    margin-bottom: 8px;
+    border-radius: 999px;
+    background: var(--p-accent-soft);
+    color: var(--p-accent-text);
     display: grid;
     place-items: center;
-    font-size: 20px;
+    font-size: 22px;
 }
 
 .primo-history-state strong {
-    font-size: 14px;
-    font-weight: 700;
-    color: #1f241c;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--p-text);
 }
 
 .primo-history-state p {
     margin: 0;
-    max-width: 250px;
-    font-size: 12.5px;
-    line-height: 1.5;
-    color: #5f6a5a;
+    max-width: 260px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--p-muted);
 }
 
-.primo-history-state .primo-history-new { margin-top: 10px; }
+.primo-history-state .primo-history-new { margin-top: 12px; }
 
 .primo-history-skeleton {
     display: grid;
-    gap: 4px;
-    padding-top: 12px;
+    gap: 6px;
+    padding-top: 14px;
 }
 
 .primo-history-skeleton span {
     display: block;
-    height: 56px;
+    height: 60px;
     border-radius: 12px;
-    background: linear-gradient(90deg, #eceee9 0%, #f6f7f4 50%, #eceee9 100%);
+    background: linear-gradient(90deg, var(--p-border) 0%, var(--p-surface-2) 50%, var(--p-border) 100%);
     background-size: 200% 100%;
     animation: primo-shimmer 1.2s ease-in-out infinite;
 }
 
 .primo-history-skeleton span:nth-child(2) { opacity: 0.7; }
 .primo-history-skeleton span:nth-child(3) { opacity: 0.45; }
-
-@keyframes primo-shimmer {
-    from { background-position: 100% 0; }
-    to { background-position: -100% 0; }
-}
 
 /* Legacy Tech & Match promo card (promo is currently disabled in primo.js). */
 .primo-msg-bubble-stack {
@@ -1457,12 +1523,12 @@
 }
 .primo-promo-lead {
     margin: 0;
-    font-size: 13.5px;
-    line-height: 1.45;
+    font-size: 14px;
+    line-height: 1.5;
 }
 .primo-tm-card {
-    background: linear-gradient(180deg, #f7fbf3 0%, #ffffff 55%);
-    border: 1px solid rgba(98, 178, 54, 0.28);
+    background: var(--p-surface);
+    border: 1px solid var(--p-border);
     border-radius: 12px;
     padding: 14px 14px 12px;
 }
@@ -1470,24 +1536,25 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12.5px;
-    font-weight: 800;
-    color: var(--primo-green-dark, #4b8b2a);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--p-accent-text);
     margin-bottom: 6px;
 }
 .primo-tm-bolt { font-size: 13px; line-height: 1; }
 .primo-tm-tagline {
     margin: 0 0 4px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #1f2328;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--p-text);
 }
 .primo-tm-copy {
     margin: 0 0 12px;
-    font-size: 12.5px;
-    line-height: 1.4;
-    color: #5c6570;
-    font-weight: 500;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--p-muted);
 }
 .primo-tm-btn {
     display: inline-flex;
@@ -1495,79 +1562,115 @@
     justify-content: center;
     gap: 6px;
     width: 100%;
-    padding: 10px 14px;
-    border-radius: 10px;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 8px;
     border: none;
-    background: var(--primo-green, #62b236);
-    color: #fff !important;
+    background: var(--p-action);
+    color: var(--p-on-action) !important;
     text-decoration: none !important;
     font-family: inherit;
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.18s ease;
+    transition: background-color 150ms ease;
 }
-.primo-tm-btn:hover {
-    background: var(--primo-green-dark, #4b8b2a);
-}
+.primo-tm-btn:hover { background: var(--p-action-hover); }
 
-/* Mini robot for panel header / bubbles */
+/* ---- §9 Avatars ---------------------------------------------------------
+ * The header and message avatars are the round launcher in miniature: a green disc with the
+ * robot's face (light head shell, dark visor, glowing eyes) and a yellow-tipped antenna.
+ */
 .primo-mini {
-    width: 36px;
+    position: relative;
+    width: 40px;
     height: 40px;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
+    display: inline-grid;
+    place-items: center;
     flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--primo-green);
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12);
 }
 
-.primo-mini-sm {
-    width: 28px;
-    height: 32px;
+/* Antenna + tip */
+.primo-mini::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 2px;
+    height: 6px;
+    margin-left: -1px;
+    border-radius: 2px;
+    background: #ffffff;
+}
+
+.primo-mini::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    margin-left: -2.5px;
+    border-radius: 50%;
+    background: var(--primo-yellow);
 }
 
 .primo-mini-head {
-    width: 22px;
-    height: 16px;
-    background: #eef0f3;
-    border: 1.5px solid #cfd3da;
-    border-radius: 8px;
+    width: 24px;
+    height: 15px;
+    margin-top: 5px;
+    box-sizing: border-box;
+    border: 2.5px solid #eceef1;
+    border-radius: 7px;
+    background: var(--primo-soft);
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 4px;
-    box-sizing: border-box;
-}
-
-.primo-mini-sm .primo-mini-head {
-    width: 18px;
-    height: 13px;
 }
 
 .primo-mini-eye {
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background: var(--primo-green);
-    box-shadow: 0 0 4px rgba(98, 178, 54, 0.8);
+    background: #7fe04a;
+    box-shadow: 0 0 4px rgba(127, 224, 74, 0.9);
 }
 
-.primo-mini-body {
-    width: 18px;
-    height: 14px;
-    margin-top: 2px;
-    background: var(--primo-green);
-    border-radius: 7px;
-    border: 1.5px solid var(--primo-green-dark);
-    box-sizing: border-box;
+.primo-mini-body { display: none; }
+
+/* Message avatar */
+.primo-mini-sm {
+    width: 30px;
+    height: 30px;
 }
 
-.primo-mini-sm .primo-mini-body {
-    width: 14px;
-    height: 11px;
+.primo-mini-sm::before { top: 4px; height: 5px; }
+.primo-mini-sm::after { top: 2px; width: 4px; height: 4px; margin-left: -2px; }
+
+.primo-mini-sm .primo-mini-head {
+    width: 19px;
+    height: 12px;
+    margin-top: 4px;
+    border-width: 2px;
+    border-radius: 6px;
+    gap: 3px;
 }
 
-/* ---- Keyframes ---- */
+.primo-mini-sm .primo-mini-eye {
+    width: 3px;
+    height: 3px;
+}
+
+/* In the dark header the disc gets a soft green halo */
+.primo-panel-header .primo-mini {
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12), 0 0 0 4px rgba(98, 178, 54, 0.18);
+}
+
+/* ---- §10 Keyframes ------------------------------------------------------ */
 @keyframes primo-blink {
     0%, 42%, 48%, 100% { transform: scaleY(1); }
     45% { transform: scaleY(0.12); }
@@ -1601,7 +1704,12 @@
     30% { opacity: 1; transform: translateY(-3px); }
 }
 
-/* ---- Responsive ---- */
+@keyframes primo-shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+}
+
+/* ---- §11 Responsive ----------------------------------------------------- */
 @media (max-width: 960px) {
     .primo-root {
         --primo-size: 92px;
@@ -1615,7 +1723,7 @@
     .primo-base { top: 84px; }
     .primo-panel {
         right: calc(var(--primo-size) + 14px);
-        width: min(380px, calc(100vw - var(--primo-size) - 36px));
+        width: min(392px, calc(100vw - var(--primo-size) - 36px));
     }
     .primo-root.is-wide .primo-panel {
         width: calc(100vw - var(--primo-size) - 36px);
@@ -1635,8 +1743,8 @@
         height: 90px;
     }
     .primo-label {
-        font-size: 9px;
-        padding: 2px 8px;
+        font-size: 10px;
+        padding: 3px 9px;
     }
     .primo-root.is-expanded .primo-stage {
         transform: translateX(-8px);
@@ -1653,6 +1761,7 @@
         width: 100%;
         height: 100%;
         min-height: 0;
+        border: 0;
         border-radius: 0;
         transform-origin: 50% 100%;
         transform: translateY(24px);
@@ -1660,8 +1769,12 @@
     .primo-panel-header {
         padding-top: calc(12px + env(safe-area-inset-top, 0px));
     }
+    .primo-icon-btn {
+        width: 44px;
+        height: 44px;
+    }
     .primo-panel-input {
-        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     }
     .primo-size-btn {
         display: none;
@@ -1670,37 +1783,17 @@
     .primo-panel-input textarea {
         font-size: 16px; /* keeps iOS from zooming the page on focus */
     }
+    .primo-chips { margin-left: 0; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .primo-figure,
-    .primo-eye,
-    .primo-launcher-eye,
-    .primo-greet,
-    .primo-antenna-tip,
-    .primo-stage,
-    .primo-panel,
-    .primo-backdrop,
-    .primo-history,
-    .primo-msg.is-new,
-    .primo-chips.is-new,
-    .primo-status-dot,
-    .primo-typing-dot,
-    .primo-history-skeleton span {
-        animation: none !important;
-        transition: none !important;
-    }
-    .primo-typing-dot { opacity: 0.7; }
-}
-
-/* ---- Compact launcher (every Primo page except the homepage) ----
+/* ---- §12 Compact launcher (every Primo page except the homepage) --------
  * A round button in the bottom-right corner instead of the full robot, so Primo
  * doesn't sit on top of product grids. The chat panel opens above it, and the
- * button turns into a close (X) while the chat is open.
+ * button turns into a dark close (X) while the chat is open.
  * --primo-lift raises both when a page has its own bar fixed to the bottom.
  */
 .primo-root.is-compact {
-    --primo-size: 58px;
+    --primo-size: 60px;
     --primo-gap: 20px;
     --primo-lift: 0px;
     right: var(--primo-gap);
@@ -1713,23 +1806,32 @@
 }
 
 .primo-root.is-compact .primo-mascot {
+    position: relative;
     height: var(--primo-size);
     border-radius: 50%;
     background: var(--primo-green);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+    box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.12), 0 12px 24px -8px rgba(10, 19, 7, 0.5), 0 0 0 3px var(--p-surface);
     filter: none;
     justify-content: center;
     gap: 0;
-    transition: background-color 0.2s ease, transform 0.2s ease;
+    transition: background-color 200ms ease, box-shadow 200ms ease, transform 200ms var(--p-ease);
 }
 
 .primo-root.is-compact .primo-mascot:hover {
-    background: var(--primo-green-dark);
+    background: #6fc043;
     transform: translateY(-2px);
 }
 
+/* Open: an inverted disc (dark in light mode, light in dark mode) so the close button stands out */
+.primo-root.is-compact.is-chat-open .primo-mascot {
+    background: var(--p-text);
+}
+
+.primo-root.is-compact.is-chat-open .primo-launcher-close { color: var(--p-surface); }
+
 .primo-root.is-compact .primo-mascot:focus-visible {
     border-radius: 50%;
+    outline-offset: 5px;
 }
 
 .primo-launcher {
@@ -1801,29 +1903,14 @@
 }
 
 .primo-root.is-compact .primo-greet {
-    right: 4px;
-    bottom: calc(var(--primo-size) + 6px);
+    right: 2px;
+    bottom: calc(var(--primo-size) + 12px);
 }
 
 .primo-root.is-compact .primo-greet::after {
-    right: 16px;
+    right: 22px;
     bottom: -6px;
-    border-width: 6px 5px 0 5px;
-    border-color: #62b236 transparent transparent transparent;
-}
-
-html[data-theme="dark"] .primo-greet {
-    background: #fff;
-    color: #171717;
-    border-color: #e4e8ea;
-}
-
-html[data-theme="dark"] .primo-greet::after {
-    border-color: transparent transparent transparent #fff;
-}
-
-html[data-theme="dark"] .primo-root.is-compact .primo-greet::after {
-    border-color: #fff transparent transparent transparent;
+    transform: rotate(135deg);
 }
 
 .primo-launcher-close {
@@ -1851,16 +1938,16 @@ html[data-theme="dark"] .primo-root.is-compact .primo-greet::after {
 
 .primo-root.is-compact .primo-panel {
     right: var(--primo-gap);
-    bottom: calc(var(--primo-gap) + var(--primo-lift) + var(--primo-size) + 12px);
-    width: min(392px, calc(100vw - 2 * var(--primo-gap)));
-    height: min(620px, calc(100vh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 52px));
-    height: min(620px, calc(100dvh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 52px));
+    bottom: calc(var(--primo-gap) + var(--primo-lift) + var(--primo-size) + 14px);
+    width: min(400px, calc(100vw - 2 * var(--primo-gap)));
+    height: min(640px, calc(100vh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 54px));
+    height: min(640px, calc(100dvh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 54px));
 }
 
 .primo-root.is-compact.is-wide .primo-panel {
-    width: min(620px, calc(100vw - 2 * var(--primo-gap)));
-    height: calc(100vh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 52px);
-    height: calc(100dvh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 52px);
+    width: min(640px, calc(100vw - 2 * var(--primo-gap)));
+    height: calc(100vh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 54px);
+    height: calc(100dvh - var(--primo-top) - var(--primo-lift) - var(--primo-size) - 54px);
 }
 
 /* Build a PC shows a fixed total bar along the bottom at this width. */
@@ -1872,7 +1959,7 @@ html[data-theme="dark"] .primo-root.is-compact .primo-greet::after {
 
 @media (max-width: 640px) {
     .primo-root.is-compact {
-        --primo-size: 54px;
+        --primo-size: 56px;
         --primo-gap: 16px;
     }
     .primo-root.is-compact .primo-panel,
@@ -1883,14 +1970,10 @@ html[data-theme="dark"] .primo-root.is-compact .primo-greet::after {
     }
 }
 
-/* ---- First-visit attention pulse ----
+/* First-visit attention pulse.
  * Until Primo has been opened once in this browser (primo.js, localStorage primo_seen),
  * a soft green ring pulses around the round launcher and the homepage "Ask Primo" tag.
  */
-.primo-root.is-compact .primo-mascot {
-    position: relative;
-}
-
 .primo-root.is-compact.is-attention .primo-mascot::after,
 .primo-root.is-attention .primo-label {
     animation: primo-attention 2.4s ease-out infinite;
@@ -1931,12 +2014,38 @@ html[data-theme="dark"] .primo-root.is-compact .primo-greet::after {
     text-align: left;
 }
 
+/* ---- §13 Reduced motion ------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
+    .primo-figure,
+    .primo-eye,
+    .primo-launcher-eye,
+    .primo-greet,
+    .primo-antenna-tip,
+    .primo-stage,
+    .primo-panel,
+    .primo-backdrop,
+    .primo-history,
+    .primo-msg.is-new,
+    .primo-chips.is-new,
+    .primo-status-dot,
+    .primo-typing-dot,
+    .primo-history-skeleton span,
     .primo-root.is-compact .primo-mascot,
     .primo-launcher-face,
-    .primo-launcher-close {
+    .primo-launcher-close,
+    .primo-product,
+    .primo-product-go,
+    .primo-chip,
+    .primo-icon-btn,
+    .primo-send-btn,
+    .primo-history-new {
+        animation: none !important;
         transition: none !important;
     }
+    .primo-typing-dot { opacity: 0.7; }
+    .primo-product:hover,
+    .primo-product:hover .primo-product-go,
+    .primo-root.is-compact .primo-mascot:hover { transform: none; }
     .primo-root.is-attention .primo-mascot::after,
     .primo-root.is-attention .primo-label {
         animation: none !important;
