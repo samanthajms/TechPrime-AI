@@ -42,7 +42,7 @@ if (!function_exists('staff_app_role_css')) {
             'cashier' => 'cashier.css?v=13',
             'admin' => 'admin.css?v=1',
             'retail_officer' => 'retail.css?v=1',
-            'inventory_custodian' => 'inventory.css?v=1',
+            'inventory_custodian' => 'inventory.css?v=2',
         ];
         return $map[$role] ?? '';
     }

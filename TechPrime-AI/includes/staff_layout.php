@@ -38,6 +38,7 @@ if (!function_exists('staff_nav_for_role')) {
                     ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes', 'ph' => 'ph-package', 'short' => 'Stocks', 'tab' => true, 'children' => [
                         ['slug' => 'inventory', 'href' => 'inventory_stocks.php', 'label' => 'Inventory'],
                         ['slug' => 'add_product', 'href' => 'inventory_stock_in.php', 'label' => 'Stock In'],
+                        ['slug' => 'alerts', 'href' => 'inventory_stock_alerts.php', 'label' => 'Alerts'],
                     ]],
                     ['key' => 'messages', 'href' => 'inventory_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments', 'ph' => 'ph-chats-circle', 'short' => 'Messages'],
                     ['key' => 'forecast', 'href' => 'inventory_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'ph' => 'ph-chart-line-up', 'short' => 'Forecast', 'section' => 'Insights'],

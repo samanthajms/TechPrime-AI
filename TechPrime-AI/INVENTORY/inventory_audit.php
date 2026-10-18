@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
 require_once __DIR__ . '/../includes/inventory_alerts.php';
+require_once __DIR__ . '/../includes/pos_helpers.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -21,6 +22,7 @@ $allowedActions = [
     'add_product' => 'Stock Added',
     'edit_product' => 'Stock Updated',
     'pos_stock_in' => 'Stock In',
+    'stock_out' => 'Stock Out',
     'delete_product' => 'Product Removed',
     'generate_barcode' => 'Barcode Generated',
     'update_order_status' => 'Order Updated',
@@ -40,6 +42,25 @@ $allowedRanges = [
 ];
 if (!array_key_exists($range, $allowedRanges)) {
     $range = 'all';
+}
+
+/* "Stock Out" is not a log action: it lists every successful stock decrease, one row per product. */
+$stockOutView = $actionFilter === 'stock_out';
+
+/** SQL condition limiting timestamp column $col to the chosen date range ('' = all time). */
+function inv_audit_range_sql(string $range, string $col): string
+{
+    switch ($range) {
+        case 'today':
+            return "DATE({$col}) = CURRENT_DATE";
+        case '7d':
+            return "{$col} >= (NOW() - INTERVAL '7 day')";
+        case '30d':
+            return "{$col} >= (NOW() - INTERVAL '30 day')";
+        case 'month':
+            return "date_trunc('month', {$col}) = date_trunc('month', CURRENT_DATE)";
+    }
+    return '';
 }
 
 $inventoryActions = ['add_product', 'edit_product', 'pos_stock_in', 'delete_product', 'generate_barcode', 'update_order_status', 'complete_order', 'accept_order'];
@@ -66,29 +87,74 @@ if ($q !== '') {
     $params[] = $like;
 }
 
-switch ($range) {
-    case 'today':
-        $where[] = "DATE(l.created_at) = CURRENT_DATE";
-        break;
-    case '7d':
-        $where[] = "l.created_at >= (NOW() - INTERVAL '7 day')";
-        break;
-    case '30d':
-        $where[] = "l.created_at >= (NOW() - INTERVAL '30 day')";
-        break;
-    case 'month':
-        $where[] = "date_trunc('month', l.created_at) = date_trunc('month', CURRENT_DATE)";
-        break;
+$rangeSql = inv_audit_range_sql($range, 'l.created_at');
+if ($rangeSql !== '') {
+    $where[] = $rangeSql;
 }
 
 $whereSql = implode(' AND ', $where);
-
-$countSql = "SELECT COUNT(*) FROM logs l LEFT JOIN users u ON u.id = l.user_id WHERE {$whereSql}";
-$countStmt = $db->prepare($countSql);
+$rows = [];
 $totalRows = 0;
-if ($countStmt) {
-    $countStmt->execute($params);
-    $totalRows = (int)($countStmt->fetchColumn() ?? 0);
+$unitsOut = 0;
+
+if ($stockOutView) {
+    /*
+     * Successful stock decreases from every source:
+     *  - POS sales: the stock_movements ledger (written in the same transaction as the sale)
+     *  - online orders: order items of orders whose stock was deducted on completion,
+     *    dated by the shipment marked delivered at that moment (shipments.updated_at)
+     *  - manual edits on the Stocks page that lowered the count ("stock X → Y" in the log)
+     */
+    $soSql = "SELECT sm.created_at AS at, 'pos' AS source, sm.product_name AS product, sm.quantity AS qty,
+                     sm.stock_before AS stock_before, sm.stock_after AS stock_after, ps.invoice_no AS ref,
+                     COALESCE(u.name, ps.cashier_name) AS user_name, u.role AS user_role, sm.id AS row_id
+              FROM stock_movements sm
+              LEFT JOIN pos_sales ps ON ps.id = sm.sale_id
+              LEFT JOIN users u ON u.id = sm.user_id
+              WHERE sm.movement_type = 'stock_out'
+              UNION ALL
+              SELECT COALESCE(sh.updated_at, o.paid_at, o.created_at), 'order', COALESCE(pr.name, 'Product #' || oi.product_id), oi.quantity,
+                     NULL, NULL, 'ORD-' || o.id,
+                     NULLIF(TRIM(COALESCE(cu.name, '') || ' ' || COALESCE(cu.surname, '')), ''), cu.role, oi.id
+              FROM order_items oi
+              INNER JOIN orders o ON o.id = oi.order_id AND o.stock_deducted = TRUE
+              LEFT JOIN products pr ON pr.id = oi.product_id
+              LEFT JOIN LATERAL (SELECT s.updated_at FROM shipments s WHERE s.order_id = o.id ORDER BY s.id DESC LIMIT 1) sh ON TRUE
+              LEFT JOIN users cu ON cu.id = o.user_id
+              WHERE oi.quantity > 0
+              UNION ALL
+              SELECT l.created_at, 'manual', COALESCE(SUBSTRING(l.details FROM '\"([^\"]{1,120})\"'), 'Product'),
+                     m[1]::int - m[2]::int, m[1]::int, m[2]::int, NULL, u.name, u.role, l.id
+              FROM logs l
+              CROSS JOIN LATERAL regexp_match(l.details, 'stock\s+(\d+)\s*(?:→|->)\s*(\d+)') AS m
+              LEFT JOIN users u ON u.id = l.user_id
+              WHERE l.action = 'edit_product' AND m[1]::int > m[2]::int";
+
+    $soWhere = [];
+    $soParams = [];
+    if ($q !== '') {
+        $soWhere[] = "(so.product ILIKE ? OR COALESCE(so.user_name, '') ILIKE ? OR COALESCE(so.ref, '') ILIKE ?)";
+        $like = '%' . $q . '%';
+        array_push($soParams, $like, $like, $like);
+    }
+    $soRange = inv_audit_range_sql($range, 'so.at');
+    if ($soRange !== '') {
+        $soWhere[] = $soRange;
+    }
+    $soWhereSql = $soWhere ? 'WHERE ' . implode(' AND ', $soWhere) : '';
+
+    $countStmt = $db->prepare("SELECT COUNT(*) AS cnt, COALESCE(SUM(so.qty), 0) AS units FROM ({$soSql}) so {$soWhereSql}");
+    $countStmt->execute($soParams);
+    $countRow = $countStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $totalRows = (int)($countRow['cnt'] ?? 0);
+    $unitsOut = (int)($countRow['units'] ?? 0);
+} else {
+    $countSql = "SELECT COUNT(*) FROM logs l LEFT JOIN users u ON u.id = l.user_id WHERE {$whereSql}";
+    $countStmt = $db->prepare($countSql);
+    if ($countStmt) {
+        $countStmt->execute($params);
+        $totalRows = (int)($countStmt->fetchColumn() ?? 0);
+    }
 }
 
 $totalPages = max(1, (int)ceil($totalRows / $perPage));
@@ -97,23 +163,30 @@ if ($page > $totalPages) {
 }
 $offset = ($page - 1) * $perPage;
 
-$listSql = "SELECT l.*, u.name AS user_name, u.role AS user_role
-            FROM logs l
-            LEFT JOIN users u ON u.id = l.user_id
-            WHERE {$whereSql}
-            ORDER BY l.created_at DESC, l.id DESC
-            LIMIT " . (int)$perPage . " OFFSET " . (int)$offset;
-$listStmt = $db->prepare($listSql);
-$rows = [];
-if ($listStmt) {
-    $listStmt->execute($params);
+if ($stockOutView) {
+    $listStmt = $db->prepare("SELECT so.* FROM ({$soSql}) so {$soWhereSql}
+                              ORDER BY so.at DESC, so.source, so.row_id DESC
+                              LIMIT " . (int)$perPage . " OFFSET " . (int)$offset);
+    $listStmt->execute($soParams);
     $rows = $listStmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $listSql = "SELECT l.*, u.name AS user_name, u.role AS user_role
+                FROM logs l
+                LEFT JOIN users u ON u.id = l.user_id
+                WHERE {$whereSql}
+                ORDER BY l.created_at DESC, l.id DESC
+                LIMIT " . (int)$perPage . " OFFSET " . (int)$offset;
+    $listStmt = $db->prepare($listSql);
+    if ($listStmt) {
+        $listStmt->execute($params);
+        $rows = $listStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
 /* Order rows: product name(s) + customer name for the orders referenced in the log details ("Order #N ..."). */
 $orderInfo = [];
 $orderIds = [];
-foreach ($rows as $r) {
+foreach ($stockOutView ? [] : $rows as $r) {
     if (in_array((string)($r['action'] ?? ''), ['update_order_status', 'complete_order', 'accept_order'], true)
         && preg_match('/Order\s*#\s*(\d+)/i', (string)($r['details'] ?? ''), $m)) {
         $orderIds[(int)$m[1]] = true;
@@ -155,6 +228,9 @@ staff_page_start([
     'active' => 'activity',
     'heading' => 'Inventory Activity',
     'subtitle' => 'Track inventory changes and custodian actions',
+    'actions' => $stockOutView
+        ? '<a class="cx-btn cx-btn-outline" href="inventory_audit.php"><i class="ph ph-clipboard-text" aria-hidden="true"></i> All activity</a>'
+        : '<a class="cx-btn cx-btn-outline" href="inventory_audit.php?action=stock_out"><i class="ph ph-arrow-up" aria-hidden="true"></i> Stock Out</a>',
 ]);
 $filtered = $q !== '' || $actionFilter !== '' || $range !== 'all';
 $actionIcons = [
@@ -169,8 +245,13 @@ $actionIcons = [
         <section class="cx-card audit-card" aria-labelledby="auditTitle">
             <div class="cx-card-head">
                 <div>
+                    <?php if ($stockOutView): ?>
+                    <h2 id="auditTitle"><i class="ph ph-arrow-up" aria-hidden="true"></i> Stock out</h2>
+                    <p>Units taken out of stock by POS sales, completed online orders and manual adjustments, newest first · <span class="cx-num"><?php echo number_format($unitsOut); ?></span> unit<?php echo $unitsOut === 1 ? '' : 's'; ?> in <span class="cx-num"><?php echo number_format($totalRows); ?></span> record<?php echo $totalRows === 1 ? '' : 's'; ?><?php echo $q !== '' ? ' matching “' . h($q) . '”' : ''; ?></p>
+                    <?php else: ?>
                     <h2 id="auditTitle"><i class="ph ph-clipboard-text" aria-hidden="true"></i> Inventory activity log</h2>
                     <p>Stock and order changes by custodians, newest first · <span class="cx-num"><?php echo number_format($totalRows); ?></span> record<?php echo $totalRows === 1 ? '' : 's'; ?><?php echo $q !== '' ? ' matching “' . h($q) . '”' : ''; ?></p>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -178,7 +259,7 @@ $actionIcons = [
                 <div class="search-wrap">
                     <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
                     <label class="cx-sr" for="auditSearch">Search activity</label>
-                    <input type="search" id="auditSearch" name="q" value="<?php echo h($q); ?>" placeholder="Search product or user">
+                    <input type="search" id="auditSearch" name="q" value="<?php echo h($q); ?>" placeholder="<?php echo $stockOutView ? 'Search product, user, invoice or order' : 'Search product or user'; ?>">
                 </div>
                 <div class="alerts-toolbar-side">
                     <label class="sort-wrap" for="auditAction">
@@ -207,8 +288,13 @@ $actionIcons = [
             <?php if (empty($rows)): ?>
             <div class="cx-empty">
                 <span class="cx-empty-icon" aria-hidden="true"><i class="ph ph-<?php echo $filtered ? 'magnifying-glass' : 'clipboard-text'; ?>"></i></span>
+                <?php if ($stockOutView): ?>
+                <strong><?php echo $q !== '' || $range !== 'all' ? 'No stock out matches these filters' : 'No stock out yet'; ?></strong>
+                <span><?php echo $q !== '' || $range !== 'all' ? 'Try another product or date range.' : 'Units sold at the POS, completed online orders and manual reductions will appear here.'; ?></span>
+                <?php else: ?>
                 <strong><?php echo $filtered ? 'No activity matches these filters' : 'No inventory activity yet'; ?></strong>
                 <span><?php echo $filtered ? 'Try another product, action or date range.' : 'Inventory actions will appear here when products are stocked, updated, or removed.'; ?></span>
+                <?php endif; ?>
                 <?php if ($filtered): ?><a class="cx-btn cx-btn-outline" href="inventory_audit.php">Clear filters</a><?php endif; ?>
             </div>
             <?php else: ?>
@@ -225,7 +311,55 @@ $actionIcons = [
                         </tr>
                     </thead>
                     <tbody>
-                    <?php foreach ($rows as $row):
+                    <?php if ($stockOutView):
+                        $soSources = [
+                            'pos' => ['POS sale', 'ph-cash-register'],
+                            'order' => ['Online order', 'ph-shopping-cart-simple'],
+                            'manual' => ['Manual adjustment', 'ph-sliders-horizontal'],
+                        ];
+                        foreach ($rows as $row):
+                            [$srcLabel, $srcIcon] = $soSources[(string)$row['source']] ?? ['Stock out', 'ph-arrow-up'];
+                            $qty = (int)$row['qty'];
+                            $hasRange = $row['stock_before'] !== null && $row['stock_after'] !== null;
+                            $userRole = (string)($row['user_role'] ?? '');
+                            ?>
+                        <tr class="act-out">
+                            <td data-label="When" class="audit-when">
+                                <strong class="cx-num"><?php echo h(pos_format_datetime((string)$row['at'], 'M j, Y')); ?></strong>
+                                <span class="cx-num"><?php echo h(pos_format_datetime((string)$row['at'], 'g:i A')); ?></span>
+                            </td>
+                            <td data-label="User" class="audit-user">
+                                <?php echo h((string)($row['user_name'] ?? '') !== '' ? $row['user_name'] : 'System'); ?>
+                                <?php if ($userRole !== ''): ?>
+                                <span><?php echo h($userRole === 'client' ? 'Customer' : staff_role_label($userRole)); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td data-label="Action">
+                                <span class="inv-action-badge act-out">
+                                    <i class="ph ph-arrow-up" aria-hidden="true"></i>
+                                    Stock Out
+                                </span>
+                                <span class="audit-source">
+                                    <i class="ph <?php echo h($srcIcon); ?>" aria-hidden="true"></i> <?php echo h($srcLabel); ?><?php if ((string)($row['ref'] ?? '') !== ''): ?> · <span class="cx-num"><?php echo h((string)$row['ref']); ?></span><?php endif; ?>
+                                </span>
+                            </td>
+                            <td data-label="Product" class="audit-product"><?php echo h((string)$row['product']); ?></td>
+                            <td data-label="Change">
+                                <span class="inv-chg cx-num chg-minus">−<?php echo $qty; ?></span>
+                                <?php if ($hasRange): ?>
+                                <span class="audit-range" title="Stock before → after"><?php echo (int)$row['stock_before']; ?> → <?php echo (int)$row['stock_after']; ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td data-label="Status">
+                                <span class="inv-status-pill">
+                                    <i class="ph-fill ph-check-circle" aria-hidden="true"></i>
+                                    Completed
+                                </span>
+                            </td>
+                        </tr>
+                    <?php endforeach;
+                    else:
+                    foreach ($rows as $row):
                         $action = (string)($row['action'] ?? '');
                         $details = (string)($row['details'] ?? '');
                         $parsed = inv_parse_log_change($action, $details);
@@ -298,7 +432,8 @@ $actionIcons = [
                                 </span>
                             </td>
                         </tr>
-                    <?php endforeach; ?>
+                    <?php endforeach;
+                    endif; ?>
                     </tbody>
                 </table>
             </div>
