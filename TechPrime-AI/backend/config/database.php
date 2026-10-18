@@ -18,7 +18,11 @@ function getDbConnection(): PDO
         $dsn = "pgsql:host=$host;port=$port;dbname=$database;sslmode=require";
         $connection = new PDO($dsn, $username, $password, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            /* The Supabase pooler (transaction mode) can run a statement's prepare and execute on
+               different server connections ("prepared statement pdo_stmt_... does not exist").
+               Client-side prepares send each query in one step; values are still escaped by PDO. */
+            PDO::ATTR_EMULATE_PREPARES => true
         ]);
         return $connection;
     } catch (PDOException $e) {
