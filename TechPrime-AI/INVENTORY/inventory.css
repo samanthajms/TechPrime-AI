@@ -308,32 +308,6 @@
 }
 
 /* =========================================================================
-   5b. Stock alerts (same look as the Cashier page, CASHIER/cashier.css §4)
-   ========================================================================= */
-.alerts-page { display: flex; flex-direction: column; gap: 20px; }
-.btn-scan {
-    display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: var(--cx-r-sm);
-    border: 1px solid var(--cx-green-200); background: var(--cx-green-50); color: var(--cx-green-700);
-    font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
-    transition: background-color var(--cx-fast) ease, border-color var(--cx-fast) ease;
-}
-.btn-scan i { font-size: 18px; }
-.btn-scan:hover { background: var(--cx-green-100); border-color: var(--cx-green-500); }
-.alerts-table { min-width: 760px; }
-.alerts-table td { padding: 14px 16px; }
-.alerts-table th.col-barcode { width: 170px; }
-.alerts-table th.col-stock { width: 120px; }
-.alerts-table th.col-status { width: 160px; }
-.alerts-table th.col-price { width: 130px; }
-.alerts-table tbody td:first-child { position: relative; padding-left: 20px; }
-.alerts-table tbody td:first-child::before {
-    content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0;
-    background: var(--cx-yellow-400);
-}
-.alerts-table tr.is-critical td:first-child::before { background: var(--cx-rose-700); }
-.alerts-table tr.is-out td:first-child::before { background: var(--cx-red-600); }
-
-/* =========================================================================
    6. Orders + order details
    ========================================================================= */
 .orders-card { container: orders / inline-size; }
@@ -629,22 +603,6 @@
     .audit-table td[data-label="Status"] { grid-column: 1 / -1; }
     .audit-table .audit-range { display: inline; margin: 0 0 0 6px; }
     .audit-view { padding: 0 16px 14px; }
-    .alerts-table { min-width: 0; }
-    .alerts-table thead { display: none; }
-    .alerts-table tbody tr {
-        display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px;
-        padding: 14px 16px 14px 20px; border-bottom: 1px solid var(--cx-border); position: relative;
-    }
-    .alerts-table td { padding: 0 !important; border: none; }
-    .alerts-table tbody td:first-child { grid-column: 1 / -1; position: static; }
-    .alerts-table tbody td:first-child::before { top: 14px; bottom: 14px; }
-    .alerts-table td[data-label="Barcode"] { grid-column: 1; }
-    .alerts-table td[data-label="Price"] { grid-column: 2; grid-row: 2; text-align: right; }
-    .alerts-table td[data-label="Stock"] { grid-column: 1; }
-    .alerts-table td[data-label="Status"] { grid-column: 2; grid-row: 3; justify-self: end; }
-    .alerts-table td[data-label="Barcode"]::before,
-    .alerts-table td[data-label="Price"]::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--cx-muted); margin-bottom: 2px; }
-    .alerts-table .qty-cell { flex-direction: row; align-items: center; gap: 10px; }
     .rv-list { padding: 0 12px 12px; }
     .rv-card { padding: 14px; }
     .rv-head { flex-wrap: wrap; }

@@ -983,6 +983,9 @@ body.cx-app #cwHeaderCount { color: var(--cx-green-700); }
 .cx-notif-icon.type-low_stock { background: var(--cx-yellow-50); color: #a67c00; border-color: #f5df8a; }
 .cx-notif-icon.type-out_of_stock { background: var(--cx-red-50); color: var(--cx-red-600); border-color: var(--cx-red-100); }
 .cx-notif-icon.type-stock_updated { background: var(--cx-green-50); color: var(--cx-green-700); border-color: var(--cx-green-200); }
+.cx-notif-icon.type-new_order, .cx-notif-icon.type-order_update { background: #eef3ff; color: #1d4ed8; border-color: #d7e2ff; }
+.cx-notif-icon.type-cancel_requested { background: var(--cx-rose-50); color: var(--cx-rose-700); border-color: #fdcdd6; }
+.cx-notif-icon.type-order_received { background: var(--cx-green-50); color: var(--cx-green-700); border-color: var(--cx-green-200); }
 .cx-notif-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .cx-notif-type { font-size: 12px; font-weight: 600; color: var(--cx-text-2); }
 .cx-notif-msg { font-size: 13.5px; line-height: 1.4; color: var(--cx-text); overflow-wrap: anywhere; }
@@ -1113,12 +1116,63 @@ body.cx-app #cwHeaderCount { color: var(--cx-green-700); }
 .cx-app .detail-panel { display: none; margin-top: 14px; }
 .cx-app .detail-panel.open { display: block; }
 
+/* Count bubble on a nav item (custodian Orders tab): sidebar, phone tab bar and More sheet */
+.cx-nav-badge {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; margin-left: auto; padding: 0 6px;
+    border: 2px solid #fff; border-radius: 999px; background: var(--cx-red-600); color: #fff;
+    font-family: var(--cx-font); font-size: 11px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+}
+.cx-nav-badge[hidden] { display: none; }
+.cx-side-link .cx-nav-badge { border-color: transparent; }
+body.cx-side-collapsed .cx-side-link .cx-nav-badge { position: absolute; top: 4px; left: 30px; margin: 0; border-color: #2f5f1a; }
+.cx-tab .cx-nav-badge { position: absolute; top: 4px; left: calc(50% + 4px); margin: 0; }
+
+/* Stock Alerts pages (Cashier + the shared includes/staff_stock_alerts_page.php; same look as CASHIER/cashier.css §4) */
+.alerts-page { display: flex; flex-direction: column; gap: 20px; }
+.btn-scan {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: var(--cx-r-sm);
+    border: 1px solid var(--cx-green-200); background: var(--cx-green-50); color: var(--cx-green-700);
+    font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    transition: background-color var(--cx-fast) ease, border-color var(--cx-fast) ease;
+}
+.btn-scan i { font-size: 18px; }
+.btn-scan:hover { background: var(--cx-green-100); border-color: var(--cx-green-500); }
+.alerts-table { min-width: 760px; }
+.alerts-table td { padding: 14px 16px; }
+.alerts-table th.col-barcode { width: 170px; }
+.alerts-table th.col-stock { width: 120px; }
+.alerts-table th.col-status { width: 160px; }
+.alerts-table th.col-price { width: 130px; }
+.alerts-table tbody td:first-child { position: relative; padding-left: 20px; }
+.alerts-table tbody td:first-child::before {
+    content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0;
+    background: var(--cx-yellow-400);
+}
+.alerts-table tr.is-critical td:first-child::before { background: var(--cx-rose-700); }
+.alerts-table tr.is-out td:first-child::before { background: var(--cx-red-600); }
+
 @media (max-width: 900px) {
     .cx-topbar-right { gap: 8px; }
     .cx-notif-panel { position: fixed; left: 8px; right: 8px; top: calc(var(--cx-topbar-h) + 6px); width: auto; transform-origin: top center; }
 }
 @media (max-width: 720px) {
     .cat-chips { padding: 0 16px 14px; }
+    .alerts-table { min-width: 0; }
+    .alerts-table thead { display: none; }
+    .alerts-table tbody tr {
+        display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px;
+        padding: 14px 16px 14px 20px; border-bottom: 1px solid var(--cx-border); position: relative;
+    }
+    .alerts-table td { padding: 0 !important; border: none; }
+    .alerts-table tbody td:first-child { grid-column: 1 / -1; position: static; }
+    .alerts-table tbody td:first-child::before { top: 14px; bottom: 14px; }
+    .alerts-table td[data-label="Barcode"] { grid-column: 1; }
+    .alerts-table td[data-label="Price"] { grid-column: 2; grid-row: 2; text-align: right; }
+    .alerts-table td[data-label="Stock"] { grid-column: 1; }
+    .alerts-table td[data-label="Status"] { grid-column: 2; grid-row: 3; justify-self: end; }
+    .alerts-table td[data-label="Barcode"]::before,
+    .alerts-table td[data-label="Price"]::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--cx-muted); margin-bottom: 2px; }
+    .alerts-table .qty-cell { flex-direction: row; align-items: center; gap: 10px; }
     .cx-chart { height: 240px; margin: 0 12px 16px; }
     .cx-chart-sm { height: 200px; }
 }

@@ -18,6 +18,24 @@ if (!function_exists('staff_chat_role_ok')) {
     }
 }
 
+if (!function_exists('staff_chat_unread_total')) {
+    /** Unread staff-chat messages for a user (same rules as the get_staff unread counts): badge on the Messages tab. */
+    function staff_chat_unread_total(PDO $db, int $userId): int
+    {
+        if ($userId <= 0 || !staff_chat_has_is_read($db)) {
+            return 0;
+        }
+        $roles = staff_chat_allowed_roles();
+        $stmt = $db->prepare(
+            'SELECT COUNT(*) FROM messages m INNER JOIN users u ON u.id = m.sender_id
+             WHERE m.receiver_id = ? AND m.is_read = 0 AND m.deleted_for_all = 0
+               AND u.role IN (' . implode(',', array_fill(0, count($roles), '?')) . ') AND COALESCE(u.is_locked, 0) = 0'
+        );
+        $stmt->execute(array_merge([$userId], $roles));
+        return (int)$stmt->fetchColumn();
+    }
+}
+
 if (!function_exists('staff_chat_has_is_read')) {
     function staff_chat_has_is_read(PDO $db): bool
     {
