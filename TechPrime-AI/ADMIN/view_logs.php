@@ -15,15 +15,16 @@ if (!in_array($perPage, $pageSizes, true)) {
 }
 $page = max(1, (int)($_GET['page'] ?? 1));
 
-$whereSql = 'TRUE';
-$params = [];
+$staffRoles = ['admin', 'retail_officer', 'inventory_custodian', 'cashier'];
+$conditions = ['u.role IN (' . implode(', ', array_fill(0, count($staffRoles), '?')) . ')'];
+$params = $staffRoles;
 if ($q !== '') {
-    // Search is done in SQL so it covers every log, not just the page on screen.
     $like = '%' . addcslashes($q, '\\%_') . '%';
-    $whereSql = "(COALESCE(u.name, '') ILIKE ? OR COALESCE(u.email, '') ILIKE ? OR COALESCE(l.action, '') ILIKE ?
+    $conditions[] = "(COALESCE(u.name, '') ILIKE ? OR COALESCE(u.email, '') ILIKE ? OR COALESCE(l.action, '') ILIKE ?
                   OR COALESCE(l.details, '') ILIKE ? OR COALESCE(l.ip_address, '') ILIKE ?)";
-    $params = array_fill(0, 5, $like);
+    $params = array_merge($params, array_fill(0, 5, $like));
 }
+$whereSql = implode(' AND ', $conditions);
 
 $countStmt = $db->prepare("SELECT COUNT(*) FROM logs l LEFT JOIN users u ON u.id = l.user_id WHERE {$whereSql}");
 $countStmt->execute($params);
@@ -58,8 +59,8 @@ function admin_logs_url(int $page, string $q, int $perPage): string
     return 'view_logs.php?' . http_build_query($parts);
 }
 
-$roleLabels = ['client' => 'Client'];
-foreach (['admin', 'retail_officer', 'inventory_custodian', 'cashier'] as $r) {
+$roleLabels = [];
+foreach ($staffRoles as $r) {
     $roleLabels[$r] = staff_role_label($r);
 }
 
@@ -68,7 +69,7 @@ staff_page_start([
     'title' => 'Activity Logs',
     'active' => 'logs',
     'heading' => 'Activity Logs',
-    'subtitle' => 'All system events, newest first',
+    'subtitle' => 'Staff activity, newest first',
 ]);
 ?>
 
