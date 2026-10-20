@@ -43,9 +43,6 @@ $epRecent = ep_recent_products($db, 0, 8);
 $returnTo = 'index.php';
 $homeCsrf = generateCsrfToken();
 
-// Hero facts: how many products are on the shelf right now (same visibility rule as the lists).
-$inStockCount = (int)$db->query("SELECT COUNT(*) FROM products p INNER JOIN users u ON p.seller_id = u.id WHERE {$vis}")->fetchColumn();
-
 $extraHead = '<link rel="preload" as="image" href="../assets/home-hero.webp" fetchpriority="high">';
 require_once __DIR__ . '/../includes/storefront_components.php';
 ?>
@@ -58,15 +55,6 @@ require_once __DIR__ . '/../includes/storefront_components.php';
             <p class="sf-hero-kicker"><i class="fas fa-map-marker-alt" aria-hidden="true"></i> EasyPC One Oasis &middot; Rosario, Pasig City</p>
             <h1 class="sf-hero-title" id="sfHeroTitle">Tech it easy at <span>EasyPC One Oasis</span></h1>
             <p class="sf-hero-sub">Laptops, PC parts and accessories from our Pasig branch. Build a PC with compatibility checks, then pay cash on delivery or online.</p>
-            <?php if ($inStockCount > 0): ?>
-                <ul class="sf-hero-facts">
-                    <li><i class="fas fa-check-circle" aria-hidden="true"></i><span><strong class="sf-num"><?php echo number_format($inStockCount); ?></strong> products in stock</span></li>
-                    <?php if (!empty($categoryTiles)): ?>
-                        <li><i class="fas fa-th-large" aria-hidden="true"></i><span><strong class="sf-num"><?php echo count($categoryTiles); ?></strong> categories</span></li>
-                    <?php endif; ?>
-                    <li><i class="fas fa-tag" aria-hidden="true"></i><span>Prices include VAT</span></li>
-                </ul>
-            <?php endif; ?>
         </div>
     </section>
 

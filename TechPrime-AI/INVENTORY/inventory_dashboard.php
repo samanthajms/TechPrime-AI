@@ -54,7 +54,8 @@ inv_sync_stock_alerts($db);
 $jsStockProducts = array_map(static function ($p) {
     return [
         'category' => trim((string)($p['tax_parent_label'] ?? 'Others')) ?: 'Others',
-        'created_at' => (string)($p['created_at'] ?? ''),
+        // Manila wall-clock time, so the chart's month buckets follow the branch calendar (DB value is UTC).
+        'created_at' => format_utc_datetime((string)($p['created_at'] ?? ''), 'Y-m-d H:i:s'),
     ];
 }, $productRows);
 $stockProductsJson = json_encode($jsStockProducts, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);

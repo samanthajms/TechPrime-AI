@@ -114,7 +114,7 @@ EXTRA
                                         echo '<br><span class="text-muted">' . h($r['carrier']) . '</span>';
                                     }
                                 ?></td>
-                                <td class="text-muted text-small"><?php echo date('M d, Y', strtotime($r['created_at'])); ?></td>
+                                <td class="text-muted text-small"><?php echo format_utc_datetime((string)$r['created_at'], 'M d, Y'); ?></td>
                                 <td>
                                     <?php if ($canPass): ?>
                                     <form method="post">

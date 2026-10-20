@@ -71,7 +71,7 @@ function ph_cleanup(PDO $db, int $uid): void
 
 function ph_day_label(string $datetime): string
 {
-    $ts = strtotime($datetime);
+    $ts = utc_datetime_to_timestamp($datetime);   // stored in UTC; 'today' below is Manila time
     if (!$ts) {
         return 'Earlier';
     }

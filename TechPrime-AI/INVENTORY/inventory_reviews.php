@@ -124,7 +124,7 @@ $starsHtml = static function (int $rating): string {
         $replyPayload = [];
         foreach ($rows as $row):
             $rating = (int) $row['rating'];
-            $when = !empty($row['created_at']) ? date('M d, Y', strtotime((string) $row['created_at'])) : '';
+            $when = format_utc_datetime((string) ($row['created_at'] ?? ''), 'M d, Y');
             $isAnon = !empty($row['is_anonymous']);
             $clientName = $isAnon ? 'Anonymous' : (string) $row['client_name'];
             // Tags show as chips, so drop the lines in the comment that only repeat a tag.

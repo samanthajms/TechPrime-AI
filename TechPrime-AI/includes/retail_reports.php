@@ -5,6 +5,8 @@
  */
 
 require_once __DIR__ . '/product_categories.php';
+// Report ranges are Manila calendar days; DB timestamps are UTC (see local_day_range_to_utc()).
+require_once __DIR__ . '/timezone_helpers.php';
 
 /** Preset date ranges. Returns ['from' => Y-m-d, 'to' => Y-m-d, 'label' => string] */
 function ias_report_date_presets(): array
@@ -129,7 +131,7 @@ function ias_fetch_pos_sales_rows(PDO $db, DateTime $from, DateTime $to, array $
             LEFT JOIN products p ON p.id = psi.product_id
             WHERE ps.status = 'completed'
               AND ps.created_at >= ? AND ps.created_at < ?";
-    $bind = [$from->format('Y-m-d 00:00:00'), (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00')];
+    $bind = local_day_range_to_utc($from, $to);
     if (!empty($filters['category'])) {
         $sql .= ' AND ' . ias_category_in_sql('p.category', (string)$filters['category'], $bind);
     }
@@ -225,7 +227,7 @@ function ias_sales_daily_trend(array $rows, DateTime $from, DateTime $to): array
         $cursor->modify('+1 day');
     }
     foreach ($rows as $r) {
-        $day = substr($r['created_at'], 0, 10);
+        $day = utc_datetime_local_date((string)$r['created_at']);
         if (isset($byDay[$day])) {
             $byDay[$day] += (float)$r['price'] * (int)$r['quantity'];
         }
@@ -256,7 +258,7 @@ function ias_fetch_delivery_rows(PDO $db, int $sellerId, DateTime $from, DateTim
             WHERE s.shipment_status = 'delivered'
               AND s.updated_at >= ? AND s.updated_at < ?";
     $types = 'ss';
-    $bind = [$from->format('Y-m-d 00:00:00'), (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00')];
+    $bind = local_day_range_to_utc($from, $to);
 
     if (!empty($filters['customer'])) {
         $sql .= " AND (u.name LIKE ? OR u.surname LIKE ? OR u.email LIKE ?)";
@@ -295,7 +297,7 @@ function ias_count_delivery_rows(PDO $db, DateTime $from, DateTime $to): int
                           INNER JOIN users u ON u.id = o.user_id
                           WHERE s.shipment_status = 'delivered'
                             AND s.updated_at >= ? AND s.updated_at < ?");
-    $stmt->execute([$from->format('Y-m-d 00:00:00'), (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00')]);
+    $stmt->execute(local_day_range_to_utc($from, $to));
     return (int)$stmt->fetchColumn();
 }
 
@@ -326,8 +328,7 @@ function ias_summarize_deliveries(PDO $db, int $sellerId, DateTime $from, DateTi
             INNER JOIN orders o ON s.order_id = o.id
             WHERE s.created_at >= ? AND s.created_at < ?";
     $stmt = $db->prepare($sql);
-    $fromStr = $from->format('Y-m-d 00:00:00');
-    $toStr = (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00');
+    [$fromStr, $toStr] = local_day_range_to_utc($from, $to);
     $stmt->execute([$fromStr, $toStr]);
     $totalInRange = (int)($stmt->fetchColumn() ?? 0);
     return [
@@ -345,8 +346,7 @@ function ias_summarize_deliveries(PDO $db, int $sellerId, DateTime $from, DateTi
  */
 function ias_summarize_deliveries_all(PDO $db, DateTime $from, DateTime $to): array
 {
-    $fromStr = $from->format('Y-m-d 00:00:00');
-    $toStr = (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00');
+    [$fromStr, $toStr] = local_day_range_to_utc($from, $to);
 
     $deliveredStmt = $db->prepare(
         "SELECT COUNT(*) FROM shipments
@@ -469,7 +469,7 @@ function ias_delivered_units_by_date(PDO $db, int $sellerId, array $rows, string
     $out = [];
     $dateByOrder = [];
     foreach ($rows as $r) {
-        $dateByOrder[(int)$r['order_id']] = substr((string)$r['updated_at'], 0, 10);
+        $dateByOrder[(int)$r['order_id']] = utc_datetime_local_date((string)$r['updated_at']);
     }
     if ($dateByOrder) {
         $orderIds = array_keys($dateByOrder);
@@ -493,7 +493,7 @@ function ias_delivered_units_by_date(PDO $db, int $sellerId, array $rows, string
             if ($group !== '' && ias_category_group_of((string)($r['category'] ?? '')) !== $group) {
                 continue;
             }
-            $d = substr((string)$r['created_at'], 0, 10);
+            $d = utc_datetime_local_date((string)$r['created_at']);
             $out[$d] = ($out[$d] ?? 0) + (int)$r['quantity'];
         }
     }
@@ -607,7 +607,7 @@ function ias_fetch_all_sales_rows(PDO $db, DateTime $from, DateTime $to, array $
             WHERE o.status = 'to_review'
               AND o.created_at >= ? AND o.created_at < ?";
     $types = 'ss';
-    $bind = [$from->format('Y-m-d 00:00:00'), (clone $to)->modify('+1 day')->format('Y-m-d 00:00:00')];
+    $bind = local_day_range_to_utc($from, $to);
 
     if (!empty($filters['category'])) {
         $before = count($bind);

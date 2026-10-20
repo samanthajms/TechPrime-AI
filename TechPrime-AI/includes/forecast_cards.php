@@ -460,7 +460,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
         note.textContent = '';
         if (acts) {
             var asOf = acts.stock_as_of ? new Date(acts.stock_as_of) : null;
-            var parts = ['Stock as of ' + (asOf && !isNaN(asOf) ? asOf.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'unknown'),
+            var parts = ['Stock as of ' + (asOf && !isNaN(asOf) ? asOf.toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' }) : 'unknown'),
                          'lead time assumed ' + ((acts.assumptions || {}).lead_time_days_default || '?') + ' days (no supplier data yet)',
                          'order quantity covers ' + ((acts.assumptions || {}).review_days || '?') + ' days of demand'];
             note.textContent = parts.join(' · ') + '.';

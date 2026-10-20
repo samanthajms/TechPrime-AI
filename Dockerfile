@@ -10,6 +10,9 @@ RUN apt-get update && apt-get install -y libpq-dev unzip git \
 # Let .htaccess files work
 RUN sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 
+# Branch timezone for PHP (web pages and CLI scripts). The database stays in UTC on purpose.
+RUN echo 'date.timezone = Asia/Manila' > "$PHP_INI_DIR/conf.d/timezone.ini"
+
 # Composer (installs vlucas/phpdotenv, since vendor/ isn't in git)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

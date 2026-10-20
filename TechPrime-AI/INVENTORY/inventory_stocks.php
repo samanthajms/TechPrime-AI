@@ -700,7 +700,7 @@ $jsProducts = array_map(function ($p) {
         'description' => $p['description'] ?? '',
         'sku' => $p['sku'] ?? '',
         'barcode' => $p['barcode'] ?? '',
-        'created_at' => $p['created_at'] ?? '',
+        'created_at' => format_utc_datetime((string)($p['created_at'] ?? ''), 'M j, Y g:i A'),   // shown as-is in the details modal
         'img' => ias_product_image_url($p),
     ];
 }, $rows);

@@ -11,8 +11,6 @@ require_once __DIR__ . '/forecast_cards.php';
 
 function staff_forecast_page(PDO $db, string $role): void
 {
-    date_default_timezone_set('Asia/Manila');
-
     $categories = ias_category_groups();   // 8 Client menu groups (shared with the forecast service filter)
     $view = (($_GET['view'] ?? '') === 'sales') ? 'sales' : 'demand';
     $fc = ias_forecast_selection($categories);

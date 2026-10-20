@@ -42,6 +42,9 @@ Options -Indexes
     php_value session.cookie_samesite Lax
     php_flag session.use_strict_mode On
     php_flag session.use_only_cookies On
+
+    # Branch timezone for every page. The database stays in UTC on purpose; see includes/timezone_helpers.php.
+    php_value date.timezone "Asia/Manila"
 </IfModule>
 <If "%{HTTPS} == 'on' || %{HTTP:X-Forwarded-Proto} == 'https'">
     <IfModule mod_php.c>

@@ -347,7 +347,7 @@ $out = [];
 foreach ($rows as $r) {
     $out[] = [
         $r['ref'],
-        $r['created_at'],
+        format_utc_datetime((string)$r['created_at'], 'Y-m-d H:i:s'),   // Manila time, like the delivery CSV
         trim($r['customer_name'] . ' ' . $r['customer_surname']),
         $r['customer_email'],
         $r['product_name'],

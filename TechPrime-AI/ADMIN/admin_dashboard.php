@@ -6,8 +6,6 @@ require_once __DIR__ . '/../includes/staff_layout.php';
 require_once __DIR__ . '/../includes/retail_reports.php';
 require_once __DIR__ . '/../includes/inventory_alerts.php';
 
-date_default_timezone_set('Asia/Manila');
-
 $db = getDbConnection();
 checkSessionTimeout();
 checkRole('admin');

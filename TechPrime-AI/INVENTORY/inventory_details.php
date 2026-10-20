@@ -41,7 +41,7 @@ staff_page_start([
     'title' => 'Order #' . $oid,
     'active' => 'orders',
     'heading' => 'Order #' . $oid,
-    'subtitle' => 'Order details · placed ' . date('M j, Y', strtotime((string)$order['created_at'])),
+    'subtitle' => 'Order details · placed ' . format_utc_datetime((string)$order['created_at'], 'M j, Y'),
     'actions' => '<a href="inventory_orders.php" class="cx-btn cx-btn-outline"><i class="ph ph-arrow-left" aria-hidden="true"></i> Back to Orders</a>',
 ]);
 ?>
@@ -76,7 +76,7 @@ staff_page_start([
                     <dl class="od-list">
                         <div><dt>Total</dt><dd class="od-total cx-num">₱<?php echo number_format((float)$order['total'], 2); ?></dd></div>
                         <div><dt>Status</dt><dd><?php echo h(ias_order_display_status($order['status'] ?? '')); ?></dd></div>
-                        <div><dt>Date</dt><dd class="cx-num"><?php echo h($order['created_at']); ?></dd></div>
+                        <div><dt>Date</dt><dd class="cx-num"><?php echo h(format_utc_datetime((string)$order['created_at'], 'M j, Y g:i A', '—')); ?></dd></div>
                     </dl>
                 </section>
             </div>

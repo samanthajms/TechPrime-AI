@@ -124,7 +124,7 @@ staff_page_start([
                     <tbody>
                         <?php foreach ($logs as $l): ?>
                         <tr>
-                            <td data-label="Time" class="log-time cx-mono"><?php echo h($l['created_at']); ?></td>
+                            <td data-label="Time" class="log-time cx-mono"><?php echo h(format_utc_datetime((string)$l['created_at'], 'Y-m-d H:i:s', (string)$l['created_at'])); ?></td>
                             <td data-label="User">
                                 <span class="log-user"><?php echo h($l['name'] ?? 'Guest'); ?></span>
                                 <?php if (!empty($l['email'])): ?>

@@ -502,6 +502,9 @@ if (!function_exists('staff_app_shell_end')) {
 <script src="../includes/ui_alerts.js"></script>
 <?php echo ias_session_timeout_assets(); ?>
 <?php echo $extraScripts; ?>
+<?php if (in_array($role, ['admin', 'retail_officer', 'inventory_custodian'], true)): /* roles with the Forecast page */ ?>
+<script src="../includes/service_warmup.js?v=1" data-svc="forecast" defer></script>
+<?php endif; ?>
 <?php staff_chat_widget_maybe(); ?>
 <script>
 (function () {

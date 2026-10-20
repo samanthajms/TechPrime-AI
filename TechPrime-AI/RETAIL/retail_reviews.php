@@ -96,7 +96,7 @@ EXTRA
                             </div>
                             <div style="text-align: right;">
                                 <span class="product-tag"><?php echo h($rev['product_name']); ?></span>
-                                <div style="font-size: 11px; color: #bbb; margin-top: 5px;"><?php echo date('M d, Y', strtotime($rev['created_at'])); ?></div>
+                                <div style="font-size: 11px; color: #bbb; margin-top: 5px;"><?php echo format_utc_datetime((string)$rev['created_at'], 'M d, Y'); ?></div>
                             </div>
                         </div>
 
@@ -110,7 +110,7 @@ EXTRA
                                 <div style="font-size: 13px; color: #555;">
                                     <?php echo h($rev['seller_reply']); ?>
                                 </div>
-                                <div style="font-size: 10px; color: #bbb; margin-top: 5px;">Replied on <?php echo date('M d, Y', strtotime($rev['replied_at'])); ?></div>
+                                <div style="font-size: 10px; color: #bbb; margin-top: 5px;">Replied on <?php echo format_utc_datetime((string)$rev['replied_at'], 'M d, Y'); ?></div>
                             </div>
                         <?php else: ?>
                             <form method="POST" class="reply-section">

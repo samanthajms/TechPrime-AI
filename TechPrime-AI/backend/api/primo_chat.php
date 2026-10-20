@@ -878,7 +878,7 @@ function primo_format_order_line(array $row): string
     $display = function_exists('ias_order_display_status')
         ? ias_order_display_status($row['status'] ?? '', $row['shipment_status'] ?? null)
         : ($row['shipment_status'] ?: $row['status']);
-    $date = !empty($row['created_at']) ? date('M d, Y', strtotime($row['created_at'])) : '';
+    $date = format_utc_datetime((string)($row['created_at'] ?? ''), 'M d, Y');
     $extra = '';
     if (!empty($row['tracking_number'])) {
         $carrier = $row['carrier'] ?: 'Courier';

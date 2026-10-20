@@ -131,6 +131,37 @@ function ias_session_idle_expired(): bool {
         && time() - (int)$_SESSION['last_activity'] >= IAS_SESSION_IDLE_TIMEOUT;
 }
 
+/*
+ * Session lock release around slow outbound calls.
+ * PHP's file session handler locks the session for the whole request, so while one request waits on
+ * the Render forecast or Primo service (up to about a minute on a cold start), every other request from
+ * the same browser (other tabs, chat / stock-alert polling, page navigation, a second forecast fetch)
+ * queues behind it. Release before the call; reacquire only if $_SESSION must be written afterwards.
+ * $_SESSION stays readable in between; writes made while released are NOT saved.
+ */
+
+/** Save the session now and drop its lock. Safe to call twice or when no session is open. */
+function release_session_lock(): void {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+}
+
+/**
+ * Re-open a session released by release_session_lock() so $_SESSION can be written again.
+ * Sends no second cookie or cache header. Returns false when it cannot reopen (output already sent).
+ * Note: $_SESSION is reloaded from storage, so it includes changes other requests made meanwhile.
+ */
+function reopen_session(): bool {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        return true;
+    }
+    if (headers_sent() || session_id() === '') {
+        return false;
+    }
+    return session_start(['use_cookies' => 0, 'cache_limiter' => '']);
+}
+
 /** Seconds left before the idle timeout (0 when signed out or expired). */
 function ias_session_remaining(): int {
     if (empty($_SESSION['user_id'])) {
