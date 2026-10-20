@@ -161,3 +161,4 @@ $primoGuest = empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'clie
 </div>
 <script>window.EP_CSRF = window.EP_CSRF || <?php echo json_encode($primoCsrf); ?>;</script>
 <script src="primo.js?v=ux-8" defer></script>
+<script src="../includes/service_warmup.js?v=1" data-svc="primo" defer></script>

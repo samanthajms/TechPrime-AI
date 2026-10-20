@@ -44,6 +44,11 @@ if (preg_match('/<\s*script|javascript:|onerror\s*=/i', $message)) {
     exit;
 }
 
+// Drop the session lock before the Primo service calls (SVM, phrasing, LLM: up to about a minute on a cold Render
+// start), so the shopper's other tabs and requests are not blocked meanwhile. $_SESSION stays readable; the two
+// writes below (primo_general_reply, primo_store_context) reopen the session briefly.
+release_session_lock();
+
 if (primo_is_itemlist_question($message)) {
     $result = primo_itemlist_answer($message);
     try {
@@ -385,7 +390,7 @@ function primo_general_reply(string $message): ?string
     }
     $turns[] = ['role' => 'user', 'content' => mb_substr($message, 0, 500)];
     $turns[] = ['role' => 'assistant', 'content' => mb_substr($reply, 0, 500)];
-    $_SESSION['primo_chat'] = array_slice($turns, -8);
+    primo_session_write('primo_chat', array_slice($turns, -8));
     return $reply;
 }
 
@@ -443,11 +448,31 @@ function primo_store_context(string $intent, string $message, array $products): 
         return;
     }
 
-    $_SESSION['primo_ctx'] = [
+    primo_session_write('primo_ctx', [
         'intent' => $intent,
         'topic' => $topic,
         'at' => time(),
-    ];
+    ]);
+}
+
+/**
+ * Save one Primo key to the session. The chat request releases the session lock before its slow service calls,
+ * so this reopens it only for the write and releases it again. When the session is still open (CLI use, or a
+ * caller that never released it) it is a plain assignment.
+ */
+function primo_session_write(string $key, array $value): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION[$key] = $value;
+        return;
+    }
+    if (reopen_session()) {
+        $_SESSION[$key] = $value;
+        release_session_lock();
+        return;
+    }
+    $_SESSION[$key] = $value;   // could not reopen (output already sent): keep it for the rest of this request only
+    error_log('primo_chat: session could not be reopened to save ' . $key);
 }
 
 function primo_is_explanation_request(string $message): bool

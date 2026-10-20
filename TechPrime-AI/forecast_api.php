@@ -34,6 +34,10 @@ $type = (string)($_GET['type'] ?? 'demand');
 if (!isset($allowed[$type])) { forecast_fail(400, 'bad type'); }
 if (!in_array($role, $allowed[$type], true)) { forecast_fail(403, 'forbidden'); }
 
+// Nothing below writes to $_SESSION, so drop the session lock now. Otherwise this request (up to 75 s on a cold
+// Render start) would block every other request from the same browser, including the parallel demand/actions fetch.
+release_session_lock();
+
 // Load .env exactly like the rest of the app (backend/config/database.php uses Dotenv safeLoad: on Render there is no
 // .env file and the real environment variables are used). Including it only loads Composer + Dotenv; it opens no DB connection.
 require_once __DIR__ . '/backend/config/database.php';
