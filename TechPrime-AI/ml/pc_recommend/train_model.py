@@ -13,10 +13,11 @@ forest that never saw that build. Reported:
 The saved model is then refit on every row.
 
 Usage (from TechPrime-AI):
-    python ml/pc_recommend/train_model.py
+    python ml/pc_recommend/train_model.py [--data CSV] [--out JSON]
 """
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -123,7 +124,13 @@ def hit_at_k(real: pd.DataFrame, columns: list[str], ascending: list[bool]) -> f
 
 
 def main() -> None:
-    df = pd.read_csv(DATA)
+    parser = argparse.ArgumentParser(description="Train and test the Build a PC Random Forest.")
+    parser.add_argument("--data", type=Path, default=DATA, help="training table (default: data/train.csv)")
+    parser.add_argument("--out", type=Path, default=OUT, help="model file (default: models/forest.json)")
+    args = parser.parse_args()
+    out = args.out
+
+    df = pd.read_csv(args.data)
     X = df[FEATURES]
     y = df["label"].astype(int)
     w = df["weight"].astype(float)
@@ -160,7 +167,7 @@ def main() -> None:
 
     forest = make_forest()
     forest.fit(X, y, sample_weight=w)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
+    out.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "type": "random_forest_classifier",
         "features": FEATURES,
@@ -182,7 +189,7 @@ def main() -> None:
         ),
         "trees": [export_tree(est) for est in forest.estimators_],
     }
-    OUT.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    out.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
 
     for name, m in metrics.items():
         if m["rows"]:
@@ -198,7 +205,7 @@ def main() -> None:
         f"expert rules={hit['expert_rules']:.2%} price range={hit['price_range']:.2%} random={hit['random']:.2%}"
     )
     print("feature importance:", payload["feature_importance"])
-    print(f"saved {OUT}")
+    print(f"saved {out}")
 
 
 if __name__ == "__main__":

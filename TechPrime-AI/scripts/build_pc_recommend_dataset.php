@@ -9,7 +9,7 @@
  *    Saved builds carry the purpose the customer picked ("_purpose"); others count as "Not sure yet".
  * Real picks weigh more, so the model follows customers wherever they disagree with the rule.
  *
- * Usage: php scripts/build_pc_recommend_dataset.php
+ * Usage: php scripts/build_pc_recommend_dataset.php [output csv=ml/pc_recommend/data/train.csv]
  */
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -29,7 +29,7 @@ const RULE_BUDGETS = [0, 0, 30000, 45000, 70000, 110000, 200000];
 const REAL_POSITIVE_WEIGHT = 5;
 const REAL_NEGATIVE_WEIGHT = 1;
 
-$out = __DIR__ . '/../ml/pc_recommend/data/train.csv';
+$out = $argv[1] ?? __DIR__ . '/../ml/pc_recommend/data/train.csv';
 if (!is_dir(dirname($out))) {
     mkdir(dirname($out), 0777, true);
 }
