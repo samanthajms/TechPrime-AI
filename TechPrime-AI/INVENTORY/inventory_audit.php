@@ -47,18 +47,23 @@ if (!array_key_exists($range, $allowedRanges)) {
 /* "Stock Out" is not a log action: it lists every successful stock decrease, one row per product. */
 $stockOutView = $actionFilter === 'stock_out';
 
-/** SQL condition limiting timestamp column $col to the chosen date range ('' = all time). */
+/**
+ * SQL condition limiting timestamp column $col to the chosen date range ('' = all time).
+ * $col holds UTC; "today" and "this month" follow the Manila calendar.
+ */
 function inv_audit_range_sql(string $range, string $col): string
 {
+    $localCol = sql_utc_to_local($col);
+    $localNow = sql_local_now();
     switch ($range) {
         case 'today':
-            return "DATE({$col}) = CURRENT_DATE";
+            return "DATE({$localCol}) = DATE({$localNow})";
         case '7d':
-            return "{$col} >= (NOW() - INTERVAL '7 day')";
+            return "{$col} >= ((NOW() AT TIME ZONE 'UTC') - INTERVAL '7 day')";
         case '30d':
-            return "{$col} >= (NOW() - INTERVAL '30 day')";
+            return "{$col} >= ((NOW() AT TIME ZONE 'UTC') - INTERVAL '30 day')";
         case 'month':
-            return "date_trunc('month', {$col}) = date_trunc('month', CURRENT_DATE)";
+            return "date_trunc('month', {$localCol}) = date_trunc('month', {$localNow})";
     }
     return '';
 }
@@ -363,7 +368,7 @@ $actionIcons = [
                         $action = (string)($row['action'] ?? '');
                         $details = (string)($row['details'] ?? '');
                         $parsed = inv_parse_log_change($action, $details);
-                        $ts = strtotime((string)$row['created_at']);
+                        $ts = utc_datetime_to_timestamp((string)$row['created_at']);
                         $dateLabel = $ts ? date('M j, Y', $ts) : (string)$row['created_at'];
                         $timeLabel = $ts ? date('g:i A', $ts) : '';
                         $actClass = 'act-other';

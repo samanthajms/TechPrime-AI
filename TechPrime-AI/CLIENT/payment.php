@@ -100,7 +100,7 @@ include __DIR__ . '/ep_header.php';
             </div>
             <div class="ep-order-line">
                 <span>Placed</span>
-                <strong><?php echo h(date('M d, Y g:i A', strtotime((string)$order['created_at']))); ?></strong>
+                <strong><?php echo h(format_utc_datetime((string)$order['created_at'], 'M d, Y g:i A')); ?></strong>
             </div>
             <div class="ep-order-line is-top">
                 <span>Items</span>

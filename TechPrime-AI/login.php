@@ -3,7 +3,6 @@ session_start();
 require_once __DIR__ . '/backend/config/database.php';
 require_once __DIR__ . '/includes/security.php';
 
-date_default_timezone_set('Asia/Manila');
 $connection = getDbConnection();
 
 $error   = $_GET['error']   ?? '';

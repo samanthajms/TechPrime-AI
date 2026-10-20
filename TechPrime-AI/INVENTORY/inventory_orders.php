@@ -274,14 +274,15 @@ for ($i = 0; $i < 8; $i++) {
     $weekMap[$key] = 0;
     $weekLabels[] = $ws->format('M d');
 }
-$rangeStart = array_key_first($weekMap);
-$weeklySql = "SELECT date_trunc('week', created_at)::date AS week_start, COUNT(*) AS cnt
+// Weeks follow the Manila calendar; created_at is stored in UTC.
+[$rangeStartUtc] = local_day_range_to_utc($weekStart, $weekStart);
+$weeklySql = "SELECT date_trunc('week', " . sql_utc_to_local('created_at') . ")::date AS week_start, COUNT(*) AS cnt
               FROM shipments
               WHERE created_at >= ?
               GROUP BY week_start
               ORDER BY week_start";
 $weeklyStmt = $db->prepare($weeklySql);
-$weeklyStmt->execute([$rangeStart]);
+$weeklyStmt->execute([$rangeStartUtc]);
 $weeklyRes = $weeklyStmt;
 while ($w = $weeklyRes->fetch(PDO::FETCH_ASSOC)) {
     $key = substr((string)($w['week_start'] ?? ''), 0, 10);
@@ -436,7 +437,7 @@ staff_page_start([
                                 </td>
                                 <td data-label="Order" class="col-order">
                                     <strong class="order-id cx-mono">#<?php echo (int)$r['id']; ?></strong>
-                                    <span class="order-date cx-num"><?php echo date('M d, Y', strtotime($r['created_at'])); ?></span>
+                                    <span class="order-date cx-num"><?php echo format_utc_datetime((string)$r['created_at'], 'M d, Y'); ?></span>
                                 </td>
                                 <td data-label="Customer" class="customer-cell">
                                     <div class="customer-name"><?php echo h($r['name'] . ' ' . $r['surname']); ?></div>

@@ -4,6 +4,8 @@
  * Expects helpers already loaded: h(), ias_client_product_image_url(), ias_order_display_status(), generateCsrfToken().
  */
 
+require_once __DIR__ . '/timezone_helpers.php';
+
 /**
  * @param array $o Order row (with optional shipment_status, carrier)
  * @param array $items Line items for this order
@@ -94,7 +96,7 @@ function ep_render_client_order_card(array $o, array $items, array $ctx): void
         <div class="pf-order-head">
             <div class="pf-order-ref">
                 <strong>Order #ORD-<?php echo $oid; ?></strong>
-                <span>Placed <?php echo date('M d, Y', strtotime((string)$o['created_at'])); ?></span>
+                <span>Placed <?php echo format_utc_datetime((string)$o['created_at'], 'M d, Y'); ?></span>
             </div>
             <div class="pf-order-head-right">
                 <span class="pf-status <?php echo $orderStatusTone($statusLabel); ?>"><?php echo h($statusLabel); ?></span>

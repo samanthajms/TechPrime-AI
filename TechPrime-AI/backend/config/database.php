@@ -1,6 +1,8 @@
 <?php
 
 require_once __DIR__ . '/../../vendor/autoload.php';
+// Branch timezone (Asia/Manila) for PHP + helpers for reading the UTC timestamps stored in the database.
+require_once __DIR__ . '/../../includes/timezone_helpers.php';
 
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../../');
 // safeLoad: on Render there is no .env file; values come from real environment variables.

@@ -148,14 +148,14 @@ $rangeText = $dRange['from']->format('M j, Y') . ' – ' . $dRange['to']->format
                         <td data-label="Customer" class="deliv-customer"><?php echo h(trim($r['customer_name'] . ' ' . $r['customer_surname'])); ?></td>
                         <td data-label="Carrier"><?php echo h($r['carrier']); ?></td>
                         <td data-label="Total" class="num cx-num"><span class="price-tag">₱<?php echo number_format((float)$r['total'], 2); ?></span></td>
-                        <td data-label="Delivered" class="deliv-when cx-num"><?php echo h($r['updated_at']); ?></td>
+                        <td data-label="Delivered" class="deliv-when cx-num"><?php echo h(format_utc_datetime((string)$r['updated_at'], 'M j, Y g:i A', '—')); ?></td>
                         <td data-label="Status"><span class="stock-status-pill ok"><i class="ph-fill ph-check-circle" aria-hidden="true"></i> Delivered</span></td>
                     </tr>
                     <tr class="drill-row" id="drill-<?php echo $i; ?>" hidden>
                         <td colspan="8">
                             <dl class="drill-grid">
                                 <div><dt>Customer email</dt><dd><?php echo h($r['customer_email']); ?></dd></div>
-                                <div><dt>Order placed</dt><dd class="cx-num"><?php echo h($r['order_created']); ?></dd></div>
+                                <div><dt>Order placed</dt><dd class="cx-num"><?php echo h(format_utc_datetime((string)$r['order_created'], 'M j, Y g:i A', '—')); ?></dd></div>
                                 <div class="drill-wide"><dt>Products</dt><dd><?php echo h($r['products']); ?></dd></div>
                                 <div class="drill-wide"><dt>Category</dt><dd><?php echo h(implode(', ', ias_category_groups_in($r['categories'] ?? ''))); ?></dd></div>
                             </dl>

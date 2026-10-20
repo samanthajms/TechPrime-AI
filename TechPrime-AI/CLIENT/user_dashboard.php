@@ -401,7 +401,7 @@ if ($search_query !== '') {
         OR o.status LIKE ?
         OR o.shipping_address LIKE ?
         OR o.customer_phone LIKE ?
-        OR to_char(o.created_at, 'Month DD, YYYY') LIKE ?
+        OR to_char(" . sql_utc_to_local('o.created_at') . ", 'Month DD, YYYY') LIKE ?
     )";
     $searchParams = [$like, $like, $like, $like, $like, $like];
 }

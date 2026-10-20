@@ -4,6 +4,8 @@
  * Stock alerts go to Admin, Retail Officer and Inventory Custodian; order updates to the Inventory Custodian only.
  */
 
+require_once __DIR__ . '/timezone_helpers.php';
+
 if (!function_exists('inv_stock_alert_roles')) {
     /** Roles that receive stock alerts (and see them in the top-bar bell). */
     function inv_stock_alert_roles(): array
@@ -375,8 +377,8 @@ if (!function_exists('inv_delete_notification')) {
 if (!function_exists('inv_relative_time')) {
     function inv_relative_time(string $datetime): string
     {
-        $ts = strtotime($datetime);
-        if ($ts === false) {
+        $ts = utc_datetime_to_timestamp($datetime);   // stored in UTC; shown in Manila time
+        if ($ts === null) {
             return $datetime;
         }
         $diff = time() - $ts;
