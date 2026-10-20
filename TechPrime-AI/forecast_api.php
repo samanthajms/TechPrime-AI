@@ -19,16 +19,14 @@ function forecast_fail(int $code, string $error): never
     exit;
 }
 
-// Who may see which forecast (matches the screens):
-//   Product Demand Forecast  -> Inventory Custodian, Retail Officer + Admin
-//   Sales / Revenue Forecast -> Retail Officer + Admin
-//   Inventory actions (reorder point, safety stock, days of inventory, order qty) -> Inventory Custodian + Admin
-//   Category list + model accuracy -> all three
+// Who may see which forecast (matches the screens): the Forecast page is shared by Admin, Retail Officer and
+// Inventory Custodian (includes/staff_forecast_page.php), so all three see Product Demand (with the inventory
+// actions: reorder point, safety stock, days of inventory, order qty), Sales / Revenue, categories and model accuracy.
 $role = (string)($_SESSION['role'] ?? '');
 $allowed = [
     'demand'     => ['admin', 'inventory_custodian', 'retail_officer'],
-    'revenue'    => ['admin', 'retail_officer'],
-    'actions'    => ['admin', 'inventory_custodian'],
+    'revenue'    => ['admin', 'inventory_custodian', 'retail_officer'],
+    'actions'    => ['admin', 'inventory_custodian', 'retail_officer'],
     'categories' => ['admin', 'retail_officer', 'inventory_custodian'],
     'metrics'    => ['admin', 'retail_officer', 'inventory_custodian'],
 ];

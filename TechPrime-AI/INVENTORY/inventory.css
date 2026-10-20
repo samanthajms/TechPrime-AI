@@ -531,6 +531,12 @@
 .inv-action-badge.act-edit { --tone: #1d4ed8; --tone-bg: #eef3ff; --tone-line: #d7e2ff; }
 .inv-action-badge.act-del { --tone: var(--cx-red-700); --tone-bg: var(--cx-red-50); --tone-line: var(--cx-red-100); }
 .inv-action-badge.act-order { --tone: var(--cx-yellow-700); --tone-bg: var(--cx-yellow-50); --tone-line: #f5df8a; }
+.inv-action-badge.act-out { --tone: var(--cx-red-700); --tone-bg: var(--cx-red-50); --tone-line: var(--cx-red-100); }
+/* Stock Out view: where the units went (POS sale / online order / manual) under the badge */
+.audit-source { display: block; margin-top: 4px; font-size: 12.5px; color: var(--cx-muted); }
+.audit-source .cx-num { color: var(--cx-text-2); }
+.audit-range { display: block; margin-top: 3px; font-family: var(--cx-font-num); font-size: 12px; color: var(--cx-muted); white-space: nowrap; }
+.audit-view { padding: 0 20px 16px; }
 .inv-chg {
     display: inline-flex; align-items: center; justify-content: center; min-width: 52px; padding: 4px 10px; border-radius: var(--cx-r-sm);
     font-family: var(--cx-font-num); font-size: 13px; font-weight: 700; white-space: nowrap;
@@ -595,6 +601,8 @@
     .audit-table td[data-label="User"] span::before { content: ' · '; }
     .audit-table td[data-label="Change"] { grid-column: 2; justify-self: end; }
     .audit-table td[data-label="Status"] { grid-column: 1 / -1; }
+    .audit-table .audit-range { display: inline; margin: 0 0 0 6px; }
+    .audit-view { padding: 0 16px 14px; }
     .rv-list { padding: 0 12px 12px; }
     .rv-card { padding: 14px; }
     .rv-head { flex-wrap: wrap; }

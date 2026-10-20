@@ -85,7 +85,7 @@ staff_page_start([
 <div class="inv-dash">
     <section class="inv-attn" aria-labelledby="attnTitle">
         <h2 id="attnTitle" class="cx-sr">Needs attention</h2>
-        <a class="level-tile inv-attn-tile <?php echo $outOfStockCount > 0 ? 'is-out' : 'is-ok'; ?>" href="inventory_stocks.php?status=outofstock">
+        <a class="level-tile inv-attn-tile <?php echo $outOfStockCount > 0 ? 'is-out' : 'is-ok'; ?>" href="inventory_stock_alerts.php?status=out">
             <span class="level-tile-icon" aria-hidden="true"><i class="ph-fill <?php echo $outOfStockCount > 0 ? 'ph-x-circle' : 'ph-check-circle'; ?>"></i></span>
             <span class="level-tile-body">
                 <strong class="cx-num"><?php echo number_format($outOfStockCount); ?></strong>
@@ -94,7 +94,7 @@ staff_page_start([
             </span>
             <i class="ph ph-caret-right inv-attn-go" aria-hidden="true"></i>
         </a>
-        <a class="level-tile inv-attn-tile <?php echo $runningLowCount > 0 ? 'is-low' : 'is-ok'; ?>" href="inventory_stocks.php?alert=low">
+        <a class="level-tile inv-attn-tile <?php echo $runningLowCount > 0 ? 'is-low' : 'is-ok'; ?>" href="inventory_stock_alerts.php?status=running">
             <span class="level-tile-icon" aria-hidden="true"><i class="ph-fill <?php echo $runningLowCount > 0 ? 'ph-warning' : 'ph-check-circle'; ?>"></i></span>
             <span class="level-tile-body">
                 <strong class="cx-num"><?php echo number_format($runningLowCount); ?></strong>

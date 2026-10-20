@@ -42,7 +42,7 @@ if (!function_exists('staff_app_role_css')) {
             'cashier' => 'cashier.css?v=13',
             'admin' => 'admin.css?v=1',
             'retail_officer' => 'retail.css?v=1',
-            'inventory_custodian' => 'inventory.css?v=1',
+            'inventory_custodian' => 'inventory.css?v=3',
         ];
         return $map[$role] ?? '';
     }
@@ -50,21 +50,23 @@ if (!function_exists('staff_app_role_css')) {
 
 if (!function_exists('staff_app_notif_bell')) {
     /**
-     * Top-bar notifications (inventory custodian only): the latest stock notifications
-     * from inv_user_notifications(), marked read / removed through INVENTORY/inventory_notif_api.php.
+     * Top-bar notifications (Admin, Retail Officer, Inventory Custodian): stock alerts for all three,
+     * order updates for the custodian (inv_notification_types()). Stock alerts open the role's Stock Alerts
+     * page, order updates open Orders (inv_notification_href()). Marked read / removed through
+     * backend/api/staff_notifications.php.
      */
     function staff_app_notif_bell(string $role): void
     {
-        if ($role !== 'inventory_custodian' || !function_exists('getDbConnection') || !isset($_SESSION['user_id'])) {
-            return;
-        }
         if (!function_exists('inv_user_notifications')) {
             require_once __DIR__ . '/inventory_alerts.php';
+        }
+        if (!in_array($role, inv_stock_alert_roles(), true) || !function_exists('getDbConnection') || !isset($_SESSION['user_id'])) {
+            return;
         }
         $items = [];
         $unread = 0;
         try {
-            $pack = inv_user_notifications(getDbConnection(), (int)$_SESSION['user_id'], 15);
+            $pack = inv_user_notifications(getDbConnection(), (int)$_SESSION['user_id'], 15, inv_notification_types($role));
             $items = $pack['items'];
             $unread = (int)$pack['unread'];
         } catch (Throwable $e) {
@@ -76,32 +78,34 @@ if (!function_exists('staff_app_notif_bell')) {
             'low_stock' => ['ph-warning', 'Low Stock'],
             'out_of_stock' => ['ph-x-circle', 'Out of Stock'],
             'stock_updated' => ['ph-check-circle', 'Stock Updated'],
+            'order_update' => ['ph-receipt', 'Order Placed'],
+            'new_order' => ['ph-shopping-cart-simple', 'Paid Order'],
+            'cancel_requested' => ['ph-prohibit', 'Cancel Request'],
+            'order_received' => ['ph-package', 'Order Completed'],
         ];
+        $emptyText = $role === 'inventory_custodian' ? 'No stock alerts or order updates yet.' : 'No stock alerts yet.';
         ?>
-            <div class="cx-notif" id="cxNotif" data-csrf="<?php echo h($csrf); ?>">
+            <div class="cx-notif" id="cxNotif" data-csrf="<?php echo h($csrf); ?>" data-empty="<?php echo h($emptyText); ?>">
                 <button type="button" class="cx-notif-btn" id="cxNotifBtn" aria-haspopup="true" aria-expanded="false" aria-controls="cxNotifPanel">
                     <i class="ph ph-bell" aria-hidden="true"></i>
                     <span class="cx-notif-badge" id="cxNotifBadge" aria-hidden="true"<?php echo $unread > 0 ? '' : ' hidden'; ?>><?php echo $unread > 99 ? '99+' : (int)$unread; ?></span>
                     <span class="cx-sr" id="cxNotifLabel">Notifications, <?php echo $unread > 0 ? (int)$unread . ' unread' : 'none unread'; ?></span>
                 </button>
-                <div class="cx-notif-panel" id="cxNotifPanel" role="region" aria-label="Inventory notifications" hidden>
+                <div class="cx-notif-panel" id="cxNotifPanel" role="region" aria-label="Notifications" hidden>
                     <div class="cx-notif-head">
                         <strong>Notifications</strong>
                         <button type="button" class="cx-btn cx-btn-ghost cx-btn-sm" id="cxNotifMarkAll"><i class="ph ph-checks" aria-hidden="true"></i> Mark all read</button>
                     </div>
                     <ul class="cx-notif-list" id="cxNotifList">
                         <?php if (!$items): ?>
-                        <li class="cx-notif-empty"><i class="ph ph-bell-slash" aria-hidden="true"></i><span>No inventory notifications yet.</span></li>
+                        <li class="cx-notif-empty"><i class="ph ph-bell-slash" aria-hidden="true"></i><span><?php echo h($emptyText); ?></span></li>
                         <?php endif; ?>
                         <?php foreach ($items as $n):
                             $type = (string)($n['type'] ?? 'info');
                             $isRead = (int)($n['is_read'] ?? 0) === 1;
                             [$icon, $label] = $types[$type] ?? ['ph-info', 'Update'];
                             $when = function_exists('inv_relative_time') ? inv_relative_time((string)$n['created_at']) : (string)$n['created_at'];
-                            $href = trim((string)($n['link'] ?? ''));
-                            if ($href === '') {
-                                $href = 'inventory_stocks.php';
-                            } ?>
+                            $href = inv_notification_href($n, $role); ?>
                         <li class="cx-notif-item<?php echo $isRead ? ' is-read' : ' is-unread'; ?>" data-id="<?php echo (int)$n['id']; ?>" data-href="<?php echo h($href); ?>">
                             <button type="button" class="cx-notif-open">
                                 <span class="cx-notif-icon type-<?php echo h($type); ?>" aria-hidden="true"><i class="ph-fill <?php echo h($icon); ?>"></i></span>
@@ -122,10 +126,29 @@ if (!function_exists('staff_app_notif_bell')) {
     }
 }
 
+if (!function_exists('staff_app_nav_badge')) {
+    /**
+     * Red count bubble on a nav item ("99+" above 99); the sr-only text keeps the link name readable.
+     * Items with 'badge_live' always print the bubble (hidden at 0) with data-nav-badge so page JS can update it.
+     */
+    function staff_app_nav_badge(array $item): string
+    {
+        $n = (int)($item['badge'] ?? 0);
+        $live = (string)($item['badge_live'] ?? '');
+        if ($n <= 0 && $live === '') {
+            return '';
+        }
+        $word = (string)($item['badge_sr'] ?? 'waiting');
+        $data = $live !== '' ? ' data-nav-badge="' . h($live) . '" data-nav-badge-word="' . h($word) . '"' : '';
+        return '<span class="cx-nav-badge"' . $data . ' aria-hidden="true"' . ($n > 0 ? '' : ' hidden') . '>' . ($n > 99 ? '99+' : $n) . '</span>'
+            . '<span class="cx-sr"' . ($live !== '' ? ' data-nav-badge-sr="' . h($live) . '"' : '') . '>' . ($n > 0 ? ', ' . $n . ' ' . h($word) : '') . '</span>';
+    }
+}
+
 if (!function_exists('staff_app_css_href')) {
     function staff_app_css_href(): string
     {
-        return str_replace('staff_shared.css', 'staff_app.css', staff_css_href()) . '?v=2';
+        return str_replace('staff_shared.css', 'staff_app.css', staff_css_href()) . '?v=4';
     }
 }
 
@@ -138,7 +161,45 @@ if (!function_exists('staff_app_nav')) {
             $item['ph'] = $item['ph'] ?? 'ph-circle';
             $item['short'] = $item['short'] ?? $item['label'];
             $item['children'] = $item['children'] ?? [];
+            $item['badge'] = 0;
             $nav[] = $item;
+        }
+        // Admin, retail officer, inventory custodian: unread staff-chat messages on the Messages tab.
+        // Kept live by the chat widget (staff_chat_widget.php) and the Messages page through data-nav-badge.
+        if (function_exists('getDbConnection') && isset($_SESSION['user_id'])) {
+            require_once __DIR__ . '/staff_chat_lib.php';
+            if (staff_chat_role_ok($role)) {
+                try {
+                    $unreadMsgs = staff_chat_unread_total(getDbConnection(), (int)$_SESSION['user_id']);
+                } catch (Throwable $e) {
+                    $unreadMsgs = 0;
+                }
+                foreach ($nav as &$item) {
+                    if ($item['key'] === 'messages') {
+                        $item['badge'] = $unreadMsgs;
+                        $item['badge_live'] = 'messages';
+                        $item['badge_sr'] = 'unread';
+                    }
+                }
+                unset($item);
+            }
+        }
+        // Inventory custodian: count of orders waiting on them, shown on the Orders tab.
+        if ($role === 'inventory_custodian' && function_exists('getDbConnection')) {
+            if (!function_exists('inv_orders_action_count')) {
+                require_once __DIR__ . '/inventory_alerts.php';
+            }
+            try {
+                $pending = inv_orders_action_count(getDbConnection());
+            } catch (Throwable $e) {
+                $pending = 0;
+            }
+            foreach ($nav as &$item) {
+                if ($item['key'] === 'orders') {
+                    $item['badge'] = $pending;
+                }
+            }
+            unset($item);
         }
         return $nav;
     }
@@ -261,6 +322,7 @@ try {
         <a href="<?php echo h($item['href']); ?>" class="cx-side-link<?php echo $on ? ' is-active' : ''; ?>"<?php echo $on ? ' aria-current="page"' : ''; ?> title="<?php echo h($item['label']); ?>">
             <i class="ph<?php echo $on ? '-fill' : ''; ?> <?php echo h($item['ph']); ?>" aria-hidden="true"></i>
             <span class="cx-side-text"><?php echo h($item['label']); ?></span>
+            <?php echo staff_app_nav_badge($item); ?>
         </a>
             <?php endif;
         endforeach; ?>
@@ -390,6 +452,7 @@ if (!function_exists('staff_app_shell_end')) {
     <a href="<?php echo h($item['href']); ?>" class="cx-tab<?php echo $on ? ' is-active' : ''; ?>"<?php echo $on ? ' aria-current="page"' : ''; ?>>
         <i class="ph<?php echo $on ? '-fill' : ''; ?> <?php echo h($item['ph']); ?>" aria-hidden="true"></i>
         <span><?php echo h($item['short']); ?></span>
+        <?php echo staff_app_nav_badge($item); ?>
     </a>
     <?php endforeach; ?>
     <?php if ($useMore): ?>
@@ -426,7 +489,7 @@ if (!function_exists('staff_app_shell_end')) {
             </div>
                 <?php else: ?>
             <a href="<?php echo h($item['href']); ?>" class="cx-sheet-link<?php echo $on ? ' is-active' : ''; ?>"<?php echo $on ? ' aria-current="page"' : ''; ?>>
-                <i class="ph<?php echo $on ? '-fill' : ''; ?> <?php echo h($item['ph']); ?>" aria-hidden="true"></i><?php echo h($item['label']); ?>
+                <i class="ph<?php echo $on ? '-fill' : ''; ?> <?php echo h($item['ph']); ?>" aria-hidden="true"></i><?php echo h($item['label']); ?><?php echo staff_app_nav_badge($item); ?>
             </a>
                 <?php endif;
             endforeach; ?>
@@ -532,8 +595,8 @@ if (!function_exists('staff_app_shell_end')) {
         }
     }
 
-<?php if ($role === 'inventory_custodian'): ?>
-    /* Notifications (inventory custodian): open, mark read, remove, mark all read */
+<?php if (in_array($role, ['inventory_custodian', 'admin', 'retail_officer'], true)): ?>
+    /* Notifications bell (admin, retail officer, inventory custodian): open, mark read, remove, mark all read */
     var nWrap = document.getElementById('cxNotif');
     if (nWrap) {
         var nBtn = document.getElementById('cxNotifBtn');
@@ -542,7 +605,7 @@ if (!function_exists('staff_app_shell_end')) {
         var nLabel = document.getElementById('cxNotifLabel');
         var nList = document.getElementById('cxNotifList');
         var nCsrf = nWrap.getAttribute('data-csrf') || '';
-        var EMPTY = '<li class="cx-notif-empty"><i class="ph ph-bell-slash" aria-hidden="true"></i><span>No inventory notifications yet.</span></li>';
+        var EMPTY = '<li class="cx-notif-empty"><i class="ph ph-bell-slash" aria-hidden="true"></i><span></span></li>';
         var setNotifOpen = function (open) {
             nPanel.hidden = !open;
             nBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -564,7 +627,7 @@ if (!function_exists('staff_app_shell_end')) {
             body.set('action', action);
             body.set('csrf_token', nCsrf);
             if (id) body.set('id', String(id));
-            return fetch('inventory_notif_api.php', {
+            return fetch('../backend/api/staff_notifications.php', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -586,7 +649,10 @@ if (!function_exists('staff_app_shell_end')) {
                     if (!d || !d.ok) return;
                     var next = gone.nextElementSibling || gone.previousElementSibling;
                     gone.remove();
-                    if (!nList.querySelector('.cx-notif-item')) nList.innerHTML = EMPTY;
+                    if (!nList.querySelector('.cx-notif-item')) {
+                        nList.innerHTML = EMPTY;
+                        nList.querySelector('.cx-notif-empty span').textContent = nWrap.getAttribute('data-empty') || '';
+                    }
                     syncCount();
                     (next ? next.querySelector('.cx-notif-open') : document.getElementById('cxNotifMarkAll')).focus();
                 });
@@ -595,7 +661,7 @@ if (!function_exists('staff_app_shell_end')) {
             var open = e.target.closest('.cx-notif-open');
             if (!open) return;
             var item = open.closest('.cx-notif-item');
-            var go = function () { window.location.href = item.getAttribute('data-href') || 'inventory_stocks.php'; };
+            var go = function () { if (item.getAttribute('data-href')) window.location.href = item.getAttribute('data-href'); };
             if (!item.classList.contains('is-unread')) { go(); return; }
             postNotif('read', item.getAttribute('data-id')).then(function () { markRead(item); syncCount(); go(); });
         });
