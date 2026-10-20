@@ -58,10 +58,6 @@ require_once __DIR__ . '/../includes/storefront_components.php';
             <p class="sf-hero-kicker"><i class="fas fa-map-marker-alt" aria-hidden="true"></i> EasyPC One Oasis &middot; Rosario, Pasig City</p>
             <h1 class="sf-hero-title" id="sfHeroTitle">Tech it easy at <span>EasyPC One Oasis</span></h1>
             <p class="sf-hero-sub">Laptops, PC parts and accessories from our Pasig branch. Build a PC with compatibility checks, then pay cash on delivery or online.</p>
-            <div class="sf-hero-ctas">
-                <a href="shop.php" class="sf-btn sf-btn-lg sf-btn-bright">Shop all products <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
-                <a href="build_a_pc.php" class="sf-btn sf-btn-lg sf-btn-glass"><i class="fas fa-desktop" aria-hidden="true"></i> Build a PC</a>
-            </div>
             <?php if ($inStockCount > 0): ?>
                 <ul class="sf-hero-facts">
                     <li><i class="fas fa-check-circle" aria-hidden="true"></i><span><strong class="sf-num"><?php echo number_format($inStockCount); ?></strong> products in stock</span></li>
@@ -89,30 +85,23 @@ require_once __DIR__ . '/../includes/storefront_components.php';
                 </div>
             </li>
             <li>
-                <a class="sf-perk-btn" href="build_a_pc.php">
+                <div class="sf-perk">
                     <span class="sf-perk-icon"><i class="fas fa-puzzle-piece" aria-hidden="true"></i></span>
-                    <span class="sf-perk-text"><strong>Parts that fit <i class="fas fa-arrow-right" aria-hidden="true"></i></strong><span>Build a PC flags parts that don't work together.</span></span>
-                </a>
+                    <span class="sf-perk-text"><strong>Parts that fit</strong><span>Build a PC flags parts that don't work together.</span></span>
+                </div>
             </li>
             <li>
-                <?php if (!empty($epShowPrimo)): ?>
-                    <button type="button" class="sf-perk-btn" data-primo-open aria-controls="primoPanel">
-                        <span class="sf-perk-icon"><i class="fas fa-robot" aria-hidden="true"></i></span>
-                        <span class="sf-perk-text"><strong>Ask Primo <i class="fas fa-arrow-right" aria-hidden="true"></i></strong><span>Our AI assistant helps you find the right item.</span></span>
-                    </button>
-                <?php else: ?>
-                    <div class="sf-perk">
-                        <span class="sf-perk-icon"><i class="fas fa-store" aria-hidden="true"></i></span>
-                        <span class="sf-perk-text"><strong>Sold by EasyPC One Oasis</strong><span>Rosario, Pasig City</span></span>
-                    </div>
-                <?php endif; ?>
+                <div class="sf-perk">
+                    <span class="sf-perk-icon"><i class="fas fa-robot" aria-hidden="true"></i></span>
+                    <span class="sf-perk-text"><strong>Ask Primo</strong><span>Our AI assistant helps you find the right item.</span></span>
+                </div>
             </li>
         </ul>
     </div>
 
     <?php if (!empty($categoryTiles)): ?>
     <section class="sf-wrap sf-section" aria-labelledby="sfCatsTitle">
-        <?php echo sf_section_head('sfCatsTitle', 'Browse the store', 'Shop by category', '', 'sfCatsRail', 'shop.php', 'View all products'); ?>
+        <?php echo sf_section_head('sfCatsTitle', 'Browse the store', 'Shop by category', '', 'sfCatsRail'); ?>
         <div class="sf-rail is-cats" data-sf-rail>
             <ul class="sf-rail-track" id="sfCatsRail" data-sf-rail-track>
                 <?php foreach ($categoryTiles as $tile): ?>
@@ -151,7 +140,7 @@ require_once __DIR__ . '/../includes/storefront_components.php';
     <section class="sf-wrap sf-section" aria-labelledby="sfFeaturedTitle">
         <?php echo sf_section_head('sfFeaturedTitle', 'Curated for you', 'Featured products',
             'A selection from the EasyPC One Oasis catalog, in stock and ready to order.',
-            !empty($topSellers) ? 'sfFeaturedRail' : '', 'shop.php', 'Shop all'); ?>
+            !empty($topSellers) ? 'sfFeaturedRail' : ''); ?>
         <?php if (!empty($topSellers)): ?>
             <div class="sf-rail" data-sf-rail>
                 <ul class="sf-rail-track" id="sfFeaturedRail" data-sf-rail-track>
@@ -198,7 +187,7 @@ require_once __DIR__ . '/../includes/storefront_components.php';
 
     <section class="sf-wrap sf-section" aria-labelledby="sfNewTitle">
         <?php echo sf_section_head('sfNewTitle', 'Just in', 'New arrivals', 'Stock added to EasyPC One Oasis in the last 7 days.',
-            !empty($newArrivals) ? 'sfNewRail' : '', !empty($newArrivals) ? 'shop.php' : '', 'Shop all'); ?>
+            !empty($newArrivals) ? 'sfNewRail' : ''); ?>
         <?php if (!empty($newArrivals)): ?>
             <div class="sf-rail" data-sf-rail>
                 <ul class="sf-rail-track" id="sfNewRail" data-sf-rail-track>
@@ -210,8 +199,7 @@ require_once __DIR__ . '/../includes/storefront_components.php';
         <?php else: ?>
             <div class="sf-empty">
                 <span class="sf-empty-icon"><i class="fas fa-box-open" aria-hidden="true"></i></span>
-                <span class="sf-empty-text"><strong>No new arrivals this week</strong><span>Fresh stock shows up here as soon as it's added. The full catalog is one tap away.</span></span>
-                <a href="shop.php" class="sf-btn sf-btn-outline">Browse all products</a>
+                <span class="sf-empty-text"><strong>No new arrivals this week</strong><span>Fresh stock shows up here as soon as it's added.</span></span>
             </div>
         <?php endif; ?>
     </section>

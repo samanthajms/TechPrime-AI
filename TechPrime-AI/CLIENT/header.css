@@ -193,7 +193,7 @@ header.ep-header.hd.is-scrolled { box-shadow: 0 10px 28px -12px rgba(5, 10, 3, 0
 .hd-link[aria-current="page"]::after { transform: none; }
 
 /* Search: dark glass on the bar, turns white while typing */
-.hd-search { position: relative; flex: 1 1 auto; min-width: 200px; max-width: 640px; margin-left: auto; }
+.hd-search { position: relative; flex: 1 1 auto; min-width: 200px; max-width: 640px; }
 .hd-search form { position: relative; display: block; margin: 0; }
 .hd-search input {
     width: 100%;
@@ -252,7 +252,7 @@ header.ep-header.hd.is-scrolled { box-shadow: 0 10px 28px -12px rgba(5, 10, 3, 0
 .hd .ep-search-suggest { top: calc(100% + 8px); }
 
 /* Actions: 44px icon buttons (names for screen readers, tooltips for the mouse) */
-.hd-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
+.hd-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .hd-pop { position: relative; display: flex; }
 .hd-act {
     position: relative;
@@ -524,7 +524,6 @@ a.hd-cat-head:hover { color: var(--hd-accent-text); }
     .hd-row { gap: 14px; }
     .hd-link { padding: 0 10px; }
     .hd-link::after { left: 10px; right: 10px; }
-    .hd-link i { display: none; }
 }
 @media (max-width: 1280px) {
     .hd-links > li.is-primo { display: none; }   /* Primo stays reachable from its corner launcher */

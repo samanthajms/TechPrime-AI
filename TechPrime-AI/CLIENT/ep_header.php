@@ -85,7 +85,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <link rel="stylesheet" href="ep_dark_auto.css?v=dark-33">
     <link rel="stylesheet" href="ep_dark.css?v=dark-19">
     <?php /* Header v2: after the dark files so its token-driven rules win over the old header ones. */ ?>
-    <link rel="stylesheet" href="header.css?v=hd-9">
+    <link rel="stylesheet" href="header.css?v=hd-10">
     <?php /* Storefront v2 (the homepage design) for every page: components, then the page-level styles.
              Token-driven dark mode; loaded last so they win over styles.css and the generated dark rules. */ ?>
     <link rel="stylesheet" href="storefront.css?v=sf-5">
@@ -122,7 +122,7 @@ $epInShop = $epActive === 'shop'
     || in_array($epScript, ['category.php', 'search.php', 'products.php', 'product_detail.php'], true);
 $epPrimaryLinks = [
     ['href' => 'index.php', 'icon' => 'fa-home', 'label' => 'Home', 'active' => $epActive === 'home'],
-    ['href' => 'shop.php', 'icon' => 'fa-store', 'label' => 'Shop', 'active' => $epInShop],
+    ['href' => 'shop.php', 'icon' => 'fa-store', 'label' => 'Shop Now', 'active' => $epInShop],
     ['href' => 'build_a_pc.php', 'icon' => 'fa-desktop', 'label' => 'Build a PC',
      'active' => $epActive === 'build_a_pc' || $epActive === 'saved_builds'],
 ];
@@ -130,12 +130,6 @@ $epAvatarHtml = $epAvatarUrl !== ''
     ? '<img src="' . h($epAvatarUrl) . '" alt="">'
     : h($epInitial);
 
-/* Categories: the same client taxonomy as Shop and the homepage tiles (links only, no query). */
-if (!function_exists('ep_shop_taxonomy')) {
-    require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
-}
-$epTaxonomy = ep_shop_taxonomy();
-$epSections = ep_shop_special_sections();
 ?>
 <a class="hd-sr hd-skip" href="#main">Skip to main content</a>
 <header class="ep-header hd full-width">
@@ -149,62 +143,15 @@ $epSections = ep_shop_special_sections();
             <img src="../assets/logo.png" alt="EasyPC home" width="137" height="32">
         </a>
 
-        <?php /* Categories + page links. Below 1100px these move into the drawer. */ ?>
         <nav class="hd-nav" aria-label="Primary">
-            <div class="hd-pop hd-cats" id="epCatsWrap">
-                <button type="button" class="hd-cats-btn" id="epCatsBtn" aria-expanded="false" aria-controls="epCatsPanel">
-                    <i class="fas fa-th-large" aria-hidden="true"></i><span>All categories</span>
-                    <i class="fas fa-chevron-down hd-caret" aria-hidden="true"></i>
-                </button>
-                <div class="hd-panel hd-cats-panel" id="epCatsPanel" role="region" aria-label="All categories">
-                    <div class="hd-cats-grid">
-                        <?php foreach ($epTaxonomy as $slug => $info): ?>
-                            <?php if (empty($info['subs'])) continue; ?>
-                            <div class="hd-cat-group">
-                                <a class="hd-cat-head" href="<?php echo h(ep_shop_url(['cat' => $slug], [])); ?>">
-                                    <i class="fas <?php echo h($info['icon']); ?>" aria-hidden="true"></i><?php echo h($info['label']); ?>
-                                </a>
-                                <ul class="hd-cat-list">
-                                    <?php foreach ($info['subs'] as $subSlug => $subLabel): ?>
-                                        <li><a href="<?php echo h(ep_shop_url(['cat' => $slug, 'sub' => $subSlug], [])); ?>"><?php echo h($subLabel); ?></a></li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </div>
-                        <?php endforeach; ?>
-                        <div class="hd-cat-group">
-                            <span class="hd-cat-head"><i class="fas fa-bolt" aria-hidden="true"></i>Shop by section</span>
-                            <ul class="hd-cat-list">
-                                <?php foreach ($epSections as $secSlug => $sec): ?>
-                                    <li><a href="<?php echo h(ep_shop_url(['section' => $secSlug], [])); ?>"><?php echo h($sec['label']); ?></a></li>
-                                <?php endforeach; ?>
-                                <?php if (isset($epTaxonomy['others'])): ?>
-                                    <li><a href="<?php echo h(ep_shop_url(['cat' => 'others'], [])); ?>"><?php echo h($epTaxonomy['others']['label']); ?></a></li>
-                                <?php endif; ?>
-                            </ul>
-                        </div>
-                    </div>
-                    <div class="hd-cats-foot">
-                        <span>Not sure what fits? Build a PC checks parts for you.</span>
-                        <a href="shop.php">View all products <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
-                    </div>
-                </div>
-            </div>
-
             <ul class="hd-links">
                 <?php foreach ($epPrimaryLinks as $link): ?>
                     <?php if ($link['href'] === 'index.php') continue; /* the logo is the Home link */ ?>
                     <li>
                         <a href="<?php echo h($link['href']); ?>" class="hd-link"
-                           <?php echo $link['active'] ? 'aria-current="page"' : ''; ?>><?php echo h($link['label']); ?></a>
+                           <?php echo $link['active'] ? 'aria-current="page"' : ''; ?>><i class="fas <?php echo h($link['icon']); ?>" aria-hidden="true"></i><?php echo h($link['label']); ?></a>
                     </li>
                 <?php endforeach; ?>
-                <?php if ($epShowPrimo): /* Survey feedback: shoppers missed the corner launcher, so Primo also gets a nav entry. */ ?>
-                    <li class="is-primo">
-                        <button type="button" class="hd-link" data-primo-open aria-controls="primoPanel">
-                            <i class="fas fa-robot" aria-hidden="true"></i>Ask Primo
-                        </button>
-                    </li>
-                <?php endif; ?>
             </ul>
         </nav>
 
@@ -274,15 +221,6 @@ $epSections = ep_shop_special_sections();
                     <?php endif; ?>
                 </div>
             </div>
-
-            <a href="wishlist.php" class="hd-act is-wish" title="Wishlist"
-               <?php echo $epActive === 'wishlist' ? 'aria-current="page"' : ''; ?>>
-                <span class="ep-nav-item-icon">
-                    <i class="fas fa-heart" aria-hidden="true"></i>
-                    <?php if ($epWishCount > 0): ?><span class="badge"><?php echo (int)$epWishCount; ?></span><?php endif; ?>
-                </span>
-                <span class="hd-sr">Wishlist<?php echo $epWishCount > 0 ? ', ' . (int)$epWishCount . ' saved' : ''; ?></span>
-            </a>
 
             <?php /* Bag opens the cart preview on click only. Full page via "View Cart". */ ?>
             <div class="ep-cart-wrap hd-pop" id="epCartWrap">
@@ -369,7 +307,6 @@ $epSections = ep_shop_special_sections();
 $epDrawerLinks = [
     ['href' => 'index.php', 'icon' => 'fa-home', 'label' => 'Home', 'active' => $epActive === 'home'],
     ['href' => 'shop.php', 'icon' => 'fa-store', 'label' => 'Shop', 'active' => $epInShop],
-    ['categories' => true],
     ['href' => 'build_a_pc.php', 'icon' => 'fa-desktop', 'label' => 'Build a PC', 'active' => $epActive === 'build_a_pc'],
 ];
 if (!empty($isLoggedIn)) {
@@ -377,7 +314,6 @@ if (!empty($isLoggedIn)) {
 }
 $epDrawerLinks[] = ['href' => 'wishlist.php', 'icon' => 'fa-heart', 'label' => 'Wishlist', 'active' => $epActive === 'wishlist', 'count' => $epWishCount];
 $epDrawerLinks[] = ['href' => 'cart.php', 'icon' => 'fa-shopping-bag', 'label' => 'Cart', 'active' => $epActive === 'cart', 'count' => $epCartCount, 'id' => 'epDrawerCartCount'];
-$epDrawerCatOpen = $epActive === 'shop' && !empty($_GET['cat']);
 ?>
 <div class="hd-backdrop" id="epDrawerBackdrop" hidden></div>
 <aside class="hd-drawer" id="epDrawer" role="dialog" aria-modal="true" aria-label="Main menu" aria-hidden="true">
@@ -409,38 +345,15 @@ $epDrawerCatOpen = $epActive === 'shop' && !empty($_GET['cat']);
 
     <nav class="hd-drawer-nav" aria-label="Main menu">
         <?php foreach ($epDrawerLinks as $link): ?>
-            <?php if (!empty($link['categories'])): ?>
-                <details class="hd-drawer-group"<?php echo $epDrawerCatOpen ? ' open' : ''; ?>>
-                    <summary class="hd-drawer-link">
-                        <i class="fas fa-th-large" aria-hidden="true"></i>
-                        <span>Categories</span>
-                        <i class="fas fa-chevron-down hd-drawer-caret" aria-hidden="true"></i>
-                    </summary>
-                    <div class="hd-drawer-sub">
-                        <?php foreach ($epTaxonomy as $slug => $info): ?>
-                            <a href="<?php echo h(ep_shop_url(['cat' => $slug], [])); ?>"
-                               <?php echo ($epActive === 'shop' && ($_GET['cat'] ?? '') === $slug) ? 'aria-current="page"' : ''; ?>><?php echo h($info['label']); ?></a>
-                        <?php endforeach; ?>
-                        <a href="shop.php" class="is-all">View all products</a>
-                    </div>
-                </details>
-            <?php else: ?>
-                <a href="<?php echo h($link['href']); ?>" class="hd-drawer-link"
-                   <?php echo $link['active'] ? 'aria-current="page"' : ''; ?>>
-                    <i class="fas <?php echo h($link['icon']); ?>" aria-hidden="true"></i>
-                    <span><?php echo h($link['label']); ?></span>
-                    <?php if (array_key_exists('count', $link)): ?>
-                        <span class="hd-drawer-count"<?php echo isset($link['id']) ? ' id="' . h($link['id']) . '"' : ''; ?><?php echo (int)$link['count'] > 0 ? '' : ' hidden'; ?>><?php echo (int)$link['count']; ?></span>
-                    <?php endif; ?>
-                </a>
-            <?php endif; ?>
+            <a href="<?php echo h($link['href']); ?>" class="hd-drawer-link"
+               <?php echo $link['active'] ? 'aria-current="page"' : ''; ?>>
+                <i class="fas <?php echo h($link['icon']); ?>" aria-hidden="true"></i>
+                <span><?php echo h($link['label']); ?></span>
+                <?php if (array_key_exists('count', $link)): ?>
+                    <span class="hd-drawer-count"<?php echo isset($link['id']) ? ' id="' . h($link['id']) . '"' : ''; ?><?php echo (int)$link['count'] > 0 ? '' : ' hidden'; ?>><?php echo (int)$link['count']; ?></span>
+                <?php endif; ?>
+            </a>
         <?php endforeach; ?>
-
-        <?php if ($epShowPrimo): ?>
-            <button type="button" class="hd-drawer-link" data-primo-open aria-controls="primoPanel">
-                <i class="fas fa-robot" aria-hidden="true"></i><span>Ask Primo (AI assistant)</span>
-            </button>
-        <?php endif; ?>
 
         <?php if (!empty($isLoggedIn)): ?>
             <div class="hd-drawer-label">My account</div>
@@ -617,8 +530,7 @@ $epDrawerCatOpen = $epActive === 'shop' && !empty($_GET['cat']);
         var panels = [
             { wrap: document.getElementById('epNotifWrap'), trigger: document.getElementById('notifBtn') },
             { wrap: document.getElementById('epCartWrap'), trigger: document.getElementById('cartBtn') },
-            { wrap: document.getElementById('epAcctWrap'), trigger: document.getElementById('profileBtn') },
-            { wrap: document.getElementById('epCatsWrap'), trigger: document.getElementById('epCatsBtn') }
+            { wrap: document.getElementById('epAcctWrap'), trigger: document.getElementById('profileBtn') }
         ].filter(function (p) { return p.wrap && p.trigger; });
         window.epCloseHeaderPanels = function () { closeAll(null); };
 
