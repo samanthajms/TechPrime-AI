@@ -1,6 +1,6 @@
 <?php
 /**
- * Product Demand + Sales Forecast cards (Admin Forecast page, Inventory Custodian Forecast page, Retail dashboard).
+ * Product Demand + Sales Forecast cards (shared Forecast page: includes/staff_forecast_page.php; Retail dashboard).
  *
  * Data comes from the XGBoost forecast service through forecast_api.php (browser -> PHP proxy -> Render), so the API
  * key never reaches the browser. Each card has:
@@ -9,7 +9,7 @@
  *                                only) and Forecast window (1, 2 or 3 months ahead)
  * Query keys: df_preset/df_from/df_to/df_category/df_months (demand), sf_preset/sf_from/sf_to/sf_months (sales).
  *
- * Forecast figures shown: MoM growth and, for Admin + Inventory Custodian,
+ * Forecast figures shown: MoM growth and, for Admin, Retail Officer + Inventory Custodian,
  * inventory actions (stock, days left, safety stock, reorder point, stockout risk, recommended order quantity). Inventory
  * actions need a stock-on-hand snapshot on the forecast service; without one the columns stay hidden and a note explains why.
  *
@@ -279,7 +279,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
             'label' => $fc['sf']['range']['label'],
         ],
         // Same roles as forecast_api.php type=actions; everyone else never asks for it.
-        'actions' => in_array($role, ['admin', 'inventory_custodian'], true),
+        'actions' => in_array($role, ['admin', 'inventory_custodian', 'retail_officer'], true),
     ];
     $cfg['which'] = $which;
     $json = json_encode($cfg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);

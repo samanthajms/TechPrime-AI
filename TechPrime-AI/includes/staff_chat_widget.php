@@ -163,6 +163,9 @@ body.sidebar-open #cwFab, body.sidebar-open #cwPanel { display: none; }
         count.textContent = label + ' unread';
         count.hidden = unread === 0;
         fab.setAttribute('aria-label', unread ? `Open Messages (${label} unread)` : 'Open Messages');
+        // Same total on the Messages tab of the staff shell (includes/staff_app_layout.php).
+        document.querySelectorAll('[data-nav-badge="messages"]').forEach((el) => { el.textContent = label; el.hidden = unread <= 0; });
+        document.querySelectorAll('[data-nav-badge-sr="messages"]').forEach((el) => { el.textContent = unread > 0 ? ', ' + unread + ' unread' : ''; });
         if (recent) {
             document.getElementById('cwFabAvatars').innerHTML = recent.map(p => {
                 const role = 'role-' + String(p.role || '').replace(/[^a-z_]/g, '');

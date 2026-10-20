@@ -17,6 +17,7 @@ if (!function_exists('staff_nav_for_role')) {
                         ['slug' => 'demand', 'href' => 'admin_forecast.php?view=demand', 'label' => 'Product Demand'],
                         ['slug' => 'sales', 'href' => 'admin_forecast.php?view=sales', 'label' => 'Sales'],
                     ]],
+                    ['key' => 'alerts', 'href' => 'admin_stock_alerts.php', 'label' => 'Stock Alerts', 'icon' => 'fa-exclamation-triangle', 'ph' => 'ph-warning', 'short' => 'Alerts'],
                     ['key' => 'messages', 'href' => 'admin_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments', 'ph' => 'ph-chats-circle', 'short' => 'Messages'],
                     ['key' => 'users', 'href' => 'manage_users.php', 'label' => 'Manage Users', 'icon' => 'fa-users', 'ph' => 'ph-users-three', 'short' => 'Users', 'tab' => true],
                     ['key' => 'logs', 'href' => 'view_logs.php', 'label' => 'Activity Logs', 'icon' => 'fa-clipboard-list', 'ph' => 'ph-clipboard-text', 'short' => 'Activity', 'tab' => true],
@@ -25,9 +26,13 @@ if (!function_exists('staff_nav_for_role')) {
                 ];
             case 'retail_officer':
                 return [
-                    ['key' => 'dashboard', 'href' => 'retail_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt', 'ph' => 'ph-squares-four', 'short' => 'Home'],
-                    ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'Sales History', 'icon' => 'fa-history', 'ph' => 'ph-clock-counter-clockwise', 'short' => 'History'],
-                    ['key' => 'forecast', 'href' => 'retail_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'ph' => 'ph-chart-line-up', 'short' => 'Forecast'],
+                    ['key' => 'dashboard', 'href' => 'retail_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt', 'ph' => 'ph-squares-four', 'short' => 'Home', 'tab' => true],
+                    ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'Sales History', 'icon' => 'fa-history', 'ph' => 'ph-clock-counter-clockwise', 'short' => 'History', 'tab' => true],
+                    ['key' => 'forecast', 'href' => 'retail_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'ph' => 'ph-chart-line-up', 'short' => 'Forecast', 'tab' => true, 'children' => [
+                        ['slug' => 'demand', 'href' => 'retail_forecast.php?view=demand', 'label' => 'Product Demand'],
+                        ['slug' => 'sales', 'href' => 'retail_forecast.php?view=sales', 'label' => 'Sales'],
+                    ]],
+                    ['key' => 'alerts', 'href' => 'retail_stock_alerts.php', 'label' => 'Stock Alerts', 'icon' => 'fa-exclamation-triangle', 'ph' => 'ph-warning', 'short' => 'Alerts', 'tab' => true],
                     ['key' => 'messages', 'href' => 'retail_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments', 'ph' => 'ph-chats-circle', 'short' => 'Messages'],
                     ['key' => 'profile', 'href' => 'retail_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user', 'ph' => 'ph-user-circle', 'short' => 'Profile', 'section' => 'Account'],
                 ];
@@ -38,9 +43,13 @@ if (!function_exists('staff_nav_for_role')) {
                     ['key' => 'stocks', 'href' => 'inventory_stocks.php', 'label' => 'Stocks', 'icon' => 'fa-boxes', 'ph' => 'ph-package', 'short' => 'Stocks', 'tab' => true, 'children' => [
                         ['slug' => 'inventory', 'href' => 'inventory_stocks.php', 'label' => 'Inventory'],
                         ['slug' => 'add_product', 'href' => 'inventory_stock_in.php', 'label' => 'Stock In'],
+                        ['slug' => 'alerts', 'href' => 'inventory_stock_alerts.php', 'label' => 'Alerts'],
                     ]],
                     ['key' => 'messages', 'href' => 'inventory_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments', 'ph' => 'ph-chats-circle', 'short' => 'Messages'],
-                    ['key' => 'forecast', 'href' => 'inventory_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'ph' => 'ph-chart-line-up', 'short' => 'Forecast', 'section' => 'Insights'],
+                    ['key' => 'forecast', 'href' => 'inventory_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'ph' => 'ph-chart-line-up', 'short' => 'Forecast', 'section' => 'Insights', 'children' => [
+                        ['slug' => 'demand', 'href' => 'inventory_forecast.php?view=demand', 'label' => 'Product Demand'],
+                        ['slug' => 'sales', 'href' => 'inventory_forecast.php?view=sales', 'label' => 'Sales'],
+                    ]],
                     ['key' => 'reviews', 'href' => 'inventory_reviews.php', 'label' => 'Reviews', 'icon' => 'fa-star', 'ph' => 'ph-star', 'short' => 'Reviews'],
                     ['key' => 'activity', 'href' => 'inventory_audit.php', 'label' => 'Activity', 'icon' => 'fa-clipboard-list', 'ph' => 'ph-clipboard-text', 'short' => 'Activity', 'tab' => true],
                     ['key' => 'profile', 'href' => 'inventory_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user', 'ph' => 'ph-user-circle', 'short' => 'Profile', 'section' => 'Account'],

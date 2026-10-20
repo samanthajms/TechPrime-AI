@@ -18,6 +18,7 @@ composer install                            # only dependency is vlucas/phpdoten
 php scripts/ensure_product_indexes.php      # idempotent product indexes
 php scripts/catalog_db.php count|ensure_sku|validate <csv>   # catalog import helper (used by scripts/import_oasis_catalog.py)
 python scripts/build_client_dark_css.py      # regenerate CLIENT/ep_dark_auto.css — re-run after editing CLIENT/styles.css, primo.css, tech_match.css or saved_builds.php styles
+python ml/pc_recommend/retrain.py            # Build a PC Random Forest: rebuild dataset from the DB (read-only), retrain, swap in forest.json only if checks pass; log in ml/pc_recommend/logs/retrain.log. Runs nightly via Windows task "TechPrime-AI PC Recommender Retrain" (daily 02:00, this PC only)
 ```
 
 Primo chatbot intent service (Python, needed only for the client chat):

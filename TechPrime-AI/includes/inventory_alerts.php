@@ -1,8 +1,65 @@
 <?php
 /**
- * Inventory Custodian: notifications + stock-alert helpers.
- * Uses the existing notifications / logs tables.
+ * Staff notifications + stock-alert helpers (notifications / logs tables).
+ * Stock alerts go to Admin, Retail Officer and Inventory Custodian; order updates to the Inventory Custodian only.
  */
+
+if (!function_exists('inv_stock_alert_roles')) {
+    /** Roles that receive stock alerts (and see them in the top-bar bell). */
+    function inv_stock_alert_roles(): array
+    {
+        return ['inventory_custodian', 'admin', 'retail_officer'];
+    }
+}
+
+if (!function_exists('inv_notification_types')) {
+    /**
+     * Notification types a staff role sees in the bell: stock alerts for every stock-alert role,
+     * plus order updates for the Inventory Custodian. Other rows (e.g. client-side order messages
+     * a staff account received while testing) stay hidden.
+     */
+    function inv_notification_types(string $role): array
+    {
+        $types = in_array($role, inv_stock_alert_roles(), true) ? ['low_stock', 'out_of_stock', 'stock_updated'] : [];
+        if ($role === 'inventory_custodian') {
+            $types = array_merge($types, ['order_update', 'new_order', 'cancel_requested', 'order_received']);
+        }
+        return $types;
+    }
+}
+
+if (!function_exists('inv_stock_alerts_href')) {
+    /** A role's Stock Alerts page, relative to its folder (includes/staff_stock_alerts_page.php). */
+    function inv_stock_alerts_href(string $role): string
+    {
+        $map = [
+            'admin' => 'admin_stock_alerts.php',
+            'retail_officer' => 'retail_stock_alerts.php',
+            'inventory_custodian' => 'inventory_stock_alerts.php',
+        ];
+        return $map[$role] ?? '';
+    }
+}
+
+if (!function_exists('inv_notification_href')) {
+    /** Where a bell item opens: stock alerts -> Stock Alerts (pre-filtered), order updates -> Orders. */
+    function inv_notification_href(array $n, string $role): string
+    {
+        $type = (string)($n['type'] ?? '');
+        $alerts = inv_stock_alerts_href($role);
+        if ($type === 'out_of_stock') {
+            return $alerts . '?status=out';
+        }
+        if ($type === 'low_stock') {
+            return $alerts . '?status=running';
+        }
+        if ($type === 'stock_updated') {
+            return $alerts;
+        }
+        $link = trim((string)($n['link'] ?? ''));
+        return str_starts_with($link, 'inventory_orders.php') ? $link : 'inventory_orders.php';
+    }
+}
 
 if (!function_exists('inv_notifications_ensure_schema')) {
     function inv_notifications_ensure_schema(PDO $db): void
@@ -31,6 +88,24 @@ if (!function_exists('inv_notifications_ensure_schema')) {
         if (empty($cols['link'])) {
             @$db->query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link VARCHAR(255) NULL DEFAULT NULL');
         }
+    }
+}
+
+if (!function_exists('inv_orders_action_count')) {
+    /**
+     * Orders waiting on the Inventory Custodian (badge on the Orders tab): paid orders to accept,
+     * orders to ship and pending cancel requests.
+     */
+    function inv_orders_action_count(PDO $db): int
+    {
+        $st = $db->query(
+            "SELECT COUNT(*) FROM orders
+             WHERE COALESCE(status, '') <> 'cancelled'
+               AND (COALESCE(cancel_requested, FALSE) = TRUE
+                    OR status = 'to_ship'
+                    OR (status = 'to_pay' AND LOWER(COALESCE(payment_status, '')) = 'paid'))"
+        );
+        return $st ? (int)$st->fetchColumn() : 0;
     }
 }
 
@@ -149,6 +224,7 @@ if (!function_exists('inv_notify_stock_change')) {
 }
 
 if (!function_exists('inv_notify_custodians_deduped')) {
+    /** Stock alert to every active stock-alert role user (Custodian, Admin, Retail Officer), deduped per user. */
     function inv_notify_custodians_deduped(
         PDO $db,
         string $needle,
@@ -156,12 +232,14 @@ if (!function_exists('inv_notify_custodians_deduped')) {
         string $type,
         string $link
     ): void {
-        $stmt = $db->prepare('SELECT id FROM users WHERE role = ? AND COALESCE(is_locked, 0) = 0');
+        $roles = inv_stock_alert_roles();
+        $stmt = $db->prepare(
+            'SELECT id FROM users WHERE role IN (' . implode(',', array_fill(0, count($roles), '?')) . ') AND COALESCE(is_locked, 0) = 0'
+        );
         if (!$stmt) {
             return;
         }
-        $role = 'inventory_custodian';
-        $stmt->execute([$role]);
+        $stmt->execute($roles);
         $res = $stmt;
         while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
             $uid = (int)$row['id'];
@@ -210,25 +288,33 @@ if (!function_exists('inv_sync_stock_alerts')) {
 }
 
 if (!function_exists('inv_user_notifications')) {
-    /** @return array{items: array<int,array>, unread: int} */
-    function inv_user_notifications(PDO $db, int $userId, int $limit = 20): array
+    /**
+     * @param list<string>|null $types only these notification types (null = all)
+     * @return array{items: array<int,array>, unread: int}
+     */
+    function inv_user_notifications(PDO $db, int $userId, int $limit = 20, ?array $types = null): array
     {
         inv_notifications_ensure_schema($db);
         $items = [];
         $unread = 0;
-        $cnt = $db->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
+        if ($types === []) {
+            return ['items' => $items, 'unread' => $unread];
+        }
+        $typeSql = $types !== null ? ' AND type IN (' . implode(',', array_fill(0, count($types), '?')) . ')' : '';
+        $params = array_merge([$userId], $types ?? []);
+        $cnt = $db->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0' . $typeSql);
         if ($cnt) {
-            $cnt->execute([$userId]);
+            $cnt->execute($params);
             $unread = (int)($cnt->fetchColumn() ?? 0);
         }
         $limit = max(1, min(50, $limit));
         $stmt = $db->prepare(
             'SELECT id, message, is_read, type, link, created_at
-             FROM notifications WHERE user_id = ?
+             FROM notifications WHERE user_id = ?' . $typeSql . '
              ORDER BY created_at DESC, id DESC LIMIT ' . $limit
         );
         if ($stmt) {
-            $stmt->execute([$userId]);
+            $stmt->execute($params);
             $res = $stmt;
             while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
                 $items[] = $row;
@@ -252,14 +338,19 @@ if (!function_exists('inv_mark_notification_read')) {
 }
 
 if (!function_exists('inv_mark_all_notifications_read')) {
-    function inv_mark_all_notifications_read(PDO $db, int $userId): bool
+    /** @param list<string>|null $types only these notification types (null = all) */
+    function inv_mark_all_notifications_read(PDO $db, int $userId, ?array $types = null): bool
     {
         inv_notifications_ensure_schema($db);
-        $stmt = $db->prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0');
+        if ($types === []) {
+            return true;
+        }
+        $typeSql = $types !== null ? ' AND type IN (' . implode(',', array_fill(0, count($types), '?')) . ')' : '';
+        $stmt = $db->prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0' . $typeSql);
         if (!$stmt) {
             return false;
         }
-        $ok = $stmt->execute([$userId]);
+        $ok = $stmt->execute(array_merge([$userId], $types ?? []));
         return (bool)$ok;
     }
 }

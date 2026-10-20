@@ -911,6 +911,11 @@ if (!function_exists('staff_messages_render')) {
                 totalEl.textContent = total > 99 ? '99+' : String(total);
                 document.title = (total ? '(' + (total > 99 ? '99+' : total) + ') ' : '') + BASE_TITLE;
                 notifyParent(total);
+                // Full Messages page: keep the shell's Messages tab count in step (the widget does it on other pages).
+                if (!EMBED) {
+                    document.querySelectorAll('[data-nav-badge="messages"]').forEach((el) => { el.textContent = total > 99 ? '99+' : String(total); el.hidden = total <= 0; });
+                    document.querySelectorAll('[data-nav-badge-sr="messages"]').forEach((el) => { el.textContent = total > 0 ? ', ' + total + ' unread' : ''; });
+                }
 
                 if (!staff.length) {
                     contactsEl.innerHTML = lastContactsHtml = '<p class="contacts-note">No staff available.</p>';

@@ -15,4 +15,8 @@ Thumbs.db
 !/uploads/chat/.htaccess
 !/uploads/chat/index.html
 
+# Build a PC recommender: retrain log and half-finished files of a run (ml/pc_recommend/retrain.py)
+/ml/pc_recommend/logs/
+/ml/pc_recommend/**/*.new
+
 .zip

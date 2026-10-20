@@ -200,6 +200,13 @@ function ep_place_unpaid_order(
         'order_placed',
         'user_dashboard.php?status=to_pay'
     );
+    inv_notify_role(
+        $db,
+        'inventory_custodian',
+        "New order #ORD-{$orderId} placed — waiting for the customer's payment.",
+        'order_update',
+        'inventory_orders.php?status=to_pay'
+    );
 
     return ['ok' => true, 'order_id' => $orderId];
 }

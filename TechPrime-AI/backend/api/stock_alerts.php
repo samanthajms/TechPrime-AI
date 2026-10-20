@@ -1,7 +1,7 @@
 <?php
 /**
- * Cashier: current low/critical/out-of-stock products, polled by the dashboard and
- * the Stock Alerts page to keep them in sync with the live stock.
+ * Cashier, Inventory Custodian, Admin, Retail Officer: current low/critical/out-of-stock products, polled by
+ * the cashier dashboard and the Stock Alerts pages to keep them in sync with the live stock.
  * GET → {ok, out, critical, low, items:[{id,name,category,price,stock,status,barcode}]}
  *
  * Polling must not keep an idle session alive, so unlike pos_api_require_cashier()
@@ -20,8 +20,8 @@ if (ias_session_idle_expired()) {
     ias_expire_session();
     pos_json(200, ['ok' => false, 'error' => 'session_expired', 'message' => 'Your session expired due to inactivity.']);
 }
-if (!isset($_SESSION['user_id'], $_SESSION['role']) || $_SESSION['role'] !== 'cashier') {
-    pos_json(403, ['ok' => false, 'error' => 'forbidden', 'message' => 'Cashier access only.']);
+if (!isset($_SESSION['user_id'], $_SESSION['role']) || !in_array($_SESSION['role'], ['cashier', 'inventory_custodian', 'admin', 'retail_officer'], true)) {
+    pos_json(403, ['ok' => false, 'error' => 'forbidden', 'message' => 'Staff access only.']);
 }
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     pos_json(405, ['ok' => false, 'error' => 'method_not_allowed', 'message' => 'Method not allowed.']);
