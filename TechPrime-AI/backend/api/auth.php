@@ -17,89 +17,14 @@ $connection = getDbConnection();
 $action = $_POST['action'] ?? '';
 
 // Check CSRF for POST actions
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'login' && $action !== 'register') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'login') {
     $csrfToken = $_POST['csrf_token'] ?? '';
     if (!verifyCsrfToken($csrfToken)) {
         json_exit(403, ['success' => false, 'message' => 'Invalid CSRF token.']);
     }
 }
 
-// ── Register ────────────────────────────────────────────────────────────────
-if ($action === 'register') {
-    $name     = trim($_POST['name'] ?? '');
-    $surname  = trim($_POST['surname'] ?? '');
-    $age      = (int)($_POST['age'] ?? 0);
-    $address  = trim($_POST['address'] ?? '');
-    $email    = strtolower(trim($_POST['email'] ?? ''));
-    $password = (string)($_POST['password'] ?? '');
-    // Registration is public, so it may only create client accounts. Staff
-    // accounts are created by an authenticated admin in Manage Users.
-    $role     = 'client';
-    $allowedRoles = ['client'];
-
-    if ($name === '' || $surname === '' || $age < 13 || $address === '' || $email === '' || $password === '') {
-        json_exit(422, ['success' => false, 'message' => 'Please complete all required fields.']);
-    }
-
-    if (!isPasswordComplex($password, $connection)) {
-        $rules = getPasswordRules($connection);
-        $msg = 'Password must be at least ' . $rules['min_length'] . ' characters';
-        $parts = [];
-        if ($rules['require_upper'])   $parts[] = 'uppercase letter';
-        if ($rules['require_lower'])   $parts[] = 'lowercase letter';
-        if ($rules['require_number'])  $parts[] = 'number';
-        if ($rules['require_special']) $parts[] = 'special character';
-        if (!empty($parts)) $msg .= ' and include: ' . implode(', ', $parts);
-        $msg .= '.';
-        json_exit(422, ['success' => false, 'message' => $msg]);
-    }
-
-    if (!in_array($role, $allowedRoles, true)) {
-        json_exit(422, ['success' => false, 'message' => 'Invalid account type.']);
-    }
-
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        json_exit(422, ['success' => false, 'message' => 'Invalid email address.']);
-    }
-
-    $chk = $connection->prepare('SELECT id FROM users WHERE LOWER(TRIM(email)) = ? LIMIT 1');
-    $chk->bind_param('s', $email);
-    $chk->execute();
-    $chk->store_result();
-    if ($chk->num_rows > 0) {
-        $chk->close();
-        json_exit(409, ['success' => false, 'message' => 'Email already registered.']);
-    }
-    $chk->close();
-
-    $hash = password_hash($password, PASSWORD_DEFAULT);
-    $activationToken = bin2hex(random_bytes(32));
-
-    $ins = $connection->prepare(
-        'INSERT INTO users (name, surname, age, address, email, password, role, is_verified, is_locked, failed_attempts, activation_token)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?)'
-    );
-    $ins->bind_param('ssisssss', $name, $surname, $age, $address, $email, $hash, $role, $activationToken);
-    if (!$ins->execute()) {
-        $ins->close();
-        json_exit(500, ['success' => false, 'message' => 'Registration failed.']);
-    }
-    $userId = $ins->insert_id;
-    $ins->close();
-
-    // Send activation email via PHPMailer
-    require_once __DIR__ . '/../../includes/mailer.php';
-    $activationLink = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-        . '://' . $_SERVER['HTTP_HOST'] . '/activitate.php?token=' . $activationToken;
-    sendActivationEmail($email, $name, $activationLink);
-
-    logActivity($connection, $userId, 'registration', 'User registered. Activation email sent to: ' . $email);
-
-    json_exit(200, [
-        'success' => true,
-        'message' => 'Registration successful! Please check your Gmail to activate your account.'
-    ]);
-}
+// Registration lives in register.php (phone/email checks, activation email resend limits).
 
 // ── Login ────────────────────────────────────────────────────────────────────
 if ($action === 'login') {
@@ -114,11 +39,8 @@ if ($action === 'login') {
         'SELECT id, name, surname, email, password, role, is_verified, is_locked, failed_attempts, totp_secret, totp_enabled
          FROM users WHERE LOWER(TRIM(email)) = ? LIMIT 1'
     );
-    $q->bind_param('s', $email);
-    $q->execute();
-    $user = $q->get_result()->fetch_assoc();
-    $q->close();
-
+    $q->execute([$email]);
+    $user = $q->fetch(PDO::FETCH_ASSOC);
     if (!$user) {
         json_exit(401, ['success' => false, 'message' => 'Invalid email or password.']);
     }
@@ -135,15 +57,10 @@ if ($action === 'login') {
         $failed = ((int)$user['failed_attempts']) + 1;
         $locked = $failed >= 3 ? 1 : 0;
         $up = $connection->prepare('UPDATE users SET failed_attempts = ?, is_locked = ? WHERE id = ?');
-        $up->bind_param('iii', $failed, $locked, $user['id']);
-        $up->execute();
-        $up->close();
-
+        $up->execute([$failed, $locked, $user['id']]);
         if ($locked === 1) {
             $stmt = $connection->prepare("INSERT INTO locked_accounts (user_id, reason) VALUES (?, '3 failed login attempts')");
-            $stmt->bind_param('i', $user['id']);
-            $stmt->execute();
-            $stmt->close();
+            $stmt->execute([$user['id']]);
             logActivity($connection, $user['id'], 'account_locked', 'Account locked after 3 failed login attempts');
             json_exit(403, ['success' => false, 'message' => 'Your account has been locked after 3 failed login attempts. Please contact an administrator to unlock it.']);
         }
@@ -191,11 +108,8 @@ if ($action === 'verify_totp') {
     }
 
     $q = $connection->prepare('SELECT * FROM users WHERE id = ? LIMIT 1');
-    $q->bind_param('i', $userId);
-    $q->execute();
-    $user = $q->get_result()->fetch_assoc();
-    $q->close();
-
+    $q->execute([$userId]);
+    $user = $q->fetch(PDO::FETCH_ASSOC);
     if (!$user) {
         json_exit(401, ['success' => false, 'message' => 'User not found.']);
     }
@@ -207,16 +121,15 @@ if ($action === 'verify_totp') {
 
     // Finalize login
     $up = $connection->prepare('UPDATE users SET failed_attempts = 0 WHERE id = ?');
-    $up->bind_param('i', $user['id']);
-    $up->execute();
-    $up->close();
-
+    $up->execute([$user['id']]);
     unset($_SESSION['partial_user_id']);
+    session_regenerate_id(true); // new session id on login (prevents session fixation)
     $_SESSION['user_id']       = (int)$user['id'];
     $_SESSION['role']          = $user['role'];
     $_SESSION['email']         = $user['email'];
     $_SESSION['name']          = $user['name'];
     $_SESSION['surname']       = $user['surname'];
+    $_SESSION['login_at']      = time();
     $_SESSION['last_activity'] = time();
 
     logActivity($connection, $user['id'], 'login_success', 'User logged in via Google Authenticator TOTP');
@@ -250,24 +163,20 @@ if ($action === 'confirm_totp_setup') {
 
     // Save secret
     $up = $connection->prepare('UPDATE users SET totp_secret = ?, totp_enabled = 1 WHERE id = ?');
-    $up->bind_param('si', $secret, $userId);
-    $up->execute();
-    $up->close();
-
+    $up->execute([$secret, $userId]);
     unset($_SESSION['totp_setup_secret']);
 
     $q = $connection->prepare('SELECT * FROM users WHERE id = ? LIMIT 1');
-    $q->bind_param('i', $userId);
-    $q->execute();
-    $user = $q->get_result()->fetch_assoc();
-    $q->close();
-
+    $q->execute([$userId]);
+    $user = $q->fetch(PDO::FETCH_ASSOC);
     unset($_SESSION['partial_user_id']);
+    session_regenerate_id(true); // new session id on login (prevents session fixation)
     $_SESSION['user_id']       = (int)$user['id'];
     $_SESSION['role']          = $user['role'];
     $_SESSION['email']         = $user['email'];
     $_SESSION['name']          = $user['name'];
     $_SESSION['surname']       = $user['surname'];
+    $_SESSION['login_at']      = time();
     $_SESSION['last_activity'] = time();
 
     logActivity($connection, $user['id'], 'totp_setup_complete', 'Google Authenticator configured via API');
@@ -288,16 +197,13 @@ if ($action === 'confirm_totp_setup') {
 
 // ── Activate account (GET) ───────────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'activate') {
-    $token = $_GET['token'] ?? '';
-    if ($token !== '') {
+    $token = (string)($_GET['token'] ?? '');
+    if ($token !== '' && !ias_activation_token_expired($token)) {
         $up = $connection->prepare('UPDATE users SET is_verified = 1, activation_token = NULL WHERE activation_token = ?');
-        $up->bind_param('s', $token);
-        if ($up->execute() && $up->affected_rows > 0) {
-            $up->close();
+        if ($up->execute([$token]) && $up->rowCount() > 0) {
             header("Location: /login.php?success=" . urlencode("Account activated! You can now sign in."));
             exit;
         }
-        $up->close();
     }
     header("Location: /login.php?error=" . urlencode("Invalid or expired activation link."));
     exit;

@@ -1,20 +1,36 @@
 <?php
-/**
- * Backend-ready MySQL connection helper for IAS E-commerce.
- * Replace credentials with your environment values.
- */
-function getDbConnection(): mysqli
+
+require_once __DIR__ . '/../../vendor/autoload.php';
+// Branch timezone (Asia/Manila) for PHP + helpers for reading the UTC timestamps stored in the database.
+require_once __DIR__ . '/../../includes/timezone_helpers.php';
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../../');
+// safeLoad: on Render there is no .env file; values come from real environment variables.
+$dotenv->safeLoad();
+
+function getDbConnection(): PDO
 {
-    $host = 'localhost';
-    $username = 'root';
-    $password = '';
-    $database = 'ias_ecommerce';
+    $host = $_ENV['DB_HOST'] ?? getenv('DB_HOST');
+    $port = $_ENV['DB_PORT'] ?? getenv('DB_PORT');
+    $database = $_ENV['DB_NAME'] ?? getenv('DB_NAME');
+    $username = $_ENV['DB_USER'] ?? getenv('DB_USER');
+    $password = $_ENV['DB_PASS'] ?? getenv('DB_PASS');
 
-    $connection = new mysqli($host, $username, $password, $database);
-
-    if ($connection->connect_error) {
-        die('Database connection failed: ' . $connection->connect_error);
+    try {
+        $dsn = "pgsql:host=$host;port=$port;dbname=$database;sslmode=require";
+        $connection = new PDO($dsn, $username, $password, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            /* The Supabase pooler (transaction mode) can run a statement's prepare and execute on
+               different server connections ("prepared statement pdo_stmt_... does not exist").
+               Client-side prepares send each query in one step; values are still escaped by PDO. */
+            PDO::ATTR_EMULATE_PREPARES => true
+        ]);
+        return $connection;
+    } catch (PDOException $e) {
+        // Details (host, user) go to the server log only — never to the visitor.
+        error_log('Database connection failed: ' . $e->getMessage());
+        require_once __DIR__ . '/../../includes/service_unavailable.php';
+        ias_service_unavailable(ias_service_unavailable_reason($e->getMessage()));
     }
-
-    return $connection;
 }

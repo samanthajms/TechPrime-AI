@@ -17,16 +17,13 @@ foreach ($_SESSION['cart'] as $item) {
 
 // 1. Create the main Order
 $stmt = $db->prepare("INSERT INTO orders (user_id, total_price, status) VALUES (?, ?, 'Pending')");
-$stmt->bind_param("id", $userId, $total);
-
-if ($stmt->execute()) {
-    $orderId = $db->insert_id;
+if ($stmt->execute([$userId, $total])) {
+    $orderId = $db->lastInsertId();
 
     // 2. Save each product into order_items
     $itemStmt = $db->prepare("INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)");
     foreach ($_SESSION['cart'] as $pId => $details) {
-        $itemStmt->bind_param("iiid", $orderId, $pId, $details['quantity'], $details['price']);
-        $itemStmt->execute();
+        $itemStmt->execute([$orderId, $pId, $details['quantity'], $details['price']]);
     }
 
     // 3. Clear cart and go to success page

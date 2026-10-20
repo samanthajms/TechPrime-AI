@@ -1,0 +1,308 @@
+"""
+Primo SVM intent prediction API.
+
+POST /predict
+{"message": "Is the RTX 4060 in stock?"}
+
+→ {"intent": "stock_inquiry", "confidence": 0.87, "ok": true}
+
+POST /phrase
+{"facts": "MSI RTX 5070 Ti — ₱65950.00 — 2 on hand"}
+
+→ {"ok": true, "reply": "...", "phrased": true}
+
+GET /health → {"ok", "model_loaded", ...} (200 if loaded, 503 if not)
+"""
+from __future__ import annotations
+
+import json
+import os
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+import joblib
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from preprocess import preprocess_text
+
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_DIR = BASE_DIR / "models"
+PIPELINE_PATH = MODEL_DIR / "primo_intent_pipeline.joblib"
+META_PATH = MODEL_DIR / "primo_intent_meta.json"
+
+app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+_pipeline = None
+_meta: dict = {}
+
+
+def load_model() -> None:
+    global _pipeline, _meta
+    if not PIPELINE_PATH.is_file():
+        raise FileNotFoundError(
+            f"Model not found: {PIPELINE_PATH}. Run: python train_model.py"
+        )
+    _pipeline = joblib.load(PIPELINE_PATH)
+    if META_PATH.is_file():
+        _meta = json.loads(META_PATH.read_text(encoding="utf-8"))
+    else:
+        _meta = {"confidence_threshold": 0.42}
+
+
+def get_threshold() -> float:
+    return float(_meta.get("confidence_threshold", 0.42))
+
+
+@app.get("/health")
+def health():
+    loaded = _pipeline is not None
+    body = {
+        "ok": loaded,
+        "service": "primo-svm-intent",
+        "model_loaded": loaded,
+        "intents": _meta.get("intents", []),
+        "confidence_threshold": get_threshold(),
+    }
+    body.update(_llm_public_status())
+    # 200 only when the trained pipeline is ready (Render health check uses HTTP status).
+    return jsonify(body), (200 if loaded else 503)
+
+
+@app.post("/predict")
+def predict():
+    if _pipeline is None:
+        return jsonify({"ok": False, "error": "model_not_loaded"}), 503
+
+    data = request.get_json(silent=True) or {}
+    message = data.get("message", "")
+    if not isinstance(message, str):
+        return jsonify({"ok": False, "error": "invalid_message"}), 400
+
+    message = message.strip()
+    if message == "" or len(message) > 500:
+        return jsonify({"ok": False, "error": "invalid_message"}), 400
+
+    cleaned = preprocess_text(message)
+    if cleaned == "":
+        return jsonify(
+            {
+                "ok": True,
+                "intent": "fallback",
+                "confidence": 0.0,
+                "raw_intent": "fallback",
+            }
+        )
+
+    proba = _pipeline.predict_proba([cleaned])[0]
+    classes = list(_pipeline.classes_)
+    best_idx = int(proba.argmax())
+    raw_intent = str(classes[best_idx])
+    confidence = float(proba[best_idx])
+    threshold = get_threshold()
+
+    intent = raw_intent if confidence >= threshold else "fallback"
+
+    return jsonify(
+        {
+            "ok": True,
+            "intent": intent,
+            "confidence": round(confidence, 4),
+            "raw_intent": raw_intent,
+            "threshold": threshold,
+        }
+    )
+
+
+def _llm_settings() -> tuple[str, str, str]:
+    key = os.environ.get("PRIMO_LLM_API_KEY", "").strip().strip('"').strip("'")
+    base = os.environ.get("PRIMO_LLM_BASE_URL", "https://api.groq.com/openai/v1").strip().strip('"').strip("'").rstrip("/")
+    model = os.environ.get("PRIMO_LLM_MODEL", "openai/gpt-oss-20b").strip().strip('"').strip("'")
+    return key, base, model
+
+
+def _llm_public_status() -> dict:
+    """Says whether the running app can see a key. Never includes the secret."""
+    key, base, model = _llm_settings()
+    return {
+        "llm_key_set": key != "",
+        "llm_key_length": len(key),
+        "llm_key_prefix_ok": key.startswith("gsk_"),
+        "llm_base_set": base != "",
+        "llm_base": base,
+        "llm_model": model,
+        "llm_model_set": model != "",
+    }
+
+
+def _llm_error_text(exc: BaseException, key: str) -> str:
+    text = f"{type(exc).__name__}: {exc}"
+    if isinstance(exc, urllib.error.HTTPError):
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")[:240]
+        except Exception:
+            detail = ""
+        text = f"http_{exc.code}: {detail or exc.reason}"
+    if key:
+        text = text.replace(key, "[key]")
+    return text[:300]
+
+
+def _groq_post(payload: dict, timeout: int) -> tuple[dict | None, str]:
+    """POST a chat completion. A browser-like user agent is required; Cloudflare rejects Python-urllib."""
+    key, base, _model = _llm_settings()
+    if key == "" or base == "" or payload.get("model", "") == "":
+        return None, "missing_setting"
+    req = urllib.request.Request(
+        base + "/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+            "User-Agent": "Primo/1.0",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+        return None, _llm_error_text(exc, key)
+    if not isinstance(body, dict):
+        return None, "empty_reply"
+    return body, ""
+
+
+def _message_text(body: dict) -> str:
+    message = ((body.get("choices") or [{}])[0].get("message") or {})
+    content = message.get("content")
+    if isinstance(content, list):
+        content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    reasoning = message.get("reasoning")
+    if isinstance(reasoning, str):
+        return reasoning.strip()
+    return ""
+
+
+def phrase_facts(facts: str) -> tuple[str, bool]:
+    """Rewrite catalog facts with Groq. The original sentence stays when Groq is off or fails."""
+    key, base, model = _llm_settings()
+    if key == "" or base == "" or model == "":
+        return facts, False
+
+    payload = {
+        "model": model,
+        "temperature": 0.2,
+        "max_completion_tokens": 220,
+        "reasoning_effort": "low",
+        "include_reasoning": False,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are Primo, the EasyPC shop assistant. Rewrite FACTS as one short friendly reply. "
+                    "Use only FACTS. Keep every product name, peso amount, and quantity exactly as written. "
+                    "Do not add products, prices, stock, or warranties. No markdown."
+                ),
+            },
+            {"role": "user", "content": facts},
+        ],
+    }
+    body, _llm_error = _groq_post(payload, 12)
+    if body is None:
+        return facts, False
+
+    text = _message_text(body)
+    if text == "" or len(text) > 700:
+        return facts, False
+    return text, True
+
+
+def chat_reply(history: list) -> tuple[str | None, str]:
+    """Answer a general question. Returns None when Groq is off or fails."""
+    key, base, model = _llm_settings()
+    if key == "" or base == "" or model == "":
+        return None, "missing_setting"
+    messages = [{
+        "role": "system",
+        "content": (
+            "You are Primo, the EasyPC One Oasis shop assistant in Rosario, Pasig. "
+            "Talk in a natural short conversation, only about EasyPC, this shop, and computer products. "
+            "If the question is not about those, say you can only help with EasyPC and computer products, then invite a product question. "
+            "Do not answer homework, relationship advice, jokes, news, or general knowledge. "
+            "Do not invent EasyPC product names, prices, or stock. No markdown."
+        ),
+    }]
+    for turn in history[-8:]:
+        if not isinstance(turn, dict):
+            continue
+        role = turn.get("role")
+        content = turn.get("content")
+        if role not in ("user", "assistant") or not isinstance(content, str):
+            continue
+        content = content.strip()
+        if content == "":
+            continue
+        messages.append({"role": role, "content": content[:800]})
+    if len(messages) < 2:
+        return None, "no_messages"
+
+    payload = {
+        "model": model,
+        "temperature": 0.6,
+        "max_completion_tokens": 400,
+        "reasoning_effort": "low",
+        "include_reasoning": False,
+        "messages": messages,
+    }
+    body, llm_error = _groq_post(payload, 20)
+    if body is None:
+        return None, llm_error
+
+    text = _message_text(body)
+    if text == "" or len(text) > 1200:
+        return None, "empty_reply"
+    return text, ""
+
+
+@app.post("/phrase")
+def phrase():
+    data = request.get_json(silent=True) or {}
+    facts = data.get("facts", "")
+    if not isinstance(facts, str):
+        return jsonify({"ok": False, "error": "invalid_facts"}), 400
+    facts = facts.strip()
+    if facts == "" or len(facts) > 1200:
+        return jsonify({"ok": False, "error": "invalid_facts"}), 400
+    reply, phrased = phrase_facts(facts)
+    return jsonify({"ok": True, "reply": reply, "phrased": phrased})
+
+
+@app.post("/chat")
+def chat():
+    data = request.get_json(silent=True) or {}
+    history = data.get("messages")
+    if not isinstance(history, list) or history == []:
+        return jsonify({"ok": False, "error": "invalid_messages"}), 400
+    reply, llm_error = chat_reply(history)
+    if reply is None:
+        body = {"ok": False, "error": "chat_unavailable", "llm_error": llm_error}
+        body.update(_llm_public_status())
+        return jsonify(body)
+    return jsonify({"ok": True, "reply": reply})
+
+
+if __name__ == "__main__":
+    try:
+        load_model()
+    except Exception as exc:
+        # Keep /health reachable so Render can see model_loaded=false instead of a dead port.
+        app.logger.error("Primo model failed to load: %s", exc)
+    # Local default: 127.0.0.1:5055. Render sets PORT (and RENDER); listen on 0.0.0.0 there.
+    hosted = bool(os.environ.get("RENDER")) or "PORT" in os.environ
+    host = os.environ.get("PRIMO_HOST", "0.0.0.0" if hosted else "127.0.0.1")
+    port = int(os.environ.get("PORT", "5055"))
+    app.run(host=host, port=port, debug=False, use_reloader=False)
