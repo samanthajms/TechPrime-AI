@@ -79,7 +79,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <?php if ($epShowPrimo): ?><link rel="stylesheet" href="primo.css?v=ux-13"><?php endif; ?>
+    <?php if ($epShowPrimo): ?><link rel="stylesheet" href="primo.css?v=ux-18"><?php endif; ?>
     <?php if (!empty($extraHead)) echo $extraHead; ?>
     <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
     <link rel="stylesheet" href="ep_dark_auto.css?v=dark-33">
@@ -89,7 +89,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <?php /* Storefront v2 (the homepage design) for every page: components, then the page-level styles.
              Token-driven dark mode; loaded last so they win over styles.css and the generated dark rules. */ ?>
     <link rel="stylesheet" href="storefront.css?v=sf-5">
-    <link rel="stylesheet" href="storefront-pages.css?v=sfp-7">
+    <link rel="stylesheet" href="storefront-pages.css?v=sfp-8">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">

@@ -17,7 +17,7 @@ $legalSections = [
         'Orders: the products and quantities you buy, order totals, your chosen delivery address or store pickup, a contact number, and the order and payment status.',
         'Shopping activity: items in your cart, your wishlist, PC builds you save in Build a PC, your notifications, and an optional profile picture you upload.',
         'Reviews: the rating, comment, tags and any photos or videos you attach when you review a completed order.',
-        'Primo conversations: the messages you send to our Primo shopping assistant and its replies.',
+        'Primo conversations: the messages you send to our Primo shopping assistant and its replies. Questions Primo cannot answer are also kept, without your name or account, to help improve it.',
         'Security records: sign-in attempts, account lockouts and a log of important account actions.',
     ]],
     ['id' => 'use-of-data', 'icon' => 'fa-sliders-h', 'title' => 'How We Use Your Information', 'body' => [
@@ -29,12 +29,14 @@ $legalSections = [
         'We do not collect or store credit card, debit card, bank or e-wallet details on this website. Your orders record only the payment method used and whether the order has been paid.',
     ]],
     ['id' => 'primo', 'icon' => 'fa-robot', 'title' => 'Primo Shopping Assistant', 'body' => [
-        'Primo answers questions about our products and helps you find parts. Your messages are processed by EasyPC\'s own assistant service and are not used to identify you outside your account.',
+        'Primo answers questions about our products and helps you find parts. Product facts such as prices, stock and compatibility always come from our own catalog.',
+        'To understand your question, Primo sends your message to EasyPC\'s Primo service, which runs on a cloud hosting provider. For general questions, and to word some product answers more naturally, Primo also uses Groq, an outside AI provider. Groq receives the question and the last few messages of that chat, with email addresses and phone numbers removed. Primo does not send it anything from your account, such as your name or email.',
+        'Questions Primo cannot answer are saved so our team can teach Primo to understand them. They are saved without your name, account or IP address, email addresses and phone numbers are removed first, and they are deleted after 90 days.',
         'Primo chat history is saved to your account for 7 days so you can continue a conversation, and you can delete a conversation at any time. Please do not share passwords or other sensitive details in the chat.',
     ]],
     ['id' => 'sharing', 'icon' => 'fa-users', 'title' => 'Who Can See Your Information', 'body' => [
         'Only authorized EasyPC One Oasis staff can see your information, and each staff role sees only what it needs: for example, inventory staff handle your orders and read your reviews. If you post a review anonymously, your name is not shown with it.',
-        'We rely on a small number of service providers to run this website: a secure cloud database that stores your account and order data, and an email service that sends your account activation email. They process your information only to provide these services to us.',
+        'We rely on a small number of service providers to run this website: a secure cloud database that stores your account and order data, an email service that sends your account activation email, a cloud host that runs the Primo assistant service, and Groq, the AI provider Primo uses for some replies. They process your information only to provide these services to us.',
         'We may disclose information when required by law or by a lawful order of a government authority.',
     ]],
     ['id' => 'security', 'icon' => 'fa-shield-alt', 'title' => 'Security Measures', 'body' => [
@@ -47,7 +49,7 @@ $legalSections = [
         'We do not use advertising or tracking cookies. Because these cookies are needed for the site to work, signing in and using the cart requires them.',
     ]],
     ['id' => 'retention', 'icon' => 'fa-history', 'title' => 'How Long We Keep Your Data', 'body' => [
-        'Primo chat history is deleted after 7 days. Your account details, cart, wishlist and saved builds are kept while your account is active.',
+        'Primo chat history is deleted after 7 days, and questions Primo could not answer are deleted after 90 days. Your account details, cart, wishlist and saved builds are kept while your account is active.',
         'Order, payment and activity records are kept for as long as we need them for business, accounting and security purposes, including after an account is closed.',
     ]],
     ['id' => 'your-rights', 'icon' => 'fa-user-check', 'title' => 'Your Rights', 'body' => [
@@ -121,7 +123,7 @@ JS;
         'title' => 'Privacy policy',
         'sub' => 'What personal data EasyPC One Oasis Branch collects when you use this online store, how we use and protect it, and the choices you have.',
         'icon' => 'fa-user-shield',
-        'meta' => '<span class="sf-meta-chip"><i class="far fa-calendar-alt" aria-hidden="true"></i><span>Last updated <time datetime="2026-10-13">October 13, 2026</time></span></span>',
+        'meta' => '<span class="sf-meta-chip"><i class="far fa-calendar-alt" aria-hidden="true"></i><span>Last updated <time datetime="2026-10-21">October 21, 2026</time></span></span>',
         'width' => 'narrow',
     ]); ?>
 

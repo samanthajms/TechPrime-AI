@@ -1,5 +1,6 @@
 /**
  * Primo — AI Product Assistant UI + SVM-backed chat.
+ * The current chat follows the shopper from page to page (saved in the browser) until New chat;
  * Reset Chat clears the active transcript only; Recent Chats persist 7 days.
  *
  * Panel: docked + non-blocking on desktop/tablet, full-screen sheet on phones.
@@ -51,20 +52,32 @@
     var HISTORY_URL = 'primo_history_api.php';
     var MAX_LEN = input ? (parseInt(input.getAttribute('maxlength'), 10) || 400) : 400;
     var COUNT_FROM = Math.floor(MAX_LEN * 0.8);
-    var STATUS_IDLE = 'AI Product Assistant';
+    var STATUS_IDLE = 'Online';
     var WIDE_KEY = 'primo_wide';
     var SEEN_KEY = 'primo_seen';   // set once Primo has been opened; stops the launcher pulse
     /* Guests chat normally, but nothing is saved to Recent chats (history API is client-only). */
     var IS_GUEST = root.getAttribute('data-guest') === '1';
 
+    /* Welcome line under "Hi, I'm Primo" (one is picked per fresh chat). */
     var GREETINGS = [
-        'Hi! 👋 I&rsquo;m <strong>Primo</strong>, your EasyPC assistant!<br><br>How can I help you today? 💚',
-        'Hello! 💚 Welcome to EasyPC! I&rsquo;m <strong>Primo</strong>. What are you looking for?',
-        'Hey there! 👋 I&rsquo;m <strong>Primo</strong>. Looking for something for your setup?',
-        'Hi! 👋 I&rsquo;m <strong>Primo</strong>, your EasyPC assistant. How can I help you today?'
+        'EasyPC&rsquo;s shopping assistant. Ask me about products, prices, stock, or if parts fit.',
+        'I can find products, check prices and stock, and tell you if parts fit together.'
     ];
 
-    /* Quick replies: shown on a fresh chat and after Primo asks for clarification. */
+    /* Welcome "Try asking" cards: each sends its example question, so visitors see how to ask. */
+    var WELCOME_TOPICS = [
+        { icon: 'fa-laptop', title: 'Find products', text: 'Show me laptops' },
+        { icon: 'fa-puzzle-piece', title: 'Will parts fit?', text: 'Is Ryzen 5 5600 compatible with B550?' },
+        { icon: 'fa-tags', title: 'Budget picks', text: 'Best budget graphics card' },
+        { icon: 'fa-store', title: 'Store & hours', text: 'Where is your store?' }
+    ];
+    var WELCOME_MORE = [
+        { icon: 'fa-box', label: 'Track order', text: 'Where is my order?' },
+        { icon: 'fa-tools', label: 'Build a PC', text: 'Help me build a PC' },
+        { icon: 'fa-undo-alt', label: 'Returns', text: 'How do returns and refunds work?' }
+    ];
+
+    /* Quick replies: shown after Primo asks for clarification. */
     var STARTERS = [
         { icon: 'fa-laptop', label: 'Find a laptop', text: 'Show me laptops' },
         { icon: 'fa-box', label: 'Track my order', text: 'Where is my order?' },
@@ -185,10 +198,12 @@
         if (persist) {
             try { window.localStorage.setItem(WIDE_KEY, on ? '1' : '0'); } catch (e) { /* private mode */ }
         }
-        if (stick) {
-            /* Keep the latest message in view while the panel animates to its new size. */
+        if (stick && hasUserMessages()) {
+            /* Keep the latest message in view while the panel animates to its new size
+               (a fresh chat stays on its greeting). */
             window.setTimeout(function () { scrollToBottom(false); }, reduceMotion ? 0 : 380);
         }
+        window.setTimeout(function () { updateCarousels(); }, reduceMotion ? 0 : 380);
     }
 
     /* ---------- Scrolling ---------- */
@@ -270,13 +285,22 @@
             .replace(/'/g, '&#39;');
     }
 
+    /* "[Shop Now](shop.php?cat=…)" from primo_chat.php: Shop Now opened on the list Primo just
+       showed. Only shop.php with plain query characters is accepted, on the already-escaped text. */
+    var SHOP_LINK_RE = /\[Shop Now\]\((shop\.php(?:\?[A-Za-z0-9=&;_%+.\-]*)?)\)/g;
+
     function linkify(escaped) {
+        var held = [];
+        escaped = escaped.replace(SHOP_LINK_RE, function (m, href) {
+            held.push('<a href="' + href + '" class="primo-link">Shop Now</a>');
+            return '\u0000' + (held.length - 1) + '\u0000';   // kept out of the plain "Shop Now" rule below
+        });
         LINKS.forEach(function (l) {
             escaped = escaped.replace(l.re, function (m) {
                 return '<a href="' + l.href + '" class="primo-link">' + m + '</a>';
             });
         });
-        return escaped;
+        return escaped.replace(/\u0000(\d+)\u0000/g, function (m, i) { return held[Number(i)]; });
     }
 
     /* Plain text → paragraphs + bullet lists ("• " lines). Text is escaped first. */
@@ -323,17 +347,25 @@
         return '₱' + v.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function productCardsHtml(products) {
-        var html = '<div class="primo-products">';
+    /* A swipeable row of cards. The product page only opens for in-stock products, so an
+       out-of-stock card is not a link. `more` adds a last "See all N …" card to Shop Now. */
+    function productCardsHtml(products, more) {
+        var single = products.length === 1 && !more;
+        var html = '<div class="primo-carousel' + (single ? ' is-single' : '') + '">' +
+            '<div class="primo-products" role="group" aria-label="' +
+            (products.length === 1 ? '1 product' : products.length + ' products') + '">';
         products.forEach(function (p) {
             var id = Number(p.id) || 0;
             var stock = Number(p.stock) || 0;
+            var listed = p.listed !== false;   // replies saved before the flag existed were all listed
             var stockCls = stock <= 0 ? ' is-out' : (stock <= 5 ? ' is-low' : '');
             var stockText = stock <= 0 ? 'Out of stock' : (stock <= 5 ? 'Only ' + stock + ' left' : 'In stock');
             var img = typeof p.image === 'string' && p.image !== ''
                 ? '<img src="' + escapeHtml(p.image) + '" alt="" loading="lazy" decoding="async">'
                 : '<i class="fas fa-box-open" aria-hidden="true"></i>';
-            html += '<a class="primo-product" href="products.php?id=' + id + '">' +
+            html += (listed
+                    ? '<a class="primo-product" href="products.php?id=' + id + '">'
+                    : '<div class="primo-product is-unlisted">') +
                 '<span class="primo-product-thumb">' + img + '</span>' +
                 '<span class="primo-product-info">' +
                 '<span class="primo-product-name">' + escapeHtml(p.name || 'Product') + '</span>' +
@@ -343,10 +375,48 @@
                 '</span>' +
                 (p.category ? '<span class="primo-product-cat">' + escapeHtml(p.category) + '</span>' : '') +
                 '</span>' +
-                '<i class="fas fa-chevron-right primo-product-go" aria-hidden="true"></i>' +
-                '</a>';
+                (listed ? '<i class="fas fa-chevron-right primo-product-go" aria-hidden="true"></i></a>' : '</div>');
         });
+        if (more) {
+            html += '<a class="primo-product primo-product-more" href="' + escapeHtml(more.href) + '">' +
+                '<span class="primo-more-icon" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>' +
+                '<span class="primo-more-title">' + escapeHtml(more.label) + '</span>' +
+                '<span class="primo-more-sub">in Shop Now</span></a>';
+        }
+        html += '</div>';
+        if (!single) {
+            /* Mouse-only shortcuts: keyboard users tab through the cards, which scrolls them into view. */
+            html += '<button type="button" class="primo-scroll is-prev" tabindex="-1" aria-hidden="true" hidden>' +
+                '<i class="fas fa-chevron-left"></i></button>' +
+                '<button type="button" class="primo-scroll is-next" tabindex="-1" aria-hidden="true" hidden>' +
+                '<i class="fas fa-chevron-right"></i></button>';
+        }
         return html + '</div>';
+    }
+
+    /* Arrows show only when the row can scroll that way. */
+    function updateCarousel(carousel) {
+        var track = carousel && carousel.querySelector('.primo-products');
+        if (!track) return;
+        var prev = carousel.querySelector('.primo-scroll.is-prev');
+        var next = carousel.querySelector('.primo-scroll.is-next');
+        var max = track.scrollWidth - track.clientWidth;
+        if (prev) prev.hidden = track.scrollLeft <= 4;
+        if (next) next.hidden = max <= 4 || track.scrollLeft >= max - 4;
+    }
+
+    function updateCarousels(scope) {
+        var el = scope || body;
+        if (!el) return;
+        el.querySelectorAll('.primo-carousel').forEach(updateCarousel);
+    }
+
+    /* "Showing 5 of the 9 laptops in stock. Open [Shop Now](shop.php?…)" → the "See all 9 laptops" card. */
+    function moreFromNote(note) {
+        var link = /\[Shop Now\]\((shop\.php(?:\?[A-Za-z0-9=&;_%+.\-]*)?)\)/.exec(note || '');
+        if (!link) return null;
+        var count = /of the (\d+) (.+?) in stock/.exec(note);
+        return { href: link[1], label: count ? 'See all ' + count[1] + ' ' + count[2] : 'See them all' };
     }
 
     /* Bot reply with product data: the bullet lines become cards. */
@@ -366,7 +436,7 @@
         var intro = before.join('\n').trim();
         var outro = after.join('\n').trim();
         if (intro) html += '<div class="primo-msg-bubble">' + formatBotText(intro) + '</div>';
-        html += productCardsHtml(products);
+        html += productCardsHtml(products, moreFromNote(outro));
         if (outro) html += '<p class="primo-msg-note">' + linkify(escapeHtml(outro)) + '</p>';
         return html;
     }
@@ -410,6 +480,7 @@
         var wrap = document.createElement('div');
         wrap.className = 'primo-msg ' + (isUser ? 'primo-msg-user' : 'primo-msg-bot');
         if (opts.error) wrap.className += ' is-error';
+        if (!isUser && opts.products && opts.products.length) wrap.className += ' has-products';
         if (opts.animate !== false && !reduceMotion) wrap.className += ' is-new';
 
         var prev = lastMessageEl();
@@ -448,6 +519,7 @@
         });
 
         body.appendChild(wrap);
+        updateCarousels(wrap);
         return wrap;
     }
 
@@ -521,12 +593,48 @@
         if (t && t.parentNode) t.parentNode.removeChild(t);
     }
 
+    /* A fresh chat: who Primo is, store hours (same as Primo's store answer), and cards that send
+       an example question. Cards are .primo-chip buttons, so the existing chip click handler sends them. */
     function welcomeHtml() {
-        return '<div class="primo-msg primo-msg-bot" id="primoWelcomeMsg">' +
-            miniAvatarHtml() +
-            '<div class="primo-msg-content"><div class="primo-msg-bubble" id="primoWelcomeBubble">' +
-            GREETINGS[Math.floor(Math.random() * GREETINGS.length)] +
-            '</div></div></div>';
+        var cards = WELCOME_TOPICS.map(function (t) {
+            return '<button type="button" class="primo-chip primo-starter" data-text="' + escapeHtml(t.text) + '">' +
+                '<span class="primo-starter-icon" aria-hidden="true"><i class="fas ' + t.icon + '"></i></span>' +
+                '<span class="primo-starter-text"><strong>' + escapeHtml(t.title) + '</strong>' +
+                '<span>&ldquo;' + escapeHtml(t.text) + '&rdquo;</span></span></button>';
+        }).join('');
+        var more = WELCOME_MORE.map(function (it) {
+            return '<button type="button" class="primo-chip" data-text="' + escapeHtml(it.text) + '">' +
+                '<i class="fas ' + it.icon + '" aria-hidden="true"></i><span>' + escapeHtml(it.label) + '</span></button>';
+        }).join('');
+        return '<div class="primo-msg primo-msg-bot primo-welcome" id="primoWelcomeMsg">' +
+            '<div class="primo-welcome-hero">' +
+            '<span class="primo-mini primo-mini-lg" aria-hidden="true">' +
+            '<span class="primo-mini-head"><span class="primo-mini-eye"></span><span class="primo-mini-eye"></span></span>' +
+            '<span class="primo-mini-body"></span></span>' +
+            '<p class="primo-welcome-title">Hi, I&rsquo;m Primo 👋</p>' +
+            '<p class="primo-welcome-text" id="primoWelcomeBubble">' +
+            GREETINGS[Math.floor(Math.random() * GREETINGS.length)] + '</p>' +
+            '<p class="primo-welcome-store"><i class="fas fa-store" aria-hidden="true"></i>' +
+            'Open daily 10 AM &ndash; 7 PM &middot; One Oasis, Pasig</p>' +
+            '</div>' +
+            '<div class="primo-welcome-try">' +
+            '<p class="primo-welcome-label" id="primoTryLabel">Try asking</p>' +
+            '<div class="primo-starters" role="group" aria-labelledby="primoTryLabel">' + cards + '</div>' +
+            '<div class="primo-welcome-more" role="group" aria-label="More help">' + more + '</div>' +
+            '</div></div>';
+    }
+
+    /* After the first question the suggestions have done their job; the greeting stays. */
+    function collapseWelcome() {
+        var tryBlock = body && body.querySelector('#primoWelcomeMsg .primo-welcome-try');
+        if (tryBlock && tryBlock.parentNode) tryBlock.parentNode.removeChild(tryBlock);
+    }
+
+    function showWelcome() {
+        if (!body) return;
+        body.innerHTML = welcomeHtml();
+        welcomeBubble = document.getElementById('primoWelcomeBubble');
+        greetingPicked = true;
     }
 
     function hasUserMessages() {
@@ -539,6 +647,8 @@
         if (!input) return;
         input.style.height = 'auto';
         input.style.height = Math.min(input.scrollHeight + 2, 132) + 'px';
+        /* No scrollbar until the text is taller than the box can grow */
+        input.style.overflowY = input.scrollHeight > 132 ? 'auto' : 'hidden';
     }
 
     function syncComposer() {
@@ -577,12 +687,11 @@
         hideHistory();
         removeTyping();
         conversationId = null;
+        clearCurrentChat();
         greetingPicked = true;
         if (body) {
-            body.innerHTML = welcomeHtml();
-            welcomeBubble = document.getElementById('primoWelcomeBubble');
-            appendChips(STARTERS);
-            scrollToBottom(false);
+            showWelcome();
+            body.scrollTop = 0;
         }
         fetch(HISTORY_URL, {
             method: 'POST',
@@ -606,17 +715,21 @@
         }
         setExpanded(true);
         pickWelcomeGreeting();
-        if (!hasUserMessages() && body && !body.querySelector('.primo-chips')) appendChips(STARTERS);
+        if (!hasUserMessages() && body && !body.querySelector('.primo-chips, .primo-starters')) appendChips(STARTERS);
         if (backdrop) backdrop.removeAttribute('hidden');
         if (panel) panel.removeAttribute('hidden');
         positionChatPanel();
         requestAnimationFrame(function () {
             root.classList.add('is-chat-open');
             applyModality();
+            updateCarousels();   // rows restored while the panel was hidden had no size yet
+            autosize();          // the message box was measured while hidden, too
         });
         if (mascot) mascot.setAttribute('aria-expanded', 'true');
         wave();
-        scrollToBottom(false);
+        /* A fresh chat opens on the greeting; an ongoing one on the latest message */
+        if (hasUserMessages()) scrollToBottom(false);
+        else if (body) body.scrollTop = 0;
         if (hasFinePointer()) {
             focusComposer();
         } else if (body) {
@@ -662,6 +775,86 @@
         });
     }
 
+    /* ---------- Current chat across pages ----------
+     * The open conversation is saved in the browser and shown again on the next page, so moving
+     * around the shop does not start over. Only New chat (or deleting that chat) clears it.
+     * Clients: localStorage per account, kept up to 7 days like Recent chats.
+     * Guests: sessionStorage, so the chat ends with the tab on a shared computer. */
+
+    var CURRENT_KEY = 'primo_current_' + (root.getAttribute('data-chat-key') || 'guest');
+    var CURRENT_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+    var CURRENT_MAX_MESSAGES = 60;
+    var transcript = [];
+
+    function currentStore() {
+        try {
+            return IS_GUEST ? window.sessionStorage : window.localStorage;
+        } catch (e) {
+            return null;   // storage blocked: the chat still works on this page
+        }
+    }
+
+    function saveCurrentChat() {
+        var store = currentStore();
+        if (!store) return;
+        try {
+            if (!transcript.length) {
+                store.removeItem(CURRENT_KEY);
+                return;
+            }
+            store.setItem(CURRENT_KEY, JSON.stringify({
+                id: conversationId || null,
+                at: Date.now(),
+                messages: transcript
+            }));
+        } catch (e) { /* storage full or blocked */ }
+    }
+
+    function rememberMessage(role, text, products, time) {
+        transcript.push({
+            role: role,
+            text: String(text || ''),
+            products: Array.isArray(products) ? products : [],
+            time: (time || new Date()).toISOString()
+        });
+        if (transcript.length > CURRENT_MAX_MESSAGES) transcript = transcript.slice(-CURRENT_MAX_MESSAGES);
+        saveCurrentChat();
+    }
+
+    function clearCurrentChat() {
+        transcript = [];
+        var store = currentStore();
+        if (!store) return;
+        try { store.removeItem(CURRENT_KEY); } catch (e) { /* blocked */ }
+    }
+
+    function restoreCurrentChat() {
+        var store = currentStore();
+        if (!store || !body) return;
+        var saved = null;
+        try { saved = JSON.parse(store.getItem(CURRENT_KEY) || 'null'); } catch (e) { saved = null; }
+        var fresh = saved && Array.isArray(saved.messages) && Date.now() - Number(saved.at || 0) < CURRENT_MAX_AGE;
+        var messages = fresh ? saved.messages.filter(function (m) {
+            return m && (m.role === 'user' || m.role === 'bot') && typeof m.text === 'string';
+        }) : [];
+        if (!messages.length) {
+            clearCurrentChat();
+            return;
+        }
+        transcript = messages;
+        conversationId = saved.id || null;
+        greetingPicked = true;
+        body.innerHTML = '';
+        messages.forEach(function (m) {
+            var when = new Date(m.time);
+            appendMessage(m.role, m.text, {
+                products: Array.isArray(m.products) ? m.products : [],
+                time: isNaN(when.getTime()) ? undefined : when,
+                animate: false
+            });
+        });
+    }
+
     /* ---------- History persistence ---------- */
 
     function persistExchange(userMsg, botMsg) {
@@ -682,6 +875,7 @@
             .then(function (data) {
                 if (data && data.ok && data.conversation_id) {
                     conversationId = data.conversation_id;
+                    saveCurrentChat();
                 }
             })
             .catch(function () {});
@@ -821,19 +1015,21 @@
                 if (!body) return;
                 body.innerHTML = '';
                 var msgs = conv.messages || [];
+                clearCurrentChat();
                 if (!msgs.length) {
-                    body.innerHTML = welcomeHtml();
-                    welcomeBubble = document.getElementById('primoWelcomeBubble');
-                    appendChips(STARTERS);
+                    showWelcome();
                     return;
                 }
+                /* The opened chat becomes the current one, so it stays open on the next page too. */
                 msgs.forEach(function (m) {
-                    appendMessage(m.role === 'user' ? 'user' : 'bot', m.content || '', {
-                        products: Array.isArray(m.products) ? m.products : [],
-                        time: parseDbTime(m.created_at) || undefined,
-                        animate: false
-                    });
+                    var role = m.role === 'user' ? 'user' : 'bot';
+                    var products = Array.isArray(m.products) ? m.products : [];
+                    var when = parseDbTime(m.created_at) || undefined;
+                    appendMessage(role, m.content || '', { products: products, time: when, animate: false });
+                    transcript.push({ role: role, text: String(m.content || ''), products: products, time: (when || new Date()).toISOString() });
                 });
+                transcript = transcript.slice(-CURRENT_MAX_MESSAGES);
+                saveCurrentChat();
                 scrollToBottom(false);
                 focusComposer();
             })
@@ -890,6 +1086,8 @@
         opts = opts || {};
         if (chatBusy) return;
         removeChips();
+        collapseWelcome();
+        var sentAt = new Date();
         if (!opts.retry) {
             appendMessage('user', message);
         }
@@ -925,9 +1123,16 @@
 
         var reply;
         if (!networkFailed && data && typeof data.reply === 'string' && data.ok) {
-            reply = appendMessage('bot', data.reply, { products: Array.isArray(data.products) ? data.products : [] });
+            var replyProducts = Array.isArray(data.products) ? data.products : [];
+            reply = appendMessage('bot', data.reply, { products: replyProducts });
+            /* Only answered questions are kept: a failed one is retried on this page, not carried over. */
+            rememberMessage('user', message, [], sentAt);
+            rememberMessage('bot', data.reply, replyProducts);
             persistExchange(message, data.reply);
             if (data.intent === 'fallback') appendChips(STARTERS);
+        } else if (!networkFailed && data && typeof data.reply === 'string' && data.error === 'rate_limited') {
+            /* Sent too fast: say how long to wait, and keep the text so one tap resends it. */
+            reply = appendMessage('bot', data.reply, { error: true, retryText: message });
         } else if (!networkFailed && data && typeof data.reply === 'string' && data.error !== 'svm_unavailable') {
             /* Session expired / invalid message: retrying the same text won't help. */
             reply = appendMessage('bot', data.reply, { error: true });
@@ -1034,6 +1239,17 @@
     }
     if (body) {
         body.addEventListener('click', function (e) {
+            var arrow = e.target.closest('.primo-scroll');
+            if (arrow) {
+                var track = arrow.parentNode.querySelector('.primo-products');
+                if (track) {
+                    track.scrollBy({
+                        left: (arrow.classList.contains('is-prev') ? -1 : 1) * Math.max(160, track.clientWidth * 0.8),
+                        behavior: reduceMotion ? 'auto' : 'smooth'
+                    });
+                }
+                return;
+            }
             var chip = e.target.closest('.primo-chip');
             if (!chip || chip.disabled || chatBusy) return;
             e.preventDefault();
@@ -1041,6 +1257,14 @@
         });
         body.addEventListener('scroll', function () {
             if (jumpBtn && !jumpBtn.hasAttribute('hidden') && nearBottom()) jumpBtn.setAttribute('hidden', '');
+        }, { passive: true });
+        /* Product rows scroll sideways; scroll events don't bubble, so listen in the capture phase. */
+        body.addEventListener('scroll', function (e) {
+            var t = e.target;
+            if (t && t.classList && t.classList.contains('primo-products')) updateCarousel(t.parentNode);
+        }, { passive: true, capture: true });
+        window.addEventListener('resize', function () {
+            if (isChatOpen()) updateCarousels();
         }, { passive: true });
     }
     if (jumpBtn) {
@@ -1095,6 +1319,8 @@
         if (window.localStorage.getItem(SEEN_KEY) !== '1') root.classList.add('is-attention');
     } catch (e) { /* private mode: no pulse */ }
     setWide(readWidePref(), false);
+    restoreCurrentChat();
+    if (!hasUserMessages()) showWelcome();
     syncComposer();
 
     var greet = document.getElementById('primoGreet');

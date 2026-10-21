@@ -312,6 +312,28 @@
     font: 500 15px/1.4 'Poppins', Arial, sans-serif;
 }
 .ep-body.sf-page .ep-shop-select:focus { outline: none; border-color: var(--sf-accent-text); box-shadow: 0 0 0 3px rgba(98, 178, 54, 0.22); }
+/* Shop results bar: "Sort by" select next to the result count */
+.ep-body.sf-page .ep-shop-sort {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+.ep-body.sf-page .ep-shop-sort label {
+    font-size: 14px;
+    color: var(--sf-muted);
+    white-space: nowrap;
+}
+.ep-body.sf-page .ep-shop-sort .ep-shop-select {
+    width: auto;
+    min-width: 196px;
+    padding: 8px 12px;
+    font-size: 14px;
+}
+@media (max-width: 480px) {
+    .ep-body.sf-page .ep-shop-sort { width: 100%; }
+    .ep-body.sf-page .ep-shop-sort .ep-shop-select { flex: 1; min-width: 0; }
+}
 .ep-body.sf-page .ep-shop-price-current {
     padding: 0;
     border: 0;

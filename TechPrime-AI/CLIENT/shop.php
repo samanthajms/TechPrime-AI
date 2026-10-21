@@ -59,6 +59,20 @@ if ($selectedRating < 1 || $selectedRating > 5) {
 $selectedBrand = isset($_GET['brand']) ? trim((string)$_GET['brand']) : '';
 $shopQuery = $searchQuery;
 
+// Sort order for the product list; '' = newest first (the default, kept out of the URL).
+$sortOptions = [
+    ''           => 'Newest',
+    'price_asc'  => 'Price: Low to High',
+    'price_desc' => 'Price: High to Low',
+    'name_asc'   => 'Name: A to Z',
+    'name_desc'  => 'Name: Z to A',
+    'rating'     => 'Top rated',
+];
+$selectedSort = isset($_GET['sort']) ? trim((string)$_GET['sort']) : '';
+if (!isset($sortOptions[$selectedSort])) {
+    $selectedSort = '';
+}
+
 $perPage = 12;
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 
@@ -73,7 +87,7 @@ $allStmt = $db->query(
 $allProducts = ep_shop_attach_taxonomy($allStmt ? $allStmt->fetchAll(PDO::FETCH_ASSOC) : []);
 
 $ratings = [];
-if ($selectedRating > 0 && !empty($allProducts)) {
+if (($selectedRating > 0 || $selectedSort === 'rating') && !empty($allProducts)) {
     try {
         $ids = array_column($allProducts, 'id');
         $ph = implode(',', array_fill(0, count($ids), '?'));
@@ -156,6 +170,33 @@ foreach ($allProducts as $p) {
     $filtered[] = $p;
 }
 
+// $filtered is already newest first (ORDER BY p.id DESC); ties in the other orders fall back to that.
+if ($selectedSort !== '') {
+    usort($filtered, function (array $a, array $b) use ($selectedSort): int {
+        switch ($selectedSort) {
+            case 'price_asc':
+                $cmp = (float)$a['price'] <=> (float)$b['price'];
+                break;
+            case 'price_desc':
+                $cmp = (float)$b['price'] <=> (float)$a['price'];
+                break;
+            case 'name_asc':
+                $cmp = strnatcasecmp((string)$a['name'], (string)$b['name']);
+                break;
+            case 'name_desc':
+                $cmp = strnatcasecmp((string)$b['name'], (string)$a['name']);
+                break;
+            case 'rating':
+                // Unrated products go last.
+                $cmp = (float)($b['avg_rating'] ?? -1) <=> (float)($a['avg_rating'] ?? -1);
+                break;
+            default:
+                $cmp = 0;
+        }
+        return $cmp !== 0 ? $cmp : (int)$b['id'] <=> (int)$a['id'];
+    });
+}
+
 $brandCounts = [];
 foreach ($allProducts as $p) {
     if ($p['brand'] === '') {
@@ -214,6 +255,7 @@ $returnQuery = array_filter([
     'price_max' => $selectedMaxPrice < $priceCeiling ? (string)(int)$selectedMaxPrice : null,
     'rating' => $selectedRating > 0 ? (string)$selectedRating : null,
     'brand' => $selectedBrand !== '' ? $selectedBrand : null,
+    'sort' => $selectedSort !== '' ? $selectedSort : null,
     'page' => $page > 1 ? (string)$page : null,
 ], fn($v) => $v !== null);
 $returnTo = 'shop.php' . ($returnQuery ? ('?' . http_build_query($returnQuery)) : '');
@@ -247,6 +289,20 @@ ob_start();
                             Showing <strong class="sf-num"><?php echo number_format(($page - 1) * $perPage + 1); ?>&ndash;<?php echo number_format(($page - 1) * $perPage + count($displayProducts)); ?></strong>
                             of <strong class="sf-num"><?php echo number_format($resultCount); ?></strong> product<?php echo $resultCount === 1 ? '' : 's'; ?>
                         </p>
+                        <?php /* Plain GET form so sorting also works without JS; the live script intercepts the change. */ ?>
+                        <form class="ep-shop-sort" method="GET" action="shop.php">
+                            <?php foreach ($returnQuery as $k => $v):
+                                if ($k === 'sort' || $k === 'page') continue; ?>
+                                <input type="hidden" name="<?php echo h($k); ?>" value="<?php echo h($v); ?>">
+                            <?php endforeach; ?>
+                            <label for="epShopSort">Sort by</label>
+                            <select id="epShopSort" class="ep-shop-select" name="sort">
+                                <?php foreach ($sortOptions as $sortKey => $sortLabel): ?>
+                                    <option value="<?php echo h($sortKey); ?>"<?php echo $selectedSort === $sortKey ? ' selected' : ''; ?>><?php echo h($sortLabel); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <noscript><button type="submit" class="sf-btn sf-btn-outline">Sort</button></noscript>
+                        </form>
                     </div>
                 <?php endif; ?>
                 <?php if (!empty($displayProducts) && !$isBrandDirectory): ?>
@@ -636,6 +692,9 @@ $extraScripts = <<<'SCRIPTS'
     var controller = null;
     var requestSeq = 0;
     var lastQs = currentQs();
+    // Kept here, not read from the select: the select lives in the swapped results HTML and is
+    // missing when nothing matches, and the sort should survive that.
+    var currentSort = new URLSearchParams(window.location.search).get('sort') || '';
 
     form.classList.add('is-live');
 
@@ -656,9 +715,10 @@ $extraScripts = <<<'SCRIPTS'
         if (p.get('price_max') === String(ceiling)) p.delete('price_max');
         var q = searchInput ? searchInput.value.trim() : '';
         if (q !== '') p.set('q', q);
+        if (currentSort !== '') p.set('sort', currentSort);
         // Keep the same key order as the server-built URLs.
         var ordered = new URLSearchParams();
-        ['cat', 'sub', 'section', 'q', 'price_min', 'price_max', 'rating', 'brand', 'page'].forEach(function (k) {
+        ['cat', 'sub', 'section', 'q', 'price_min', 'price_max', 'rating', 'brand', 'sort', 'page'].forEach(function (k) {
             if (p.has(k)) ordered.set(k, p.get(k));
         });
         return ordered;
@@ -750,6 +810,17 @@ $extraScripts = <<<'SCRIPTS'
         syncActiveOptions('.ep-shop-brand-list', '.ep-shop-brand-option');
         syncActiveOptions('.ep-shop-rating-list', '.ep-shop-rating-option');
         load(buildParams(), { push: true });
+    });
+
+    // Sort select (inside the live results): re-sort from page 1.
+    results.addEventListener('change', function (e) {
+        var t = e.target;
+        if (!t || t.id !== 'epShopSort') return;
+        currentSort = t.value;
+        load(buildParams(), { push: true });
+    });
+    results.addEventListener('submit', function (e) {
+        if (e.target && e.target.classList.contains('ep-shop-sort')) e.preventDefault();
     });
 
     form.addEventListener('submit', function (e) {

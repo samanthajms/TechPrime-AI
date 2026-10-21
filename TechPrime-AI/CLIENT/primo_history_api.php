@@ -143,6 +143,7 @@ function ph_attach_products(PDO $db, array $messages): array
         if (isset($byName[$key]) || $img === '') {
             continue;
         }
+        // Same card fields as primo_map_product_rows(): an out-of-stock product gets a card without a link
         $byName[$key] = [
             'id' => (int)$p['id'],
             'name' => $key,
@@ -150,6 +151,7 @@ function ph_attach_products(PDO $db, array $messages): array
             'stock' => (int)($p['stock'] ?? 0),
             'category' => (string)($p['category'] ?? ''),
             'image' => $img,
+            'listed' => $img !== '' && (int)($p['stock'] ?? 0) > 0,
         ];
     }
 

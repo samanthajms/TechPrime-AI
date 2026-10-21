@@ -33,7 +33,7 @@ REPORT_PATH = MODEL_DIR / "last_eval_report.json"
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.25
-CONFIDENCE_THRESHOLD = 0.42
+CONFIDENCE_THRESHOLD = 0.32   # from tune_threshold.py (2026-10-21); was 0.42
 
 
 def load_dataset(path: Path) -> pd.DataFrame:

@@ -11,8 +11,10 @@ $primoCompact = empty($isHomePage);
 $primoCsrf = generateCsrfToken(); // guests too: the Primo chat endpoint requires it
 // Chat history is saved for logged-in clients only (same check as primo_history_api.php).
 $primoGuest = empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'client';
+// The current chat is saved in the browser per account (primo.js), so two accounts on one computer never share it.
+$primoChatKey = $primoGuest ? 'guest' : 'u' . (int) $_SESSION['user_id'];
 ?>
-<div id="primoRoot" class="primo-root is-collapsed<?php echo $primoCompact ? ' is-compact' : ''; ?>"<?php echo $primoGuest ? ' data-guest="1"' : ''; ?>>
+<div id="primoRoot" class="primo-root is-collapsed<?php echo $primoCompact ? ' is-compact' : ''; ?>"<?php echo $primoGuest ? ' data-guest="1"' : ''; ?> data-chat-key="<?php echo h($primoChatKey); ?>">
     <div class="primo-stage">
         <p class="primo-greet" id="primoGreet">Hey, it's me Primo!</p>
         <button type="button" class="primo-mascot" id="primoMascot" aria-label="Chat with Primo, AI Product Assistant" aria-expanded="false" aria-controls="primoPanel"<?php echo $primoCompact ? ' title="Chat with Primo"' : ''; ?>>
@@ -76,13 +78,13 @@ $primoGuest = empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'clie
                     <span class="primo-mini-body"></span>
                 </span>
                 <div class="primo-panel-titles">
-                    <h2 id="primoPanelTitle">Primo</h2>
-                    <p class="primo-status" id="primoStatus"><span class="primo-status-dot" aria-hidden="true"></span><span id="primoStatusText">AI Product Assistant</span></p>
+                    <h2 id="primoPanelTitle">Primo <span class="primo-ai-badge">AI</span></h2>
+                    <p class="primo-status" id="primoStatus"><span class="primo-status-dot" aria-hidden="true"></span><span id="primoStatusText">Online</span></p>
                 </div>
             </div>
             <div class="primo-panel-actions">
-                <button type="button" class="primo-icon-btn" id="primoResetBtn" aria-label="Start a new chat" title="New chat">
-                    <i class="fas fa-plus" aria-hidden="true"></i>
+                <button type="button" class="primo-new-btn" id="primoResetBtn" title="Start a new chat">
+                    <i class="fas fa-plus" aria-hidden="true"></i><span class="primo-new-label">New chat</span>
                 </button>
                 <button type="button" class="primo-icon-btn" id="primoHistoryBtn" aria-label="Recent chats" title="Recent chats" aria-expanded="false" aria-controls="primoHistory">
                     <i class="fas fa-history" aria-hidden="true"></i>
@@ -148,17 +150,19 @@ $primoGuest = empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'clie
             <label class="sr-only" for="primoChatInput">Message Primo</label>
             <div class="primo-compose">
                 <textarea id="primoChatInput" name="primo_message" rows="1"
-                          placeholder="Ask Primo about a product…" maxlength="400"
-                          aria-describedby="primoComposeHint"></textarea>
+                          placeholder="Ask about a product, price, or part…" maxlength="400"
+                          aria-describedby="primoComposeHint primoPrivacyNote"></textarea>
                 <span class="primo-count" id="primoCount" aria-live="polite" hidden></span>
+                <button type="submit" class="primo-send-btn" id="primoSendBtn" aria-label="Send message" disabled>
+                    <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                </button>
             </div>
-            <button type="submit" class="primo-send-btn" id="primoSendBtn" aria-label="Send message" disabled>
-                <i class="fas fa-paper-plane" aria-hidden="true"></i>
-            </button>
             <p class="primo-compose-hint" id="primoComposeHint">Enter to send · Shift + Enter for a new line</p>
+            <!-- What primo_log_unanswered() in backend/api/primo_chat.php keeps (Data Privacy Act, RA 10173) -->
+            <p class="primo-privacy-note" id="primoPrivacyNote"><i class="fas fa-user-shield" aria-hidden="true"></i>Questions Primo can&rsquo;t answer are saved without your name to help improve it.</p>
         </form>
     </section>
 </div>
 <script>window.EP_CSRF = window.EP_CSRF || <?php echo json_encode($primoCsrf); ?>;</script>
-<script src="primo.js?v=ux-8" defer></script>
+<script src="primo.js?v=ux-13" defer></script>
 <script src="../includes/service_warmup.js?v=1" data-svc="primo" defer></script>

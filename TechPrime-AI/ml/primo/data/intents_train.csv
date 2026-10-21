@@ -691,3 +691,254 @@ How are you today,fallback
 What can you talk about besides computers,fallback
 Give me a short pep talk,fallback
 What is a metaphor,fallback
+magandang umaga po,greeting
+magandang gabi primo,greeting
+magandang araw,greeting
+kamusta ka primo,greeting
+kamusta po,greeting
+hello po,greeting
+hi primo kamusta,greeting
+good eve primo,greeting
+heyy,greeting
+hellooo primo,greeting
+hi there po,greeting
+gud eve,greeting
+paalam na,goodbye
+kailangan ko nang umalis,goodbye
+bye na po,goodbye
+got to go now,goodbye
+g2g,goodbye
+signing out na,goodbye
+im off,goodbye
+later primo,goodbye
+babye,goodbye
+tapos na ako,goodbye
+thats all for today,goodbye
+sige salamat bye na,goodbye
+ingat primo,goodbye
+see you next time po,goodbye
+salamat primo,gratitude
+salamat ng marami,gratitude
+salamuch,gratitude
+thank you po,gratitude
+thanks po,gratitude
+ty po,gratitude
+thanks so much primo,gratitude
+thx a lot,gratitude
+big help thanks,gratitude
+youre the best thanks,gratitude
+thank you sa info,gratitude
+tenks,gratitude
+ano kaya mo gawin,help
+ano ang kaya mong itulong,help
+paano mag-umpisa dito,help
+pano ba to gumagana,help
+patulong naman,help
+patulong po,help
+need help po,help
+help po,help
+i could use some guidance,help
+whats this chat for,help
+what is primo,help
+how can this bot help me,help
+what questions can you answer,help
+im not sure where to start,help
+guide me please,help
+what can i do here,help
+ano ang capital ng france,fallback
+turuan mo ako mag-luto ng adobo,fallback
+sino nanalo sa pba kagabi,fallback
+bigyan mo ako ng quote,fallback
+gumawa ka ng speech para sa akin,fallback
+kantahan mo ako,fallback
+anong panahon bukas,fallback
+can you book me a grab,fallback
+call a taxi for me,fallback
+whats the bitcoin price today,fallback
+who is the richest person in the world,fallback
+how do i fix my car,fallback
+can you draw a cat,fallback
+tell me a scary story,fallback
+whats the best anime,fallback
+help me write a love letter,fallback
+the gpu section please,product_category
+storage section items,product_category
+go to the accessories section,product_category
+lahat ng laptop sa category nyo,product_category
+ano laman ng ram category,product_category
+category list of speakers,product_category
+pahanap ng logitech keyboard,product_search
+naghahanap ako ng printer,product_search
+find asus monitors,product_search
+search for a gaming chair,product_search
+show me the rakk mouse,product_search
+ano specs ng ryzen 5 5600,product_search
+details of the msi b650m,product_search
+look for a 1tb hdd,product_search
+any speakers?,product_search
+got any routers,product_search
+ubos na ba yung gpu,stock_inquiry
+naubos na ba,stock_inquiry
+is this sold out,stock_inquiry
+ilang piraso pa ang meron,stock_inquiry
+do you have more units of this,stock_inquiry
+can i reserve this item,stock_inquiry
+will you get more stocks soon,stock_inquiry
+still have stocks of the vivobook?,stock_inquiry
+is the ram available today,stock_inquiry
+sold out na ba,stock_inquiry
+magkano po ang gpu,product_price
+magkano ba to,product_price
+presyo po,product_price
+how much ang laptop,product_price
+magkano na ngayon,product_price
+cost po?,product_price
+whats the srp,product_price
+how much will it cost me,product_price
+pricing po ng ram,product_price
+magkano lahat,product_price
+pa-suggest ng laptop for work,product_recommendation
+ano ma-rerecommend mo na pc,product_recommendation
+need ko ng pc pang gaming,product_recommendation
+ano best na laptop for 30k,product_recommendation
+recommend ka naman ng monitor,product_recommendation
+what pc can run gta 5,product_recommendation
+suggest a laptop for my mom,product_recommendation
+budget build for a student,product_recommendation
+compatible ba to sa motherboard ko,compatibility_question
+pwede kaya ito sa board ko,compatibility_question
+gagana ba ang ddr5 sa board ko,compatibility_question
+magkakasya ba ang gpu sa casing,compatibility_question
+does this cpu work with a b650,compatibility_question
+will this cooler fit an am4 socket,compatibility_question
+is 650 watts enough for an rtx 4070,compatibility_question
+can my board take 64gb ram,compatibility_question
+does the rtx 5060 fit in a mini itx case,compatibility_question
+will an intel cpu work on an amd board,compatibility_question
+can i use ddr4 in a ddr5 board,compatibility_question
+is my psu strong enough for this gpu,compatibility_question
+are ryzen 7000 cpus ok with b550,compatibility_question
+will this ram work on a laptop,compatibility_question
+socket am5 compatible ba,compatibility_question
+na-deliver na ba,order_status
+update sa order ko,order_status
+track order po,order_status
+may tracking number na ba,order_status
+my package is late,order_status
+when does my order ship,order_status
+status ng order ko,order_status
+is my delivery delayed,order_status
+has my item been dispatched,order_status
+hindi pa dumarating yung binili ko,order_status
+where is my lalamove delivery,order_status
+order update po,order_status
+refund process po,return_refund
+sira yung dumating,return_refund
+may defect yung product,return_refund
+ayaw gumana ng binili ko,return_refund
+pa-replace po,return_refund
+i received the wrong item,return_refund
+the item is damaged,return_refund
+my mouse stopped working after a week,return_refund
+warranty claim please,return_refund
+how do i claim warranty,return_refund
+can i swap this for a different model,return_refund
+item not working out of the box,return_refund
+return po,return_refund
+refund po,return_refund
+can i return an opened item,return_refund
+send back a damaged product,return_refund
+nasaan ang store nyo,store_information
+bukas ba kayo bukas,store_information
+open hours po,store_information
+what are your hours on weekends,store_information
+phone number please,store_information
+how can i call you,store_information
+may fb page ba kayo,store_information
+do you have a landline,store_information
+directions to one oasis,store_information
+store open today?,store_information
+when do you open,store_information
+where can i pick up my order,store_information
+what floor is the store on,store_information
+closing time?,store_information
+messenger link ng store,store_information
+pakita ang saved build ko,saved_build
+buksan ang naka-save na build,saved_build
+my saved setups,saved_build
+go to my saved builds,saved_build
+where did my build go,saved_build
+edit my saved build,saved_build
+continue my saved build,saved_build
+delete a saved build,saved_build
+my pc configurations,saved_build
+open the parts list i saved,saved_build
+saved pc list,saved_build
+access my saved setups,saved_build
+resume the build i was working on,saved_build
+build history,saved_build
+yung build ko kanina,saved_build
+saan makikita ang na-save kong pc,saved_build
+asus vs acer for laptops,brand_advice
+msi or gigabyte which brand for motherboards,brand_advice
+which brand is more reliable,brand_advice
+whats the most trusted laptop brand,brand_advice
+which monitor brand do you recommend,brand_advice
+magandang brand ba ang lenovo,brand_advice
+ano ang pinaka-trusted na brand,brand_advice
+brand comparison please,brand_advice
+which psu brand is safest,brand_advice
+what brand do you trust most,brand_advice
+pros and cons of asus,brand_advice
+should i go with a known brand or a cheaper one,brand_advice
+are rakk products good quality as a brand,brand_advice
+samsung vs crucial for ssd,brand_advice
+any news on my order,order_status
+i ordered last week where is it,order_status
+how long until my order arrives,order_status
+estimated delivery date please,order_status
+did you ship my order already,order_status
+is my order ready for pickup,order_status
+can i check where my parcel is,order_status
+my order says processing what does that mean,order_status
+tracking info for my purchase,order_status
+how far is the rider,order_status
+show builds i created,saved_build
+list my saved configurations,saved_build
+i want my old build back,saved_build
+where do saved builds go,saved_build
+open saved pc parts,saved_build
+can i reuse my saved build,saved_build
+rename my saved build,saved_build
+compare my saved builds,saved_build
+check my build from last time,saved_build
+find my saved computer setup,saved_build
+which laptop brand lasts the longest,brand_advice
+is asus or lenovo better for students,brand_advice
+tell me about the brands you carry,brand_advice
+which gpu brand has better cooling,brand_advice
+why do people like msi,brand_advice
+is it worth paying more for a brand,brand_advice
+which brand has the best warranty,brand_advice
+recommend a brand for headsets,brand_advice
+what brand is good for budget builds,brand_advice
+which keyboard brand is durable,brand_advice
+can i cancel my order and get my money back,return_refund
+the screen has dead pixels can i return it,return_refund
+i changed my mind can i return it,return_refund
+what is covered by warranty,return_refund
+who do i contact for a defective item,return_refund
+exchange policy please,return_refund
+my order came incomplete,return_refund
+how long does a refund take,return_refund
+can i return it if the box is open,return_refund
+refund for a cancelled order,return_refund
+where exactly is one oasis,store_information
+what is your email,store_information
+can i visit the store to see products,store_information
+do you have a showroom,store_information
+what days are you open,store_information
+how late are you open,store_information
+store landmark please,store_information
+whats the stores contact info,store_information
+can i walk in,store_information

@@ -1,0 +1,161 @@
+text,intent
+helo primo,greeting
+gud morning po,greeting
+kumusta primo,greeting
+magandang hapon,greeting
+yo primo whats up,greeting
+hi po,greeting
+hello po good evening,greeting
+heyyy,greeting
+"hi, anyone here?",greeting
+musta,greeting
+sige bye na,goodbye
+paalam primo,goodbye
+ok thats all bye,goodbye
+gtg,goodbye
+c u later,goodbye
+im logging off now,goodbye
+babush,goodbye
+ok im done for today,goodbye
+alis na ako,goodbye
+sige una na ko,goodbye
+salamat po,gratitude
+maraming salamat primo,gratitude
+tnx,gratitude
+thank youuu,gratitude
+ang galing mo thanks,gratitude
+appreciate the quick answer,gratitude
+salamat sa tulong,gratitude
+tysm,gratitude
+thanks that helps a ton,gratitude
+nice one thank u,gratitude
+ano pwede ko itanong sayo,help
+pano ka gamitin,help
+what are u for,help
+can u help me pls,help
+i dont know what to ask,help
+paano ka makakatulong,help
+what else can you do,help
+need assistance pls,help
+how does this assistant work,help
+tulungan mo ako,help
+sino ang presidente ng pilipinas,fallback
+kwentuhan mo ako ng joke,fallback
+whats the score of the lakers game,fallback
+gawa ka ng tula,fallback
+can you order me food,fallback
+how tall is mount everest,fallback
+write my essay about climate change,fallback
+what horoscope am i,fallback
+translate hello to spanish,fallback
+ano ulam ngayon,fallback
+show me the cooling section,product_category
+list evry keyboard in the category,product_category
+what do you have in the processor section,product_category
+pakita mo lahat ng nasa headset category,product_category
+browse the power supplies category,product_category
+everything under printers pls,product_category
+open the mouse category,product_category
+whats in the ssd section,product_category
+show all items under the monitor category,product_category
+display the whole case category,product_category
+looking for a logitech g pro mouse,product_search
+hanap ka ng 2tb ssd,product_search
+search msi motherboards,product_search
+find a wireless mouse,product_search
+hanapin mo yung kingston nvme,product_search
+look up asus vivobook,product_search
+any webcams?,product_search
+im searching for a 27 inch monitor,product_search
+find me a ups,product_search
+tell me more about the rtx 5060,product_search
+available pa po ba yung rtx 5060,stock_inquiry
+is the vivobook in stock rn,stock_inquiry
+how many units left of the ryzen 5 5600,stock_inquiry
+may natira pa ba,stock_inquiry
+is it still avail,stock_inquiry
+out of stock na ba yung mouse,stock_inquiry
+can i still order this,stock_inquiry
+when will the rtx 5070 be restocked,stock_inquiry
+do u guys still have ddr5 ram in stock,stock_inquiry
+stock pa ba nito,stock_inquiry
+magkano yung ryzen 7 7700,product_price
+hm po,product_price
+how much is the asus dual rtx 3050,product_price
+presyo ng monitor,product_price
+price ng logitech g502,product_price
+whats the cost of the 850w psu,product_price
+how much would a 1tb nvme be,product_price
+ilan ang presyo nito,product_price
+how pricey is the rog monitor,product_price
+magkano ang laptop na yan,product_price
+ano magandang laptop pang school,product_recommendation
+recommend me a pc for valorant under 40k,product_recommendation
+suggest a gpu for 1440p gaming,product_recommendation
+what laptop is good for programming,product_recommendation
+need a pc for my small business,product_recommendation
+what should i get for photo editing,product_recommendation
+best pc for a beginner streamer,product_recommendation
+pa-recommend naman ng gaming laptop,product_recommendation
+which monitor should i buy for gaming,product_recommendation
+ano bagay na pc para sa editing,product_recommendation
+compatible ba yung ryzen 7 7700 sa b550,compatibility_question
+will a 550w psu handle rtx 4060,compatibility_question
+does ddr5 fit on b450 boards,compatibility_question
+can i put this gpu in a micro atx case,compatibility_question
+kasya ba yung 360 aio sa case ko,compatibility_question
+is the i5 14400 compatible w/ b760,compatibility_question
+will 2 ram sticks of different brands work together,compatibility_question
+can this mobo support ryzen 9 9900x,compatibility_question
+pwede ba ddr4 sa am5,compatibility_question
+check if my parts are compatible,compatibility_question
+nasaan na yung order ko,order_status
+track my parcel pls,order_status
+when will my laptop be delivered,order_status
+order #5521 status,order_status
+na-ship na ba order ko,order_status
+has the rider picked up my order,order_status
+my order still hasnt arrived,order_status
+wheres my stuff,order_status
+kailan darating order ko,order_status
+is my order on the way,order_status
+pano mag return ng sira na mouse,return_refund
+defective yung nabili ko pwede ba ibalik,return_refund
+can i get my money back,return_refund
+i want to exchange my keyboard for another color,return_refund
+my gpu arrived broken what do i do,return_refund
+how many days do i have to return it,return_refund
+pwede pa ba i-refund,return_refund
+the laptop i bought is defective,return_refund
+do you offer replacements,return_refund
+ibabalik ko sana yung headset,return_refund
+saan kayo located,store_information
+what time do you close,store_information
+open ba kayo ng sunday,store_information
+contact number nyo po,store_information
+how do i get to your store,store_information
+are you open on holidays,store_information
+address ng easypc oasis,store_information
+anong oras kayo sarado,store_information
+is there parking at your branch,store_information
+do you have a facebook page,store_information
+asan na yung build na sinave ko,saved_build
+open my previous pc build,saved_build
+can i see the build i saved yesterday,saved_build
+view saved configuration,saved_build
+nasaan saved builds ko,saved_build
+show the pc i built earlier,saved_build
+retrieve my build list,saved_build
+i saved a build where is it,saved_build
+my builds,saved_build
+load the build i made,saved_build
+which is better asus or msi,brand_advice
+anong brand ng laptop ang maganda,brand_advice
+is gigabyte a good brand,brand_advice
+amd or intel which brand is better,brand_advice
+nvidia vs amd which brand for gpu,brand_advice
+what brand of ram do you recommend and why,brand_advice
+bakit maganda ang asus,brand_advice
+which mouse brand is best,brand_advice
+logitech or rakk which is better,brand_advice
+is lexar a reliable ssd brand,brand_advice
