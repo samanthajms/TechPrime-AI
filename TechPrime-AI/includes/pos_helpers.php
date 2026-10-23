@@ -655,7 +655,13 @@ function pos_get_sale_for_cashier(PDO $db, int $saleId, int $cashierId): ?array
     if (!$sale) {
         return null;
     }
-    $it = $db->prepare('SELECT product_name, barcode, unit_price, quantity, line_total FROM pos_sale_items WHERE sale_id = ? ORDER BY id');
+    $it = $db->prepare(
+        'SELECT i.product_name, i.barcode, i.unit_price, i.quantity, i.line_total, p.sku
+         FROM pos_sale_items i
+         LEFT JOIN products p ON p.id = i.product_id
+         WHERE i.sale_id = ?
+         ORDER BY i.id'
+    );
     $it->execute([$saleId]);
     $sale['items'] = $it->fetchAll(PDO::FETCH_ASSOC);
     return $sale;
