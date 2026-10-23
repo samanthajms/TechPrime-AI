@@ -303,6 +303,11 @@
         return escaped.replace(/\u0000(\d+)\u0000/g, function (m, i) { return held[Number(i)]; });
     }
 
+    /* One escaped line; "**bold**" from the general chat becomes bold instead of showing the stars. */
+    function inlineHtml(line) {
+        return linkify(escapeHtml(line)).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    }
+
     /* Plain text → paragraphs + bullet lists ("• " lines). Text is escaped first. */
     function formatBotText(text) {
         var lines = String(text || '').split(/\n/);
@@ -318,16 +323,16 @@
             list = [];
         }
         lines.forEach(function (raw) {
-            var line = raw.trim();
-            if (/^[•\-\*]\s+/.test(line)) {
+            var line = raw.trim().replace(/^#{1,6}\s+/, '');   // "### Heading" → plain line
+            if (/^([•\-\*]|\d+[.)])\s+/.test(line)) {
                 flushPara();
-                list.push('<li>' + linkify(escapeHtml(line.replace(/^[•\-\*]\s+/, ''))) + '</li>');
+                list.push('<li>' + inlineHtml(line.replace(/^([•\-\*]|\d+[.)])\s+/, '')) + '</li>');
             } else if (line === '') {
                 flushPara();
                 flushList();
             } else {
                 flushList();
-                para.push(linkify(escapeHtml(line)));
+                para.push(inlineHtml(line));
             }
         });
         flushPara();
@@ -1129,7 +1134,15 @@
             rememberMessage('user', message, [], sentAt);
             rememberMessage('bot', data.reply, replyProducts);
             persistExchange(message, data.reply);
-            if (data.intent === 'fallback') appendChips(STARTERS);
+            /* "Did you mean …?": the corrected question, one tap to send it */
+            var suggestions = Array.isArray(data.suggestions) ? data.suggestions.filter(function (s) {
+                return s && typeof s.text === 'string' && s.text !== '';
+            }) : [];
+            if (suggestions.length) {
+                appendChips(suggestions.map(function (s) {
+                    return { icon: 'fa-search', label: s.label || s.text, text: s.text };
+                }));
+            } else if (data.intent === 'fallback') appendChips(STARTERS);
         } else if (!networkFailed && data && typeof data.reply === 'string' && data.error === 'rate_limited') {
             /* Sent too fast: say how long to wait, and keep the text so one tap resends it. */
             reply = appendMessage('bot', data.reply, { error: true, retryText: message });

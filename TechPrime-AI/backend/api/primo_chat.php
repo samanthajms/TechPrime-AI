@@ -70,9 +70,31 @@ if ($wait > 0) {
     exit;
 }
 
+/* A misspelled product type or brand ("hedset", "lenvo laptop", "may moniter ba kayo") is asked back as
+ * "Did you mean …?" with the corrected question as suggestions, before any lookup answers with the
+ * wrong products. Order and account questions are left alone. */
+$db = ias_db_try();
+if ($db !== null && !preg_match('/\b(order|refund|return|password|tracking)\b/i', $message)) {
+    $misses = primo_spelling_check($db, $message);
+    if ($misses !== []) {
+        $result = primo_spelling_reply($message, $misses);
+        echo json_encode([
+            'ok' => true,
+            'intent' => 'spelling_check',
+            'confidence' => 1,
+            'raw_intent' => 'spelling_check',
+            'reply' => $result['reply'],
+            'products' => [],
+            'suggestions' => $result['suggestions'],
+            'show_tech_match' => false,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 /* "Will X work with Y?" is answered with the Build a PC compatibility rules. */
 if (primo_is_compat_question($message)) {
-    $db = getDbConnection();
+    $db ??= getDbConnection();
     $result = primo_compat_answer($db, $message);
     if ($result !== null) {
         primo_store_context('compatibility_question', $message, $result['products']);
@@ -91,7 +113,7 @@ if (primo_is_compat_question($message)) {
 
 if (primo_is_itemlist_question($message)) {
     try {
-        $db = getDbConnection();
+        $db ??= getDbConnection();
         $result = primo_itemlist_answer($db, $message);
     } catch (Throwable $e) {
         $result = ['reply' => 'I could not read the EasyPC catalog right now. Please try again in a moment.', 'products' => []];
@@ -110,7 +132,7 @@ if (primo_is_itemlist_question($message)) {
 }
 
 if (primo_is_explanation_request($message)) {
-    $db = getDbConnection();
+    $db ??= getDbConnection();
     $messageForLookup = primo_apply_context($message, 'brand_advice');
     $result = primo_brand_advice($db, $messageForLookup);
     primo_store_context('brand_advice', $messageForLookup, $result['products'] ?? []);
@@ -144,13 +166,34 @@ if ($intent === 'fallback') {
     primo_log_unanswered($message, $rawIntent, $confidence);
 }
 
-/* A brand plus a product type ("asus gpu", "intel processor") is a product search even when the
- * message is too short for the intent model. It is still logged above, so retraining can learn it. */
-if ($intent === 'fallback') {
-    $brandDb = ias_db_try();
-    $brandsAsked = $brandDb !== null ? primo_brands_in($brandDb, $message) : [];
-    if ($brandsAsked !== [] && primo_match_category(primo_without_brands($message, $brandsAsked)) !== null) {
+/* A message that names a product type is a catalog search, whatever the intent model made of it:
+ * "asus gpu" is too short for the model, and Taglish such as "ano yung mga headphones niyo?" scores as
+ * fallback or store information. Without this it reaches the general chat, which has no catalog and
+ * invents products. It is still logged above, so retraining can learn it. A brand inside the type word
+ * does not count ("cooler master case" is a case). */
+if (in_array($intent, ['fallback', 'greeting', 'help', 'store_information'], true)) {
+    $brandsAsked = $db !== null ? primo_brands_in($db, $message) : [];
+    if (primo_match_category(primo_without_brands($message, $brandsAsked)) !== null) {
         $intent = 'product_search';
+    }
+}
+
+/* Still unplaced: a word close to a product name ("vivobok") is asked back too, instead of going to the general chat. */
+if ($intent === 'fallback' && $db !== null && !preg_match('/\b(order|refund|return|password|tracking)\b/i', $message)) {
+    $misses = primo_spelling_check($db, $message, true);
+    if ($misses !== []) {
+        $result = primo_spelling_reply($message, $misses);
+        echo json_encode([
+            'ok' => true,
+            'intent' => 'spelling_check',
+            'confidence' => round($confidence, 4),
+            'raw_intent' => $rawIntent,
+            'reply' => $result['reply'],
+            'products' => [],
+            'suggestions' => $result['suggestions'],
+            'show_tech_match' => false,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 }
 
@@ -170,7 +213,7 @@ if (in_array($intent, ['greeting', 'goodbye', 'gratitude', 'help', 'fallback'], 
     }
 }
 
-$db = getDbConnection();
+$db ??= getDbConnection();
 
 /* Short follow-ups like "how much?" reuse the last product topic from this session. */
 $messageForLookup = primo_apply_context($message, $intent);
@@ -194,6 +237,7 @@ echo json_encode([
     'raw_intent' => $rawIntent,
     'reply' => $reply,
     'products' => $result['products'] ?? [],
+    'suggestions' => $result['suggestions'] ?? [],
     'show_tech_match' => !empty($result['show_tech_match']),
 ], JSON_UNESCAPED_UNICODE);
 }
@@ -263,6 +307,10 @@ function primo_phrase_catalog_reply(string $reply): string
         return $reply;
     }
     if (substr_count($reply, "\n") > 2) {
+        return $reply;
+    }
+    // a reply with product cards keeps its "•" lines (primo_cards_reply), or a reopened chat loses the cards
+    if (preg_match('/^\s*•\s/mu', $reply)) {
         return $reply;
     }
     if (!preg_match('/₱[\d,]+(?:\.\d+)?/u', $reply)) {
@@ -630,9 +678,10 @@ function primo_is_explanation_request(string $message): bool
     );
 }
 
-function primo_match_category(string $message): ?string
+/** Product-type words => category. primo_match_category() also accepts their plurals. */
+function primo_category_map(): array
 {
-    $categoryMap = [
+    return [
         'laptop' => 'Laptops',
         'laptops' => 'Laptops',
         'desktop' => 'Desktop',
@@ -640,6 +689,9 @@ function primo_match_category(string $message): ?string
         'audio' => 'Audio',
         'headset' => 'Audio',
         'headsets' => 'Audio',
+        'headphone' => 'Audio',
+        'earphone' => 'Audio',
+        'earbud' => 'Audio',
         'speaker' => 'Speaker',
         'cooling' => 'Cooling',
         'accessories' => 'Accessories',
@@ -671,9 +723,13 @@ function primo_match_category(string $message): ?string
         'monitor' => 'Monitor',
         'case' => 'Case',
     ];
+}
+
+function primo_match_category(string $message): ?string
+{
     $matched = null;
     $bestLen = 0;
-    foreach ($categoryMap as $needle => $cat) {
+    foreach (primo_category_map() as $needle => $cat) {
         // plurals too: "monitors", "gpus", "cases"
         if (!preg_match('/\b' . preg_quote($needle, '/') . '(?:e?s)?\b/i', $message)) {
             continue;
@@ -727,17 +783,11 @@ function primo_brand_advice(PDO $db, string $message): array
                 };
                 return $score($b) <=> $score($a);
             });
-            $lines = [];
-            foreach (array_slice($products, 0, 3) as $p) {
-                $stock = (int) $p['stock'];
-                $avail = $stock > 0 ? "in stock ({$stock})" : 'out of stock';
-                $lines[] = '• ' . $p['name'] . ' — ₱' . number_format((float) $p['price'], 2) . ' — ' . $avail;
-            }
-            $reply = "I checked the EasyPC catalog and there is no exact match for \"{$focus}\". "
-                . "The closest {$family} items we actually sell are:\n"
-                . implode("\n", $lines)
-                . "\nAsk me for the price, the stock, or which of these fits a budget and I will narrow it down.";
-            return ['reply' => $reply, 'products' => array_slice($products, 0, 3)];
+            return primo_cards_reply(
+                "I checked the EasyPC catalog and there is no exact match for \"{$focus}\". The closest {$family} items we actually sell are:",
+                array_slice($products, 0, 3),
+                'Ask me for the price, the stock, or which of these fits a budget and I will narrow it down.'
+            );
         }
         $where = $category !== null ? " for {$category}" : '';
         return [
@@ -749,10 +799,7 @@ function primo_brand_advice(PDO $db, string $message): array
     if (!empty($products)) {
         $top = $products[0];
         $brand = primo_brand_from_name((string) $top['name']);
-        $stock = (int) $top['stock'];
-        $avail = $stock > 0 ? "in stock ({$stock} available)" : 'currently out of stock';
-        $price = number_format((float) $top['price'], 2);
-        $cat = $category ?? primo_match_category((string) $top['name']) ?? ($top['category'] !== '' ? $top['category'] : 'this category');
+        $cat =$category ?? primo_match_category((string) $top['name']) ?? ($top['category'] !== '' ? $top['category'] : 'this category');
         $stats = primo_brand_stats($db, $cat !== 'this category' ? $cat : null);
         $why = '';
         foreach ($stats as $row) {
@@ -761,8 +808,12 @@ function primo_brand_advice(PDO $db, string $message): array
                 break;
             }
         }
-        $reply = "{$top['name']} is a {$cat} from {$brand}. It is ₱{$price} and {$avail}.{$why} I use our catalog for this, not a guess from outside the store. Ask me to compare another brand, or name a budget and I will narrow it down.";
-        return ['reply' => $reply, 'products' => array_slice($products, 0, 3)];
+        // name, price and stock are on the cards
+        return primo_cards_reply(
+            'The closest match in our catalog is ' . (count($products) > 1 ? 'the first one below' : 'the one below') . ", a {$cat} from {$brand}.{$why} I use our catalog for this, not a guess from outside the store.",
+            array_slice($products, 0, 3),
+            'Ask me to compare another brand, or name a budget and I will narrow it down.'
+        );
     }
 
     $scope = $category ?? null;
@@ -776,17 +827,21 @@ function primo_brand_advice(PDO $db, string $message): array
 
     $lead = $stats[0];
     $where = $scope !== null ? "in {$scope}" : 'across the EasyPC catalog';
-    $lines = [];
+    $counts = [];
+    $tops = [];   // each brand's top-end item in stock, shown as its card
     foreach (array_slice($stats, 0, 4) as $row) {
-        $lines[] = '• ' . $row['brand'] . ' — ' . $row['stocked'] . ' in stock (' . $row['count'] . ' listed), ₱' . number_format($row['min'], 2) . '–₱' . number_format($row['max'], 2);
+        $counts[] = "{$row['brand']} {$row['stocked']}";
+        if ($row['top'] !== null) {
+            $tops[] = $row['top'];
+        }
     }
     $reply = "You asked for the best brand and why. In this store I do not invent a winner. I pick the brand you can actually buy today: the one with the most items in stock {$where}. That is {$lead['brand']}, with {$lead['stocked']} in stock"
         . ($lead['count'] !== $lead['stocked'] ? " out of {$lead['count']} listed" : '')
         . ', from ₱' . number_format($lead['min'], 2) . ' to ₱' . number_format($lead['max'], 2) . ".\n"
-        . implode("\n", $lines)
-        . "\nTell me a category, a budget, or a part name and I will explain that choice the same way.";
+        . 'Items in stock per brand: ' . implode(', ', $counts) . '.'
+        . ($tops !== [] ? " Below is each brand's top-end item in stock." : '');
 
-    return ['reply' => $reply, 'products' => []];
+    return primo_cards_reply($reply, primo_map_product_rows($tops), 'Tell me a category, a budget, or a part name and I will explain that choice the same way.');
 }
 
 function primo_category_name_pattern(string $category): ?string
@@ -847,7 +902,7 @@ function primo_brand_from_name(string $name): string
 function primo_brand_stats(PDO $db, ?string $category): array
 {
     $condition = ias_client_product_list_sql_condition('p');
-    $sql = "SELECT p.name, p.price, p.stock, p.category FROM products p WHERE {$condition}";
+    $sql = "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url FROM products p WHERE {$condition}";
     $params = [];
     if ($category !== null && $category !== '') {
         $sql .= ' AND (' . ias_category_in_sql('p.category', $category, $params);
@@ -870,12 +925,15 @@ function primo_brand_stats(PDO $db, ?string $category): array
         }
         $key = mb_strtolower($brand);
         if (!isset($stats[$key])) {
-            $stats[$key] = ['brand' => $brand, 'count' => 0, 'stocked' => 0, 'min' => (float) $row['price'], 'max' => (float) $row['price']];
+            $stats[$key] = ['brand' => $brand, 'count' => 0, 'stocked' => 0, 'min' => (float) $row['price'], 'max' => (float) $row['price'], 'top' => null];
         }
         $price = (float) $row['price'];
         $stats[$key]['count']++;
         if ((int) ($row['stock'] ?? 0) > 0) {
             $stats[$key]['stocked']++;
+            if ($stats[$key]['top'] === null || $price > (float) $stats[$key]['top']['price']) {
+                $stats[$key]['top'] = $row;
+            }
         }
         $stats[$key]['min'] = min($stats[$key]['min'], $price);
         $stats[$key]['max'] = max($stats[$key]['max'], $price);
@@ -1126,9 +1184,21 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
     $wantsBuild = (bool) preg_match('/\b(build|components?|tech\s*&?\s*match|customize|parts?\s+to\s+choose)\b/i', $message . ' ' . (string) $displayMessage);
 
     if (empty($products)) {
+        // nothing matched: a word close to a product name ("vivobok") is asked back, not guessed
+        $misses = primo_spelling_check($db, $own, true);
+        if ($misses !== []) {
+            return primo_spelling_reply($own, $misses);
+        }
         if ($intent === 'product_recommendation' || $wantsBuild) {
             return [
                 'reply' => "Sure! 💻 I can help you choose components. Open Build a PC in the top navigation to customize a full setup, or tell me a specific part (like Ryzen 5, RTX 4060, or 1TB SSD).",
+                'products' => [],
+            ];
+        }
+        $named = primo_search_keywords($own);
+        if ($named !== []) {
+            return [
+                'reply' => 'I couldn\'t find "' . implode(' ', $named) . '" in the EasyPC catalog. Try another name, brand, or category, or open Shop Now to see everything in stock.',
                 'products' => [],
             ];
         }
@@ -1148,15 +1218,6 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
             'reply' => "I couldn't find matching products in the EasyPC catalog for that. Try another name, brand, or category — or open Build a PC to browse by component.",
             'products' => [],
         ];
-    }
-
-    $lines = [];
-    foreach ($products as $p) {
-        $stock = (int) ($p['stock'] ?? 0);
-        $avail = $stock > 0 ? "In stock ({$stock})" : 'Out of stock';
-        $price = number_format((float) $p['price'], 2);
-        $cat = $p['category'] ?: 'Uncategorized';
-        $lines[] = "• {$p['name']} — ₱{$price} — {$cat} — {$avail}";
     }
 
     switch ($intent) {
@@ -1181,19 +1242,16 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
         $intro = $brandIntro;
     }
 
-    $outro = "\nOpen Shop Now to buy, or ask me about price, stock, or compatibility.";
+    $outro = 'Open Shop Now to buy, or ask me about price, stock, or compatibility.';
     if ($total !== null && $total > count($products)) {
         // never let a short list look like everything the store has
         // primo.js turns [Shop Now](shop.php?...) into a link to that filtered list
-        $outro = "\nShowing " . count($products) . " of the {$total} {$listLabel} in stock. Open [Shop Now]("
+        $outro = 'Showing ' . count($products) . " of the {$total} {$listLabel} in stock. Open [Shop Now]("
             . primo_shop_url($listCategory, $listBrands, $products) . ') to see them all.';
     } elseif ($total !== null && $total > 1 && $limit === 12 && $brandIntro === null) {
         $intro = "Here are all {$total} {$listLabel} in stock:";
     }
-    return [
-        'reply' => $intro . "\n" . implode("\n", $lines) . $outro,
-        'products' => $products,
-    ];
+    return primo_cards_reply($intro, $products, $outro);
 }
 
 /**
@@ -1234,6 +1292,13 @@ function primo_find_products(PDO $db, string $message, string $intent, bool $str
             return !empty($attempt['keywords']);
         }));
     }
+    // A message that named something ("headfones", "xyz") must not be answered with the newest items
+    // of the whole shop: no match is answered with "could not find" / "did you mean" instead.
+    if ($keywords !== []) {
+        $attempts = array_values(array_filter($attempts, static function ($attempt) {
+            return $attempt['category'] !== null || !empty($attempt['cats']) || !empty($attempt['keywords']);
+        }));
+    }
 
     $seen = [];
     foreach ($attempts as $attempt) {
@@ -1271,14 +1336,7 @@ function primo_search_keywords(string $message): array
 {
     $lower = mb_strtolower($message);
     $tokens = preg_split('/\s+/', preg_replace('/[^\p{L}\p{N}\-+#.]/u', ' ', $lower) ?? '') ?: [];
-    $stop = [
-        'a','an','the','is','are','do','you','have','this','that','for','my','me','i','to','of','in','on',
-        'what','which','how','much','price','cost','stock','available','availability','recommend','recommendation',
-        'explain','explanation','details','detail','brand','brands','why','because','reason','reasons','better','compare','give',
-        'looking','need','show','find','want','buy','good','best','should','would','please','can','about',
-        'product','products','pc','computer','item','items','with','and','or','your','from','any','play',
-        'get','suggest','advice','advise','help','choose','still','right','now','tell',
-    ];
+    $stop = primo_stop_words();
     $keywords = [];
     foreach ($tokens as $t) {
         $t = trim((string) $t);
@@ -1296,6 +1354,207 @@ function primo_search_keywords(string $message): array
     }
 
     return $keywords;
+}
+
+/** Filler words that never name a product, in English and Tagalog/Taglish ("ipakita mo sakin yung mga headphones"). */
+function primo_stop_words(): array
+{
+    return [
+        'a','an','the','is','are','do','you','have','this','that','for','my','me','i','to','of','in','on',
+        'what','which','how','much','price','cost','stock','available','availability','recommend','recommendation',
+        'explain','explanation','details','detail','brand','brands','why','because','reason','reasons','better','compare','give',
+        'looking','need','show','find','want','buy','good','best','should','would','please','can','about',
+        'product','products','pc','computer','item','items','with','and','or','your','from','any','play',
+        'get','suggest','advice','advise','help','choose','still','right','now','tell',
+        // "what's new?", "recommend something": no product named, so the newest items are a fair answer
+        'new','newest','latest','something','anything',
+        'ano','anong','yung','iyong','yong','mga','niyo','nyo','ninyo','inyo','ipakita','pakita','pakitingin',
+        'patingin','tingin','mo','ko','sakin','akin','amin','namin','natin','sa','kayo','kayong','ka','ba','bang',
+        'po','opo','meron','merong','mayroon','may','ng','nang','ang','na','naman','lang','lamang','pa','gusto',
+        'hanap','hinahanap','naghahanap','pwede','puwede','paki','magkano','presyo','din','rin','nga','ito','eto',
+        'iyan','yan','yun','iyon','dito','diyan','dyan','kailangan','bili','bibili','bumili','para','sana','kung',
+        'saan','ilan','ilang','pang','at','o','kaya','wala','walang','bago','si','ni','sila','kami','tayo',
+    ];
+}
+
+/** Everyday shop words that are not in product names; the spell check must not take them for typos. */
+function primo_common_words(): array
+{
+    return [
+        'hello','hi','hey','thanks','thank','salamat','good','morning','afternoon','evening','bye','okay',
+        'want','need','like','looking','search','show','list','have','has','had','there','here','where','when',
+        'what','which','who','whom','whose','will','would','could','should','shall','might','must','does','did',
+        'done','make','made','take','took','come','came','going','gonna','know','think','sure','also','just',
+        'only','very','really','more','most','less','least','many','much','some','every','each','other','another',
+        'same','than','then','them','they','their','these','those','your','yours','ours','mine','into','onto',
+        'over','under','below','above','around','between','within','without','about','after','before','again',
+        'cheap','cheaper','cheapest','affordable','budget','expensive','price','prices','pricing','cost','costs',
+        'total','amount','pesos','peso','money','cash','card','gcash','maya','paymongo','payment','pay','paid',
+        'delivery','deliver','lalamove','pickup','pick','ship','shipping','store','shop','branch','open','close',
+        'closed','hours','time','today','tomorrow','address','location','contact','number','phone','email',
+        'order','orders','track','tracking','return','refund','warranty','repair','fix','broken','issue',
+        'problem','account','login','password','profile','cart','checkout','wishlist','review','reviews',
+        'build','builds','saved','part','parts','component','components','compatible','compatibility','upgrade',
+        'gaming','game','games','gamer','office','school','student','students','work','working','business',
+        'editing','video','videos','photo','photos','stream','streaming','music','movies','coding','programming',
+        'fast','faster','fastest','slow','strong','powerful','light','lightweight','small','big','large','size',
+        'color','colors','white','black','pink','blue','green','red','silver','gray','grey','wireless','wired',
+        'inch','inches','model','models','type','types','kind','kinds','spec','specs','specification',
+        'specifications','quality','brand','brands','available','availability','stock','stocks','left','sold',
+        'apply','deal','deals','sale','promo','discount','offer','offers','free','included','include','includes',
+        'please','pls','thank','sorry','yes','yeah','nope','maybe','compare','comparison','difference','versus',
+        'recommend','recommended','suggestion','suggestions','option','options','choice','best','better','great',
+        'nice','cool','awesome','latest','newest','older','used','brand-new','original','authentic','legit',
+        'mura','murang','mahal','maganda','magandang','sulit','salamat','hello','kamusta','kumusta','paano',
+        'pano','bakit','gaano','kelan','kailan','tapos','pero','kasi','talaga','sige','okay','ayos',
+        'primo','easypc','techprime','oasis','pasig','rosario',
+    ];
+}
+
+/**
+ * What the spell check compares a word with. "strong": product types and brands, word => how to write it;
+ * a near miss of one of these is asked back ("Did you mean headset?"). "names": every word of the product
+ * names, offered only when a search found nothing. "known": words that are never a typo. Built once per request.
+ *
+ * @return array{strong:array<string,string>,names:array<string,string>,known:array<string,true>}
+ */
+function primo_spelling_words(PDO $db): array
+{
+    static $words = null;
+    if ($words !== null) {
+        return $words;
+    }
+    $strong = [];
+    foreach (array_keys(primo_category_map()) as $type) {
+        foreach (explode(' ', $type) as $part) {   // "power supply": each word on its own
+            $strong[$part] = $part;
+        }
+    }
+    foreach (['laptop', 'desktop', 'headset', 'headphone', 'earphone', 'earbud', 'speaker', 'keyboard', 'printer',
+        'scanner', 'monitor', 'processor', 'motherboard', 'cooler', 'case', 'gpu', 'cpu', 'ssd'] as $countable) {
+        $strong[$countable . 's'] = $countable . 's';
+    }
+    $known = [];
+    foreach (array_keys(primo_brand_patterns($db)) as $label) {
+        $key = mb_strtolower(str_replace([' ', '-'], '', $label));
+        if (mb_strlen($key) >= 3) {
+            $strong[$key] = $label;
+        }
+        foreach (preg_split('/[\s\-]+/', mb_strtolower($label)) ?: [] as $part) {
+            $known[$part] = true;
+        }
+    }
+    $names = [];
+    try {
+        foreach ($db->query('SELECT name FROM products') as $row) {
+            preg_match_all('/\p{L}{3,}/u', mb_strtolower((string) $row['name']), $m);
+            foreach ($m[0] as $word) {
+                $names[$word] = $word;
+            }
+        }
+    } catch (Throwable $e) {
+        // no product words: types and brands are still checked
+    }
+    foreach (array_merge(primo_stop_words(), primo_common_words()) as $word) {
+        $known[$word] = true;
+    }
+    $words = [
+        'strong' => $strong,
+        'names' => $names,
+        'known' => $known + array_fill_keys(array_keys($strong), true) + array_fill_keys(array_keys($names), true),
+    ];
+    return $words;
+}
+
+/**
+ * The closest targets to a word that is not known: same first letter, at most 1 letter off (2 for words
+ * of 6+ letters). A 4-letter word only counts when a letter was left out ("mous"), so "cash" is not "case".
+ *
+ * @param array<string,string> $targets
+ * @return list<string> how to write each match, best first, at most 2
+ */
+function primo_spelling_matches(string $word, array $targets): array
+{
+    $len = strlen($word);
+    $max = $len >= 6 ? 2 : 1;
+    $found = [];
+    foreach ($targets as $target => $label) {
+        $target = (string) $target;
+        if ($target[0] !== $word[0] || abs(strlen($target) - $len) > $max) {
+            continue;
+        }
+        if ($len < 5 && (strlen($target) !== $len + 1 || !preg_match('/^' . implode('.?', array_map(static fn ($c) => preg_quote($c, '/'), str_split($word))) . '.?$/', $target))) {
+            continue;
+        }
+        $distance = levenshtein($word, $target);
+        if ($distance <= $max) {
+            $found[$label] = min($found[$label] ?? PHP_INT_MAX, $distance);
+        }
+    }
+    if ($found === []) {
+        return [];
+    }
+    $best = min($found);
+    $closest = array_keys(array_filter($found, static fn ($d) => $d === $best));
+    return array_slice(array_map('strval', $closest), 0, 2);
+}
+
+/**
+ * Words in the message that look like misspelled product types or brands, or with $names also like
+ * misspelled words of product names.
+ *
+ * @return list<array{word:string,options:list<string>}>
+ */
+function primo_spelling_check(PDO $db, string $message, bool $names = false): array
+{
+    $words = primo_spelling_words($db);
+    $targets = $names ? $words['strong'] + $words['names'] : $words['strong'];
+    preg_match_all('/[\p{L}\p{N}]+/u', mb_strtolower($message), $m);
+    $misses = [];
+    foreach (array_unique($m[0]) as $token) {
+        // model numbers ("rtx4060", "b450m") and short words are left alone
+        if (strlen($token) < 4 || preg_match('/\d|[^a-z]/', $token) || isset($words['known'][$token])) {
+            continue;
+        }
+        // a plural of a known word ("vivobooks", "boxes") is known too
+        if (isset($words['known'][substr($token, 0, -1)]) || (str_ends_with($token, 'es') && isset($words['known'][substr($token, 0, -2)]))) {
+            continue;
+        }
+        $options = primo_spelling_matches($token, $targets);
+        if ($options !== []) {
+            $misses[] = ['word' => $token, 'options' => $options];
+        }
+    }
+    return $misses;
+}
+
+/**
+ * "Did you mean …?" for the words primo_spelling_check() found, with the corrected question as
+ * tap-to-send suggestions (shown by primo.js as chips).
+ *
+ * @param list<array{word:string,options:list<string>}> $misses
+ * @return array{reply:string,products:array,suggestions:list<array{label:string,text:string}>}
+ */
+function primo_spelling_reply(string $message, array $misses): array
+{
+    $typed = implode(' or ', array_map(static fn ($miss) => '"' . $miss['word'] . '"', $misses));
+    $meant = implode(' and ', array_map(static fn ($miss) => implode(' or ', array_map(static fn ($o) => '"' . $o . '"', $miss['options'])), $misses));
+    $replace = static function (string $text, string $word, string $with): string {
+        return preg_replace('/(?<![\p{L}\p{N}])' . preg_quote($word, '/') . '(?![\p{L}\p{N}])/iu', $with, $text) ?? $text;
+    };
+    $suggestions = [];
+    foreach ($misses[0]['options'] as $option) {
+        $text = $replace($message, $misses[0]['word'], $option);
+        foreach (array_slice($misses, 1) as $miss) {
+            $text = $replace($text, $miss['word'], $miss['options'][0]);
+        }
+        $suggestions[] = ['label' => mb_strimwidth($text, 0, 48, '…'), 'text' => $text];
+    }
+    return [
+        'reply' => "I couldn't find {$typed} in the EasyPC catalog. Did you mean {$meant}? Pick a suggestion below, or type the name again.",
+        'products' => [],
+        'suggestions' => $suggestions,
+    ];
 }
 
 /**
@@ -1409,6 +1668,28 @@ function primo_map_product_rows(array $filtered): array
         ];
     }
     return $out;
+}
+
+/**
+ * Every answer that shows products has this one shape, so the chat draws the same product cards for
+ * all of them (CLIENT/primo.js botContentHtml: text above, cards, note below) and a reopened chat gets
+ * the cards back (CLIENT/primo_history_api.php reads the "•" lines): the text, one
+ * "• {name} — ₱{price} — {category} — {availability}" line per product, then a short note.
+ *
+ * @param list<array{name:string,price:float,stock:int,category:string}> $products from primo_map_product_rows()
+ * @return array{reply:string,products:list<array>}
+ */
+function primo_cards_reply(string $text, array $products, string $note = ''): array
+{
+    $reply = trim($text);
+    foreach ($products as $p) {
+        $stock = (int) ($p['stock'] ?? 0);
+        $avail = $stock > 0 ? "In stock ({$stock})" : 'Out of stock';
+        $cat = ($p['category'] ?? '') !== '' ? $p['category'] : 'Uncategorized';
+        $reply .= "\n• {$p['name']} — ₱" . number_format((float) $p['price'], 2) . " — {$cat} — {$avail}";
+    }
+    $note = trim($note);
+    return ['reply' => $note !== '' ? $reply . "\n" . $note : $reply, 'products' => $products];
 }
 
 /* ---- Brands ----------------------------------------------------------------
@@ -1983,28 +2264,6 @@ function primo_peso(float $amount): string
     return '₱' . number_format($amount, 2);
 }
 
-function primo_itemlist_line(array $row): string
-{
-    $stock = $row['stock'] > 0 ? "{$row['stock']} on hand" : 'none on hand';
-    return "• {$row['name']} — " . primo_peso($row['price']) . " — {$stock}";
-}
-
-function primo_itemlist_blurb(array $row): string
-{
-    $stock = $row['stock'] > 0 ? "{$row['stock']} on hand" : 'none on hand';
-    $warranty = rtrim(trim((string) ($row['warranty'] ?? '')), '.');
-    $warranty = $warranty !== '' ? $warranty : 'warranty not listed';
-    $desc = trim((string) ($row['description'] ?? ''));
-    if (mb_strlen($desc) > 160) {
-        $desc = rtrim(mb_substr($desc, 0, 157)) . '...';
-    }
-    $text = "{$row['name']} — " . primo_peso($row['price']) . " — {$stock} — {$warranty}.";
-    if ($desc !== '') {
-        $text .= ' ' . $desc;
-    }
-    return $text;
-}
-
 /**
  * @return array{reply:string,products:list<array>}
  */
@@ -2055,41 +2314,47 @@ function primo_itemlist_answer(PDO $db, string $message): array
             }
             $rows = $ofBrand;
         }
+        // "components for gaming", "parts for a build": PC parts only, not mice, tables or laptops
+        $partsOnly = (bool) preg_match('/\b(components?|parts?|build|piyesa)\b/i', $message);
         $byCat = [];
         foreach ($rows as $row) {
             if ($row['category'] === '' || in_array(strtolower($row['category']), ['others', 'services'], true)) {
                 continue;
             }
+            if ($partsOnly && primo_compat_slot_for_category($row['category']) === null
+                && !in_array(strtolower($row['category']), ['solid state drive', 'hard disk', 'chassis fan'], true)) {
+                continue;
+            }
             $byCat[$row['category']][] = $row;
         }
         ksort($byCat);
-        $lines = [];
-        foreach ($byCat as $category => $group) {
+        $picks = [];
+        foreach ($byCat as $group) {
             $pick = primo_itemlist_pick($group, $pref, 1);
             $best = $pick['picks'][0] ?? null;
             if ($best === null || $best['stock'] <= 0 || $pick['none_under']) {
                 continue;
             }
-            $lines[] = '• ' . $category . ' — ' . $best['name'] . ' — ' . primo_peso($best['price']) . ' — ' . $best['stock'] . ' on hand';
+            $picks[] = $best;
         }
+        $what = $partsOnly ? 'PC part type' : 'category';
         if ($pref['mode'] === 'budget') {
-            $intro = 'Here is the most affordable in-stock product in each category right now:';
+            $intro = "Here is the most affordable in-stock product in each {$what} right now:";
         } elseif ($pref['mode'] === 'under') {
-            $intro = "Here is the top in-stock product at or under {$limitText} in each category:";
+            $intro = "Here is the top in-stock product at or under {$limitText} in each {$what}:";
         } else {
-            $intro = 'Here is the top-end (highest-priced) in-stock product in each category right now:';
+            $intro = "Here is the top-end (highest-priced) in-stock product in each {$what} right now:";
         }
-        if ($lines === []) {
+        if ($picks === []) {
             return [
                 'reply' => "I couldn't find an in-stock product that matches. Try a higher price limit or one category, such as GPU or RAM.",
                 'products' => [],
             ];
         }
-        return [
-            'reply' => $intro . "\n" . implode("\n", $lines)
-                . "\nAsk about one category, such as GPU, laptop, or RAM, for its description and warranty.",
-            'products' => [],
-        ];
+        $note = $partsOnly
+            ? 'Open Build a PC to check that the parts fit together, or ask about one part for its description and warranty.'
+            : 'Ask about one category, such as GPU, laptop, or RAM, for its description and warranty.';
+        return primo_cards_reply($intro, primo_map_product_rows($picks), $note);
     }
 
     $filtered = primo_itemlist_filter($rows, $topic);
@@ -2112,36 +2377,37 @@ function primo_itemlist_answer(PDO $db, string $message): array
     $pick = primo_itemlist_pick($filtered, $pref, 3);
     $picks = $pick['picks'];
     $best = $picks[0];
+    // the name, price and stock are on the cards, so the text stays short and points at them
+    $first = count($picks) > 1 ? 'the first one below' : 'the one below';
 
     if ($best['stock'] <= 0) {
-        $lead = "EasyPC lists this {$label}, but none are in stock right now:";
+        $lead = "EasyPC lists this {$label}, but none are in stock right now.";
         $outro = 'Ask me again later, or open Shop Now to see what is available.';
     } elseif ($pick['none_under']) {
-        $lead = "There is no in-stock {$label} at or under {$limitText}. The most affordable one in stock is:";
+        $lead = "There is no in-stock {$label} at or under {$limitText}. The most affordable one in stock is {$first}.";
         $outro = "Ask for a higher limit, like \"best {$label} under " . primo_peso(ceil($best['price'] / 1000) * 1000) . '".';
     } elseif ($pref['mode'] === 'budget') {
-        $lead = "The most affordable in-stock {$label} right now is:";
+        $lead = "The most affordable in-stock {$label} right now is {$first}.";
         $outro = "Ask for the top-end {$label} if you want the highest specs.";
     } elseif ($pref['mode'] === 'under') {
-        $lead = "The top in-stock {$label} at or under {$limitText} is:";
+        $lead = "The top in-stock {$label} at or under {$limitText} is {$first}.";
         $outro = "Ask for the top-end {$label} if you want the highest specs.";
     } else {
-        $lead = "The top-end in-stock {$label} right now is the highest-priced one, since higher-priced parts usually have higher specs:";
+        $lead = "The top-end in-stock {$label} right now is {$first}: the highest-priced one, since higher-priced parts usually have higher specs.";
         $outro = "Want something cheaper? Ask for a budget {$label}, or one under a price, like \"best {$label} under 10k\".";
     }
-    $extra = '';
-    if (preg_match('/\bquality\b/i', $message)) {
-        $extra = ' The catalog does not give a quality score; it gives the description, warranty, price, and stock.';
+    // the warranty is not on the cards; the description only when the shopper asks for it
+    $warranty = rtrim(trim((string) ($best['warranty'] ?? '')), '.');
+    $about = 'Warranty: ' . ($warranty !== '' ? $warranty : 'not listed') . '.';
+    $desc = trim((string) ($best['description'] ?? ''));
+    if ($desc !== '' && preg_match('/\b(specs?|specifications?|description|details?|about|features?|quality)\b/i', $message)) {
+        $about .= ' ' . (mb_strlen($desc) > 160 ? rtrim(mb_substr($desc, 0, 157)) . '...' : $desc);
     }
-    $more = count($picks) > 1 ? ' Other options are listed below.' : '';
-    $lines = array_map('primo_itemlist_line', $picks);
+    if (preg_match('/\bquality\b/i', $message)) {
+        $about .= ' The catalog does not give a quality score; it gives the description, warranty, price, and stock.';
+    }
 
-    return [
-        'reply' => $brandNote . $lead . ' ' . primo_itemlist_blurb($best) . $extra . $more
-            . "\n" . implode("\n", $lines)
-            . "\n" . $outro,
-        'products' => primo_map_product_rows($picks),
-    ];
+    return primo_cards_reply($brandNote . $lead . "\n" . $about, primo_map_product_rows($picks), $outro);
 }
 
 /**
@@ -2653,7 +2919,7 @@ function primo_compat_answer(PDO $db, string $message): ?array
     }
 
     $products = primo_map_product_rows(array_values(array_filter(array_map(static fn ($c) => $c['row'], $chosen))));
-    $footer = "\nI check socket, RAM type, size, and power from the product names and descriptions, like Build a PC does.";
+    $footer = 'I check socket, RAM type, size, and power from the product names and descriptions, like Build a PC does.';
 
     if (count($chosen) >= 2) {
         $ok = [];
@@ -2684,7 +2950,7 @@ function primo_compat_answer(PDO $db, string $message): ?array
                 . implode("\n- ", array_map(static fn ($p) => ucfirst(primo_compat_needs($p)), $list))
                 . "\nOpen Build a PC to check them in a full setup.";
         }
-        return ['reply' => $reply . $footer, 'products' => $products];
+        return primo_cards_reply($reply, $products, $footer);
     }
 
     // One part: say what it needs and show in-stock parts that match it
@@ -2719,13 +2985,14 @@ function primo_compat_answer(PDO $db, string $message): ?array
 
     $reply = ucfirst(primo_compat_needs($part));
     if ($matches !== []) {
-        $reply .= "\nIn-stock " . primo_compat_slot_label($target) . ' options that match, most affordable first:'
-            . "\n" . implode("\n", array_map('primo_itemlist_line', $matches))
-            . "\nName a second part, like a motherboard or RAM, and I'll check the pair.";
-        return ['reply' => $reply, 'products' => primo_map_product_rows($matches)];
+        return primo_cards_reply(
+            $reply . "\nIn-stock " . primo_compat_slot_label($target) . ' options that match, most affordable first:',
+            primo_map_product_rows($matches),
+            "Name a second part, like a motherboard or RAM, and I'll check the pair."
+        );
     }
     if ($target !== null) {
         $reply .= "\nI couldn't confirm an in-stock " . primo_compat_slot_label($target) . ' that matches it. Open Build a PC to browse compatible parts.';
     }
-    return ['reply' => $reply . $footer, 'products' => $products];
+    return primo_cards_reply($reply, $products, $footer);
 }

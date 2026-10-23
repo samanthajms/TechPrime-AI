@@ -164,5 +164,5 @@ $primoChatKey = $primoGuest ? 'guest' : 'u' . (int) $_SESSION['user_id'];
     </section>
 </div>
 <script>window.EP_CSRF = window.EP_CSRF || <?php echo json_encode($primoCsrf); ?>;</script>
-<script src="primo.js?v=ux-13" defer></script>
+<script src="primo.js?v=ux-15" defer></script>
 <script src="../includes/service_warmup.js?v=1" data-svc="primo" defer></script>
