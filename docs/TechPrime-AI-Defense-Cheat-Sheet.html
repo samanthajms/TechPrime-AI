@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Defense Cheat Sheet</title>
+<style>
+  :root {
+    --green: #3d7422; --green-fill: #62b236; --green-tint: #eef6e8;
+    --yellow: #f3c400; --yellow-tint: #fff8d6; --yellow-ink: #7a5d00;
+    --red: #c0392b; --red-tint: #fdecea; --blue: #1f5f9e; --blue-tint: #e8f1fa;
+    --ink: #16201a; --ink-2: #45514a; --muted: #5c6862; --line: #dfe5dc;
+  }
+  @page { size: A4; margin: 13mm 12mm 15mm 12mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #fff; color: var(--ink); }
+  body { font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif; font-size: 8.9pt; line-height: 1.45; }
+  main { max-width: 900px; margin: 0 auto; padding: 0 16px; }
+  code { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 8pt; background: #f2f5f1; border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }
+
+  .top { background: linear-gradient(150deg, #1d3a12, #13230d); color: #fff; border-radius: 14px; padding: 16px 20px; margin-bottom: 10px; }
+  .top .eyebrow { color: var(--yellow); letter-spacing: .12em; text-transform: uppercase; font-size: 8pt; font-weight: bold; }
+  .top h1 { margin: 4px 0 2px; font-size: 20pt; color: #fff; }
+  .top p { margin: 0; color: #c9f5a8; font-size: 9.6pt; }
+
+  .nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0 10px; }
+  .nums div { border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; background: #fafcf9; break-inside: avoid; }
+  .nums b { display: block; font-size: 13pt; color: var(--green); line-height: 1.2; }
+  .nums span { font-size: 7.8pt; color: var(--ink-2); }
+
+  .tips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+  .tips div { background: var(--yellow-tint); border-left: 4px solid var(--yellow); border-radius: 8px; padding: 6px 9px; font-size: 8.4pt; break-inside: avoid; }
+  .tips b { color: var(--yellow-ink); }
+
+  h2 { font-size: 11.5pt; margin: 12px 0 6px; padding: 5px 10px; background: var(--green-tint); border-left: 5px solid var(--green-fill); border-radius: 6px; color: var(--green); break-after: avoid; page-break-after: avoid; }
+  h2 small { color: var(--ink-2); font-weight: normal; font-size: 8.4pt; margin-left: 6px; }
+  .qs { columns: 2; column-gap: 14px; }
+  .q { break-inside: avoid; page-break-inside: avoid; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; margin: 0 0 7px; background: #fff; }
+  .q > b { display: block; color: var(--ink); margin-bottom: 2px; }
+  .q > b::before { content: "Q  "; color: var(--green); font-weight: bold; }
+  .q p { margin: 0; color: var(--ink-2); }
+  .q .where { display: block; margin-top: 3px; font-size: 7.6pt; color: var(--muted); }
+  .tag { display: inline-block; font-size: 6.8pt; font-weight: bold; letter-spacing: .05em; text-transform: uppercase; border-radius: 999px; padding: 0 6px; margin-left: 4px; vertical-align: 1px; }
+  .t-trap { background: var(--red-tint); color: var(--red); border: 1px solid #e9a29a; }
+  .t-honest { background: var(--yellow-tint); color: var(--yellow-ink); border: 1px solid var(--yellow); }
+  .t-deep { background: var(--blue-tint); color: var(--blue); border: 1px solid #9cc0e3; }
+  .legend { font-size: 7.8pt; color: var(--muted); margin: 0 0 4px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 8.4pt; margin: 4px 0 8px; }
+  tr { break-inside: avoid; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { background: #f2f5f1; font-size: 7.6pt; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }
+  .k { font-weight: bold; width: 30%; }
+  .foot { font-size: 7.8pt; color: var(--muted); text-align: center; margin-top: 10px; }
+
+  @media screen {
+    body { background: #eef2ec; font-size: 10pt; }
+    main { background: #fff; padding: 22px 26px 30px; margin: 18px auto; border-radius: 14px; box-shadow: 0 2px 14px rgba(0,0,0,.08); }
+  }
+  @media screen and (max-width: 700px) {
+    main { margin: 0; border-radius: 0; padding: 16px; }
+    .qs { columns: 1; }
+    .nums { grid-template-columns: repeat(2, 1fr); }
+    .tips { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<div class="top">
+  <div class="eyebrow">TechPrime AI · Capstone defense</div>
+  <h1>Panel Questions Cheat Sheet</h1>
+  <p>Short answers you can say out loud. Each one is based on the actual code. The full explanations are in the System Guide.</p>
+</div>
+
+<div class="nums">
+  <div><b>5 roles</b><span>Admin, Retail Officer, Inventory Custodian, Cashier, Client</span></div>
+  <div><b>3 AI models</b><span>XGBoost (forecast), SVM (Primo), Random Forest (Build a PC)</span></div>
+  <div><b>83.8%</b><span>Primo on 160 unseen hard sentences (134/160)</span></div>
+  <div><b>82.7% ± 1.7</b><span>Primo 5×5 cross-validation, 922 examples</span></div>
+  <div><b>0.32</b><span>Primo confidence threshold → below it, ask to rephrase</span></div>
+  <div><b>16 intents</b><span>price, stock, order status, compatibility, greeting…</span></div>
+  <div><b>99.0%</b><span>Random Forest accuracy, 4-fold CV grouped by build</span></div>
+  <div><b>65% vs 57%</b><span>Hit@3 on real builds: model vs rules (price 51%, random 40%)</span></div>
+  <div><b>60 trees · 23 features</b><span>54,724 training rows (53,985 rule + 739 real)</span></div>
+  <div><b>1–3 months</b><span>Forecast horizon (demand + revenue)</span></div>
+  <div><b>0 · 1–5 · 6–15</b><span>Out · Critical · Low stock thresholds</span></div>
+  <div><b>3 tries · 15 min</b><span>Lockout after 3 wrong passwords · idle logout</span></div>
+  <div><b>12% VAT</b><span>Prices VAT-inclusive: VAT = total − total ÷ 1.12</span></div>
+  <div><b>261 products</b><span>Imported from EasyPC's Oasis item list</span></div>
+  <div><b>24 h · 90 d · 7 d</b><span>Activation link · unanswered log · Primo chat history</span></div>
+  <div><b>02:00 nightly</b><span>Build-a-PC retrain, goes live only if accuracy ≥ 0.90</span></div>
+</div>
+
+<div class="tips">
+  <div><b>Answer shape:</b> what it does → how it works → how you know it works (a test or a number).</div>
+  <div><b>Don't know?</b> “That part is handled by ___; I can show it in the code.” Then open the file named under the answer.</div>
+  <div><b>Limitation asked?</b> Admit it, give the reason (scope/time), give the fix. Admitting it plainly scores better than defending it.</div>
+</div>
+<p class="legend"><span class="tag t-trap">trap</span> a question meant to catch a weak spot · <span class="tag t-honest">admit</span> a known limitation · <span class="tag t-deep">deep</span> a technical follow-up</p>
+
+<!-- ======================================================= -->
+<h2>1 · The project in general <small>opening questions</small></h2>
+<div class="qs">
+  <div class="q"><b>Explain your system in one minute.</b><p>TechPrime AI is an inventory, point-of-sale and online-store system for EasyPC One Oasis. A single database connects the counter, the stock room, the website and the office. A counter sale, an online order and a supplier delivery all update the same stock number immediately. Three AI features sit on top: demand and sales forecasting, the Primo chatbot, and a Build-a-PC recommender.</p></div>
+  <div class="q"><b>What problem does it solve?</b><p>Stock that drifts out of sync between counter and records, items running out without warning, no online channel, and buying decisions based on guesses. We answer with live stock, automatic low-stock alerts, an online store, and forecasts with reorder suggestions.</p></div>
+  <div class="q"><b>Who are the users?</b><p>Five roles. Clients (customers) shop online. Cashiers sell at the counter. Inventory Custodians manage products, stock-in and online orders. Retail Officers handle reports and forecasts. Admins handle accounts, logs and settings.</p></div>
+  <div class="q"><b>What makes it “AI”?</b><p>Three trained models. XGBoost forecasts demand and revenue. An SVM classifies what a chat message is asking for. A Random Forest ranks compatible PC parts. Each one was evaluated with held-out data (see the numbers above).</p></div>
+  <div class="q"><b>What is the scope? What is NOT included?</b><p>Included: one branch's inventory, POS, online orders (delivery via Lalamove or store pickup), reports, forecasts, chatbot and PC builder. Not included: multi-branch stock, a real payment gateway, accounting/payroll, and courier tracking integration.</p></div>
+  <div class="q"><b>What is new compared with existing systems?</b><p>Forecasts that turn into inventory actions (reorder point, order quantity). A chatbot that answers from live store data in Taglish. A PC builder that combines hard compatibility rules with a model trained on real customer builds. All on one shared stock database.</p></div>
+  <div class="q"><b>Did the client actually use or validate it?</b><p>The catalog is EasyPC's real item list (261 products, their SKUs and barcodes). <i>Add your own evaluation or acceptance results here if you ran a user survey or client test.</i></p></div>
+  <div class="q"><b>Why the name “TechPrime AI”? Why “Primo”?</b><p><i>Answer from your team.</i> Primo is the store's shopping assistant persona.</p></div>
+</div>
+
+<!-- ======================================================= -->
+<h2>2 · Technology and architecture</h2>
+<div class="qs">
+  <div class="q"><b>What is your tech stack?</b><p>PHP 8.2 on Apache with vanilla JavaScript/CSS and a PostgreSQL database on Supabase. Python (scikit-learn, Flask) for the chatbot and PC models, and an XGBoost forecast service on Render. Gmail SMTP sends e-mails, and Chart.js draws the charts.</p></div>
+  <div class="q"><b>Your proposal said Next.js / FastAPI. Why PHP?</b> <span class="tag t-trap">trap</span><p>Plain PHP runs on XAMPP and simple hosting with no build step, which fit our timeline. We kept Python where it matters, for the ML. PostgreSQL was chosen because the POS needs real transactions and row locks.</p></div>
+  <div class="q"><b>Why PostgreSQL and not MySQL?</b><p>We needed reliable transactions, <code>SELECT … FOR UPDATE</code> row locks, <code>RETURNING</code>, CHECK constraints (stock ≥ 0) and a hosted, backed-up service (Supabase).</p></div>
+  <div class="q"><b>Why no framework (Laravel, React)?</b><p>The pages are server-rendered, which keeps them fast and simple to deploy with no build step. Shared helpers in <code>includes/</code> give us the reuse a framework would.</p></div>
+  <div class="q"><b>How does the browser talk to the AI models?</b><p>It never does directly. The browser calls PHP, and PHP calls the Python services. That keeps API keys secret and lets PHP validate input, check the user's role and rate-limit.</p><span class="where">backend/api/primo_chat.php · forecast_api.php</span></div>
+  <div class="q"><b>Where is it hosted?</b><p>Locally on XAMPP. For hosting, a Docker image (<code>php:8.2-apache</code>, Asia/Manila timezone). The database is on Supabase; Primo and the forecast service run on Render.</p></div>
+  <div class="q"><b>How do you keep passwords and API keys out of the code?</b><p>They live in a <code>.env</code> file or in server environment variables, loaded with phpdotenv, and never committed to Git.</p></div>
+  <div class="q"><b>Is it responsive / mobile-friendly?</b><p>Yes. Staff screens have a sidebar on desktop and a bottom tab bar on phones, and tables turn into cards on small screens. Buttons are at least 44 px, and status is shown with an icon and text, not colour alone.</p></div>
+</div>
+
+<!-- ======================================================= -->
+<h2>3 · Security and access control</h2>
+<div class="qs">
+  <div class="q"><b>How are passwords stored?</b><p>As bcrypt hashes (<code>password_hash</code>). We never store or see the real password; login uses <code>password_verify</code>.</p></div>
+  <div class="q"><b>What stops brute-force login?</b><p>Three wrong passwords lock the account (<code>is_locked</code>), which is recorded in <code>locked_accounts</code> and the audit log. Only an Admin can unblock it.</p><span class="where">login.php</span></div>
+  <div class="q"><b>Admin Settings has “max failed attempts”. Does it work?</b> <span class="tag t-honest">admit</span><p>The value is saved, but login currently uses a fixed 3. Connecting it is a one-line follow-up in <code>login.php</code>.</p></div>
+  <div class="q"><b>Can a cashier open the admin page by typing its URL?</b><p>No. Every page starts with <code>checkRole()</code>, which redirects to login. JSON endpoints check the session role and return 403.</p></div>
+  <div class="q"><b>What about SQL injection?</b><p>All queries use PDO prepared statements, so user input is sent as data, never as SQL.</p></div>
+  <div class="q"><b>And XSS?</b><p>Every value printed into HTML goes through <code>h()</code> (<code>htmlspecialchars</code>), so typed scripts show as text.</p></div>
+  <div class="q"><b>What is CSRF and how do you prevent it?</b><p>A forged form submitted from another site. Each form carries a random secret token stored in the session, and the server compares it with <code>hash_equals</code> before doing anything.</p></div>
+  <div class="q"><b>What if a staff member leaves the PC unattended?</b><p>After 15 minutes of inactivity the session ends; a 60-second countdown warning appears first. Background polling (stock alerts) doesn't count as activity.</p></div>
+  <div class="q"><b>How do you verify customer e-mails?</b><p>An activation link with a random 64-character token that expires in 24 hours. It works once (the token is deleted), and a resend option is offered.</p></div>
+  <div class="q"><b>Do you have two-factor authentication?</b> <span class="tag t-honest">admit</span><p>TOTP (Google Authenticator) code exists in the older API (<code>backend/api/auth.php</code>), but the main login page doesn't use it yet. Adding it for staff accounts is the next step.</p></div>
+  <div class="q"><b>Why does login say “Invalid email or password” for both cases?</b><p>So an attacker can't find out which e-mails have accounts.</p></div>
+  <div class="q"><b>How can you trace who did something?</b><p><code>logActivity()</code> records the user, action, details (for example “stock 3 → 23”) and IP for logins, sales, stock-ins, orders, exports and settings changes. Admin sees it in Activity Logs.</p></div>
+  <div class="q"><b>Could someone read the database through Supabase's public API?</b> <span class="tag t-deep">deep</span><p>No. Row Level Security is on with no policies, so the public REST API returns nothing. Only our server's connection reads data.</p></div>
+  <div class="q"><b>What is session fixation and do you handle it?</b> <span class="tag t-deep">deep</span><p>An attacker plants a session ID before login. We call <code>session_regenerate_id(true)</code> on login, so the planted ID becomes useless.</p></div>
+</div>
+
+<!-- ======================================================= -->
+<h2>4 · Cashier POS</h2>
+<div class="qs">
+  <div class="q"><b>Walk us through a POS sale.</b><p>Scan → the check digit is validated → the product is looked up → added to the cart. Then choose Cash, GCash, Maya or Card, complete the sale (one database transaction), and print the receipt with an invoice number like <code>INV-20261023-000123</code>.</p></div>
+  <div class="q"><b>How does the scanner work without clicking a field?</b><p>A USB scanner types like a very fast keyboard and ends with Enter. <code>barcode_scanner.js</code> detects keystrokes arriving milliseconds apart and treats them as a scan.</p></div>
+  <div class="q"><b>What if the barcode is misread?</b><p>The last digit is a check digit computed from the others (weights 1 and 3, then mod 10). One wrong digit breaks the check, and the scan is rejected in both the browser and the server.</p></div>
+  <div class="q"><b>Two cashiers sell the last item at the same time. What happens?</b> <span class="tag t-trap">trap</span><p>The sale locks the product rows (<code>FOR UPDATE</code>). The second sale waits, then sees stock 0 and gets “Not enough stock”. The update also requires <code>stock &gt;= qty</code>, and the database forbids negative stock.</p></div>
+  <div class="q"><b>What if the cashier clicks “Complete sale” twice or Wi-Fi drops?</b><p>Each sale carries a unique ID (UUID, <code>client_ref</code>) created by the screen. A repeat request returns the original sale instead of charging twice. The UNIQUE constraint also covers two requests arriving at the same instant.</p></div>
+  <div class="q"><b>What if something fails halfway through a sale?</b><p>Everything is in one transaction: sale, items, stock deduction, stock movement and log. Any error rolls all of it back: “No changes were saved.”</p></div>
+  <div class="q"><b>Can someone change a price in the browser?</b><p>No. The server ignores browser prices and reads them from the database inside the transaction. If prices changed since the scan, the cashier is asked to review the new total.</p></div>
+  <div class="q"><b>How is VAT computed?</b><p>Prices include 12% VAT. VATable = total ÷ 1.12 (rounded to the centavo); VAT = total − VATable, so the two always add up exactly. Example: ₱3,450.00 → ₱3,080.36 + ₱369.64.</p></div>
+  <div class="q"><b>Why store money as centavos?</b> <span class="tag t-deep">deep</span><p>Decimal fractions like 0.1 aren't exact in floating point, so the POS works in whole centavos (₱1,234.50 = 123450) to keep totals and change exact.</p></div>
+  <div class="q"><b>What is a deadlock and how do you avoid it?</b> <span class="tag t-deep">deep</span><p>Two sales each waiting for a row the other locked. We always lock products in ID order, so the circular wait can't happen.</p></div>
+  <div class="q"><b>Can the cashier add stock?</b><p>No, by design. Stock-in belongs to the Inventory Custodian (separation of duties), so the person handling cash can't also adjust stock to hide shortages.</p></div>
+  <div class="q"><b>Is GCash/Maya/Card payment integrated?</b> <span class="tag t-honest">admit</span><p>At the counter the customer pays on their own app or terminal, and the cashier records the reference number (required). There is no direct API integration.</p></div>
+</div>
+
+<!-- ======================================================= -->
+<h2>5 · Online store and orders</h2>
+<div class="qs">
+  <div class="q"><b>What are the order statuses?</b><p>To Pay → To Ship → To Receive (“With Courier”) → Completed, or Cancelled. Status only moves forward; Completed and Cancelled are final. Pickup orders skip To Ship.</p></div>
+  <div class="q"><b>When is stock deducted for online orders?</b> <span class="tag t-trap">trap</span><p>Stock is checked (with a row lock) when the order is placed, and deducted once, when the customer clicks “Item Received” or staff completes the order. Unpaid orders can still be cancelled, so deducting earlier would show items as sold out when they aren't. A <code>stock_deducted</code> flag guarantees it happens only once.</p></div>
+  <div class="q"><b>Then can two customers order the last item?</b> <span class="tag t-trap">trap</span><p>Both orders can be placed, because stock isn't reserved at order time. Completion deducts with <code>stock &gt;= qty</code>, so the second completion is refused rather than going negative. A reservation step at payment is a possible improvement.</p></div>
+  <div class="q"><b>Is the online payment real?</b> <span class="tag t-honest">admit</span><p>No. It's a placeholder for the project; the page says so. “Pay Now” marks the order paid with a generated reference. A real gateway (for example PayMongo) would replace only that step.</p></div>
+  <div class="q"><b>Who can cancel, and when?</b><p>The customer can request it only while the order is unpaid and in To Pay, choosing a reason. The custodian approves it. Stock doesn't change because none was deducted.</p></div>
+  <div class="q"><b>What happens to a guest's cart after login?</b><p>It merges into the saved database cart (keeping the higher quantity for duplicates), so carts survive logout and login.</p></div>
+  <div class="q"><b>What stops a double order from a double-click?</b><p>A one-time checkout token: the second submit is refused.</p></div>
+  <div class="q"><b>How is delivery handled?</b><p>Delivery orders get a shipment record with carrier Lalamove; the custodian updates the status. Pickup orders become To Receive right after payment.</p></div>
+  <div class="q"><b>Can customers leave reviews?</b><p>One review per completed order: 1–5 stars, comment, tags, optional photos, and it can be anonymous. The custodian can reply.</p></div>
+  <div class="q"><b>How does the customer know what's happening?</b><p>Bell notifications at each step (placed, paid, accepted, completed, cancellation), each linking to the right order tab.</p></div>
+</div>
+
+<!-- ======================================================= -->
+<h2>6 · Inventory, reports and admin</h2>
+<div class="qs">
+  <div class="q"><b>How do stock alerts work?</b><p>Out = 0, Critical = 1–5, Low = 6–15. After every stock change, the system compares the old and new level and notifies Admin, Retail Officer and Custodian only when the level changes (or stock recovers). The same alert isn't repeated within 24 hours.</p></div>
+  <div class="q"><b>Why fixed thresholds for all products?</b> <span class="tag t-honest">admit</span><p>It keeps the rule simple and clear for the store. A per-product reorder level, or using the forecast's reorder point, is the improvement.</p></div>
+  <div class="q"><b>How is a delivery from a supplier recorded?</b><p>Stock-in: scan, quantity (1–10,000), supplier (required) and reference number. It locks the row, adds the stock, and writes a <code>stock_movements</code> entry (before → after) plus an audit log line.</p></div>
+  <div class="q"><b>Where is your suppliers table?</b> <span class="tag t-trap">trap</span><p>There isn't one. A supplier is the product's brand, matched from the first word of the product name against the shop's brand list. Simple for this branch; a real suppliers table is future work.</p></div>
+  <div class="q"><b>What if a product has no barcode?</b><p>The custodian generates an in-store EAN-13: “21” + 10-digit product ID + check digit, and prints a label.</p></div>
+  <div class="q"><b>What counts as a sale in reports?</b><p>Completed online orders plus POS sales. Unpaid, in-transit and cancelled orders don't count. Reports read live data.</p></div>
+  <div class="q"><b>What reports can the Retail Officer produce?</b><p>Totals, transactions, units, average sale, sales by category, daily trend and a 12-month breakdown, with month-over-month and year-over-year % badges. Exports to CSV, Excel and PDF, and each export is logged.</p></div>
+  <div class="q"><b>What can the Admin do?</b><p>Create staff accounts, block/unblock/delete users, view all activity logs, set the password policy, and view alerts, forecasts and messages.</p></div>
+  <div class="q"><b>How is time handled?</b> <span class="tag t-deep">deep</span><p>Timestamps are stored in UTC and displayed in Asia/Manila time, so “today's sales” is correct wherever the server runs.</p></div>
+  <div class="q"><b>Is there internal communication?</b><p>Staff chat for Admin, Retail and Custodian: attachments, reactions, unsend, forward, pin and search, plus a floating widget on every staff page. Each action checks that the user is in that conversation.</p></div>
+</div>
+
+<!-- ======================================================= -->
+<h2>7 · AI #1 · Forecasting (XGBoost)</h2>
+<div class="qs">
+  <div class="q"><b>What does the forecast predict?</b><p>Units per product (demand) and store revenue for 1, 2 or 3 months ahead. Each comes with a likely range, the trend, confidence, and inventory actions: days of stock left, safety stock, reorder point, stockout risk and a recommended order quantity.</p></div>
+  <div class="q"><b>What is XGBoost, simply?</b><p>Many small decision trees built one after another. Each new tree corrects the errors of the previous ones, and the forecast is the sum of all of them (“gradient boosting”). It works well on tabular sales data.</p></div>
+  <div class="q"><b>Why XGBoost and not ARIMA or linear regression?</b> <span class="tag t-deep">deep</span><p>Sales per product are irregular and depend on several factors (recent months, trend, category). Boosted trees handle many features and non-linear patterns without assuming a fixed curve, and they train fast on small tabular data.</p></div>
+  <div class="q"><b>What is a reorder point?</b><p>The stock level at which to order: average daily demand × supplier lead time + safety stock. Example: 2/day × 7 days + 6 = 20.</p></div>
+  <div class="q"><b>What is safety stock?</b><p>Extra units kept for unexpected demand or late deliveries, so the store doesn't run out while waiting for stock.</p></div>
+  <div class="q"><b>Why does the forecast sometimes load slowly?</b><p>The service is on Render's free tier, which sleeps when idle and can take about 50 seconds to wake. The proxy waits up to 75 seconds, and the screen asks the user to retry if it's still waking.</p></div>
+  <div class="q"><b>How is the forecast API protected?</b><p>Only Admin, Retail and Custodian can call it (403 for others). PHP adds the API key server-side, validates the horizon (1–3), category text and dates, and requires HTTPS.</p></div>
+  <div class="q"><b>How accurate is the forecast?</b> <span class="tag t-honest">admit</span><p>The screen shows each product's confidence and model reliability from the service's metrics. <i>Quote the accuracy figure (MAE/MAPE/WAPE) from your forecast service's evaluation; it's in the forecast repository, not this codebase.</i></p></div>
+  <div class="q"><b>Where is the model code?</b><p>In a separate repository deployed to Render. This system uses it through <code>forecast_api.php</code> and displays it in <code>includes/forecast_cards.php</code>.</p></div>
+  <div class="q"><b>What if there is little sales history?</b> <span class="tag t-trap">trap</span><p>Forecasts are less reliable for new or rarely sold products; that's why the screen shows a confidence and a likely range, not just one number.</p></div>
+</div>
+
+<!-- ======================================================= -->
+<h2>8 · AI #2 · Primo chatbot (TF-IDF + SVM)</h2>
+<div class="qs">
+  <div class="q"><b>How does Primo understand a question?</b><p>TF-IDF turns the text into numbers (words, word pairs and 3–5-letter chunks). An SVM then picks one of 16 intents with a confidence. PHP runs that intent's handler, which reads the live database.</p></div>
+  <div class="q"><b>What is TF-IDF?</b><p>Term frequency × inverse document frequency: words that are distinctive across all examples weigh more than common words like “the”.</p></div>
+  <div class="q"><b>What is an SVM?</b><p>A Support Vector Machine learns the boundaries that best separate the categories. We use an RBF kernel (C = 2.5, balanced classes) with probability outputs.</p></div>
+  <div class="q"><b>Why SVM and not a neural network or only ChatGPT?</b> <span class="tag t-trap">trap</span><p>With about 900 examples, an SVM is accurate, fast, explainable and runs on a free server. An LLM alone could invent prices or stock. Here the model only chooses the intent; the facts come from our database.</p></div>
+  <div class="q"><b>How does it handle Taglish and typos?</b><p>Character chunks: “magkano”, “mgkano” and “magkanoo” share most 3–5-letter pieces. The training data also has 102 Taglish/Filipino examples.</p></div>
+  <div class="q"><b>What if Primo is unsure?</b><p>If the top probability is below 0.32, it asks the shopper to rephrase instead of guessing, and saves the masked question so we can retrain on it.</p></div>
+  <div class="q"><b>How did you pick 0.32?</b> <span class="tag t-deep">deep</span><p>With <code>tune_threshold.py</code> on out-of-fold probabilities. Macro-F1 was almost flat from 0.10 to 0.32, so we took the highest threshold within 0.005 of the best. That's about 8% wrong answers and 9% rephrase requests.</p></div>
+  <div class="q"><b>How do you know the 83.8% is honest?</b><p>The 160-sentence hard test set was written before the new training data and is never trained on. Training rows that were too similar to a test sentence (cosine ≥ 0.80) were removed.</p></div>
+  <div class="q"><b>Then what is the LLM (Groq) for?</b><p>Only to rephrase our database sentence so it sounds friendlier, and for small talk about the shop. If any peso amount, product name or “N on hand” changes, the reply is rejected and the original sentence is used.</p></div>
+  <div class="q"><b>Can Primo answer off-topic questions (homework, love advice)?</b><p>No. Off-topic messages get a fixed “I'm only here for EasyPC” reply and are never sent to the LLM.</p></div>
+  <div class="q"><b>What about privacy (Data Privacy Act, RA 10173)?</b><p>E-mails and phone numbers are masked before anything goes to Groq or the unanswered log. That log has no user, session or IP and is deleted after 90 days. Chat history is deleted after 7 days, and the privacy policy page explains all of it.</p></div>
+  <div class="q"><b>Can someone spam Primo?</b><p>Rate limits: 15 messages per minute per browser and 60 per IP. Messages are capped at 400 characters, and CSRF is checked.</p></div>
+  <div class="q"><b>What are Primo's weak spots?</b> <span class="tag t-honest">admit</span><p>The “help” and “fallback” intents (4–6 out of 10 on the hard set). The test set was written by the same team, so the next round of data will come from real unanswered questions.</p></div>
+  <div class="q"><b>Can it answer “Will this GPU fit my case?”</b><p>Yes. Compatibility questions skip the SVM and use the same rules as Build a PC.</p></div>
+</div>
+
+<!-- ======================================================= -->
+<h2>9 · AI #3 · Build a PC (rules + Random Forest)</h2>
+<div class="qs">
+  <div class="q"><b>How does it check compatibility?</b><p>It reads tags from product names and descriptions: socket, DDR type, form factor, NVMe/SATA, watts. Rules then check CPU socket = board socket, RAM type = board/CPU type, cooler socket, case ≥ board size and PSU ≥ estimated draw.</p></div>
+  <div class="q"><b>Then why do you need machine learning?</b> <span class="tag t-trap">trap</span><p>Rules only say what fits. Among compatible parts, the forest ranks what suits this purpose, budget and the rest of the build. On real customer builds it put the chosen part in the top 3 65% of the time, versus 57% for rules alone, 51% for price range and 40% for random.</p></div>
+  <div class="q"><b>What is a Random Forest?</b><p>60 decision trees, each trained on a random sample. Each one votes a “good fit” probability; we average them. A score ≥ 0.5 means a good fit, and the top 3 get the Recommended badge.</p></div>
+  <div class="q"><b>What features does it use?</b><p>23 features, including purpose, slot, price-tier gap versus the build, performance tier, balance, cooling margin, PSU headroom/rating and VRAM. The top ones are budget slack (19%), slot (14%), price-tier gap (13%) and performance tier (11%).</p></div>
+  <div class="q"><b>Where did the training data come from?</b><p>53,985 rule rows: random partial builds from the real catalog, labelled by expert rules for 5 purposes and several budgets. 739 real rows: saved builds, orders and POS sales, where the part the customer chose counts as good. Real rows are weighted 5×.</p></div>
+  <div class="q"><b>99% accuracy is suspicious. Is it overfitting?</b> <span class="tag t-trap">trap</span><p>It's cross-validated by build, so each score comes from builds the model never saw. It's high because most labels come from rules, which trees learn easily. On real rows alone it's about 47%, because only the one part the customer picked counts as “right”. That's why we report Hit@3 (65%) as the fair measure.</p></div>
+  <div class="q"><b>Does the model improve over time?</b><p>Yes. Every night at 02:00 it rebuilds the dataset from the database (read only) and retrains. The new model goes live only if the row count is ≥ 90% of the last run and accuracy is ≥ 0.90; otherwise the old model stays.</p></div>
+  <div class="q"><b>Why does PHP run the forest, not Python?</b> <span class="tag t-deep">deep</span><p>The trained trees are exported to <code>forest.json</code>, and PHP walks them directly. No extra server is needed, and recommendations work even if Python is down.</p></div>
+  <div class="q"><b>Can it recommend a part that leaves no option for another slot?</b><p>No. A “dead-end” check refuses any part that would leave a required part with no compatible item in stock.</p></div>
+  <div class="q"><b>What is “Build it for me”?</b><p>Given a purpose and budget, it fills each empty slot in order, using a budget share per slot and the best-scoring compatible part.</p></div>
+  <div class="q"><b>What if a product description is wrong?</b> <span class="tag t-honest">admit</span><p>Compatibility relies on product text, so bad names give bad tags. The fix is storing specs as proper product columns.</p></div>
+  <div class="q"><b>How is PSU wattage estimated?</b><p>CPU 65 W + board 40 W + GPU 180 W + RAM 10 W + storage 15 W for the rule check; the recommender also looks at PSU headroom and rating.</p></div>
+</div>
+
+<!-- ======================================================= -->
+<h2>10 · Database, testing and deployment</h2>
+<div class="qs">
+  <div class="q"><b>What are your main tables?</b><p><code>users</code>, <code>products</code>, <code>orders</code> / <code>order_items</code> / <code>shipments</code>, <code>pos_sales</code> / <code>pos_sale_items</code>, <code>stock_movements</code> (stock ledger), <code>logs</code> (audit), <code>notifications</code>, <code>cart</code>, <code>wishlist</code>, <code>saved_builds</code>, <code>order_reviews</code>, <code>messages</code>, <code>site_settings</code>.</p></div>
+  <div class="q"><b>Show us normalization / relationships.</b><p>Orders reference users; order_items reference orders and products; shipments reference orders; sale items reference sales. Sale items copy the name and price at the time of sale, on purpose, so old receipts never change.</p></div>
+  <div class="q"><b>How did you test the system?</b><p>Syntax checks on every PHP file. Database logic tested in transactions that are rolled back afterwards. Role access tested with logged-in requests per role. UI tested with automated headless-browser runs (including simulated scans) and screenshots at desktop, tablet and phone widths. ML models evaluated with cross-validation and held-out test sets.</p></div>
+  <div class="q"><b>Do you have unit tests?</b> <span class="tag t-honest">admit</span><p>No automated test suite. Testing was scripted and manual as described. The ML side has its own test scripts (<code>test_intents.py</code>, <code>evaluate_cv.py</code>).</p></div>
+  <div class="q"><b>What if the database is down?</b><p>Visitors see a branded “can't connect” page. Technical details go only to the server log.</p></div>
+  <div class="q"><b>What if an AI service is down?</b><p>Primo shows “temporarily unavailable”. Without Groq it still answers with plain database sentences. The forecast shows a “waking up, retry” message. Build a PC still filters with rules if the model file is missing.</p></div>
+  <div class="q"><b>Can it scale to more branches?</b> <span class="tag t-trap">trap</span><p>Not as is: stock is one number per product. Multi-branch needs a stock-per-branch table and a branch on each sale and order. The rest (roles, POS logic, models) carries over.</p></div>
+  <div class="q"><b>How are backups handled?</b><p>Supabase manages the hosted database and its backups. All schema changes are written as SQL migration files in <code>database/</code>.</p></div>
+</div>
+
+<!-- ======================================================= -->
+<h2>11 · Limitations and future work <small>say these before they find them</small></h2>
+<table>
+  <tr><th>Limitation</th><th>Why</th><th>Future work</th></tr>
+  <tr><td class="k">Online payment is a placeholder</td><td>Real gateways need business verification</td><td>PayMongo (or similar), mark paid from its webhook</td></tr>
+  <tr><td class="k">“Max failed attempts” setting not applied</td><td>Login uses a fixed 3</td><td>Read the setting in login.php</td></tr>
+  <tr><td class="k">2FA not on the main login</td><td>TOTP code exists only in the old API</td><td>Enable TOTP for staff</td></tr>
+  <tr><td class="k">Same stock thresholds for all products</td><td>Simpler rule for one branch</td><td>Per-product reorder level from the forecast</td></tr>
+  <tr><td class="k">No suppliers table</td><td>Supplier = brand</td><td>Suppliers table + purchase orders</td></tr>
+  <tr><td class="k">Compatibility from product text</td><td>No structured spec columns</td><td>Store socket/DDR/form/watts as columns</td></tr>
+  <tr><td class="k">Online stock not reserved at order time</td><td>Deducted at completion</td><td>Reserve stock on payment</td></tr>
+  <tr><td class="k">Free-tier AI hosting sleeps</td><td>Cost</td><td>Paid plan or scheduled warm-up</td></tr>
+  <tr><td class="k">One live database, no test copy</td><td>Free plan</td><td>Staging database</td></tr>
+  <tr><td class="k">Single branch, no courier API</td><td>Project scope</td><td>Branch stock table, Lalamove API tracking</td></tr>
+</table>
+
+<!-- ======================================================= -->
+<h2>12 · If the demo breaks</h2>
+<table>
+  <tr><th>What happens</th><th>What to say / do</th></tr>
+  <tr><td class="k">Forecast spins for a long time</td><td>“The forecast service is on a free host that sleeps; it takes about a minute to wake.” Show another module, then come back.</td></tr>
+  <tr><td class="k">Primo says “temporarily unavailable”</td><td>The Python service is asleep or not started. Locally: <code>python predict_api.py</code> in <code>ml/primo</code>. Meanwhile, show a compatibility question; it doesn't need the SVM.</td></tr>
+  <tr><td class="k">“Can't connect” page</td><td>Database or internet issue. Check Wi-Fi/hotspot; the page itself proves the error handling works.</td></tr>
+  <tr><td class="k">Logged out mid-demo</td><td>That's the 15-minute idle timeout working as designed. Log in again.</td></tr>
+  <tr><td class="k">Account locked during demo</td><td>That's the 3-try lockout. Unblock it from Admin → Manage Users.</td></tr>
+  <tr><td class="k">Scanner not reading</td><td>Type the barcode in the scan field and press Enter (same path). Test codes: <code>400000000015</code>, <code>20000011</code>, <code>2000000000015</code>.</td></tr>
+  <tr><td class="k">Activation e-mail slow</td><td>Gmail delivery can take a minute; use the Resend button, or demo with an already activated account.</td></tr>
+</table>
+
+<p class="foot">Lines in <i>italics</i> are for your team to fill in (survey results, forecast metrics, naming). Everything else comes from the code and model files. Good luck!</p>
+</main>
+</body>
+</html>
