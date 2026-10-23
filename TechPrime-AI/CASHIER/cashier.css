@@ -321,10 +321,10 @@ body.cx-page-pos .cx-main { padding-top: 20px; }
 .receipt-toolbar { display: flex; gap: 10px; flex-wrap: wrap; }
 .receipt-missing { max-width: 520px; margin: 24px auto 0; border: 1px solid var(--cx-border); border-radius: var(--cx-r-lg); background: var(--cx-surface); }
 .receipt {
-    position: relative; width: 100%; max-width: 384px; margin: 8px auto 24px; padding: 28px 24px 24px;
-    background: #fff; color: #111; border-radius: 6px 6px 0 0;
-    font-family: var(--cx-font-num); font-size: 12.5px; line-height: 1.6;
-    box-shadow: 0 1px 2px rgba(19, 35, 13, 0.06), 0 18px 40px -12px rgba(19, 35, 13, 0.22);
+    width: 100%; max-width: 820px; margin: 8px auto 24px; padding: 28px 32px 36px;
+    background: #fff; color: #111; border: 1px solid #d5d5d5;
+    font-family: Arial, Helvetica, sans-serif; font-size: 13px; line-height: 1.35;
+    font-variant-numeric: tabular-nums;
 }
 /* Hidden frame that receipt_print.js prints from (Print / Reprint stay in this tab) */
 .cx-print-frame {
@@ -333,26 +333,39 @@ body.cx-page-pos .cx-main { padding-top: 20px; }
 }
 .cx-btn.is-busy { pointer-events: none; opacity: 0.75; cursor: progress; }
 body.cx-receipt-frame { min-height: 0; background: #fff; padding: 16px; }
-/* torn thermal-paper edge (screen only) */
-.receipt::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: -10px; height: 10px;
-    background:
-        linear-gradient(135deg, #fff 50%, transparent 50%) 0 0 / 14px 10px repeat-x,
-        linear-gradient(225deg, #fff 50%, transparent 50%) 0 0 / 14px 10px repeat-x;
-    filter: drop-shadow(0 3px 2px rgba(19, 35, 13, 0.06));
+.receipt .r-head { text-align: center; }
+.receipt .r-logo { display: block; height: 42px; width: auto; margin: 0 auto 2px; }
+.receipt .r-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; }
+.receipt .r-co { font-weight: 700; margin-top: 8px; }
+.receipt .r-meta { text-align: center; font-weight: 700; }
+.receipt .r-title { font-size: 15px; }
+.receipt hr { border: none; border-top: 1px dashed #222; margin: 10px 0; }
+.receipt .r-party { display: grid; gap: 2px; }
+.receipt .r-party span { display: inline-block; min-width: 88px; }
+.receipt .r-party b { font-weight: 700; margin-right: 6px; }
+.receipt .r-lines { width: 100%; border-collapse: collapse; }
+.receipt .r-lines th { font-weight: 700; text-align: left; padding: 0 6px 2px 0; vertical-align: bottom; white-space: nowrap; }
+.receipt .r-lines td { vertical-align: top; padding: 7px 6px 7px 0; }
+.receipt .r-lines .r-sku { width: 124px; font-weight: 700; }
+.receipt .r-lines .r-desc { font-weight: 700; overflow-wrap: anywhere; }
+.receipt .r-lines .num { width: 88px; text-align: right; white-space: nowrap; }
+.receipt .r-lines .qty { width: 42px; text-align: center; }
+.receipt .r-lines thead .num,
+.receipt .r-lines thead .qty { text-align: right; }
+.receipt .r-lines thead .qty { text-align: center; }
+.receipt .r-foot {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
+    margin-top: 8px; padding-top: 8px; border-top: 2px solid #111;
 }
-.receipt .r-center { text-align: center; }
-.receipt .r-store { font-family: var(--cx-font); font-size: 20px; font-weight: 800; letter-spacing: 0.02em; }
-.receipt .r-title { font-weight: 700; letter-spacing: 0.16em; margin-top: 10px; }
-.receipt hr { border: none; border-top: 1px dashed #9ca3af; margin: 12px 0; }
-.receipt .r-row { display: flex; justify-content: space-between; gap: 10px; }
-.receipt .r-row span:last-child { text-align: right; white-space: nowrap; }
-.receipt .r-item-name { font-weight: 600; overflow-wrap: anywhere; }
-.receipt .r-total { font-size: 15px; font-weight: 700; }
-.receipt .r-note { font-size: 11px; color: #444; }
+.receipt .r-remarks { font-weight: 700; padding-top: 4px; }
+.receipt .r-totals { margin-left: auto; border-collapse: collapse; }
+.receipt .r-totals th { text-align: right; font-weight: 700; padding: 1px 14px 1px 0; white-space: nowrap; }
+.receipt .r-totals td { text-align: right; padding: 1px 0; white-space: nowrap; min-width: 96px; }
+.receipt .r-totals .r-grand th,
+.receipt .r-totals .r-grand td { font-weight: 700; }
 .receipt .r-void {
     color: #b91c1c; font-weight: 700; text-align: center; font-size: 14px; letter-spacing: 0.12em;
-    border: 2px solid #b91c1c; border-radius: 4px; padding: 4px;
+    border: 2px solid #b91c1c; border-radius: 4px; padding: 4px; margin-top: 8px;
 }
 
 /* =========================================================================
@@ -432,11 +445,10 @@ body.cx-receipt-frame { min-height: 0; background: #fff; padding: 16px; }
    7. Print (receipt) + reduced motion
    ========================================================================= */
 @media print {
-    @page { margin: 6mm; }
+    @page { size: A4 portrait; margin: 12mm; }
     .receipt-toolbar, .cx-print-frame { display: none !important; }
     body.cx-receipt-frame { padding: 0; }
-    .receipt { max-width: 72mm; border: none; border-radius: 0; box-shadow: none; padding: 0; margin: 0 auto; font-size: 11px; }
-    .receipt::after { display: none; }
+    .receipt { max-width: none; border: none; padding: 0; margin: 0; font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
     .pay-method:active, .pay-chip-amt:active, .pos-remove:active { transform: none; }
