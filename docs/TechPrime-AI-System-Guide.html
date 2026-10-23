@@ -1,0 +1,1085 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TechPrime AI System Guide</title>
+<style>
+  :root {
+    --green: #3d7422; --green-fill: #62b236; --green-tint: #eef6e8; --green-deep: #13230d;
+    --yellow: #f3c400; --yellow-tint: #fff8d6; --yellow-ink: #7a5d00;
+    --red: #c0392b; --red-tint: #fdecea; --blue: #1f5f9e; --blue-tint: #e8f1fa;
+    --ink: #16201a; --ink-2: #45514a; --muted: #5c6862; --line: #dfe5dc; --page: #ffffff;
+  }
+  @page { size: A4; margin: 16mm 15mm 18mm 15mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--page); color: var(--ink); }
+  body { font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif; font-size: 10.4pt; line-height: 1.55; }
+  main { max-width: 820px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3, h4 { line-height: 1.25; color: var(--ink); }
+  h2 { font-size: 19pt; margin: 0 0 4px; padding-top: 2px; }
+  h2 .num { color: var(--green-fill); margin-right: 8px; }
+  h3 { font-size: 12.6pt; margin: 20px 0 6px; color: var(--green); }
+  h4 { font-size: 10.8pt; margin: 14px 0 4px; }
+  p { margin: 6px 0 8px; }
+  ul, ol { margin: 6px 0 10px; padding-left: 22px; }
+  li { margin: 3px 0; }
+  code, .mono { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 9.2pt; }
+  code { background: #f2f5f1; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  .chapter { break-before: page; page-break-before: always; }
+  .lede { color: var(--ink-2); font-size: 11pt; margin: 2px 0 14px; border-bottom: 2px solid var(--green-fill); padding-bottom: 10px; }
+  .avoid { break-inside: avoid; page-break-inside: avoid; }
+
+  /* Cover */
+  .cover { min-height: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 6mm 0 0; }
+  .cover-band { background: linear-gradient(150deg, #1d3a12, #13230d); color: #fff; border-radius: 18px; padding: 24px 28px 22px; }
+  .cover-band .eyebrow { color: var(--yellow); letter-spacing: .12em; text-transform: uppercase; font-size: 9.5pt; font-weight: bold; }
+  .cover-band h1 { color: #fff; font-size: 30pt; margin: 10px 0 6px; }
+  .cover-band .sub { color: #c9f5a8; font-size: 13pt; margin: 0; }
+  .cover-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .cover-meta div { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 10px 12px; font-size: 9.6pt; color: #e8f5df; }
+  .cover-meta b { display: block; color: #fff; font-size: 10.4pt; }
+  .toc { margin-top: 12px; columns: 2; column-gap: 26px; font-size: 9.6pt; }
+  .toc ol { margin: 0; padding-left: 20px; }
+  .toc li { break-inside: avoid; margin: 1px 0 3px; }
+  .toc span { color: var(--muted); font-size: 9pt; display: block; }
+  .howto { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-top: 10px; font-size: 9.6pt; }
+  .howto h4 { margin: 0 0 6px; }
+
+  /* Boxes */
+  .box { border-radius: 10px; padding: 10px 14px; margin: 12px 0; border-left: 5px solid; break-inside: avoid; page-break-inside: avoid; }
+  .box > b.tag { display: block; font-size: 8.8pt; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 3px; }
+  .box p:last-child, .box ul:last-child, .box ol:last-child { margin-bottom: 0; }
+  .simple { background: var(--green-tint); border-color: var(--green-fill); }
+  .simple > b.tag { color: var(--green); }
+  .example { background: var(--blue-tint); border-color: var(--blue); }
+  .example > b.tag { color: var(--blue); }
+  .panel { background: var(--yellow-tint); border-color: var(--yellow); }
+  .panel > b.tag { color: var(--yellow-ink); }
+  .warn { background: var(--red-tint); border-color: var(--red); }
+  .warn > b.tag { color: var(--red); }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 9.5pt; break-inside: auto; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f2f5f1; font-size: 8.8pt; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .k { font-weight: bold; }
+  td.k { width: 26%; }
+
+  /* Figures */
+  figure { margin: 12px 0 14px; break-inside: avoid; page-break-inside: avoid; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption { font-size: 8.8pt; color: var(--muted); text-align: center; margin-top: 4px; }
+  .steps { counter-reset: s; list-style: none; padding-left: 0; }
+  .steps > li { counter-increment: s; position: relative; padding-left: 34px; margin: 7px 0; break-inside: avoid; }
+  .steps > li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 23px; height: 23px; border-radius: 50%; background: var(--green); color: #fff; font-weight: bold; font-size: 9pt; text-align: center; line-height: 23px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card { border: 1px solid var(--line); border-radius: 12px; padding: 10px 13px; break-inside: avoid; }
+  .card h4 { margin: 0 0 4px; color: var(--green); }
+  .card p, .card ul { margin: 4px 0 0; font-size: 9.6pt; }
+  .pill { display: inline-block; border-radius: 999px; padding: 0 8px; font-size: 8.6pt; font-weight: bold; border: 1px solid; }
+  .p-ok { color: var(--green); border-color: var(--green-fill); background: var(--green-tint); }
+  .p-low { color: var(--yellow-ink); border-color: var(--yellow); background: var(--yellow-tint); }
+  .p-crit { color: #a3254a; border-color: #e58aa6; background: #fdebf1; }
+  .p-out { color: var(--red); border-color: #e9a29a; background: var(--red-tint); }
+  .qa dt { font-weight: bold; margin-top: 10px; break-after: avoid; }
+  .qa dt::before { content: "Q: "; color: var(--green); }
+  .qa dd { margin: 3px 0 0 0; padding-left: 20px; border-left: 3px solid var(--line); break-inside: avoid; }
+  .qa dd::before { content: "A: "; font-weight: bold; color: var(--ink-2); }
+  .small { font-size: 9pt; color: var(--muted); }
+
+  @media screen {
+    body { background: #eef2ec; }
+    main { background: #fff; padding: 28px 34px 40px; margin: 20px auto; border-radius: 14px; box-shadow: 0 2px 14px rgba(0,0,0,.08); }
+    .chapter { border-top: 1px dashed var(--line); margin-top: 36px; padding-top: 26px; }
+  }
+  @media screen and (max-width: 640px) {
+    main { padding: 18px 16px 30px; margin: 0; border-radius: 0; }
+    .grid2, .cover-meta { grid-template-columns: 1fr; }
+    .toc { columns: 1; }
+    table { display: block; overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<!-- ============================== COVER ============================== -->
+<section class="cover">
+  <div>
+    <div class="cover-band">
+      <div class="eyebrow">Capstone defense study guide</div>
+      <h1>TechPrime AI</h1>
+      <p class="sub">How the system works: logic, flows and the AI parts, explained simply</p>
+      <div class="cover-meta">
+        <div><b>Client</b>EasyPC, One Oasis Branch (Rosario, Pasig)</div>
+        <div><b>What it is</b>Inventory, point-of-sale and online-store system with three AI features</div>
+        <div><b>Built with</b>PHP 8.2 · PostgreSQL (Supabase) · vanilla JS/CSS · Python ML services</div>
+        <div><b>Based on</b>The current source code (branch <span class="mono">khenzou</span>, Oct 2026)</div>
+      </div>
+    </div>
+
+    <div class="toc">
+      <ol>
+        <li>The system in one page<span>Problem, users, features</span></li>
+        <li>Technology and architecture<span>What runs where, and why</span></li>
+        <li>How the code is organized<span>Folders, page pattern, shared helpers</span></li>
+        <li>Accounts, login and security<span>Register → activate → log in → timeout</span></li>
+        <li>The five user roles<span>Who can do what</span></li>
+        <li>Online store and the order lifecycle<span>Cart → pay → ship → receive → review</span></li>
+        <li>Cashier point of sale (POS)<span>Barcodes, VAT, the safe sale transaction</span></li>
+        <li>Inventory custodian<span>Products, stock-in, alerts, orders</span></li>
+        <li>Retail officer and admin<span>Reports, exports, users, logs, settings</span></li>
+        <li>AI #1: Sales and demand forecasting<span>XGBoost service, reorder point</span></li>
+        <li>AI #2: Primo chatbot<span>TF-IDF + SVM intent model, LLM phrasing</span></li>
+        <li>AI #3: Build a PC recommender<span>Compatibility rules + Random Forest</span></li>
+        <li>The database<span>Main tables and how they connect</span></li>
+        <li>Notifications, staff chat, deployment<span>Supporting features</span></li>
+        <li>Defense prep: likely questions<span>Answers + honest limitations</span></li>
+        <li>Glossary<span>Terms in plain words</span></li>
+      </ol>
+    </div>
+
+    <div class="howto">
+      <h4>How to read this guide</h4>
+      <div class="grid2" style="gap:8px">
+        <div class="box simple" style="margin:0"><b class="tag">In simple words</b>The idea without jargon.</div>
+        <div class="box example" style="margin:0"><b class="tag">Example</b>A worked case with numbers.</div>
+        <div class="box panel" style="margin:0"><b class="tag">If the panel asks</b>A ready answer for the defense.</div>
+        <div class="box warn" style="margin:0"><b class="tag">Be honest about</b>A limitation to admit, not hide.</div>
+      </div>
+      <p class="small" style="margin:8px 0 0">Numbers marked “illustrative” are made up to explain a calculation. Every other number (thresholds, accuracy, limits) comes from the code or the model files.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 1. ONE PAGE ============================== -->
+<section class="chapter">
+  <h2><span class="num">1</span>The system in one page</h2>
+  <p class="lede">TechPrime AI runs one computer store branch end to end: the shelf (inventory), the counter (cashier POS), the website (online store), the office (reports and forecasts) and a few “smart” helpers.</p>
+
+  <h3>The problem it solves</h3>
+  <p>A computer parts store usually keeps stock in a spreadsheet, sells at the counter with a separate cash register, and has no online shop. Then stock counts drift, nobody knows which items are running out until they are gone, and buying decisions are guesses. TechPrime AI puts all of this in <b>one database</b>, so a sale at the counter, an online order and a delivery from a supplier all change the same stock number right away.</p>
+
+  <h3>Who uses it</h3>
+  <table>
+    <tr><th>Role</th><th>Where they work</th><th>Main job in the system</th></tr>
+    <tr><td class="k">Client (customer)</td><td>Online store</td><td>Browse, chat with Primo, build a PC, order, pay, review.</td></tr>
+    <tr><td class="k">Cashier</td><td>Store counter</td><td>Scan barcodes and sell to walk-in customers, print receipts.</td></tr>
+    <tr><td class="k">Inventory Custodian</td><td>Stock room</td><td>Maintain products, receive deliveries (stock-in), process online orders, watch stock alerts.</td></tr>
+    <tr><td class="k">Retail Officer</td><td>Office</td><td>Sales reports, sales history, exports, forecasts.</td></tr>
+    <tr><td class="k">Admin</td><td>Office</td><td>User accounts, activity (audit) logs, security settings, overview of everything.</td></tr>
+  </table>
+
+  <h3>The three AI features</h3>
+  <div class="grid2">
+    <div class="card"><h4>1 · Forecasting</h4><p>Predicts product demand and sales revenue 1 to 3 months ahead using an <b>XGBoost</b> model (a separate Python service). Also suggests when to reorder and how much.</p></div>
+    <div class="card"><h4>2 · Primo chatbot</h4><p>A shop assistant that understands questions in English and Taglish. An <b>SVM</b> model guesses what the customer wants (price? stock? order status?), then real data comes from the database.</p></div>
+    <div class="card"><h4>3 · Build a PC</h4><p>Checks that parts fit together (CPU socket, RAM type, case size, power) using rules, then a <b>Random Forest</b> ranks the compatible parts and marks the top 3 as “Recommended”.</p></div>
+    <div class="card"><h4>Plus: barcode POS</h4><p>Not AI, but a core feature: USB scanner support, check-digit validation, VAT-inclusive receipts and sale transactions that can never oversell.</p></div>
+  </div>
+
+  <div class="box simple"><b class="tag">In simple words</b>
+    <p>One database is the “single source of truth”. Five kinds of users each get their own screens. Three AI helpers sit on top: one predicts the future (forecast), one talks to customers (Primo), one helps customers choose PC parts (Build a PC).</p>
+  </div>
+</section>
+
+<!-- ============================== 2. ARCHITECTURE ============================== -->
+<section class="chapter">
+  <h2><span class="num">2</span>Technology and architecture</h2>
+  <p class="lede">A classic web application: the browser asks, PHP on the server thinks, PostgreSQL remembers. The AI models run as small helper services the PHP code calls.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 430" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="12">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#45514a"/></marker>
+      </defs>
+      <!-- Users -->
+      <rect x="10" y="20" width="150" height="390" rx="14" fill="#f2f5f1" stroke="#dfe5dc"/>
+      <text x="85" y="44" text-anchor="middle" font-weight="bold" fill="#16201a">Browsers</text>
+      <g fill="#fff" stroke="#62b236"><rect x="25" y="60" width="120" height="44" rx="8"/><rect x="25" y="114" width="120" height="44" rx="8"/><rect x="25" y="168" width="120" height="44" rx="8"/><rect x="25" y="222" width="120" height="44" rx="8"/><rect x="25" y="276" width="120" height="44" rx="8"/></g>
+      <g text-anchor="middle" fill="#16201a" font-size="11.5"><text x="85" y="87">Customer</text><text x="85" y="141">Cashier + scanner</text><text x="85" y="195">Inv. Custodian</text><text x="85" y="249">Retail Officer</text><text x="85" y="303">Admin</text></g>
+      <text x="85" y="350" text-anchor="middle" font-size="10.5" fill="#5c6862">HTML + CSS +</text>
+      <text x="85" y="365" text-anchor="middle" font-size="10.5" fill="#5c6862">vanilla JavaScript</text>
+
+      <!-- Server -->
+      <rect x="230" y="20" width="270" height="390" rx="14" fill="#eef6e8" stroke="#62b236" stroke-width="1.5"/>
+      <text x="365" y="44" text-anchor="middle" font-weight="bold" fill="#3d7422">Web server (Docker)</text>
+      <text x="365" y="61" text-anchor="middle" font-size="10.5" fill="#45514a">Apache + PHP 8.2</text>
+      <rect x="250" y="76" width="230" height="58" rx="8" fill="#fff" stroke="#dfe5dc"/>
+      <text x="365" y="98" text-anchor="middle" font-weight="bold" fill="#16201a">Role pages</text>
+      <text x="365" y="116" text-anchor="middle" font-size="10.5" fill="#45514a">ADMIN/ RETAIL/ INVENTORY/ CASHIER/ CLIENT/</text>
+      <rect x="250" y="144" width="230" height="58" rx="8" fill="#fff" stroke="#dfe5dc"/>
+      <text x="365" y="166" text-anchor="middle" font-weight="bold" fill="#16201a">Shared logic (includes/)</text>
+      <text x="365" y="184" text-anchor="middle" font-size="10.5" fill="#45514a">security, POS, orders, alerts, reports</text>
+      <rect x="250" y="212" width="230" height="58" rx="8" fill="#fff" stroke="#dfe5dc"/>
+      <text x="365" y="234" text-anchor="middle" font-weight="bold" fill="#16201a">JSON APIs (backend/api/)</text>
+      <text x="365" y="252" text-anchor="middle" font-size="10.5" fill="#45514a">barcode, stock_out, primo_chat …</text>
+      <rect x="250" y="280" width="230" height="58" rx="8" fill="#fff" stroke="#f3c400"/>
+      <text x="365" y="302" text-anchor="middle" font-weight="bold" fill="#16201a">Random Forest (in PHP)</text>
+      <text x="365" y="320" text-anchor="middle" font-size="10.5" fill="#45514a">reads ml/pc_recommend/forest.json</text>
+      <text x="365" y="365" text-anchor="middle" font-size="10.5" fill="#45514a">Sessions · CSRF · audit log</text>
+      <text x="365" y="380" text-anchor="middle" font-size="10.5" fill="#45514a">Timezone: Asia/Manila</text>
+
+      <!-- Right side services -->
+      <rect x="570" y="20" width="180" height="96" rx="12" fill="#e8f1fa" stroke="#1f5f9e"/>
+      <text x="660" y="44" text-anchor="middle" font-weight="bold" fill="#1f5f9e">Supabase</text>
+      <text x="660" y="62" text-anchor="middle" font-size="11" fill="#16201a">PostgreSQL database</text>
+      <text x="660" y="80" text-anchor="middle" font-size="10.5" fill="#45514a">via pooler (port 6543)</text>
+      <text x="660" y="96" text-anchor="middle" font-size="10.5" fill="#45514a">PDO pgsql, SSL required</text>
+
+      <rect x="570" y="130" width="180" height="84" rx="12" fill="#fff8d6" stroke="#f3c400"/>
+      <text x="660" y="154" text-anchor="middle" font-weight="bold" fill="#7a5d00">Primo service</text>
+      <text x="660" y="172" text-anchor="middle" font-size="10.5" fill="#16201a">Python Flask · SVM</text>
+      <text x="660" y="188" text-anchor="middle" font-size="10.5" fill="#45514a">/predict  /phrase  /chat</text>
+      <text x="660" y="204" text-anchor="middle" font-size="10.5" fill="#45514a">(Render, or 127.0.0.1:5055)</text>
+
+      <rect x="570" y="228" width="180" height="70" rx="12" fill="#fff8d6" stroke="#f3c400"/>
+      <text x="660" y="252" text-anchor="middle" font-weight="bold" fill="#7a5d00">Forecast service</text>
+      <text x="660" y="270" text-anchor="middle" font-size="10.5" fill="#16201a">XGBoost (Render)</text>
+      <text x="660" y="286" text-anchor="middle" font-size="10.5" fill="#45514a">needs API key</text>
+
+      <rect x="570" y="312" width="180" height="44" rx="12" fill="#f2f5f1" stroke="#dfe5dc"/>
+      <text x="660" y="331" text-anchor="middle" font-weight="bold" fill="#16201a">Groq LLM</text>
+      <text x="660" y="347" text-anchor="middle" font-size="10.5" fill="#45514a">rephrases Primo replies</text>
+      <rect x="570" y="366" width="180" height="44" rx="12" fill="#f2f5f1" stroke="#dfe5dc"/>
+      <text x="660" y="385" text-anchor="middle" font-weight="bold" fill="#16201a">Gmail SMTP</text>
+      <text x="660" y="401" text-anchor="middle" font-size="10.5" fill="#45514a">activation e-mails</text>
+
+      <!-- arrows -->
+      <g stroke="#45514a" stroke-width="1.6" fill="none" marker-end="url(#ar)">
+        <path d="M160 215 L228 215"/>
+        <path d="M500 68 L568 68"/>
+        <path d="M500 172 L568 172"/>
+        <path d="M500 262 L568 262"/>
+        <path d="M660 214 L660 312" stroke-dasharray="4 3"/>
+        <path d="M500 388 L568 388"/>
+      </g>
+      <text x="194" y="206" text-anchor="middle" font-size="10" fill="#45514a">HTTPS</text>
+      <text x="534" y="60" text-anchor="middle" font-size="10" fill="#45514a">SQL</text>
+      <text x="534" y="164" text-anchor="middle" font-size="10" fill="#45514a">JSON</text>
+      <text x="534" y="254" text-anchor="middle" font-size="10" fill="#45514a">JSON</text>
+    </svg>
+    <figcaption>Figure 2.1 · The browser never talks to the database or the AI services directly. Everything goes through PHP.</figcaption>
+  </figure>
+
+  <h3>Each piece and why it was chosen</h3>
+  <table>
+    <tr><th>Piece</th><th>What it does</th><th>Why this choice</th></tr>
+    <tr><td class="k">PHP 8.2 + Apache</td><td>Builds every page on the server and handles form posts and JSON requests.</td><td>Runs on XAMPP for local work and in a <code>php:8.2-apache</code> Docker image for hosting. No build step, easy to deploy.</td></tr>
+    <tr><td class="k">PostgreSQL on Supabase</td><td>Stores users, products, orders, sales, logs and more.</td><td>Real transactions and row locks (needed so two cashiers can’t sell the last item twice), hosted and backed up for us.</td></tr>
+    <tr><td class="k">Vanilla JS + CSS</td><td>Live search, the POS cart, the chat widget, charts (Chart.js).</td><td>No framework to learn or bundle; pages still work as normal HTML.</td></tr>
+    <tr><td class="k">Python (scikit-learn, Flask)</td><td>Trains the SVM (Primo) and the Random Forest (Build a PC); serves Primo.</td><td>Python has the best ML libraries. The forest is exported to JSON so PHP can use it without Python running.</td></tr>
+    <tr><td class="k">XGBoost forecast service</td><td>Demand and revenue forecasts, inventory actions.</td><td>Gradient-boosted trees work well on tabular sales data. Hosted separately on Render; PHP reaches it through a proxy that hides the API key.</td></tr>
+    <tr><td class="k">phpdotenv</td><td>Reads secrets (DB password, API keys, SMTP) from a <code>.env</code> file or the server environment.</td><td>Secrets never sit inside the code or the Git repository.</td></tr>
+    <tr><td class="k">PHPMailer + Gmail</td><td>Sends account-activation e-mails.</td><td>Reliable SMTP library; the credentials come from the environment.</td></tr>
+  </table>
+
+  <div class="box panel"><b class="tag">If the panel asks: “Your planning documents mention Next.js and FastAPI. Why PHP?”</b>
+    <p>The final build uses plain PHP pages, which fit XAMPP and simple hosting with no build step. The database moved to PostgreSQL on Supabase because the POS needs real transactions and row locking. The machine-learning parts stayed in Python, where the libraries are.</p>
+  </div>
+</section>
+
+<!-- ============================== 3. CODE ORGANIZATION ============================== -->
+<section class="chapter">
+  <h2><span class="num">3</span>How the code is organized</h2>
+  <p class="lede">The folder you are in tells you the role. Shared logic lives in <code>includes/</code>, so every role uses the same rules.</p>
+
+  <table>
+    <tr><th>Folder</th><th>Contents</th></tr>
+    <tr><td class="k">login.php, register.php, activitate.php, logout.php</td><td>Entry points: sign in, sign up, e-mail activation, sign out.</td></tr>
+    <tr><td class="k">CLIENT/</td><td>The online store: home, shop, product page, cart, checkout, payment, orders, wishlist, notifications, Build a PC, saved builds, Primo chat.</td></tr>
+    <tr><td class="k">CASHIER/</td><td>Dashboard, POS checkout, receipt printing, stock alerts (read only), profile.</td></tr>
+    <tr><td class="k">INVENTORY/</td><td>Custodian pages: dashboard, orders, stocks, stock-in, alerts, messages, forecast, reviews, activity, profile.</td></tr>
+    <tr><td class="k">RETAIL/</td><td>Retail Officer: dashboard, sales history, forecast, stock alerts, messages, exports, profile.</td></tr>
+    <tr><td class="k">ADMIN/</td><td>Admin: dashboard, forecast, stock alerts, messages, manage users, activity logs, settings, profile.</td></tr>
+    <tr><td class="k">includes/</td><td>Shared PHP: <code>security.php</code> (login guards, CSRF, logging), <code>pos_helpers.php</code> (barcodes, sales, stock-in), <code>client_helpers.php</code> (cart, orders), <code>inventory_alerts.php</code>, <code>retail_reports.php</code>, <code>pc_compatibility.php</code>, <code>pc_recommend.php</code>, staff layout and chat, plus shared JS (barcode scanner, alerts, session timer).</td></tr>
+    <tr><td class="k">backend/api/</td><td>Small JSON endpoints used by JavaScript: barcode lookup, stock out (sale), stock in, stock alerts, Primo chat, session status.</td></tr>
+    <tr><td class="k">backend/config/database.php</td><td>The one function that opens the database connection: <code>getDbConnection()</code>.</td></tr>
+    <tr><td class="k">ml/primo, ml/pc_recommend</td><td>Python training scripts, data and saved models for the two in-house AI models.</td></tr>
+    <tr><td class="k">scripts/</td><td>One-off command-line tools: catalog import, index setup, dataset builders.</td></tr>
+    <tr><td class="k">database/</td><td>SQL migration files (the Postgres ones for POS and chat match the live schema).</td></tr>
+  </table>
+
+  <h3>The pattern every page follows</h3>
+  <figure>
+    <svg viewBox="0 0 760 170" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="12">
+      <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#45514a"/></marker></defs>
+      <g fill="#fff" stroke="#62b236" stroke-width="1.5">
+        <rect x="10" y="20" width="160" height="70" rx="10"/><rect x="200" y="20" width="160" height="70" rx="10"/><rect x="390" y="20" width="160" height="70" rx="10"/><rect x="580" y="20" width="170" height="70" rx="10"/>
+      </g>
+      <g text-anchor="middle" fill="#16201a">
+        <text x="90" y="48" font-weight="bold">1. Guards</text><text x="90" y="66" font-size="10.5">checkSessionTimeout()</text><text x="90" y="80" font-size="10.5">checkRole('cashier')</text>
+        <text x="280" y="48" font-weight="bold">2. POST handler</text><text x="280" y="66" font-size="10.5">verify CSRF token,</text><text x="280" y="80" font-size="10.5">validate, write to DB</text>
+        <text x="470" y="48" font-weight="bold">3. Redirect</text><text x="470" y="66" font-size="10.5">back to the page with</text><text x="470" y="80" font-size="10.5">?alert=saved / ?error=…</text>
+        <text x="665" y="48" font-weight="bold">4. Render (GET)</text><text x="665" y="66" font-size="10.5">read DB, print HTML,</text><text x="665" y="80" font-size="10.5">show the alert message</text>
+      </g>
+      <g stroke="#45514a" stroke-width="1.6" marker-end="url(#a3)"><path d="M170 55 L198 55"/><path d="M360 55 L388 55"/><path d="M550 55 L578 55"/></g>
+      <text x="380" y="125" text-anchor="middle" font-size="11" fill="#45514a">Why redirect after a POST? Refreshing the page then repeats a harmless GET,</text>
+      <text x="380" y="142" text-anchor="middle" font-size="11" fill="#45514a">not the form submission, so nothing is saved twice (the “Post/Redirect/Get” pattern).</text>
+    </svg>
+    <figcaption>Figure 3.1 · Request flow inside a typical page.</figcaption>
+  </figure>
+
+  <p>JSON endpoints (used by JavaScript, like the POS) follow a matching rule: a business problem such as “not enough stock” comes back as HTTP 200 with <code>{ok:false, error, message}</code>, so the screen can show the message. Only security problems (not logged in, wrong role, bad CSRF token, wrong method) use 4xx error codes.</p>
+</section>
+
+<!-- ============================== 4. SECURITY ============================== -->
+<section class="chapter">
+  <h2><span class="num">4</span>Accounts, login and security</h2>
+  <p class="lede">Customers register themselves and activate by e-mail. Staff accounts are created by the Admin. Everyone signs in on the same login page and is sent to their own area.</p>
+
+  <h3>Customer registration and activation</h3>
+  <ol class="steps">
+    <li><b>Fill in the form</b> (<code>register.php</code>): name, surname, age, phone, full Philippine address (province → city → barangay pickers), e-mail and password. The e-mail and phone are checked live for duplicates.</li>
+    <li><b>Password rules</b> come from the Admin’s Settings page (default: at least 8 characters with uppercase, lowercase, a number and a special character).</li>
+    <li><b>Saved safely</b>: the password is hashed with <b>bcrypt</b> (<code>password_hash</code>). The real password is never stored. The account starts as <code>is_verified = 0</code>.</li>
+    <li><b>Activation e-mail</b>: a random 64-character token plus an expiry time (24 hours) is saved and e-mailed as a link. Clicking it (<code>activitate.php</code>) sets <code>is_verified = 1</code> and deletes the token so the link works only once.</li>
+    <li><b>Expired link?</b> Logging in with the right password opens a “Resend activation link” screen (with a wait time between resends).</li>
+  </ol>
+
+  <h3>Login decision flow</h3>
+  <figure>
+    <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="11.5">
+      <defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#45514a"/></marker></defs>
+      <rect x="10" y="20" width="140" height="44" rx="8" fill="#fff" stroke="#45514a"/><text x="80" y="47" text-anchor="middle" fill="#16201a">E-mail + password</text>
+      <!-- decisions -->
+      <g fill="#fff" stroke="#3d7422" stroke-width="1.5">
+        <rect x="190" y="20" width="130" height="44" rx="22"/><rect x="190" y="100" width="130" height="44" rx="22"/><rect x="190" y="180" width="130" height="44" rx="22"/><rect x="190" y="260" width="130" height="44" rx="22"/>
+      </g>
+      <g text-anchor="middle" fill="#16201a"><text x="255" y="47">E-mail exists?</text><text x="255" y="127">Account locked?</text><text x="255" y="207">Password correct?</text><text x="255" y="287">Activated?</text></g>
+      <g stroke="#45514a" stroke-width="1.5" fill="none" marker-end="url(#a4)">
+        <path d="M150 42 L188 42"/><path d="M255 64 L255 98"/><path d="M255 144 L255 178"/><path d="M255 224 L255 258"/>
+        <path d="M320 42 L388 42"/><path d="M320 122 L388 122"/><path d="M320 202 L388 202"/><path d="M320 282 L388 282"/><path d="M255 304 L255 330 L388 330"/>
+      </g>
+      <g font-size="10" fill="#45514a"><text x="262" y="86">yes</text><text x="262" y="166">no</text><text x="262" y="246">yes</text><text x="262" y="322">yes</text>
+        <text x="335" y="36">no</text><text x="335" y="116">yes</text><text x="335" y="196">no</text><text x="335" y="276">no</text></g>
+      <g fill="#fdecea" stroke="#c0392b"><rect x="390" y="22" width="360" height="40" rx="8"/><rect x="390" y="102" width="360" height="40" rx="8"/><rect x="390" y="182" width="360" height="40" rx="8"/></g>
+      <rect x="390" y="262" width="360" height="40" rx="8" fill="#fff8d6" stroke="#f3c400"/>
+      <rect x="390" y="310" width="360" height="40" rx="8" fill="#eef6e8" stroke="#62b236"/>
+      <g fill="#16201a"><text x="402" y="47">“Invalid email or password.” (same message on purpose)</text>
+        <text x="402" y="127">“Account locked. Contact support.”</text>
+        <text x="402" y="200">failed_attempts + 1. At 3 → account locked,</text><text x="402" y="214">saved in locked_accounts, logged.</text>
+        <text x="402" y="287">Offer “Resend activation link”.</text>
+        <text x="402" y="328">Reset counter, new session ID, save role,</text><text x="402" y="342">log “login_success”, go to the role’s dashboard.</text></g>
+    </svg>
+    <figcaption>Figure 4.1 · What login.php checks, in order. The password is checked before “activated?” so wrong guesses always count toward the lockout.</figcaption>
+  </figure>
+
+  <h3>Where each role lands after login</h3>
+  <table>
+    <tr><th>users.role</th><th>Redirected to</th></tr>
+    <tr><td>admin</td><td><code>ADMIN/admin_dashboard.php</code></td></tr>
+    <tr><td>retail_officer</td><td><code>RETAIL/retail_dashboard.php</code></td></tr>
+    <tr><td>inventory_custodian</td><td><code>INVENTORY/inventory_dashboard.php</code></td></tr>
+    <tr><td>cashier</td><td><code>CASHIER/cashier_dashboard.php</code></td></tr>
+    <tr><td>client (or anything else)</td><td>The store home page, or the page they came from (for example checkout), if that page is a safe local address.</td></tr>
+  </table>
+
+  <h3>The security measures, one by one</h3>
+  <table>
+    <tr><th>Threat</th><th>Protection in the code</th><th>In simple words</th></tr>
+    <tr><td class="k">Stolen password database</td><td>bcrypt hashes (<code>password_hash</code> / <code>password_verify</code>)</td><td>Even we cannot read the passwords. A hash can be checked but not reversed.</td></tr>
+    <tr><td class="k">Password guessing</td><td>3 wrong tries → <code>is_locked = 1</code>; Admin unblocks</td><td>A guesser gets three tries, then the door locks.</td></tr>
+    <tr><td class="k">Guessing which e-mails exist</td><td>The same “Invalid email or password” message for both cases</td><td>The attacker can’t tell which half was wrong.</td></tr>
+    <tr><td class="k">Opening another role’s page</td><td><code>checkRole()</code> at the top of every page; APIs check <code>$_SESSION['role']</code> and answer 403</td><td>A cashier typing the admin page address is sent back to login.</td></tr>
+    <tr><td class="k">Unattended computer</td><td>15-minute idle timeout; a warning appears 60 seconds before</td><td>Walk away from the counter and the session closes itself.</td></tr>
+    <tr><td class="k">Session fixation</td><td><code>session_regenerate_id(true)</code> on login</td><td>A new session ID is issued on login, so an ID planted before login is useless.</td></tr>
+    <tr><td class="k">Forged form posts (CSRF)</td><td>Random token in each form, checked with <code>hash_equals</code></td><td>Another website cannot submit our forms, because it doesn’t know the secret token.</td></tr>
+    <tr><td class="k">SQL injection</td><td>PDO prepared statements everywhere</td><td>User input is always sent as data, never as part of the SQL command.</td></tr>
+    <tr><td class="k">Cross-site scripting (XSS)</td><td><code>h()</code> = <code>htmlspecialchars</code> on every printed value</td><td>If someone types <code>&lt;script&gt;</code> as their name, it shows as text and never runs.</td></tr>
+    <tr><td class="k">Untraceable actions</td><td><code>logActivity()</code> writes user, action, details and IP to <code>logs</code></td><td>Every sale, stock change, login and setting change leaves a trail the Admin can read.</td></tr>
+    <tr><td class="k">Leaked secrets</td><td><code>.env</code> file / environment variables, never in Git</td><td>Passwords and API keys are kept out of the code.</td></tr>
+    <tr><td class="k">Direct database access via Supabase API</td><td>Row Level Security switched on with no policies</td><td>The public Supabase REST API can read nothing; only our server’s connection can.</td></tr>
+  </table>
+
+  <div class="box example"><b class="tag">Example · the idle timeout</b>
+    <p>A cashier last clicked at 2:00:00 PM. At 2:14:00 a dialog counts down from 60 seconds. If nobody clicks “Stay signed in”, at 2:15:00 the session ends and the next click goes to <code>login.php?expired=1</code>. The live stock-alert check that runs every 30 seconds deliberately does <b>not</b> count as activity, otherwise an open screen would never time out.</p>
+  </div>
+</section>
+
+<!-- ============================== 5. ROLES ============================== -->
+<section class="chapter">
+  <h2><span class="num">5</span>The five user roles</h2>
+  <p class="lede">Each staff role has its own sidebar (on phones, a bottom tab bar). This table is the menu of each role, taken from <code>staff_nav_for_role()</code>.</p>
+
+  <table>
+    <tr><th>Role</th><th>Menu items</th><th>Can change data?</th></tr>
+    <tr><td class="k">Admin</td><td>Dashboard · Forecast (Product Demand, Sales) · Stock Alerts · Messages · Manage Users · Activity Logs · My Profile · Settings</td><td>Users (create staff, block, unblock, delete), security settings</td></tr>
+    <tr><td class="k">Retail Officer</td><td>Dashboard · Sales History · Forecast · Stock Alerts · Messages · My Profile</td><td>Reads and exports reports only</td></tr>
+    <tr><td class="k">Inventory Custodian</td><td>Dashboard · Orders · Stocks (Inventory, Stock In, Alerts) · Messages · Forecast · Reviews · Activity · My Profile</td><td>Products, barcodes, stock-in, order status, cancellations, review replies</td></tr>
+    <tr><td class="k">Cashier</td><td>Dashboard · POS Checkout · Stock Alerts · My Profile</td><td>Creates sales (stock-out) only</td></tr>
+    <tr><td class="k">Client</td><td>Home · Shop · Build a PC · Saved Builds · Cart · Wishlist · Orders · Notifications · Primo chat</td><td>Own cart, orders, reviews, saved builds</td></tr>
+  </table>
+
+  <div class="box simple"><b class="tag">In simple words · “separation of duties”</b>
+    <p>The person who sells (cashier) is not the person who receives stock (custodian), and neither can edit user accounts (admin). Stock-in was moved from the cashier to the custodian on purpose: the person handling cash should not also be able to add stock, which would make it easy to hide missing items.</p>
+  </div>
+
+  <h3>Who sees what (feature matrix)</h3>
+  <table>
+    <tr><th>Feature</th><th>Admin</th><th>Retail</th><th>Custodian</th><th>Cashier</th><th>Client</th></tr>
+    <tr><td>Forecast pages</td><td>✓</td><td>✓</td><td>✓</td><td>–</td><td>–</td></tr>
+    <tr><td>Stock alerts</td><td>✓</td><td>✓</td><td>✓</td><td>✓ (read only)</td><td>–</td></tr>
+    <tr><td>Bell notifications for stock</td><td>✓</td><td>✓</td><td>✓</td><td>–</td><td>own orders</td></tr>
+    <tr><td>Staff chat (Messages)</td><td>✓</td><td>✓</td><td>✓</td><td>–</td><td>–</td></tr>
+    <tr><td>POS sales</td><td>–</td><td>–</td><td>–</td><td>✓</td><td>–</td></tr>
+    <tr><td>Stock-in (receiving)</td><td>–</td><td>–</td><td>✓</td><td>–</td><td>–</td></tr>
+    <tr><td>Process online orders</td><td>–</td><td>–</td><td>✓</td><td>–</td><td>places them</td></tr>
+    <tr><td>Sales reports and exports</td><td>dashboard</td><td>✓</td><td>–</td><td>own day</td><td>–</td></tr>
+    <tr><td>User accounts and logs</td><td>✓</td><td>–</td><td>own activity</td><td>–</td><td>–</td></tr>
+  </table>
+</section>
+
+<!-- ============================== 6. ONLINE STORE ============================== -->
+<section class="chapter">
+  <h2><span class="num">6</span>Online store and the order lifecycle</h2>
+  <p class="lede">An online order moves through fixed stages, like a package tracker. Each stage has a clear owner, and stock is deducted only once, at the very end.</p>
+
+  <h3>Shopping before the order</h3>
+  <ul>
+    <li><b>Browsing</b>: Home, Shop (with categories, brands, price filters and live search), product detail pages, recently viewed items, wishlist.</li>
+    <li><b>Cart</b>: guests have a cart in their session. On login, <code>ep_sync_cart_on_login()</code> merges it into the saved database cart (keeping the higher quantity if the item is in both), so a cart survives logout and login.</li>
+    <li><b>Checkout</b>: choose a saved address, a new address, or <b>Pick up at the store</b>, and give a phone number. Delivery orders are handed to <b>Lalamove</b>.</li>
+    <li><b>Double-submit protection</b>: a one-time checkout token means clicking “Place order” twice creates only one order.</li>
+  </ul>
+
+  <h3>The order stages</h3>
+  <figure>
+    <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="11.5">
+      <defs><marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#45514a"/></marker></defs>
+      <g stroke-width="1.8">
+        <rect x="10" y="40" width="150" height="78" rx="12" fill="#fff8d6" stroke="#f3c400"/>
+        <rect x="205" y="40" width="150" height="78" rx="12" fill="#e8f1fa" stroke="#1f5f9e"/>
+        <rect x="400" y="40" width="150" height="78" rx="12" fill="#e8f1fa" stroke="#1f5f9e"/>
+        <rect x="595" y="40" width="155" height="78" rx="12" fill="#eef6e8" stroke="#62b236"/>
+        <rect x="10" y="210" width="150" height="62" rx="12" fill="#fdecea" stroke="#c0392b"/>
+      </g>
+      <g text-anchor="middle" fill="#16201a">
+        <text x="85" y="66" font-weight="bold">TO PAY</text><text x="85" y="84" font-size="10.5">order placed,</text><text x="85" y="99" font-size="10.5">unpaid → paid</text>
+        <text x="280" y="66" font-weight="bold">TO SHIP</text><text x="280" y="84" font-size="10.5">accepted by the</text><text x="280" y="99" font-size="10.5">custodian, packing</text>
+        <text x="475" y="66" font-weight="bold">TO RECEIVE</text><text x="475" y="84" font-size="10.5">with courier, or</text><text x="475" y="99" font-size="10.5">ready for pickup</text>
+        <text x="672" y="66" font-weight="bold">COMPLETED</text><text x="672" y="84" font-size="10.5">stock deducted,</text><text x="672" y="99" font-size="10.5">counts as a sale</text>
+        <text x="85" y="237" font-weight="bold">CANCELLED</text><text x="85" y="255" font-size="10.5">no stock change</text>
+      </g>
+      <g stroke="#45514a" stroke-width="1.6" fill="none" marker-end="url(#a6)">
+        <path d="M160 79 L203 79"/><path d="M355 79 L398 79"/><path d="M550 79 L593 79"/>
+        <path d="M85 118 L85 208"/>
+        <path d="M120 40 C200 0 420 0 470 38" stroke-dasharray="5 4"/>
+      </g>
+      <g font-size="10" fill="#45514a">
+        <text x="181" y="136" text-anchor="middle">custodian</text><text x="181" y="149" text-anchor="middle">“Accept”</text>
+        <text x="376" y="136" text-anchor="middle">custodian</text><text x="376" y="149" text-anchor="middle">updates</text>
+        <text x="572" y="136" text-anchor="middle">customer clicks</text><text x="572" y="149" text-anchor="middle">“Item Received”</text>
+        <text x="295" y="14" text-anchor="middle">pickup orders skip To Ship right after payment</text>
+        <text x="96" y="165">customer asks to cancel (only while unpaid)</text>
+        <text x="96" y="179">→ custodian approves</text>
+      </g>
+      <text x="380" y="292" text-anchor="middle" font-size="10.5" fill="#45514a">Status only moves forward. Completed and Cancelled are final.</text>
+    </svg>
+    <figcaption>Figure 6.1 · Order stages (database values: to_pay → to_ship → to_receive → to_review, or cancelled).</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Step</th><th>Who</th><th>Function</th><th>What happens in the database</th></tr>
+    <tr><td class="k">Place order</td><td>Customer</td><td><code>ep_place_unpaid_order()</code></td><td>Locks each product row and checks stock is enough; creates the <code>orders</code> row (status <code>to_pay</code>, unpaid) and <code>order_items</code>; removes the items from the cart; notifies the customer and the custodian. <b>Stock is not deducted yet.</b></td></tr>
+    <tr><td class="k">Pay</td><td>Customer</td><td><code>ep_mark_order_paid()</code></td><td>Sets <code>payment_status = 'paid'</code>, a unique payment reference and <code>paid_at</code>. Pickup orders jump to <code>to_receive</code>. The custodian is told “ready to Accept”.</td></tr>
+    <tr><td class="k">Accept</td><td>Custodian</td><td><code>ep_accept_order()</code></td><td>Only if paid and no cancellation pending → <code>to_ship</code>; creates a <code>shipments</code> row (carrier Lalamove for delivery).</td></tr>
+    <tr><td class="k">Ship</td><td>Custodian</td><td>status dropdown</td><td>→ <code>to_receive</code> (“With Courier”). Moving backward is refused.</td></tr>
+    <tr><td class="k">Item Received</td><td>Customer (or custodian)</td><td><code>ep_complete_order()</code></td><td>Deducts stock for every item (refused if stock would go below 0), sets <code>stock_deducted = TRUE</code> and status <code>to_review</code> (Completed), marks the shipment delivered, notifies the customer, custodian and retail officer.</td></tr>
+    <tr><td class="k">Review</td><td>Customer</td><td><code>ep_review_submit()</code></td><td>One review per completed order: 1–5 stars, comment, tags, optional photos, can be anonymous. The custodian can reply.</td></tr>
+    <tr><td class="k">Cancel</td><td>Customer → Custodian</td><td><code>ep_request_order_cancel()</code>, <code>ep_accept_order_cancel()</code></td><td>Allowed only while the order is <code>to_pay</code> and <b>unpaid</b>. The customer picks a reason; the custodian approves. No stock change, because none was deducted.</td></tr>
+  </table>
+
+  <div class="box simple"><b class="tag">In simple words · why deduct stock only at “Completed”?</b>
+    <p>An order can still be cancelled before it is paid, so taking stock away at order time would make items look sold out when they are not. The stock is checked (and locked) when the order is placed, and actually removed when the customer has the item. The <code>stock_deducted</code> flag makes sure it happens only once, even if the button is clicked twice.</p>
+  </div>
+
+  <div class="box example"><b class="tag">Example · one order from start to end (illustrative)</b>
+    <ol>
+      <li>Ana orders 1 × 16 GB RAM kit (stock 9). The order becomes <b>#ORD-120, To Pay</b>. Stock is still 9.</li>
+      <li>Ana pays. The custodian’s bell shows “Paid order #ORD-120 ready to Accept”.</li>
+      <li>The custodian clicks Accept → <b>To Ship</b>, packs it, and sets it to <b>To Receive</b> when Lalamove picks it up.</li>
+      <li>Ana clicks <b>Item Received</b> → stock 9 → 8, order <b>Completed</b>. The sale now appears in the Retail Officer’s reports.</li>
+      <li>No new stock alert: 9 and 8 are both in the “low” level (6–15), and alerts fire only when the level changes. Had the stock gone from 16 to 15, every stock-alert user would get “low in stock (15 left)”.</li>
+    </ol>
+  </div>
+
+  <div class="box warn"><b class="tag">Be honest about · online payment</b>
+    <p>The <b>Pay</b> page is a placeholder for the school project (the page itself says so). Clicking “Pay Now” marks the order paid with a generated reference. No real money moves and no payment gateway is called. A real gateway such as PayMongo would replace only this one step; the rest of the order flow stays the same.</p>
+  </div>
+</section>
+
+<!-- ============================== 7. POS ============================== -->
+<section class="chapter">
+  <h2><span class="num">7</span>Cashier point of sale (POS)</h2>
+  <p class="lede">The counter screen for walk-in customers: scan, review the cart, take payment, print the receipt. The important part is what happens behind “Complete sale”.</p>
+
+  <h3>The flow at the counter</h3>
+  <ol class="steps">
+    <li><b>Scan</b>. A USB barcode scanner works like a very fast keyboard: it “types” the digits and presses Enter. <code>barcode_scanner.js</code> spots this (keys arriving a few milliseconds apart), so scanning works without clicking into a field first.</li>
+    <li><b>Validate the check digit</b> in the browser and again on the server (see the example below). A misread code is rejected right away.</li>
+    <li><b>Look up the product</b> (<code>backend/api/barcode_lookup.php</code>): name, price and stock come back and the item is added to the cart.</li>
+    <li><b>Choose payment</b>: Cash (enter the amount tendered, change is computed), GCash, Maya or Card (a reference number is required).</li>
+    <li><b>Complete sale</b> (<code>backend/api/stock_out.php</code> → <code>pos_complete_sale()</code>): one database transaction does everything, or nothing.</li>
+    <li><b>Receipt</b> opens with the invoice number (format <code>INV-YYYYMMDD-000123</code>), VAT breakdown and change, and prints in the same tab.</li>
+  </ol>
+
+  <h3>Barcode check digit, worked example</h3>
+  <p>Every UPC/EAN barcode ends with a <b>check digit</b> computed from the other digits. If one digit is misread, the check digit no longer matches. The system accepts UPC-A (12 digits), UPC-E (8), EAN-13 (13) and EAN-8 (8).</p>
+  <div class="box example"><b class="tag">Example · is 480012345678<u>6</u> a valid EAN-13?</b>
+    <table style="margin:6px 0">
+      <tr><th>Digit</th><td>4</td><td>8</td><td>0</td><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><th>check</th></tr>
+      <tr><th>Weight</th><td>1</td><td>3</td><td>1</td><td>3</td><td>1</td><td>3</td><td>1</td><td>3</td><td>1</td><td>3</td><td>1</td><td>3</td><td>–</td></tr>
+      <tr><th>Product</th><td>4</td><td>24</td><td>0</td><td>0</td><td>1</td><td>6</td><td>3</td><td>12</td><td>5</td><td>18</td><td>7</td><td>24</td><td><b>6</b></td></tr>
+    </table>
+    <p>Sum = 104. Check digit = (10 − (104 mod 10)) mod 10 = (10 − 4) mod 10 = <b>6</b>. The last digit is 6, so the code is valid. If the scanner misread one digit, for example 48001234567<b>9</b>6, the sum becomes 107, the expected check digit becomes 3 instead of 6, and the code is rejected with “Invalid barcode check digit”.</p>
+    <p class="small">The code stores every barcode in one normalized form (12-digit UPC-A gets a leading 0 to become 13 digits; UPC-E is expanded first), so the same product is found whichever format is scanned. Products without a barcode can get an in-store one: <code>21</code> + the 10-digit product ID + a check digit (product #57 → 210000000057<b>9</b>), printable as a label.</p>
+  </div>
+
+  <h3>What “Complete sale” does inside the database</h3>
+  <figure>
+    <svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="11.5">
+      <rect x="10" y="10" width="740" height="290" rx="14" fill="#eef6e8" stroke="#62b236" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <text x="26" y="32" font-weight="bold" fill="#3d7422">ONE TRANSACTION: all steps succeed together, or none are saved</text>
+      <g fill="#fff" stroke="#dfe5dc">
+        <rect x="26" y="46" width="226" height="74" rx="10"/><rect x="267" y="46" width="226" height="74" rx="10"/><rect x="508" y="46" width="226" height="74" rx="10"/>
+        <rect x="26" y="134" width="226" height="74" rx="10"/><rect x="267" y="134" width="226" height="74" rx="10"/><rect x="508" y="134" width="226" height="74" rx="10"/>
+        <rect x="26" y="222" width="226" height="64" rx="10"/><rect x="267" y="222" width="226" height="64" rx="10"/><rect x="508" y="222" width="226" height="64" rx="10"/>
+      </g>
+      <g fill="#16201a">
+        <text x="38" y="68" font-weight="bold">1 · Already done?</text><text x="38" y="86" font-size="10.5">Look up client_ref (a UUID). If</text><text x="38" y="101" font-size="10.5">found, return that sale again.</text>
+        <text x="279" y="68" font-weight="bold">2 · Lock products</text><text x="279" y="86" font-size="10.5">SELECT … FOR UPDATE,</text><text x="279" y="101" font-size="10.5">always in product-ID order.</text>
+        <text x="520" y="68" font-weight="bold">3 · Re-check stock</text><text x="520" y="86" font-size="10.5">qty ≤ stock for every line,</text><text x="520" y="101" font-size="10.5">or stop: “Not enough stock”.</text>
+        <text x="38" y="156" font-weight="bold">4 · Price from the DB</text><text x="38" y="174" font-size="10.5">Never trust the browser’s price.</text><text x="38" y="189" font-size="10.5">Totals in integer centavos.</text>
+        <text x="279" y="156" font-weight="bold">5 · Payment check</text><text x="279" y="174" font-size="10.5">Cash ≥ total (change computed);</text><text x="279" y="189" font-size="10.5">e-wallet/card needs a reference.</text>
+        <text x="520" y="156" font-weight="bold">6 · Write the sale</text><text x="520" y="174" font-size="10.5">pos_sales (with VAT split)</text><text x="520" y="189" font-size="10.5">+ pos_sale_items.</text>
+        <text x="38" y="244" font-weight="bold">7 · Deduct stock</text><text x="38" y="262" font-size="10.5">UPDATE … SET stock = stock − qty</text><text x="38" y="276" font-size="10.5">WHERE stock ≥ qty (extra guard)</text>
+        <text x="279" y="244" font-weight="bold">8 · Movement + log</text><text x="279" y="262" font-size="10.5">stock_movements (before → after)</text><text x="279" y="276" font-size="10.5">+ logs entry “pos_sale”.</text>
+        <text x="520" y="244" font-weight="bold">9 · Commit</text><text x="520" y="262" font-size="10.5">Then (outside the transaction)</text><text x="520" y="276" font-size="10.5">send low-stock alerts.</text>
+      </g>
+      <text x="380" y="322" text-anchor="middle" font-size="10.5" fill="#45514a">Any error at any step → ROLLBACK → “The sale could not be completed. No changes were saved.”</text>
+    </svg>
+    <figcaption>Figure 7.1 · <code>pos_complete_sale()</code> in includes/pos_helpers.php.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <div class="box simple" style="margin:0"><b class="tag">Why lock the rows? (overselling)</b>
+      <p>Two cashiers sell the <b>last</b> mouse at the same second. Without a lock, both read “stock 1” and both sell. With <code>FOR UPDATE</code>, the second cashier waits until the first finishes, then reads “stock 0” and gets “Not enough stock”. The database rule <code>CHECK (stock &gt;= 0)</code> is a last safety net.</p>
+    </div>
+    <div class="box simple" style="margin:0"><b class="tag">Why lock in ID order? (deadlock)</b>
+      <p>If sale A locks mouse then keyboard while sale B locks keyboard then mouse, each waits for the other forever. Locking always in the same order (lowest ID first) makes that impossible.</p>
+    </div>
+    <div class="box simple" style="margin:0"><b class="tag">What is client_ref? (idempotency)</b>
+      <p>The POS screen creates a random ID (UUID) for each sale before sending it. If the Wi-Fi drops and the cashier clicks again, the server sees the same ID and returns the first sale instead of charging twice. The column is <code>UNIQUE</code>, so even two requests at the same instant cannot both succeed.</p>
+    </div>
+    <div class="box simple" style="margin:0"><b class="tag">Why integer centavos?</b>
+      <p>Computers store decimals like 0.1 inaccurately. ₱1,234.50 is handled as 123450 centavos, so totals and change are always exact.</p>
+    </div>
+  </div>
+
+  <div class="box example"><b class="tag">Example · VAT on a receipt (illustrative)</b>
+    <p>Prices already include 12% VAT. The cart total is <b>₱3,450.00</b> (345,000 centavos).</p>
+    <ul>
+      <li>VATable sales = 345,000 ÷ 1.12 = 308,035.7 → rounded to <b>₱3,080.36</b></li>
+      <li>VAT = total − VATable = 345,000 − 308,036 = <b>₱369.64</b></li>
+      <li>Customer pays ₱4,000.00 cash → change = <b>₱550.00</b></li>
+    </ul>
+    <p>VAT is total minus VATable (not a separate rounding), so the two always add up to the total exactly.</p>
+  </div>
+
+  <h3>Other cashier screens</h3>
+  <ul>
+    <li><b>Dashboard</b>: today’s sales count and total for this cashier, recent sales, a live stock-alert panel (refreshes every 30 seconds).</li>
+    <li><b>Stock Alerts</b>: out / critical / low products, read only, so the cashier can tell customers what is running out.</li>
+    <li>Limits: at most 999 per line and 200 different products per sale; references are letters, digits, spaces and <code>- / #</code>, up to 64 characters.</li>
+  </ul>
+</section>
+
+<!-- ============================== 8. INVENTORY ============================== -->
+<section class="chapter">
+  <h2><span class="num">8</span>Inventory custodian</h2>
+  <p class="lede">The custodian owns the product list and the stock numbers, receives supplier deliveries and moves online orders forward.</p>
+
+  <h3>Products (Stocks page)</h3>
+  <ul>
+    <li>Add, edit, delete (single or bulk) products: name, category, price, stock, description, image, <b>SKU</b> (EasyPC’s internal item code) and <b>barcode</b>.</li>
+    <li>The catalog was imported from EasyPC’s item list (<code>Oasis-Itemlist.csv</code>, 261 products) with images per category.</li>
+    <li>Print a barcode label, or generate an in-store barcode for products that have none.</li>
+  </ul>
+
+  <h3>Stock-in (receiving a delivery)</h3>
+  <ol class="steps">
+    <li>Scan the product’s barcode (same scanner logic as the POS).</li>
+    <li>Enter the quantity (1 to 10,000), choose the <b>supplier</b> (required) and an optional reference number (for example the delivery receipt number).</li>
+    <li><code>pos_stock_in()</code> locks the product row, adds the quantity, writes a <code>stock_movements</code> row of type <code>stock_in</code> (with stock before and after, supplier, reference) and an audit log line like <code>stock 3 → 23 (+20), supplier: Kingston</code>.</li>
+    <li>If the product was out or low and is now fine, the alert roles get “stock increased by 20 (now 23)”.</li>
+  </ol>
+  <div class="box warn"><b class="tag">Be honest about · suppliers</b>
+    <p>There is no separate suppliers table. A supplier is the product’s <b>brand</b>: the first word of the product name, matched against the list of shop brands (for example “Kingston FURY 16GB…” → Kingston). It keeps receiving simple, but a distributor that sells several brands can’t be recorded as itself.</p>
+  </div>
+
+  <h3>Stock alert levels</h3>
+  <figure>
+    <svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="12">
+      <rect x="20" y="30" width="80" height="40" fill="#fdecea" stroke="#c0392b"/>
+      <rect x="100" y="30" width="170" height="40" fill="#fdebf1" stroke="#e58aa6"/>
+      <rect x="270" y="30" width="230" height="40" fill="#fff8d6" stroke="#f3c400"/>
+      <rect x="500" y="30" width="240" height="40" fill="#eef6e8" stroke="#62b236"/>
+      <g text-anchor="middle" font-weight="bold"><text x="60" y="55" fill="#c0392b">OUT</text><text x="185" y="55" fill="#a3254a">CRITICAL</text><text x="385" y="55" fill="#7a5d00">LOW</text><text x="620" y="55" fill="#3d7422">OK</text></g>
+      <g text-anchor="middle" fill="#45514a" font-size="11"><text x="60" y="92">stock = 0</text><text x="185" y="92">1 to 5</text><text x="385" y="92">6 to 15</text><text x="620" y="92">16 and up</text></g>
+      <text x="20" y="18" font-size="10.5" fill="#45514a">Thresholds are fixed in includes/inventory_alerts.php (inv_stock_status_label)</text>
+    </svg>
+    <figcaption>Figure 8.1 · How a stock number becomes a status. Status is always shown with an icon and text, not colour alone.</figcaption>
+  </figure>
+  <p><b>Alerts fire on a change of level, not on every sale.</b> <code>inv_notify_stock_change(old, new)</code> runs after every stock change (POS sale, online order completion, stock-in) and sends a bell notification to every Admin, Retail Officer and Custodian only when the stock <i>crosses</i> into Low, Critical or Out, or recovers. The same alert is not repeated to the same person within 24 hours.</p>
+  <div class="box example"><b class="tag">Example · crossing levels</b>
+    <p>Stock 16 → 15: “low in stock (15 left)”. 15 → 14: nothing new. 6 → 5 after a sale: Low to Critical, both “running low”, so nothing new is sent (the Stock Alerts page still shows it as Critical). 1 → 0: “out of stock”. Then a stock-in of 20 (0 → 20): “stock increased by 20 (now 20)”.</p>
+  </div>
+
+  <h3>Orders, reviews and activity</h3>
+  <ul>
+    <li><b>Orders</b>: tabs by stage, Accept (single or bulk), status dropdown that only moves forward, cancellation requests to approve. Completed and cancelled orders are locked.</li>
+    <li><b>Reviews</b>: all customer reviews with stars, photos and tags; the custodian can reply.</li>
+    <li><b>Activity</b>: the custodian’s own audit trail (stock-ins, product edits, order updates, stock-outs), showing stock changes as “before → after”.</li>
+    <li><b>Forecast</b>: the same forecast pages as Admin and Retail, including the reorder suggestions (chapter 10).</li>
+  </ul>
+</section>
+
+<!-- ============================== 9. RETAIL + ADMIN ============================== -->
+<section class="chapter">
+  <h2><span class="num">9</span>Retail officer and admin</h2>
+  <p class="lede">The office roles mostly read data: the Retail Officer turns sales into reports, the Admin manages people and settings and watches the audit trail.</p>
+
+  <h3>What counts as a “sale” in reports</h3>
+  <div class="box simple"><b class="tag">In simple words</b>
+    <p>Sales = <b>completed online orders</b> (status Completed) <b>+ POS sales</b> at the counter. Orders that are unpaid, in transit or cancelled do not count. Reports are read live from the database, so a sale shows up the moment it is completed.</p>
+  </div>
+
+  <h3>Retail Officer</h3>
+  <ul>
+    <li><b>Dashboard</b>: total sales, transactions, units sold and average transaction for a chosen period (presets like Today, This week, This month, or a custom range), sales by category, a daily trend chart, a 12-month breakdown and the forecast cards.</li>
+    <li><b>Comparisons</b>: each figure is compared with the previous period (month-over-month) and the same period a year ago (year-over-year), shown as a green ▲ or red ▼ badge.</li>
+    <li><b>Sales History</b>: every sale line, searchable and filterable by category and customer.</li>
+    <li><b>Exports</b>: CSV, Excel (.xlsx) or PDF, with a “prepared by” line. Each export is written to the audit log.</li>
+  </ul>
+  <div class="box example"><b class="tag">Example · the % change badge (illustrative)</b>
+    <p>This month ₱120,000, last month ₱100,000 → (120,000 − 100,000) ÷ 100,000 × 100 = <b>▲ 20.0%</b>. If last month was ₱0, the badge says “new” instead of dividing by zero.</p>
+  </div>
+
+  <h3>Admin</h3>
+  <ul>
+    <li><b>Manage Users</b>: counts per role, locked and unverified accounts; create staff accounts (retail officer, inventory custodian, cashier), which are verified immediately; <b>block / unblock</b> (unblocking clears the lockout) and delete accounts.</li>
+    <li><b>Activity Logs</b>: the full audit trail from the <code>logs</code> table, such as logins, lockouts, sales, stock-ins, order actions, exports, settings changes, with the user, time and IP address.</li>
+    <li><b>Settings</b>: password policy (minimum length 6–32, upper, lower, number, special). New passwords must follow it.</li>
+    <li><b>Stock Alerts, Forecast, Messages</b>: same shared pages as the other office roles.</li>
+  </ul>
+  <div class="box warn"><b class="tag">Be honest about · “max failed attempts” setting</b>
+    <p>The Settings page saves a “max failed attempts” value (1–10), but <code>login.php</code> currently locks after a fixed <b>3</b> attempts. If asked: the lockout works at 3; connecting the setting to the login check is a small, known follow-up.</p>
+  </div>
+</section>
+
+<!-- ============================== 10. FORECAST ============================== -->
+<section class="chapter">
+  <h2><span class="num">10</span>AI #1 · Sales and demand forecasting</h2>
+  <p class="lede">Looks at past monthly sales and predicts the next 1 to 3 months: how many units of each product will sell (demand) and how much money the store will make (revenue).</p>
+
+  <h3>How a forecast reaches the screen</h3>
+  <figure>
+    <svg viewBox="0 0 760 150" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="11.5">
+      <defs><marker id="a10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#45514a"/></marker></defs>
+      <g stroke-width="1.5"><rect x="10" y="30" width="170" height="80" rx="10" fill="#f2f5f1" stroke="#dfe5dc"/>
+      <rect x="295" y="30" width="170" height="80" rx="10" fill="#eef6e8" stroke="#62b236"/>
+      <rect x="580" y="30" width="170" height="80" rx="10" fill="#fff8d6" stroke="#f3c400"/></g>
+      <g text-anchor="middle" fill="#16201a"><text x="95" y="58" font-weight="bold">Forecast page</text><text x="95" y="76" font-size="10.5">Chart.js chart / table,</text><text x="95" y="91" font-size="10.5">filters: range, category, 1–3 mo</text>
+      <text x="380" y="58" font-weight="bold">forecast_api.php</text><text x="380" y="76" font-size="10.5">checks login + role,</text><text x="380" y="91" font-size="10.5">adds the secret API key</text>
+      <text x="665" y="58" font-weight="bold">XGBoost service</text><text x="665" y="76" font-size="10.5">hosted on Render,</text><text x="665" y="91" font-size="10.5">returns JSON forecasts</text></g>
+      <g stroke="#45514a" stroke-width="1.6" fill="none" marker-end="url(#a10)"><path d="M180 60 L293 60"/><path d="M465 60 L578 60"/><path d="M578 88 L467 88"/><path d="M293 88 L182 88"/></g>
+      <text x="237" y="52" text-anchor="middle" font-size="10" fill="#45514a">request</text><text x="522" y="52" text-anchor="middle" font-size="10" fill="#45514a">+ X-API-Key</text>
+      <text x="380" y="138" text-anchor="middle" font-size="10.5" fill="#45514a">The API key never reaches the browser. Inputs are validated (horizon 1–3, safe category text, real dates).</text>
+    </svg>
+    <figcaption>Figure 10.1 · The PHP proxy pattern. Admin, Retail Officer and Inventory Custodian can open it; other roles get 403.</figcaption>
+  </figure>
+
+  <h3>What XGBoost is, in plain words</h3>
+  <div class="box simple"><b class="tag">In simple words</b>
+    <p>XGBoost builds many small decision trees <b>one after another</b>. The first tree makes a rough guess of next month’s sales; the second tree learns the mistakes of the first; the third fixes what is still wrong, and so on. Added together, hundreds of small corrections give a strong prediction. It learns from patterns such as recent months’ sales, trend and season, per product and category.</p>
+  </div>
+  <figure>
+    <svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="11.5">
+      <g fill="#fff" stroke="#3d7422"><rect x="10" y="30" width="140" height="56" rx="10"/><rect x="200" y="30" width="140" height="56" rx="10"/><rect x="390" y="30" width="140" height="56" rx="10"/><rect x="610" y="30" width="140" height="56" rx="10" fill="#eef6e8"/></g>
+      <g text-anchor="middle" fill="#16201a"><text x="80" y="54" font-weight="bold">Tree 1</text><text x="80" y="72" font-size="10.5">guess: 40 units</text>
+      <text x="270" y="54" font-weight="bold">Tree 2</text><text x="270" y="72" font-size="10.5">fix: +6</text>
+      <text x="460" y="54" font-weight="bold">Tree 3 … N</text><text x="460" y="72" font-size="10.5">fix: −2, +1 …</text>
+      <text x="680" y="54" font-weight="bold">Forecast</text><text x="680" y="72" font-size="10.5">≈ 45 units</text></g>
+      <g font-size="20" fill="#45514a" text-anchor="middle"><text x="175" y="66">+</text><text x="365" y="66">+</text><text x="570" y="66">=</text></g>
+      <text x="380" y="112" text-anchor="middle" font-size="10.5" fill="#45514a">Illustrative numbers. Each tree corrects the error left by the trees before it (“boosting”).</text>
+    </svg>
+    <figcaption>Figure 10.2 · Boosting: a forecast is the sum of many small corrections.</figcaption>
+  </figure>
+
+  <h3>What the forecast pages show</h3>
+  <table>
+    <tr><th>View</th><th>Columns / content</th></tr>
+    <tr><td class="k">Product Demand</td><td>Units sold in the chosen date range, forecast units, a likely range (low–high), forecast revenue, trend (month-over-month growth), confidence and model reliability. Filter by category.</td></tr>
+    <tr><td class="k">Inventory actions</td><td>Current stock, days of inventory left, safety stock, reorder point, stockout risk and a recommended order quantity, with an action such as “order now” or “reorder”. Shown once the service has a stock snapshot; otherwise a note explains why the columns are hidden.</td></tr>
+    <tr><td class="k">Sales</td><td>Store-wide revenue: actual months next to forecast months, with a confidence band (low–high).</td></tr>
+  </table>
+
+  <div class="box example"><b class="tag">Example · reorder point and safety stock (textbook definitions, illustrative numbers)</b>
+    <p>A product is forecast to sell <b>60 units next month ≈ 2 per day</b>. The supplier takes <b>7 days</b> to deliver. Keep an extra <b>6 units</b> of <i>safety stock</i> for surprises.</p>
+    <ul>
+      <li><b>Reorder point</b> = daily demand × lead time + safety stock = 2 × 7 + 6 = <b>20</b>. When stock falls to 20, order more.</li>
+      <li><b>Days of inventory</b> = stock ÷ daily demand. With 30 in stock: 30 ÷ 2 = <b>15 days</b> left.</li>
+    </ul>
+    <p class="small">These are the standard formulas the columns are named after. The exact calculation runs inside the forecast service, which lives in its own repository, not in this codebase.</p>
+  </div>
+
+  <div class="box panel"><b class="tag">If the panel asks: “Why is the first forecast slow sometimes?”</b>
+    <p>The forecast service runs on Render’s free tier, which sleeps when idle and needs up to about 50 seconds to wake. The proxy waits up to 75 seconds, and the page tells the user to retry in a minute if it’s still waking up.</p>
+  </div>
+</section>
+
+<!-- ============================== 11. PRIMO ============================== -->
+<section class="chapter">
+  <h2><span class="num">11</span>AI #2 · Primo chatbot</h2>
+  <p class="lede">Primo answers shopper questions like “magkano yung ryzen 7?” or “is the RTX 4060 in stock?”. A machine-learning model decides <i>what kind</i> of question it is; the <i>answer</i> always comes from the live database.</p>
+
+  <h3>The pipeline</h3>
+  <figure>
+    <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="11.5">
+      <defs><marker id="a11" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#45514a"/></marker></defs>
+      <rect x="10" y="10" width="220" height="44" rx="8" fill="#f2f5f1" stroke="#dfe5dc"/><text x="120" y="37" text-anchor="middle" fill="#16201a">Shopper types a message</text>
+      <rect x="10" y="74" width="220" height="62" rx="8" fill="#fff" stroke="#dfe5dc"/><text x="120" y="96" text-anchor="middle" font-weight="bold" fill="#16201a">Safety checks (PHP)</text><text x="120" y="113" text-anchor="middle" font-size="10.5" fill="#45514a">CSRF, ≤ 400 chars, no scripts,</text><text x="120" y="127" text-anchor="middle" font-size="10.5" fill="#45514a">15 msgs/min per browser</text>
+      <rect x="10" y="156" width="220" height="80" rx="8" fill="#fff" stroke="#3d7422"/><text x="120" y="178" text-anchor="middle" font-weight="bold" fill="#16201a">Special cases first</text><text x="120" y="195" text-anchor="middle" font-size="10.5" fill="#45514a">“Will X work with Y?” → PC rules</text><text x="120" y="210" text-anchor="middle" font-size="10.5" fill="#45514a">item-list questions → catalog</text><text x="120" y="225" text-anchor="middle" font-size="10.5" fill="#45514a">“explain / compare” → brand advice</text>
+      <rect x="270" y="156" width="220" height="80" rx="8" fill="#fff8d6" stroke="#f3c400" stroke-width="1.6"/><text x="380" y="180" text-anchor="middle" font-weight="bold" fill="#7a5d00">SVM intent model</text><text x="380" y="198" text-anchor="middle" font-size="10.5" fill="#16201a">Python service /predict</text><text x="380" y="214" text-anchor="middle" font-size="10.5" fill="#45514a">→ intent + confidence</text><text x="380" y="228" text-anchor="middle" font-size="10.5" fill="#45514a">below 0.32 → “fallback”</text>
+      <rect x="530" y="156" width="220" height="80" rx="8" fill="#e8f1fa" stroke="#1f5f9e"/><text x="640" y="180" text-anchor="middle" font-weight="bold" fill="#1f5f9e">Intent handler (PHP)</text><text x="640" y="198" text-anchor="middle" font-size="10.5" fill="#16201a">queries the live database:</text><text x="640" y="214" text-anchor="middle" font-size="10.5" fill="#45514a">products, prices, stock,</text><text x="640" y="228" text-anchor="middle" font-size="10.5" fill="#45514a">the customer’s orders</text>
+      <rect x="530" y="262" width="220" height="70" rx="8" fill="#f2f5f1" stroke="#dfe5dc"/><text x="640" y="284" text-anchor="middle" font-weight="bold" fill="#16201a">Optional LLM rephrase</text><text x="640" y="301" text-anchor="middle" font-size="10.5" fill="#45514a">Groq makes it sound friendly;</text><text x="640" y="316" text-anchor="middle" font-size="10.5" fill="#45514a">rejected if any fact changed</text>
+      <rect x="270" y="270" width="220" height="54" rx="8" fill="#eef6e8" stroke="#62b236"/><text x="380" y="293" text-anchor="middle" font-weight="bold" fill="#3d7422">Reply + product cards</text><text x="380" y="310" text-anchor="middle" font-size="10.5" fill="#45514a">shown in the chat widget</text>
+      <rect x="10" y="270" width="220" height="70" rx="8" fill="#fdecea" stroke="#c0392b"/><text x="120" y="292" text-anchor="middle" font-weight="bold" fill="#c0392b">Fallback</text><text x="120" y="309" text-anchor="middle" font-size="10.5" fill="#16201a">ask to rephrase; save the masked</text><text x="120" y="324" text-anchor="middle" font-size="10.5" fill="#16201a">question for retraining (90 days)</text>
+      <g stroke="#45514a" stroke-width="1.6" fill="none" marker-end="url(#a11)">
+        <path d="M120 54 L120 72"/><path d="M120 136 L120 154"/><path d="M230 196 L268 196"/><path d="M490 196 L528 196"/><path d="M640 236 L640 260"/><path d="M530 297 L492 297"/><path d="M330 236 L230 290"/>
+        <path d="M120 236 C120 255 300 252 330 268" stroke-dasharray="4 3"/>
+      </g>
+      <text x="236" y="250" font-size="10" fill="#45514a">low confidence</text>
+      <text x="380" y="372" text-anchor="middle" font-size="10.5" fill="#45514a">Off-topic messages (homework, dating, weather…) get a fixed “I’m only here for EasyPC” reply and are never sent to the LLM.</text>
+    </svg>
+    <figcaption>Figure 11.1 · How backend/api/primo_chat.php answers one message.</figcaption>
+  </figure>
+
+  <h3>The intent model: TF-IDF + SVM</h3>
+  <p>An <b>intent</b> is the goal behind a message. Primo knows 16: greeting, goodbye, gratitude, help, product_search, product_category, product_price, stock_inquiry, product_recommendation, brand_advice, compatibility_question, saved_build, order_status, return_refund, store_information, and fallback (not understood).</p>
+  <ol class="steps">
+    <li><b>Clean the text</b>: lowercase, normalize spelling.</li>
+    <li><b>TF-IDF</b> turns the sentence into numbers. It counts words and word pairs (“in stock”), plus 3–5-letter chunks (“mag”, “agka”, “kano”), and gives more weight to words that are rare across all examples. The letter chunks are why typos and Taglish still work.</li>
+    <li><b>SVM</b> (Support Vector Machine, RBF kernel) has learned boundaries that separate the 16 intents in that number space, and outputs a probability for each.</li>
+    <li><b>Threshold</b>: if the top probability is below <b>0.32</b>, the answer is “fallback” (ask to rephrase) instead of a risky guess.</li>
+  </ol>
+
+  <div class="box example"><b class="tag">Example · “magkano yung ryzen 7?” (illustrative probabilities)</b>
+    <table style="margin:6px 0">
+      <tr><th>Intent</th><th class="num">Probability</th></tr>
+      <tr><td>product_price</td><td class="num"><b>0.71</b></td></tr>
+      <tr><td>product_search</td><td class="num">0.12</td></tr>
+      <tr><td>stock_inquiry</td><td class="num">0.08</td></tr>
+      <tr><td>others</td><td class="num">0.09</td></tr>
+    </table>
+    <p>0.71 ≥ 0.32 → intent <b>product_price</b>. The PHP price handler searches products for “ryzen 7” and replies with real rows, for example “AMD Ryzen 7 … — ₱(price from DB) — (n) on hand”. A follow-up like “how about stock?” reuses the last product topic saved in the session.</p>
+  </div>
+
+  <h3>Measured accuracy (from ml/primo/BASELINE.md)</h3>
+  <table>
+    <tr><th>Measure</th><th class="num">Result</th><th>What it means</th></tr>
+    <tr><td>Hard test set (160 tricky sentences: typos, Taglish, new phrasing; never used for training)</td><td class="num"><b>83.8%</b> (134/160)</td><td>The honest “real-world” score. Up from 59.4% after adding Taglish and slang examples.</td></tr>
+    <tr><td>5-fold × 5 cross-validation</td><td class="num">82.7% ± 1.7</td><td>Train on 4/5 of the data, test on the other 1/5, repeated 25 times.</td></tr>
+    <tr><td>Quick checks</td><td class="num">47/47</td><td>Common sentences that must always work.</td></tr>
+    <tr><td>Training data</td><td class="num">922 examples</td><td>102 in Taglish/Filipino; every intent has at least 40.</td></tr>
+  </table>
+
+  <h3>Why the LLM can’t make things up</h3>
+  <div class="box simple"><b class="tag">In simple words</b>
+    <p>The LLM (Groq, model <code>gpt-oss-20b</code>) is only allowed to <b>rephrase</b> a sentence that PHP already built from the database. After it answers, <code>primo_phrase_keeps_facts()</code> checks that every peso amount is the same, no new peso amount appeared, the product name is still there and every “N on hand” is unchanged. If anything differs, the original database sentence is used. If Groq is off, Primo still works with the plain sentences.</p>
+  </div>
+
+  <h3>Privacy and abuse protection</h3>
+  <ul>
+    <li>E-mail addresses and phone numbers are masked before anything goes to the LLM or into the “unanswered questions” log.</li>
+    <li>The unanswered log keeps only the masked message text (no user ID, session or IP), at most 30 per visitor, deleted after 90 days. Staff review it and add good examples to the training data: the model learns from real questions.</li>
+    <li>Rate limits: 15 messages per minute per browser, 60 per IP address.</li>
+  </ul>
+
+  <div class="box warn"><b class="tag">Be honest about</b>
+    <p>“help” and “fallback” are the weakest intents (about 4–6 out of 10 on the hard set), and the test sentences were written by the same team as the training data, so they aren’t fully independent. Real shopper messages from the unanswered log are the planned next source of data.</p>
+  </div>
+</section>
+
+<!-- ============================== 12. BUILD A PC ============================== -->
+<section class="chapter">
+  <h2><span class="num">12</span>AI #3 · Build a PC recommender</h2>
+  <p class="lede">The customer picks a purpose (School, Office, Gaming, Content Creation, or Not sure yet), an optional budget, and then a part for each slot. Two layers help: <b>rules</b> remove parts that won’t fit, then a <b>Random Forest</b> ranks the parts that remain.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="11.5">
+      <defs><marker id="a12" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#45514a"/></marker></defs>
+      <path d="M10 30 L230 30 L200 170 L40 170 Z" fill="#f2f5f1" stroke="#dfe5dc"/>
+      <text x="120" y="60" text-anchor="middle" font-weight="bold" fill="#16201a">All motherboards</text><text x="120" y="80" text-anchor="middle" font-size="10.5" fill="#45514a">in stock (e.g. 20)</text>
+      <path d="M290 40 L490 40 L465 160 L315 160 Z" fill="#e8f1fa" stroke="#1f5f9e"/>
+      <text x="390" y="70" text-anchor="middle" font-weight="bold" fill="#1f5f9e">Compatible (e.g. 7)</text><text x="390" y="90" text-anchor="middle" font-size="10.5" fill="#16201a">socket matches CPU,</text><text x="390" y="105" text-anchor="middle" font-size="10.5" fill="#16201a">DDR matches RAM,</text><text x="390" y="120" text-anchor="middle" font-size="10.5" fill="#16201a">fits the case</text>
+      <path d="M550 50 L740 50 L715 150 L575 150 Z" fill="#eef6e8" stroke="#62b236"/>
+      <text x="645" y="80" text-anchor="middle" font-weight="bold" fill="#3d7422">Top 3 = Recommended</text><text x="645" y="100" text-anchor="middle" font-size="10.5" fill="#16201a">ranked by the forest’s</text><text x="645" y="115" text-anchor="middle" font-size="10.5" fill="#16201a">“good fit” probability</text>
+      <g stroke="#45514a" stroke-width="1.6" marker-end="url(#a12)"><path d="M225 100 L292 100"/><path d="M480 100 L556 100"/></g>
+      <text x="258" y="92" text-anchor="middle" font-size="10" fill="#45514a">rules</text><text x="518" y="92" text-anchor="middle" font-size="10" fill="#45514a">forest</text>
+      <text x="380" y="192" text-anchor="middle" font-size="10.5" fill="#45514a">The forest never sees incompatible parts; rules are the safety layer, the model is the taste layer.</text>
+    </svg>
+    <figcaption>Figure 12.1 · Two-stage recommendation for one slot (illustrative counts).</figcaption>
+  </figure>
+
+  <h3>Layer 1 · Compatibility rules (includes/pc_compatibility.php)</h3>
+  <p>Each product’s name and description are read for tags such as socket (AM4, AM5, LGA1700), memory type (DDR4/DDR5), form factor (ITX, mATX, ATX, E-ATX), storage type (NVMe/SATA) and wattage. Then:</p>
+  <table>
+    <tr><th>Rule</th><th>Message the customer sees</th></tr>
+    <tr><td>CPU socket = motherboard socket</td><td>“CPU socket mismatch”</td></tr>
+    <tr><td>RAM type = motherboard type (and what the CPU supports)</td><td>“RAM type mismatch” / “this processor needs DDR5”</td></tr>
+    <tr><td>Cooler socket fits the CPU/motherboard</td><td>“cooler socket mismatch”</td></tr>
+    <tr><td>Case size ≥ motherboard size (ITX &lt; mATX &lt; ATX &lt; E-ATX)</td><td>“case form factor too small”</td></tr>
+    <tr><td>PSU watts ≥ estimated draw (CPU 65 W + board 40 W + GPU 180 W + RAM 10 W + storage 15 W)</td><td>“PSU wattage too low for estimated power draw”</td></tr>
+  </table>
+  <p>An extra check refuses any part that would leave another <b>required</b> part with <b>no compatible option in stock</b> (a “dead end”).</p>
+
+  <h3>Layer 2 · The Random Forest</h3>
+  <div class="box simple"><b class="tag">In simple words</b>
+    <p>A decision tree is a flowchart of yes/no questions (“Is this part much pricier than the rest of the build?”, “Does the purpose need a graphics card?”). A <b>Random Forest</b> is <b>60 such trees</b>, each trained on a slightly different random sample. Each tree votes how good a fit the part is; the forest averages the votes. Many imperfect voters together are more reliable than one.</p>
+  </div>
+  <div class="box example"><b class="tag">Example · scoring one graphics card for a Gaming build (illustrative)</b>
+    <p>Tree 1 says 0.9, tree 2 says 0.7, tree 3 says 0.8 … the average of all 60 is <b>0.78</b>. That is above the threshold 0.5, so it is a “good fit”. Among all compatible GPUs, the three highest averages get the <b>Recommended</b> badge with a reason (“Fits the parts you already picked”). A part that fits the rules but scores low gets a note such as “Pricier than the rest of this build needs.”</p>
+  </div>
+  <p><b>What the trees look at (23 features)</b>: the purpose, which slot, how the part’s price tier compares with the rest of the build, overall build level, GPU level, performance tier, balance, cooling margin, dual-channel memory, PSU headroom and rating, ATX 3.0, case bundle, form-factor slack, brand match, built-in graphics, bundled cooler, VRAM and budget slack. The most important ones are <b>budget slack (19%)</b>, slot (14%), price-tier gap (13%) and performance tier (11%).</p>
+
+  <h3>Where the training data comes from</h3>
+  <ul>
+    <li><b>Rule rows (53,985)</b>: random partial builds from the real catalog, for every purpose and several sample budgets (₱30k to ₱200k). Each candidate part is labelled good/not good by expert rules.</li>
+    <li><b>Real rows (739)</b>: real customer choices from saved builds, online orders and POS sales. One part is hidden; the part the customer actually chose is “good”. Real picks count 5× more, so the model follows customers where they disagree with the rules.</li>
+  </ul>
+
+  <h3>How well it works (from models/forest.json)</h3>
+  <table>
+    <tr><th>Test</th><th class="num">Result</th><th>Meaning</th></tr>
+    <tr><td>Accuracy, 4-fold cross-validation grouped by build</td><td class="num"><b>99.0%</b></td><td>Agrees with the labels on builds it never saw (F1 0.989).</td></tr>
+    <tr><td>Hit@3 on real customer builds</td><td class="num"><b>65.1%</b></td><td>Hide a part a real customer chose: in 65% of cases it is in the model’s top 3.</td></tr>
+    <tr><td>Same test, expert rules alone</td><td class="num">57.0%</td><td rowspan="3">The model beats every simpler method, which shows the machine learning adds value over plain rules.</td></tr>
+    <tr><td>Same test, closest price range</td><td class="num">51.2%</td></tr>
+    <tr><td>Same test, random picks</td><td class="num">39.9%</td></tr>
+  </table>
+  <div class="box warn"><b class="tag">Be honest about</b>
+    <p>The 99% is high partly because most rows are labelled by rules, which a forest learns easily. On the 739 real rows alone accuracy is about 47%, because a customer’s single choice is “right” and every other good part counts as “wrong”. That’s why Hit@3 (is the real choice in the top 3?) is the fairer measure. Compatibility also depends on product names and descriptions being written clearly.</p>
+  </div>
+
+  <h3>Nightly self-improvement (ml/pc_recommend/retrain.py)</h3>
+  <figure>
+    <svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="11">
+      <defs><marker id="a12b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#45514a"/></marker></defs>
+      <g fill="#fff" stroke="#62b236"><rect x="10" y="20" width="160" height="64" rx="10"/><rect x="200" y="20" width="160" height="64" rx="10"/><rect x="390" y="20" width="160" height="64" rx="10"/><rect x="580" y="20" width="170" height="64" rx="10" fill="#eef6e8"/></g>
+      <g text-anchor="middle" fill="#16201a"><text x="90" y="44" font-weight="bold">02:00 daily</text><text x="90" y="62">rebuild dataset from</text><text x="90" y="76">DB (read only)</text>
+      <text x="280" y="44" font-weight="bold">Train + test</text><text x="280" y="62">into forest.json.new</text><text x="280" y="76">(not live yet)</text>
+      <text x="470" y="44" font-weight="bold">Safety checks</text><text x="470" y="62">rows ≥ 90% of last,</text><text x="470" y="76">accuracy ≥ 0.90</text>
+      <text x="665" y="44" font-weight="bold">Swap in</text><text x="665" y="62">used from the next</text><text x="665" y="76">page load</text></g>
+      <g stroke="#45514a" stroke-width="1.6" marker-end="url(#a12b)"><path d="M170 52 L198 52"/><path d="M360 52 L388 52"/><path d="M550 52 L578 52"/></g>
+      <text x="380" y="108" text-anchor="middle" fill="#45514a" font-size="10.5">If any check fails, the current model stays live and the reason is written to logs/retrain.log.</text>
+    </svg>
+    <figcaption>Figure 12.2 · Automatic retraining that can never put a broken model online.</figcaption>
+  </figure>
+  <p><b>“Build it for me”</b> uses the same pieces: given a purpose and budget, it fills each empty slot in order (CPU, motherboard, memory, GPU if the purpose needs one, storage, PSU, case, cooler, fans), using a budget share per slot for that purpose and the best-scoring compatible part. Builds can be saved to the account and added to the cart.</p>
+</section>
+
+<!-- ============================== 13. DATABASE ============================== -->
+<section class="chapter">
+  <h2><span class="num">13</span>The database</h2>
+  <p class="lede">PostgreSQL on Supabase. These are the tables that matter most and how they connect.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="11">
+      <g stroke="#9aa59e" stroke-width="1.4" fill="none">
+        <path d="M195 70 L285 70"/><path d="M195 90 L285 230"/><path d="M110 120 L110 300"/><path d="M465 70 L555 70"/><path d="M375 120 L375 200"/>
+        <path d="M465 250 L555 250"/><path d="M640 120 L640 200"/><path d="M640 290 L640 320"/><path d="M195 330 L285 330"/><path d="M465 330 L555 350"/><path d="M195 110 L555 380"/>
+      </g>
+      <!-- users -->
+      <g><rect x="20" y="20" width="175" height="100" rx="10" fill="#e8f1fa" stroke="#1f5f9e"/><text x="107" y="40" text-anchor="middle" font-weight="bold" fill="#1f5f9e">users</text>
+        <text x="30" y="58" fill="#16201a">id, name, surname, email</text><text x="30" y="73" fill="#16201a">password (bcrypt), role</text><text x="30" y="88" fill="#16201a">is_verified, is_locked</text><text x="30" y="103" fill="#16201a">failed_attempts, address…</text></g>
+      <!-- orders -->
+      <g><rect x="285" y="20" width="180" height="100" rx="10" fill="#fff" stroke="#3d7422"/><text x="375" y="40" text-anchor="middle" font-weight="bold" fill="#3d7422">orders</text>
+        <text x="295" y="58" fill="#16201a">user_id → users, total</text><text x="295" y="73" fill="#16201a">status, payment_status</text><text x="295" y="88" fill="#16201a">fulfillment, stock_deducted</text><text x="295" y="103" fill="#16201a">cancel_requested, pay ref</text></g>
+      <!-- shipments -->
+      <g><rect x="555" y="20" width="180" height="100" rx="10" fill="#fff" stroke="#3d7422"/><text x="645" y="40" text-anchor="middle" font-weight="bold" fill="#3d7422">shipments</text>
+        <text x="565" y="62" fill="#16201a">order_id → orders</text><text x="565" y="78" fill="#16201a">shipment_status</text><text x="565" y="94" fill="#16201a">carrier (LALAMOVE)</text></g>
+      <!-- order_items -->
+      <g><rect x="285" y="200" width="180" height="90" rx="10" fill="#fff" stroke="#3d7422"/><text x="375" y="220" text-anchor="middle" font-weight="bold" fill="#3d7422">order_items</text>
+        <text x="295" y="240" fill="#16201a">order_id → orders</text><text x="295" y="256" fill="#16201a">product_id → products</text><text x="295" y="272" fill="#16201a">quantity, price</text></g>
+      <!-- products -->
+      <g><rect x="555" y="200" width="180" height="90" rx="10" fill="#fff8d6" stroke="#f3c400" stroke-width="1.6"/><text x="645" y="220" text-anchor="middle" font-weight="bold" fill="#7a5d00">products</text>
+        <text x="565" y="240" fill="#16201a">name, category, price</text><text x="565" y="256" fill="#16201a">stock (CHECK ≥ 0)</text><text x="565" y="272" fill="#16201a">sku, barcode, image</text></g>
+      <!-- cart etc -->
+      <g><rect x="20" y="300" width="175" height="105" rx="10" fill="#f2f5f1" stroke="#dfe5dc"/><text x="107" y="320" text-anchor="middle" font-weight="bold" fill="#16201a">per-user tables</text>
+        <text x="30" y="338" fill="#16201a">cart, wishlist</text><text x="30" y="353" fill="#16201a">saved_builds</text><text x="30" y="368" fill="#16201a">notifications</text><text x="30" y="383" fill="#16201a">logs (audit), messages</text><text x="30" y="398" fill="#16201a">locked_accounts</text></g>
+      <!-- POS -->
+      <g><rect x="285" y="300" width="180" height="90" rx="10" fill="#fff" stroke="#1f5f9e"/><text x="375" y="320" text-anchor="middle" font-weight="bold" fill="#1f5f9e">pos_sales</text>
+        <text x="295" y="340" fill="#16201a">invoice_no, client_ref</text><text x="295" y="356" fill="#16201a">cashier_id, total, VAT</text><text x="295" y="372" fill="#16201a">payment_method, change_due</text></g>
+      <g><rect x="555" y="320" width="180" height="85" rx="10" fill="#fff" stroke="#1f5f9e"/><text x="645" y="340" text-anchor="middle" font-weight="bold" fill="#1f5f9e">pos_sale_items +</text><text x="645" y="355" text-anchor="middle" font-weight="bold" fill="#1f5f9e">stock_movements</text>
+        <text x="565" y="374" fill="#16201a">stock_in / stock_out,</text><text x="565" y="390" fill="#16201a">stock_before → stock_after</text></g>
+    </svg>
+    <figcaption>Figure 13.1 · Simplified entity relationships. Arrows in the text (→) are foreign keys.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Table</th><th>Holds</th></tr>
+    <tr><td class="k">users</td><td>Every account and its role. <code>role</code> is limited by a CHECK constraint to the valid roles.</td></tr>
+    <tr><td class="k">products</td><td>The catalog and the live stock number. <code>stock</code> can never go below zero (database CHECK).</td></tr>
+    <tr><td class="k">orders, order_items, shipments</td><td>Online orders, their lines and delivery status.</td></tr>
+    <tr><td class="k">pos_sales, pos_sale_items</td><td>Counter sales and their lines; names and prices are copied at the time of sale, so old receipts never change.</td></tr>
+    <tr><td class="k">stock_movements</td><td>The stock ledger: every stock-in and POS stock-out with before/after values, supplier, reference, user.</td></tr>
+    <tr><td class="k">logs</td><td>The audit trail: user, action, details, IP, time.</td></tr>
+    <tr><td class="k">notifications</td><td>Bell items for customers (order updates) and staff (stock alerts, new orders).</td></tr>
+    <tr><td class="k">order_reviews, order_review_media</td><td>Customer reviews, photos and staff replies.</td></tr>
+    <tr><td class="k">saved_builds, cart, wishlist</td><td>Customer data kept between visits.</td></tr>
+    <tr><td class="k">messages (+ reactions, pins, hidden)</td><td>Staff chat.</td></tr>
+    <tr><td class="k">site_settings</td><td>Admin-controlled settings (password policy).</td></tr>
+    <tr><td class="k">primo_unanswered</td><td>Masked questions Primo could not answer, for retraining.</td></tr>
+  </table>
+
+  <div class="box simple"><b class="tag">Small details worth knowing</b>
+    <ul>
+      <li><b>Time</b>: timestamps are saved in UTC and shown in Philippine time (Asia/Manila), so reports are correct regardless of the server’s location.</li>
+      <li><b>SKU vs barcode</b>: SKU is EasyPC’s own item code; the barcode is the manufacturer’s UPC/EAN, stored in one normalized form.</li>
+      <li><b>Connection</b>: through Supabase’s connection pooler (transaction mode), with SSL required. Each piece of work stays inside one transaction.</li>
+      <li><b>Outage page</b>: if the database can’t be reached, visitors see a friendly “can’t connect” page; technical details go only to the server log.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================== 14. SUPPORTING ============================== -->
+<section class="chapter">
+  <h2><span class="num">14</span>Notifications, staff chat, deployment</h2>
+  <p class="lede">The features that tie the roles together and keep the system running.</p>
+
+  <h3>Notifications (the bell)</h3>
+  <table>
+    <tr><th>Who</th><th>Gets notified about</th></tr>
+    <tr><td class="k">Customer</td><td>Order placed, payment successful, order accepted, completed, cancellation updates.</td></tr>
+    <tr><td class="k">Inventory Custodian</td><td>New and paid orders, cancellation requests, items received, plus all stock alerts.</td></tr>
+    <tr><td class="k">Admin, Retail Officer</td><td>Stock alerts (low, out, restocked); the Retail Officer also gets “order completed, recorded as a sale”.</td></tr>
+  </table>
+  <p>Clicking an item opens the right page already filtered, for example a low-stock alert opens Stock Alerts showing only items that are running low.</p>
+
+  <h3>Staff chat (Messages)</h3>
+  <p>An internal messenger for Admin, Retail Officer and Inventory Custodian (not cashiers). It supports one-to-one conversations, file and image attachments, reactions, unsend, forward, pin, search and read status. It also appears as a floating widget on every staff page. Every action checks that the user really belongs to that conversation, and attachments are stored in a folder that can’t be opened directly from the web.</p>
+
+  <h3>Deployment</h3>
+  <ul>
+    <li><b>Local</b>: XAMPP (Apache + PHP) at <code>http://localhost/TechPrime-AI/TechPrime-AI/login.php</code>, with Primo’s Python service on <code>127.0.0.1:5055</code>.</li>
+    <li><b>Hosted</b>: a Docker image based on <code>php:8.2-apache</code> with the PostgreSQL driver, timezone set to Asia/Manila and Composer dependencies installed during the build. Secrets come from environment variables.</li>
+    <li><b>AI services</b>: Primo (Flask) and the XGBoost forecast service run on Render. The Build-a-PC model is a JSON file read by PHP, so it needs no extra server.</li>
+  </ul>
+
+  <h3>The look (staff design system)</h3>
+  <p>All staff screens share one app shell, modelled on the Cashier redesign: a dark green sidebar on desktop, a bottom tab bar on phones, EasyPC green and yellow, Fira Sans/Fira Code fonts, buttons at least 44 px tall, and tables that turn into cards on small screens. Status always uses an icon and text, not colour alone. The customer store has its own matching design with a light/dark theme switch.</p>
+</section>
+
+<!-- ============================== 15. Q&A ============================== -->
+<section class="chapter">
+  <h2><span class="num">15</span>Defense prep: likely questions</h2>
+  <p class="lede">Short, honest answers. Say what the system does, how you know it works, and what you would improve.</p>
+
+  <dl class="qa">
+    <dt>What makes the system “AI”?</dt>
+    <dd>Three trained models: an XGBoost model forecasts demand and revenue; an SVM classifies the intent of chatbot messages; a Random Forest ranks compatible PC parts. Each was evaluated: Primo 83.8% on a held-out hard test set, the forest 99.0% cross-validated accuracy and 65% Hit@3 on real builds, better than rules alone (57%).</dd>
+
+    <dt>How do you prevent selling an item that is already out of stock?</dt>
+    <dd>At the POS, the sale locks the product rows (<code>FOR UPDATE</code>), re-checks stock inside the transaction, deducts with <code>WHERE stock &gt;= qty</code>, and the database itself forbids negative stock. If any check fails, the whole sale rolls back. Online orders check and lock stock when placed and deduct once at completion.</dd>
+
+    <dt>What if the cashier clicks “Complete sale” twice or the network drops?</dt>
+    <dd>Each sale carries a unique <code>client_ref</code> created by the POS screen. A repeated request returns the same sale instead of a new one; the UNIQUE constraint covers even simultaneous requests.</dd>
+
+    <dt>Why is the stock of an online order not deducted when the order is placed?</dt>
+    <dd>The order can still be cancelled while unpaid. Stock is validated at placement and deducted exactly once, when the customer confirms receipt (or staff completes it), guarded by the <code>stock_deducted</code> flag.</dd>
+
+    <dt>How are passwords protected?</dt>
+    <dd>bcrypt hashes, an admin-configurable complexity policy, lockout after 3 wrong attempts, identical error messages for wrong e-mail or password, a new session ID at login and a 15-minute idle timeout.</dd>
+
+    <dt>How do you stop one role from opening another role’s pages?</dt>
+    <dd>Every page starts with <code>checkSessionTimeout()</code> and <code>checkRole()</code>; JSON endpoints check the session role and return 403. Typing another role’s URL redirects to login.</dd>
+
+    <dt>Can the chatbot give a wrong price?</dt>
+    <dd>Prices and stock always come from the database. The LLM only rephrases, and the reply is thrown away if any price, product name or quantity changed. If the model is unsure (below 0.32 confidence) Primo asks the customer to rephrase instead of guessing.</dd>
+
+    <dt>How does Primo understand Taglish and typos?</dt>
+    <dd>TF-IDF uses 3–5 character chunks as well as words, so “magkano”, “mgkano” and “magkanoo” share most chunks. The training data includes 102 Taglish/Filipino examples.</dd>
+
+    <dt>How does the forecast help the business?</dt>
+    <dd>It shows which products will sell in the next 1–3 months and turns that into inventory actions: reorder point, safety stock, days of inventory left and a recommended order quantity, so buying decisions are based on data.</dd>
+
+    <dt>How does the Build-a-PC know two parts are compatible?</dt>
+    <dd>It reads the socket, memory type, form factor, storage type and wattage from product names and descriptions, then applies fixed rules (socket match, DDR match, case ≥ board size, PSU ≥ estimated draw). Only parts that pass are ranked by the model.</dd>
+
+    <dt>Does the model keep learning?</dt>
+    <dd>Yes. The Build-a-PC forest retrains every night from new saved builds and sales, and goes live only if it passes the data-size and accuracy checks. Primo’s unanswered questions are reviewed and added to its training data.</dd>
+
+    <dt>How is every action traceable?</dt>
+    <dd><code>logActivity()</code> records the user, action, details (for stock: before → after) and IP for logins, sales, stock-ins, order actions, exports and settings changes. Admin sees all of it in Activity Logs.</dd>
+
+    <dt>What happens if the database or an AI service is down?</dt>
+    <dd>Database down: a branded “can’t connect” page, details only in the server log. Primo down: “temporarily unavailable” message. Groq down: Primo still answers with plain database sentences. Forecast asleep: a “waking up, retry” message. Build a PC without the model file: the rules still filter parts.</dd>
+  </dl>
+
+  <h3>Limitations to admit (and the fix you would make)</h3>
+  <table>
+    <tr><th>Limitation</th><th>Next step</th></tr>
+    <tr><td>Online payment is a placeholder: no real money moves.</td><td>Connect a gateway (e.g. PayMongo) and mark orders paid from its confirmation.</td></tr>
+    <tr><td>The “max failed attempts” setting is saved, but login always locks at 3.</td><td>Read the setting in <code>login.php</code>.</td></tr>
+    <tr><td>Stock thresholds (5 / 15) are the same for every product.</td><td>A per-product reorder level, or use the forecast’s reorder point.</td></tr>
+    <tr><td>Supplier = product brand; no suppliers table.</td><td>Add a suppliers table linked to products.</td></tr>
+    <tr><td>PC compatibility is read from product text, so it depends on well-written names and descriptions.</td><td>Store specs (socket, DDR, form factor, watts) as proper product columns.</td></tr>
+    <tr><td>Two-factor (TOTP) code exists in the old API (<code>backend/api/auth.php</code>) but the main login page doesn’t use it.</td><td>Add the TOTP step to <code>login.php</code> for staff accounts.</td></tr>
+    <tr><td>AI services on free hosting sleep when idle (slow first request).</td><td>A paid plan or a scheduled warm-up.</td></tr>
+    <tr><td>One shared live database; no separate test database.</td><td>A staging database for testing.</td></tr>
+  </table>
+</section>
+
+<!-- ============================== 16. GLOSSARY ============================== -->
+<section class="chapter">
+  <h2><span class="num">16</span>Glossary</h2>
+  <p class="lede">Terms you may hear or use during the defense.</p>
+  <table>
+    <tr><td class="k">Audit trail / log</td><td>A record of who did what and when (<code>logs</code> table).</td></tr>
+    <tr><td class="k">bcrypt / hash</td><td>A one-way scramble of a password. You can check a password against it, but you can’t reverse it.</td></tr>
+    <tr><td class="k">Check digit</td><td>The last digit of a barcode, computed from the others to catch misreads.</td></tr>
+    <tr><td class="k">Confidence threshold</td><td>The minimum probability before Primo trusts its guess (0.32).</td></tr>
+    <tr><td class="k">Cross-validation</td><td>Testing a model on parts of the data it didn’t train on, several times, and averaging.</td></tr>
+    <tr><td class="k">CSRF token</td><td>A secret value in each form so other websites can’t submit forms as the user.</td></tr>
+    <tr><td class="k">Deadlock</td><td>Two processes each waiting for a lock the other holds. Avoided by locking in a fixed order.</td></tr>
+    <tr><td class="k">F1 score</td><td>One number that balances precision (how many “yes” answers were right) and recall (how many real “yes” cases were found).</td></tr>
+    <tr><td class="k">Hit@3</td><td>How often the correct answer is among the top 3 suggestions.</td></tr>
+    <tr><td class="k">Idempotent</td><td>Doing the same request twice has the same effect as doing it once.</td></tr>
+    <tr><td class="k">Intent</td><td>The purpose behind a chat message (price, stock, order status…).</td></tr>
+    <tr><td class="k">LLM</td><td>Large Language Model, a text-generating AI (used here only to rephrase).</td></tr>
+    <tr><td class="k">PDO / prepared statement</td><td>PHP’s database layer; user input is sent separately from the SQL so it can’t be run as code.</td></tr>
+    <tr><td class="k">Random Forest</td><td>Many decision trees that vote; the average vote is the prediction.</td></tr>
+    <tr><td class="k">Reorder point</td><td>The stock level at which you should order more (daily demand × lead time + safety stock).</td></tr>
+    <tr><td class="k">Row lock (FOR UPDATE)</td><td>Reserves a database row so no one else can change it until the transaction ends.</td></tr>
+    <tr><td class="k">Safety stock</td><td>Extra units kept for unexpected demand or late deliveries.</td></tr>
+    <tr><td class="k">Session</td><td>The server’s memory of a logged-in user, linked to a browser cookie.</td></tr>
+    <tr><td class="k">SKU</td><td>Stock Keeping Unit, the store’s own product code.</td></tr>
+    <tr><td class="k">SVM</td><td>Support Vector Machine, a model that learns boundaries between categories.</td></tr>
+    <tr><td class="k">TF-IDF</td><td>Turns text into numbers; rare, distinctive words weigh more than common ones.</td></tr>
+    <tr><td class="k">Transaction / rollback</td><td>A group of database changes that are saved together, or all undone if one fails.</td></tr>
+    <tr><td class="k">UPC / EAN</td><td>Standard product barcode formats (12 / 13 / 8 digits).</td></tr>
+    <tr><td class="k">UUID</td><td>A random, practically unique ID (used as the POS <code>client_ref</code>).</td></tr>
+    <tr><td class="k">VAT-inclusive</td><td>The shelf price already contains the 12% VAT; VAT = total − total ÷ 1.12.</td></tr>
+    <tr><td class="k">XGBoost</td><td>Gradient-boosted trees: each new tree corrects the errors of the previous ones.</td></tr>
+  </table>
+  <p class="small" style="margin-top:18px">Good luck at the defense. If a question goes deeper than this guide, the file names in each chapter point to the exact code to open.</p>
+</section>
+
+</main>
+</body>
+</html>
