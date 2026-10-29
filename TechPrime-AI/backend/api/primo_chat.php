@@ -1131,6 +1131,12 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
     }
 
     $own = (string) $displayMessage !== '' ? (string) $displayMessage : $message;
+    // A named price ("laptop with price 10,000") is a hard limit for every category.
+    // Search words must not include the amount, or "10000" fails to match and the
+    // category fallback returns any laptop, including ones far above that price.
+    $priceAsk = primo_asked_price($own) ?? primo_asked_price($message);
+    $searchOwn = $priceAsk !== null ? primo_message_without_price($own) : $own;
+    $searchMessage = $priceAsk !== null ? primo_message_without_price($message) : $message;
     // 5 cards keep the chat readable; "show all ..." gets the whole list up to 12, the rest is in Shop Now
     $limit = primo_wants_all($own) ? 12 : 5;
     $total = null;        // set when the list is a whole category or brand, so the reply can give the count
@@ -1148,15 +1154,21 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
     $brandIntro = null;
     if ($brands !== []) {
         // the shopper's words first: "asus gpu" after a laptop answer is about GPUs, not the carried-over laptop
-        $category = primo_match_category(primo_without_brands($own, $brands))
-            ?? primo_match_category(primo_without_brands($message, $brands));
-        $products = primo_find_brand_products($db, $message, $brands, $category, $limit, $total);
+        $category = primo_match_category(primo_without_brands($searchOwn, $brands))
+            ?? primo_match_category(primo_without_brands($searchMessage, $brands));
+        $products = primo_find_brand_products($db, $searchMessage, $brands, $category, $limit, $total, $priceAsk);
         $listLabel = primo_brand_label($brands) . ' ' . primo_category_plural($category);
         $listCategory = $category;
         $listBrands = $brands;
+        if ($products === [] && $priceAsk !== null) {
+            return [
+                'reply' => primo_price_miss_text($listLabel, $priceAsk),
+                'products' => [],
+            ];
+        }
         if ($products === []) {
             $missing = "We don't have any {$listLabel} in stock right now.";
-            $products = $category !== null ? primo_find_brand_products($db, $message, [], $category, $limit, $total) : [];
+            $products = $category !== null ? primo_find_brand_products($db, $searchMessage, [], $category, $limit, $total) : [];
             $listLabel = primo_category_plural($category);
             $listBrands = [];
             if ($products === []) {
@@ -1168,17 +1180,30 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
             $brandIntro = $missing . " Here are other {$listLabel} you can check:";
         }
     } else {
-        $category = primo_match_category($own);
+        $category = primo_match_category($searchOwn);
         $products = [];
-        if ($category !== null && primo_is_category_listing($own)) {
+        if ($category !== null && primo_is_category_listing($searchOwn)) {
             // a whole category ("show all laptops"): the same list and count as Shop Now
-            $products = primo_find_brand_products($db, $own, [], $category, $limit, $total);
+            $products = primo_find_brand_products($db, $searchOwn, [], $category, $limit, $total, $priceAsk);
             $listLabel = primo_category_plural($category);
             $listCategory = $category;
+            if ($products === [] && $priceAsk !== null) {
+                return [
+                    'reply' => primo_price_miss_text(primo_price_subject($own, $category), $priceAsk),
+                    'products' => [],
+                ];
+            }
         }
         if ($products === []) {
             $total = null;
-            $products = primo_find_products($db, $message, $intent);
+            $products = primo_find_products($db, $searchMessage, $intent, false, $priceAsk);
+        }
+        if ($products === [] && $priceAsk !== null) {
+            $what = primo_price_subject($own, primo_match_category($searchOwn) ?? primo_match_category($searchMessage));
+            return [
+                'reply' => primo_price_miss_text($what, $priceAsk),
+                'products' => [],
+            ];
         }
     }
     $wantsBuild = (bool) preg_match('/\b(build|components?|tech\s*&?\s*match|customize|parts?\s+to\s+choose)\b/i', $message . ' ' . (string) $displayMessage);
@@ -1241,6 +1266,10 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
     if ($brandIntro !== null) {
         $intro = $brandIntro;
     }
+    if ($priceAsk !== null) {
+        $what = $listLabel !== '' ? $listLabel : primo_category_plural($category ?? null);
+        $intro = 'Here are in-stock ' . $what . ' ' . primo_price_phrase($priceAsk) . ':';
+    }
 
     $outro = 'Open Shop Now to buy, or ask me about price, stock, or compatibility.';
     if ($total !== null && $total > count($products)) {
@@ -1248,7 +1277,7 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
         // primo.js turns [Shop Now](shop.php?...) into a link to that filtered list
         $outro = 'Showing ' . count($products) . " of the {$total} {$listLabel} in stock. Open [Shop Now]("
             . primo_shop_url($listCategory, $listBrands, $products) . ') to see them all.';
-    } elseif ($total !== null && $total > 1 && $limit === 12 && $brandIntro === null) {
+    } elseif ($priceAsk === null && $total !== null && $total > 1 && $limit === 12 && $brandIntro === null) {
         $intro = "Here are all {$total} {$listLabel} in stock:";
     }
     return primo_cards_reply($intro, $products, $outro);
@@ -1258,7 +1287,7 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
  * Search real products using existing client visibility rules.
  * @return list<array{id:int,name:string,price:float,stock:int,category:string}>
  */
-function primo_find_products(PDO $db, string $message, string $intent, bool $strict = false): array
+function primo_find_products(PDO $db, string $message, string $intent, bool $strict = false, ?array $priceAsk = null): array
 {
     $condition = ias_client_product_list_sql_condition('p');
     $matchedCategory = primo_match_category($message);
@@ -1299,6 +1328,13 @@ function primo_find_products(PDO $db, string $message, string $intent, bool $str
             return $attempt['category'] !== null || !empty($attempt['cats']) || !empty($attempt['keywords']);
         }));
     }
+    // A named category plus a price stays on that category. Dropping the category
+    // would answer "laptop at 10,000" with any cheaper product in the shop.
+    if ($priceAsk !== null && $matchedCategory !== null) {
+        $attempts = array_values(array_filter($attempts, static function ($attempt) use ($matchedCategory) {
+            return $attempt['category'] === $matchedCategory;
+        }));
+    }
 
     $seen = [];
     foreach ($attempts as $attempt) {
@@ -1319,9 +1355,18 @@ function primo_find_products(PDO $db, string $message, string $intent, bool $str
         if (!empty($attempt['keywords']) && !empty($rows)) {
             $rows = primo_rank_products($rows, $attempt['keywords']);
         }
+        $matchedRows = $rows;
+        if ($priceAsk !== null) {
+            $rows = primo_sort_by_asked_price(primo_products_within_price($rows, $priceAsk), $priceAsk);
+        }
         $filtered = ias_client_filter_products_for_display($rows, 5);
         if (!empty($filtered)) {
             return primo_map_product_rows($filtered);
+        }
+        // The question matched products, and none of them are at the asked price.
+        // A later, looser attempt would be a different product, so stop here.
+        if ($priceAsk !== null && $matchedRows !== [] && (!empty($attempt['keywords']) || $attempt['category'] !== null)) {
+            return [];
         }
     }
 
@@ -1811,6 +1856,15 @@ function primo_brand_label(array $brands): string
     return $labels === [] ? (string) $last : implode(', ', $labels) . ' or ' . $last;
 }
 
+/** The product the shopper named, for a price miss. Headset stays "headsets", not the Audio bucket. */
+function primo_price_subject(string $message, ?string $category): string
+{
+    if (preg_match('/\b(?:headsets?|headphones?|earphones?|earbuds?)\b/i', $message)) {
+        return 'headsets';
+    }
+    return primo_category_plural($category);
+}
+
 /** Plural shop words for a primo_match_category() result: "We don't have any Lenovo monitors". */
 function primo_category_plural(?string $category): string
 {
@@ -1911,7 +1965,7 @@ function primo_shop_url(?string $category, array $brands, array $products): stri
  * @param array<string,string> $brands
  * @return list<array>
  */
-function primo_find_brand_products(PDO $db, string $message, array $brands, ?string $category, int $limit = 5, ?int &$total = null): array
+function primo_find_brand_products(PDO $db, string $message, array $brands, ?string $category, int $limit = 5, ?int &$total = null, ?array $priceAsk = null): array
 {
     $params = [];
     $shopFilter = $category !== null ? (primo_shop_filters()[$category] ?? null) : null;
@@ -1933,6 +1987,9 @@ function primo_find_brand_products(PDO $db, string $message, array $brands, ?str
     $keywords = primo_search_keywords($message);
     if ($rows !== [] && $keywords !== []) {
         $rows = primo_rank_products($rows, $keywords);
+    }
+    if ($priceAsk !== null) {
+        $rows = primo_sort_by_asked_price(primo_products_within_price($rows, $priceAsk), $priceAsk);
     }
     $rows = ias_client_filter_products_for_display($rows);
     $total = count($rows);
@@ -2191,36 +2248,218 @@ function primo_itemlist_filter(array $rows, string $topic): array
 }
 
 /**
+ * A price the shopper actually named. A model number such as RTX 4060 is not a price:
+ * the amount needs a price word, a peso sign, a thousands comma, or a "k" (10k).
+ * "price 10,00" is treated as a cut-off "10,000".
+ *
+ * "price 10,000" with no "under" or "above" is a ceiling: ₱30,000 does not match.
+ * "around 10,000" keeps a tight band. "above 10,000" is a floor.
+ *
+ * @return array{mode:string,min:?float,max:?float}|null
+ */
+function primo_asked_price(string $message): ?array
+{
+    $message = str_replace(["\u{00A0}", "\u{202F}"], ' ', $message);
+    $message = str_replace(["\u{FF0C}", '，'], ',', $message);
+    $message = trim($message);
+    $message = preg_replace('/\s+/u', ' ', $message) ?? $message;
+    if ($message === '') {
+        return null;
+    }
+    $amt = '(?:₱\s*|php\s+)?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{1,3},\d{1,2}|\d+(?:\.\d+)?)\s*(k)?';
+    $finish = static function (string $number, string $k, bool $shortComma, float $min = 100) : ?float {
+        return primo_amount_value($number, $k, $shortComma, $min);
+    };
+    if (preg_match('/\b(?:between|from)\s+' . $amt . '\s+(?:and|to)\s+' . $amt . '\b/iu', $message, $m)) {
+        $low = $finish($m[1], (string) ($m[2] ?? ''), true);
+        $high = $finish($m[3], (string) ($m[4] ?? ''), true);
+        if ($low !== null && $high !== null) {
+            return ['mode' => 'between', 'min' => min($low, $high), 'max' => max($low, $high)];
+        }
+    }
+    $under = '(?:under|below|less\s+than|at\s+most|up\s+to|max(?:imum)?|within|not\s+more\s+than|hanggang|pababa|budget(?:\s+(?:of|is))?)';
+    if (preg_match('/\b' . $under . '\s*:?\s*' . $amt . '\b/iu', $message, $m)) {
+        $value = $finish($m[1], (string) ($m[2] ?? ''), true);
+        if ($value !== null) {
+            return ['mode' => 'under', 'min' => null, 'max' => $value];
+        }
+    }
+    if (preg_match('/' . $amt . '\s*(?:or\s+less|and\s+below|pababa)\b/iu', $message, $m)) {
+        $value = $finish($m[1], (string) ($m[2] ?? ''), true);
+        if ($value !== null) {
+            return ['mode' => 'under', 'min' => null, 'max' => $value];
+        }
+    }
+    $over = '(?:above|over|more\s+than|at\s+least|starting(?:\s+at)?|pataas)';
+    if (preg_match('/\b' . $over . '\s*:?\s*' . $amt . '\b/iu', $message, $m)) {
+        $value = $finish($m[1], (string) ($m[2] ?? ''), true);
+        if ($value !== null) {
+            return ['mode' => 'over', 'min' => $value, 'max' => null];
+        }
+    }
+    if (preg_match('/\b(?:around|about|approx(?:imately)?|roughly|near|close\s+to)\s+' . $amt . '\b/iu', $message, $m)) {
+        $value = $finish($m[1], (string) ($m[2] ?? ''), true);
+        if ($value !== null) {
+            return ['mode' => 'around', 'min' => round($value * 0.9, 2), 'max' => round($value * 1.1, 2)];
+        }
+    }
+    // "prices" is the word shoppers type ("laptops with prices 10,000"); \bprice\b does not match it.
+    $named = '(?:prices?|priced|pricing|costs?|costing|worth|budget|presyo|halaga|magkano)';
+    if (preg_match('/\b' . $named . '\s+(?:of\s+|at\s+|is\s+)?' . $amt . '\b/iu', $message, $m)
+        || preg_match('/\b' . $amt . '\s*(?:pesos?|php)\b/iu', $message, $m)
+        || preg_match('/₱\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{1,3},\d{1,2}|\d+(?:\.\d+)?)\s*(k)?/iu', $message, $m)
+    ) {
+        // "prices 50" is a real price. The 100 floor stays on other numbers so "16" is not read as pesos.
+        $value = $finish($m[1], (string) ($m[2] ?? ''), true, 1);
+        if ($value !== null) {
+            return ['mode' => 'under', 'min' => null, 'max' => $value];
+        }
+    }
+    // "10,000" with a thousands comma is a price even without the word. Model numbers do not use that comma.
+    if (preg_match('/\b(\d{1,3}(?:,\d{3})+(?:\.\d+)?)\b/u', $message, $m)) {
+        $value = $finish($m[1], '', false);
+        if ($value !== null) {
+            return ['mode' => 'under', 'min' => null, 'max' => $value];
+        }
+    }
+    if (preg_match_all('/\b(\d+(?:\.\d+)?)\s*(k)\b/iu', $message, $all, PREG_SET_ORDER)) {
+        foreach ($all as $hit) {
+            $value = $finish($hit[1], $hit[2], false);
+            if ($value === null) {
+                continue;
+            }
+            if ($value === 4000.0 && primo_is_resolution_4k($message)) {
+                continue;
+            }
+            return ['mode' => 'under', 'min' => null, 'max' => $value];
+        }
+    }
+    return null;
+}
+
+function primo_amount_value(string $number, string $k = '', bool $shortComma = false, float $min = 100): ?float
+{
+    $number = str_replace(' ', '', $number);
+    if ($shortComma && preg_match('/^(\d{1,3}),(\d{1,2})$/', $number, $m)) {
+        $number = $m[1] . ',' . str_pad($m[2], 3, '0');
+    }
+    if (!preg_match('/\d/', $number)) {
+        return null;
+    }
+    $value = (float) str_replace(',', '', $number);
+    if (strtolower($k) === 'k') {
+        $value *= 1000;
+    }
+    if ($value < $min) {
+        return null;
+    }
+    return $value;
+}
+
+function primo_is_resolution_4k(string $message): bool
+{
+    return (bool) preg_match('/\b4\s*k\b/iu', $message)
+        && preg_match('/\b(monitor|tv|display|resolution|uhd|screen)\b/iu', $message)
+        && !preg_match('/\b(price|priced|cost|budget|peso|php|presyo|worth)\b/iu', $message)
+        && !preg_match('/₱/u', $message);
+}
+
+/** Drop the amount so it is not used as a product-name keyword. */
+function primo_message_without_price(string $message): string
+{
+    $clean = preg_replace('/₱\s*\d[\d,]*(?:\.\d+)?\s*k?/iu', ' ', $message) ?? $message;
+    $clean = preg_replace('/\bphp\s+\d[\d,]*(?:\.\d+)?\s*k?/iu', ' ', $clean) ?? $clean;
+    $clean = preg_replace('/\b\d{1,3}(?:,\d{1,3})+(?:\.\d+)?\b/u', ' ', $clean) ?? $clean;
+    $clean = preg_replace('/\b\d+(?:\.\d+)?\s*k\b/iu', ' ', $clean) ?? $clean;
+    $clean = preg_replace('/\b\d{5,}\b/u', ' ', $clean) ?? $clean;
+    $clean = preg_replace('/\b(?:prices?|priced|pricing|costs?|costing|worth|budget|presyo|halaga|magkano)\s+(?:of\s+|at\s+|is\s+)?\d+(?:\.\d+)?\b/iu', ' ', $clean) ?? $clean;
+    return trim(preg_replace('/\s+/u', ' ', $clean) ?? $clean);
+}
+
+function primo_price_phrase(array $ask): string
+{
+    if (($ask['mode'] ?? '') === 'over') {
+        return 'at or above ' . primo_peso((float) $ask['min']);
+    }
+    if (($ask['mode'] ?? '') === 'around') {
+        $mid = ((float) $ask['min'] + (float) $ask['max']) / 2;
+        return 'around ' . primo_peso($mid) . ' (' . primo_peso((float) $ask['min']) . ' to ' . primo_peso((float) $ask['max']) . ')';
+    }
+    if (($ask['mode'] ?? '') === 'between') {
+        return 'between ' . primo_peso((float) $ask['min']) . ' and ' . primo_peso((float) $ask['max']);
+    }
+    return 'at or under ' . primo_peso((float) $ask['max']);
+}
+
+function primo_price_miss_text(string $what, array $ask): string
+{
+    $what = trim($what) !== '' ? trim($what) : 'products';
+    return 'EasyPC has no in-stock ' . $what . ' ' . primo_price_phrase($ask) . '. I only list a product at the price you asked for.';
+}
+
+/**
+ * @param list<array<string,mixed>> $rows
+ * @param array{mode?:string,min:?float,max:?float} $ask
+ * @return list<array<string,mixed>>
+ */
+function primo_products_within_price(array $rows, array $ask): array
+{
+    $min = $ask['min'] ?? null;
+    $max = $ask['max'] ?? null;
+    return array_values(array_filter($rows, static function ($row) use ($min, $max) {
+        if ((int) ($row['stock'] ?? 0) <= 0) {
+            return false;
+        }
+        $price = (float) ($row['price'] ?? 0);
+        if ($price <= 0) {
+            return false;
+        }
+        if ($min !== null && $price + 0.001 < (float) $min) {
+            return false;
+        }
+        if ($max !== null && $price - 0.001 > (float) $max) {
+            return false;
+        }
+        return true;
+    }));
+}
+
+/**
+ * @param list<array<string,mixed>> $rows
+ * @param array{mode?:string,min:?float,max:?float} $ask
+ * @return list<array<string,mixed>>
+ */
+function primo_sort_by_asked_price(array $rows, array $ask): array
+{
+    $mode = (string) ($ask['mode'] ?? 'under');
+    if ($mode === 'over') {
+        $target = (float) ($ask['min'] ?? 0);
+    } elseif ($mode === 'around' || $mode === 'between') {
+        $target = ((float) ($ask['min'] ?? 0) + (float) ($ask['max'] ?? 0)) / 2;
+    } else {
+        $target = (float) ($ask['max'] ?? 0);
+    }
+    usort($rows, static function ($a, $b) use ($target) {
+        $da = abs((float) ($a['price'] ?? 0) - $target);
+        $db = abs((float) ($b['price'] ?? 0) - $target);
+        if ($da != $db) {
+            return $da <=> $db;
+        }
+        return ((int) ($b['stock'] ?? 0)) <=> ((int) ($a['stock'] ?? 0));
+    });
+    return $rows;
+}
+
+/**
  * What "best" means in this question: the top-end pick, the most affordable pick, or the top pick under a price.
  *
  * @return array{mode:string,max:?float}
  */
 function primo_itemlist_preference(string $message): array
 {
-    $max = null;
-    $amount = '(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(k)?';
-    $hit = preg_match(
-        '/\b(?:under|below|less\s+than|at\s+most|up\s+to|max(?:imum)?|within|not\s+more\s+than|hanggang|budget(?:\s+(?:of|is))?)\s*:?\s*(?:₱|php|p)?\s*' . $amount . '\b/iu',
-        $message,
-        $m
-    ) || preg_match(
-        // "20k budget", "₱15,000 or less": a bare number here could be a model number (RTX 4060), so it needs ₱ or k
-        '/(?:(?:₱|php)\s*' . $amount . '|(\d+(?:\.\d+)?)\s*(k))\s*(?:budget|or\s+less|and\s+below|pababa)\b/iu',
-        $message,
-        $m
-    );
-    if ($hit) {
-        $parts = array_values(array_filter(array_slice($m, 1), static fn ($v) => $v !== ''));
-        $value = (float) str_replace(',', '', (string) ($parts[0] ?? '0'));
-        if (isset($parts[1]) && strtolower((string) $parts[1]) === 'k') {
-            $value *= 1000;
-        }
-        if ($value >= 100) {
-            $max = $value;
-        }
-    }
-    if ($max !== null) {
-        return ['mode' => 'under', 'max' => $max];
+    $asked = primo_asked_price($message);
+    if ($asked !== null && ($asked['mode'] ?? '') !== 'over' && $asked['max'] !== null) {
+        return ['mode' => 'under', 'max' => $asked['max']];
     }
     $budget = (bool) preg_match(
         '/\b(budget|cheap|cheaper|cheapest|affordable|low[\s-]?cost|entry[\s-]?level|inexpensive|murang|mura|sulit|value\s+for\s+money)\b/iu',
@@ -2244,10 +2483,9 @@ function primo_itemlist_pick(array $rows, array $pref, int $limit = 3): array
     if ($pref['max'] !== null && $inStock !== []) {
         $under = array_values(array_filter($inStock, static fn ($row) => $row['price'] <= $pref['max']));
         if ($under === []) {
-            $noneUnder = true;
-        } else {
-            $pool = $under;
+            return ['picks' => [], 'none_under' => true];
         }
+        $pool = $under;
     }
     $cheapFirst = $pref['mode'] === 'budget' || $noneUnder;
     usort($pool, static function ($a, $b) use ($cheapFirst) {
@@ -2347,7 +2585,7 @@ function primo_itemlist_answer(PDO $db, string $message): array
         }
         if ($picks === []) {
             return [
-                'reply' => "I couldn't find an in-stock product that matches. Try a higher price limit or one category, such as GPU or RAM.",
+                'reply' => "I couldn't find an in-stock product at that price. Ask for one category, such as GPU or RAM, or name a different price.",
                 'products' => [],
             ];
         }
@@ -2370,12 +2608,27 @@ function primo_itemlist_answer(PDO $db, string $message): array
         if ($ofBrand !== []) {
             $filtered = $ofBrand;
             $label = primo_brand_label($brands) . ' ' . $label;
+        } elseif ($pref['max'] !== null) {
+            $asked = primo_asked_price($message);
+            $phrase = $asked !== null ? primo_price_phrase($asked) : ('at or under ' . $limitText);
+            return [
+                'reply' => 'EasyPC has no in-stock ' . primo_brand_label($brands) . " {$label} {$phrase}. I only list a product at the price you asked for.",
+                'products' => [],
+            ];
         } else {
             $brandNote = 'EasyPC has no ' . primo_brand_label($brands) . " {$label} listed right now, so here are other brands. ";
         }
     }
     $pick = primo_itemlist_pick($filtered, $pref, 3);
     $picks = $pick['picks'];
+    if ($pick['none_under'] || $picks === []) {
+        $asked = primo_asked_price($message);
+        $phrase = $asked !== null ? primo_price_phrase($asked) : ('at or under ' . $limitText);
+        return [
+            'reply' => "There is no in-stock {$label} {$phrase}. I only list a product at the price you asked for.",
+            'products' => [],
+        ];
+    }
     $best = $picks[0];
     // the name, price and stock are on the cards, so the text stays short and points at them
     $first = count($picks) > 1 ? 'the first one below' : 'the one below';
@@ -2383,9 +2636,6 @@ function primo_itemlist_answer(PDO $db, string $message): array
     if ($best['stock'] <= 0) {
         $lead = "EasyPC lists this {$label}, but none are in stock right now.";
         $outro = 'Ask me again later, or open Shop Now to see what is available.';
-    } elseif ($pick['none_under']) {
-        $lead = "There is no in-stock {$label} at or under {$limitText}. The most affordable one in stock is {$first}.";
-        $outro = "Ask for a higher limit, like \"best {$label} under " . primo_peso(ceil($best['price'] / 1000) * 1000) . '".';
     } elseif ($pref['mode'] === 'budget') {
         $lead = "The most affordable in-stock {$label} right now is {$first}.";
         $outro = "Ask for the top-end {$label} if you want the highest specs.";

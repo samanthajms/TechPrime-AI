@@ -70,6 +70,7 @@ def build_pipeline() -> Pipeline:
                     analyzer="char_wb",
                     ngram_range=(3, 5),
                     min_df=1,
+                    
                     max_df=0.98,
                     sublinear_tf=True,
                 ),
