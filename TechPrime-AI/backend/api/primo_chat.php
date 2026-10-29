@@ -1189,7 +1189,7 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
             $listCategory = $category;
             if ($products === [] && $priceAsk !== null) {
                 return [
-                    'reply' => primo_price_miss_text($listLabel, $priceAsk),
+                    'reply' => primo_price_miss_text(primo_price_subject($own, $category), $priceAsk),
                     'products' => [],
                 ];
             }
@@ -1199,7 +1199,7 @@ function primo_product_intent(PDO $db, string $intent, string $message, ?string 
             $products = primo_find_products($db, $searchMessage, $intent, false, $priceAsk);
         }
         if ($products === [] && $priceAsk !== null) {
-            $what = primo_category_plural(primo_match_category($searchOwn) ?? primo_match_category($searchMessage));
+            $what = primo_price_subject($own, primo_match_category($searchOwn) ?? primo_match_category($searchMessage));
             return [
                 'reply' => primo_price_miss_text($what, $priceAsk),
                 'products' => [],
@@ -1856,6 +1856,15 @@ function primo_brand_label(array $brands): string
     return $labels === [] ? (string) $last : implode(', ', $labels) . ' or ' . $last;
 }
 
+/** The product the shopper named, for a price miss. Headset stays "headsets", not the Audio bucket. */
+function primo_price_subject(string $message, ?string $category): string
+{
+    if (preg_match('/\b(?:headsets?|headphones?|earphones?|earbuds?)\b/i', $message)) {
+        return 'headsets';
+    }
+    return primo_category_plural($category);
+}
+
 /** Plural shop words for a primo_match_category() result: "We don't have any Lenovo monitors". */
 function primo_category_plural(?string $category): string
 {
@@ -2250,13 +2259,16 @@ function primo_itemlist_filter(array $rows, string $topic): array
  */
 function primo_asked_price(string $message): ?array
 {
+    $message = str_replace(["\u{00A0}", "\u{202F}"], ' ', $message);
+    $message = str_replace(["\u{FF0C}", '，'], ',', $message);
     $message = trim($message);
+    $message = preg_replace('/\s+/u', ' ', $message) ?? $message;
     if ($message === '') {
         return null;
     }
     $amt = '(?:₱\s*|php\s+)?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{1,3},\d{1,2}|\d+(?:\.\d+)?)\s*(k)?';
-    $finish = static function (string $number, string $k, bool $shortComma) : ?float {
-        return primo_amount_value($number, $k, $shortComma);
+    $finish = static function (string $number, string $k, bool $shortComma, float $min = 100) : ?float {
+        return primo_amount_value($number, $k, $shortComma, $min);
     };
     if (preg_match('/\b(?:between|from)\s+' . $amt . '\s+(?:and|to)\s+' . $amt . '\b/iu', $message, $m)) {
         $low = $finish($m[1], (string) ($m[2] ?? ''), true);
@@ -2291,12 +2303,21 @@ function primo_asked_price(string $message): ?array
             return ['mode' => 'around', 'min' => round($value * 0.9, 2), 'max' => round($value * 1.1, 2)];
         }
     }
-    $named = '(?:price|priced|pricing|cost|costs|costing|worth|budget|presyo|halaga|magkano)';
+    // "prices" is the word shoppers type ("laptops with prices 10,000"); \bprice\b does not match it.
+    $named = '(?:prices?|priced|pricing|costs?|costing|worth|budget|presyo|halaga|magkano)';
     if (preg_match('/\b' . $named . '\s+(?:of\s+|at\s+|is\s+)?' . $amt . '\b/iu', $message, $m)
         || preg_match('/\b' . $amt . '\s*(?:pesos?|php)\b/iu', $message, $m)
         || preg_match('/₱\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{1,3},\d{1,2}|\d+(?:\.\d+)?)\s*(k)?/iu', $message, $m)
     ) {
-        $value = $finish($m[1], (string) ($m[2] ?? ''), true);
+        // "prices 50" is a real price. The 100 floor stays on other numbers so "16" is not read as pesos.
+        $value = $finish($m[1], (string) ($m[2] ?? ''), true, 1);
+        if ($value !== null) {
+            return ['mode' => 'under', 'min' => null, 'max' => $value];
+        }
+    }
+    // "10,000" with a thousands comma is a price even without the word. Model numbers do not use that comma.
+    if (preg_match('/\b(\d{1,3}(?:,\d{3})+(?:\.\d+)?)\b/u', $message, $m)) {
+        $value = $finish($m[1], '', false);
         if ($value !== null) {
             return ['mode' => 'under', 'min' => null, 'max' => $value];
         }
@@ -2316,7 +2337,7 @@ function primo_asked_price(string $message): ?array
     return null;
 }
 
-function primo_amount_value(string $number, string $k = '', bool $shortComma = false): ?float
+function primo_amount_value(string $number, string $k = '', bool $shortComma = false, float $min = 100): ?float
 {
     $number = str_replace(' ', '', $number);
     if ($shortComma && preg_match('/^(\d{1,3}),(\d{1,2})$/', $number, $m)) {
@@ -2329,7 +2350,7 @@ function primo_amount_value(string $number, string $k = '', bool $shortComma = f
     if (strtolower($k) === 'k') {
         $value *= 1000;
     }
-    if ($value < 100) {
+    if ($value < $min) {
         return null;
     }
     return $value;
@@ -2351,6 +2372,7 @@ function primo_message_without_price(string $message): string
     $clean = preg_replace('/\b\d{1,3}(?:,\d{1,3})+(?:\.\d+)?\b/u', ' ', $clean) ?? $clean;
     $clean = preg_replace('/\b\d+(?:\.\d+)?\s*k\b/iu', ' ', $clean) ?? $clean;
     $clean = preg_replace('/\b\d{5,}\b/u', ' ', $clean) ?? $clean;
+    $clean = preg_replace('/\b(?:prices?|priced|pricing|costs?|costing|worth|budget|presyo|halaga|magkano)\s+(?:of\s+|at\s+|is\s+)?\d+(?:\.\d+)?\b/iu', ' ', $clean) ?? $clean;
     return trim(preg_replace('/\s+/u', ' ', $clean) ?? $clean);
 }
 
