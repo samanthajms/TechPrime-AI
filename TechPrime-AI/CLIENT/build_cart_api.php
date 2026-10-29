@@ -43,8 +43,10 @@ if (!in_array($action, ['add_to_cart', 'buy_now'], true)) {
     bc_json(['ok' => false, 'error' => 'invalid_action'], 400);
 }
 
-// Same slots as tech_match_api.php / tech_match.js.
-$slots = ['processor', 'motherboard', 'memory', 'ssd', 'ssd_sata', 'hdd', 'gpu', 'psu', 'case', 'cooler', 'case_fan'];
+// Same slots as tech_match_api.php / tech_match.js: the PC parts, then the add-ons. Parts the customer
+// already owns are not sent by the page.
+$slots = ['processor', 'motherboard', 'memory', 'ssd', 'ssd_sata', 'hdd', 'gpu', 'psu', 'case', 'cooler', 'case_fan',
+    'monitor', 'keyboard', 'mouse', 'os', 'ups'];
 $picked = [];
 foreach ((array)($payload['components'] ?? []) as $slot => $item) {
     $pid = (int)(is_array($item) ? ($item['id'] ?? 0) : $item);

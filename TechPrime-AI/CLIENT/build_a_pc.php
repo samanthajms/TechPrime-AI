@@ -37,17 +37,21 @@ include __DIR__ . '/ep_header.php';
             <span class="bp-budget-label">Budget</span>
             <div class="bp-budget-bar" aria-hidden="true"><span id="tmBudgetBar"></span></div>
             <span class="bp-budget-value">
-                <strong id="tmBudgetUsed">₱0</strong> / <span id="tmBudgetAmount">₱200,000</span>
+                <?php /* "₱25,275 / ₱33,000", or "₱25,275 · No budget set" until the shopper sets one (tech_match.js renderBudget). */ ?>
+                <strong id="tmBudgetUsed">₱0</strong><span id="tmBudgetAmount"> · No budget set</span>
             </span>
+            <?php /* Which suggested budget is in use (e.g. "Recommended · Gaming"); it follows the purpose (tech_match.js). */ ?>
+            <span class="bp-budget-tier" id="tmBudgetTier" hidden></span>
             <button type="button" class="bp-budget-edit is-unset" id="tmBudgetEdit" aria-haspopup="dialog">
                 <i class="fas fa-wallet" aria-hidden="true"></i><span id="tmBudgetEditLabel">Set budget</span>
             </button>
         </div>
+        <?php /* Budget hints after a purpose change: "updated, Undo" / "usually costs ..., Use ₱X" (tech_match.js renderBudgetNote). */ ?>
+        <div class="bp-budget-note" id="tmBudgetNote" role="status" aria-live="polite" hidden></div>
         <?php /* Build purpose: steers which parts get the Recommended badge (tech_match.js keeps the choice). */ ?>
         <div class="bp-purpose">
             <div class="bp-purpose-head">
                 <span class="bp-purpose-label" id="bpPurposeLabel">What will you use this PC for?</span>
-                <span class="bp-purpose-sub">Choose one and we'll recommend parts that fit.</span>
             </div>
             <div class="bp-purpose-chips" id="bpPurposeChips" role="radiogroup" aria-labelledby="bpPurposeLabel" aria-describedby="bpPurposeHint">
                 <?php $first = true; foreach (pc_purposes() as $key => $purpose): ?>
@@ -55,8 +59,7 @@ include __DIR__ . '/ep_header.php';
                         data-label="<?php echo h($purpose['label']); ?>" data-hint="<?php echo h($purpose['hint']); ?>"
                         aria-checked="<?php echo $first ? 'true' : 'false'; ?>" tabindex="<?php echo $first ? '0' : '-1'; ?>">
                     <span class="bp-purpose-icon" aria-hidden="true"><i class="fas <?php echo h($purpose['icon']); ?>"></i></span>
-                    <span class="bp-purpose-text"><strong><?php echo h($purpose['label']); ?></strong><small><?php echo h($purpose['short']); ?></small></span>
-                    <span class="bp-purpose-radio" aria-hidden="true"></span>
+                    <span class="bp-purpose-text"><strong><?php echo h($purpose['label']); ?></strong></span>
                 </button>
                 <?php $first = false; endforeach; ?>
             </div>
@@ -112,6 +115,18 @@ include __DIR__ . '/ep_header.php';
         });
     })();
     </script>
+
+    <?php /* Ready-made starter builds: "Build it for me" at the suggested budgets, built live from stock (tech_match.js loadStarters). */ ?>
+    <section class="bp-starters" id="bpStarters" aria-labelledby="bpStartersTitle" hidden>
+        <div class="bp-starters-head">
+            <div>
+                <h2 id="bpStartersTitle"><i class="fas fa-rocket" aria-hidden="true"></i> Start from a ready-made build</h2>
+                <p>Complete PCs picked from today's stock. Load one, then change any part.</p>
+            </div>
+            <button type="button" class="bp-starters-toggle" id="bpStartersToggle" aria-expanded="true" aria-controls="bpStartersList">Hide</button>
+        </div>
+        <div class="bp-starters-list" id="bpStartersList" role="list"></div>
+    </section>
 
     <div class="tm-edit-banner" id="tmEditBanner" hidden>
         <i class="fas fa-pen" aria-hidden="true"></i>
@@ -174,10 +189,6 @@ include __DIR__ . '/ep_header.php';
 
                 <div class="pcx-dock" id="pcxInfo" aria-live="polite"></div>
             </div>
-            <div class="tm-progress-wrap">
-                <div class="tm-progress-meta"><span id="tmComponentCount"><b>0</b> / 11 components</span></div>
-                <div class="tm-bar"><span id="tmComponentBar"></span></div>
-            </div>
             <div class="tm-power-card">
                 <div class="tm-power-head">
                     <span><i class="fas fa-bolt" aria-hidden="true"></i> Estimated Power Draw</span>
@@ -194,13 +205,11 @@ include __DIR__ . '/ep_header.php';
                 </div>
                 <small class="tm-power-hint" id="tmPowerHint"></small>
             </div>
-            <div class="tm-disclaimer">
-                <i class="fas fa-info-circle" aria-hidden="true"></i>
-                <span>Compatibility checks are for guidance only and may not cover all scenarios. Please verify component specifications before purchasing.</span>
-            </div>
-            <div class="tm-disclaimer">
-                <i class="fas fa-magic" aria-hidden="true"></i>
-                <span><strong>Build it for me</strong> suggests parts from EasyPC's current stock using the recommendation model. It fills the required parts first; optional parts (CPU cooler, case fans, and a graphics card for School or Office builds) are added only when they suit your purpose and budget, so some slots may stay empty. A required part can also be left out if no compatible one is in stock. Prices and stock may change, so review each part before checkout.</span>
+            <div class="tm-disclaimer tm-notes">
+                <details class="tm-note-more">
+                    <summary><i class="fas fa-magic" aria-hidden="true"></i><span>How does <strong>Build it for me</strong> pick parts?</span></summary>
+                    <p>Build it for me suggests parts from EasyPC's current stock using the recommendation model. It fills the required parts first; optional parts (case fans, and a graphics card for School or Office builds) are added only when they suit your purpose and budget, so some slots may stay empty. A CPU cooler is added only when the processor does not come with one. Any money left over then goes to the upgrades that raise the Build Score most, such as more memory or a bigger drive. A required part can also be left out if no compatible one is in stock. Prices and stock may change, so review each part before checkout.</p>
+                </details>
             </div>
         </section>
 
@@ -212,10 +221,15 @@ include __DIR__ . '/ep_header.php';
                 </div>
                 <p class="tm-score-verdict" id="tmScoreVerdict" aria-live="polite"></p>
                 <ul class="tm-score-notes" id="tmScoreNotes" hidden></ul>
+                <?php /* Breakdown of the score (pc_rating.php: points per part, deductions, limits), filled by tech_match.js. */ ?>
+                <details class="tm-score-why" id="tmScoreWhy" hidden>
+                    <summary>How is this scored?</summary>
+                    <div id="tmScoreWhyBody"></div>
+                </details>
                 <div class="tm-score-actions">
-                    <span id="tmScoreBadgeScore" title="Score"><i class="fas fa-star" aria-hidden="true"></i></span>
-                    <span id="tmScoreBadgeCompat" title="Compatibility"><i class="fas fa-microchip" aria-hidden="true"></i></span>
-                    <span id="tmScoreBadgePower" title="Power"><i class="fas fa-plug" aria-hidden="true"></i></span>
+                    <span id="tmScoreBadgeScore" title="Score"><i class="fas fa-star" aria-hidden="true"></i>Score</span>
+                    <span id="tmScoreBadgeCompat" title="Compatibility"><i class="fas fa-microchip" aria-hidden="true"></i>Fit</span>
+                    <span id="tmScoreBadgePower" title="Power"><i class="fas fa-plug" aria-hidden="true"></i>Power</span>
                 </div>
             </div>
             <div class="tm-card">
@@ -230,53 +244,65 @@ include __DIR__ . '/ep_header.php';
             </div>
             <div class="tm-card tm-summary-card">
                 <h3>Build Summary</h3>
-                <div class="tm-summary-row">
-                    <span>Components</span>
-                    <strong id="tmSummaryCount">0 / 11</strong>
-                </div>
-                <div class="tm-bar tm-bar-thin"><span id="tmSummaryBar"></span></div>
-                <div class="tm-summary-list" id="tmSummaryList">
-                    <p class="tm-summary-empty">No components selected yet.</p>
-                </div>
                 <div class="tm-summary-total">
-                    <span>Total</span>
+                    <span>Total <small>(VAT-inclusive)</small></span>
                     <strong id="tmSummaryTotal">₱0</strong>
                 </div>
+                <p class="tm-summary-asof" id="tmSummaryOwned" hidden></p>
+                <p class="tm-summary-asof" id="tmSummaryAsOf" hidden></p>
                 <div class="tm-compat" id="tmCompatStatus"></div>
                 <div class="tm-platform" id="tmPlatform" hidden></div>
+                <?php /* Per-part prices are already on the parts list, so the breakdown here is folded. */ ?>
+                <details class="tm-summary-more">
+                    <summary><span>Price breakdown</span><span class="tm-summary-count"><strong id="tmSummaryCount">0 / 11</strong> parts</span></summary>
+                    <div class="tm-summary-list" id="tmSummaryList">
+                        <p class="tm-summary-empty">No components selected yet.</p>
+                    </div>
+                </details>
+                <?php /* Purchase actions: Buy Now is the one primary action; the rest are secondary. */ ?>
+                <div class="tm-checkout">
+                    <button type="button" class="tm-btn-primary tm-btn-buy" id="tmBuildBuyNow">
+                        <i class="fas fa-bolt" aria-hidden="true"></i> Buy Now
+                    </button>
+                    <button type="button" class="tm-btn-outline" id="tmBuildToCart">
+                        <i class="fas fa-cart-plus" aria-hidden="true"></i> Add to Cart
+                    </button>
+                    <button type="button" class="tm-btn-outline tm-btn-missing" id="tmAddMissing">
+                        <i class="fas fa-puzzle-piece" aria-hidden="true"></i> Add Missing Components
+                    </button>
+                </div>
+                <button type="button" class="tm-ask" id="tmAskStore" aria-haspopup="dialog"><i class="fas fa-headset" aria-hidden="true"></i> Ask EasyPC about this build</button>
+                <div class="tm-tools" role="group" aria-label="Build tools">
+                    <button type="button" class="tm-tool" id="tmSaveBuild"><i class="far fa-save" aria-hidden="true"></i><span id="tmSaveLabel">Save Build</span></button>
+                    <button type="button" class="tm-tool" id="tmShareBuild"><i class="fas fa-share-alt" aria-hidden="true"></i><span>Share</span></button>
+                    <button type="button" class="tm-tool" id="tmReportBuild"><i class="fas fa-print" aria-hidden="true"></i><span>Print</span></button>
+                    <button type="button" class="tm-tool" id="tmLoadBuild"><i class="far fa-folder-open" aria-hidden="true"></i><span>Load</span></button>
+                </div>
+                <div class="tm-tools-foot">
+                    <a class="tm-link" href="<?php echo $canSaveBuilds ? 'saved_builds.php' : h($buildLoginUrl); ?>"><i class="fas fa-folder" aria-hidden="true"></i> My Saved Builds</a>
+                    <button type="button" class="tm-link tm-link-danger" id="tmClearBuild"><i class="far fa-trash-alt" aria-hidden="true"></i> Clear build</button>
+                </div>
+                <p class="tm-summary-disclaimer">
+                    <i class="fas fa-info-circle" aria-hidden="true"></i>
+                    <span>Prices and stock can change until you check out. Compatibility checks and the Build Score are guides; EasyPC staff can confirm before you buy.</span>
+                </p>
             </div>
-            <div class="tm-buy-row">
-                <button type="button" class="tm-btn-outline" id="tmBuildToCart">
-                    <i class="fas fa-cart-plus" aria-hidden="true"></i> Add to Cart
-                </button>
-                <button type="button" class="tm-btn-primary tm-btn-buy" id="tmBuildBuyNow">
-                    <i class="fas fa-bolt" aria-hidden="true"></i> Buy Now
-                </button>
+            <?php /* Plain-language estimates for common uses (pc_rating.php pc_rating_can_run, via the build check);
+                     the uses that matter for the purpose come first (tech_match.js renderCanRun). */ ?>
+            <div class="tm-card tm-canrun-card">
+                <h3>What can it run?</h3>
+                <p class="tm-canrun-empty" id="tmCanRunEmpty">Pick a processor to see what this PC can handle.</p>
+                <ul class="tm-canrun" id="tmCanRun" hidden></ul>
+                <button type="button" class="tm-canrun-more" id="tmCanRunMore" aria-controls="tmCanRun" aria-expanded="false" hidden></button>
+                <p class="tm-canrun-note"><i class="fas fa-info-circle" aria-hidden="true"></i><span>Rough estimates at typical settings, not benchmarks.</span></p>
             </div>
-            <button type="button" class="tm-btn-primary" id="tmAddMissing">
-                <i class="fas fa-cog" aria-hidden="true"></i> Add Missing Components
-            </button>
-            <button type="button" class="tm-btn-outline" id="tmSaveBuild">
-                <i class="far fa-save" aria-hidden="true"></i> <span id="tmSaveLabel">Save Build</span>
-            </button>
-            <button type="button" class="tm-btn-outline" id="tmShareBuild">
-                <i class="fas fa-share-alt" aria-hidden="true"></i> Share
-            </button>
-            <a class="tm-btn-outline" href="<?php echo $canSaveBuilds ? 'saved_builds.php' : h($buildLoginUrl); ?>">
-                <i class="fas fa-folder-open" aria-hidden="true"></i> My Saved Builds
-            </a>
-            <div class="tm-btn-row">
-                <button type="button" class="tm-btn-outline tm-btn-sm" id="tmLoadBuild">Load</button>
-                <button type="button" class="tm-btn-outline tm-btn-sm" id="tmReportBuild"><i class="far fa-flag" aria-hidden="true"></i> Report</button>
-                <button type="button" class="tm-btn-outline tm-btn-sm tm-btn-danger" id="tmClearBuild"><i class="far fa-trash-alt" aria-hidden="true"></i> Clear</button>
-            </div>
-            <div class="tm-card tm-compare-card">
-                <h3>Compare Builds</h3>
+            <details class="tm-card tm-compare-card">
+                <summary><h3>Compare Builds</h3><span>Put two saved builds side by side</span></summary>
                 <div class="tm-compare-slots" id="tmCompareSlots"></div>
                 <button type="button" class="tm-btn-outline tm-btn-sm tm-compare-go" id="tmCompareGo" hidden>
                     <i class="fas fa-columns" aria-hidden="true"></i> Compare
                 </button>
-            </div>
+            </details>
         </aside>
     </div>
     </div>
@@ -299,7 +325,7 @@ include __DIR__ . '/ep_header.php';
                 <option value="name">Name: A to Z</option>
                 <option value="stock">Most in Stock</option>
             </select>
-            <label class="tm-picker-toggle"><input type="checkbox" id="tmPickerInStock" checked> In Stock</label>
+            <label class="tm-picker-toggle"><input type="checkbox" id="tmPickerInStock"> In stock only</label>
             <button type="button" class="tm-filters-btn" id="tmFiltersBtn" aria-expanded="false">Filters</button>
         </div>
         <div class="tm-filters" id="tmFilters" hidden>
@@ -331,7 +357,7 @@ window.EP_TM_TARGETS = <?php echo json_encode(pc_rating_all_targets()); ?>;
 window.EP_TM_CAN_SAVE = <?php echo $canSaveBuilds ? 'true' : 'false'; ?>;
 window.EP_TM_LOGIN_URL = <?php echo json_encode($buildLoginUrl); ?>;
 </script>
-<script src="tech_match.js?v=pcx-28" defer></script>
+<script src="tech_match.js?v=pcx-40" defer></script>
 
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>

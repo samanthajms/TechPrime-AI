@@ -13,6 +13,8 @@ require_once __DIR__ . '/client_shop_taxonomy.php';
 require_once __DIR__ . '/pc_compatibility.php';
 require_once __DIR__ . '/pc_specs.php';
 require_once __DIR__ . '/pc_purpose.php';
+/* "Build it for me" upgrades by the Build Score; pc_rating.php requires this file back, which require_once allows. */
+require_once __DIR__ . '/pc_rating.php';
 
 /** @return array<string,array{label:string,subs:array<int,string>,exclude?:string,storage?:string}> */
 function pc_recommend_slot_map(): array
@@ -29,6 +31,24 @@ function pc_recommend_slot_map(): array
         'case' => ['label' => 'PC Case', 'subs' => ['pc-case']],
         'cooler' => ['label' => 'CPU Cooler', 'subs' => ['cpu-cooling']],
         'case_fan' => ['label' => 'Case Fan', 'subs' => ['chassis-fan']],
+    ];
+}
+
+/**
+ * Add-ons sold with a build: not part of the PC itself, so no compatibility rules, no Build Score and
+ * no model. A first PC still needs them (a screen, input devices, Windows, power protection), so the
+ * builder lists them like parts.
+ *
+ * @return array<string,array{label:string,subs:array<int,string>}>
+ */
+function pc_recommend_addon_map(): array
+{
+    return [
+        'monitor' => ['label' => 'Monitor', 'subs' => ['monitor']],
+        'keyboard' => ['label' => 'Keyboard', 'subs' => ['keyboard', 'keyboard-mouse']],
+        'mouse' => ['label' => 'Mouse', 'subs' => ['mouse']],
+        'os' => ['label' => 'Operating System', 'subs' => ['operating-system']],
+        'ups' => ['label' => 'UPS / AVR', 'subs' => ['ups-avr']],
     ];
 }
 
@@ -80,22 +100,56 @@ function pc_recommend_catalog(?PDO $db = null): array
     if ($db === null) {
         return array_fill_keys(array_keys(pc_recommend_slot_map()), []);
     }
-    $map = pc_recommend_slot_map();
-    $catalog = array_fill_keys(array_keys($map), []);
-    $vis = ias_client_product_list_sql_condition('p');
+    $catalog = pc_recommend_classify_rows(pc_recommend_product_rows($db, false));
+    foreach ($catalog as $slot => $products) {
+        $prices = array_column($products, 'price');
+        foreach ($products as $i => $product) {
+            $catalog[$slot][$i]['tier'] = pc_recommend_price_tier($prices, (float)$product['price']);
+        }
+    }
+    return $catalog;
+}
+
+/**
+ * Shop products as rows for pc_recommend_classify_rows(), loaded once per request: the in-stock
+ * listing (shop rule: stock > 0), or the sold-out products that would otherwise be listed.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function pc_recommend_product_rows(PDO $db, bool $soldOut): array
+{
+    static $rows = [];
+    if (isset($rows[(int)$soldOut])) {
+        return $rows[(int)$soldOut];
+    }
+    $where = $soldOut
+        ? "COALESCE(p.stock, 0) <= 0
+           AND p.seller_id IS NOT NULL AND p.seller_id > 0
+           AND p.image IS NOT NULL AND TRIM(p.image) <> ''"
+        : ias_client_product_list_sql_condition('p');
     $stmt = $db->prepare(
         "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, p.description,
                 u.name AS seller_name
          FROM products p
          INNER JOIN users u ON u.id = p.seller_id
-         WHERE {$vis}
-         ORDER BY p.stock DESC, p.name ASC"
+         WHERE {$where}
+         ORDER BY " . ($soldOut ? 'p.name ASC' : 'p.stock DESC, p.name ASC')
     );
-    if (!$stmt) {
-        return $catalog;
-    }
-    $stmt->execute();
-    $rows = ias_client_filter_products_for_display($stmt->fetchAll(PDO::FETCH_ASSOC));
+    $rows[(int)$soldOut] = $stmt && $stmt->execute() ? ias_client_filter_products_for_display($stmt->fetchAll(PDO::FETCH_ASSOC)) : [];
+    return $rows[(int)$soldOut];
+}
+
+/**
+ * Sorts product rows into build slots by the shop taxonomy (one row can fit several slots).
+ *
+ * @param array<int,array<string,mixed>> $rows products joined with u.name AS seller_name
+ * @param array<string,array<string,mixed>>|null $map slot map (default: the PC parts)
+ * @return array<string,array<int,array<string,mixed>>>
+ */
+function pc_recommend_classify_rows(array $rows, ?array $map = null): array
+{
+    $map ??= pc_recommend_slot_map();
+    $catalog = array_fill_keys(array_keys($map), []);
     $seen = [];
     foreach ($rows as $p) {
         $id = (int)($p['id'] ?? 0);
@@ -135,16 +189,108 @@ function pc_recommend_catalog(?PDO $db = null): array
                 'image' => ias_client_product_image_url($p),
                 'seller' => (string)($p['seller_name'] ?? ''),
                 'compat' => ep_pc_compat_tags($name, $description, $category),
+                'warranty' => ep_product_warranty($description),
             ];
         }
     }
-    foreach ($catalog as $slot => $products) {
-        $prices = array_column($products, 'price');
-        foreach ($products as $i => $product) {
-            $catalog[$slot][$i]['tier'] = pc_recommend_price_tier($prices, (float)$product['price']);
+    return $catalog;
+}
+
+/**
+ * Out-of-stock shop products for one slot. The catalog above (shop listing rule: stock > 0)
+ * stays the only source for the model, budgets and Build it for me; these are only shown in
+ * the picker, still scored, so a good part is recommended even when it is sold out.
+ * Price tier is measured against the in-stock prices, the same scale the model was trained on.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function pc_recommend_sold_out(PDO $db, string $slot): array
+{
+    static $soldOut = null;
+    if ($soldOut === null) {
+        $soldOut = pc_recommend_classify_rows(pc_recommend_product_rows($db, true));
+    }
+    $prices = array_column(pc_recommend_catalog($db)[$slot] ?? [], 'price');
+    $out = [];
+    foreach ($soldOut[$slot] ?? [] as $product) {
+        $product['tier'] = pc_recommend_price_tier($prices, (float)$product['price']);
+        $out[] = $product;
+    }
+    return $out;
+}
+
+/**
+ * Picker list for an add-on slot (pc_recommend_addon_map()): in-stock products first, then sold-out ones,
+ * each with a short note on what it is for. No model scores; the picker's Recommended sort keeps this order.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function pc_recommend_addon_products(PDO $db, string $slot): array
+{
+    $map = pc_recommend_addon_map();
+    if (!isset($map[$slot])) {
+        return [];
+    }
+    $out = array_merge(
+        pc_recommend_classify_rows(pc_recommend_product_rows($db, false), $map)[$slot] ?? [],
+        pc_recommend_classify_rows(pc_recommend_product_rows($db, true), $map)[$slot] ?? []
+    );
+    foreach ($out as $i => $p) {
+        $out[$i]['addon'] = true;
+        $out[$i]['recommend_note'] = pc_recommend_addon_note($slot, (string)$p['name']);
+    }
+    return $out;
+}
+
+/** One line on what an add-on is for, read from its name (monitor size and refresh rate, UPS vs AVR, ...). */
+function pc_recommend_addon_note(string $slot, string $name): string
+{
+    switch ($slot) {
+        case 'monitor':
+            $size = preg_match('/(\d{2}(?:\.\d)?)\s*(?:"|”|-?\s*inch|in\b)/i', $name, $m) ? $m[1] . '-inch screen' : '';
+            $hz = preg_match('/(\d{2,3})\s*hz/i', $name, $h) ? (int)$h[1] : 0;
+            $use = $hz >= 120 ? 'smooth for fast games' : ($hz > 0 ? 'fine for work, school and videos' : '');
+            return ucfirst(implode(', ', array_filter([$size, $hz > 0 ? $hz . ' Hz' : '', $use])));
+        case 'keyboard':
+            if (preg_match('/\bmouse\b|combo/i', $name)) {
+                return 'Keyboard and mouse set: covers both.';
+            }
+            return preg_match('/mechanical/i', $name) ? 'Mechanical keyboard: durable and good for gaming.' : '';
+        case 'mouse':
+            return preg_match('/wireless/i', $name) ? 'Wireless mouse.' : '';
+        case 'os':
+            return 'Genuine Windows license: a new PC needs one to install Windows.';
+        case 'ups':
+            return preg_match('/\bups\b/i', $name)
+                ? 'Battery backup: keeps the PC on for a few minutes during a brownout so you can save and shut down.'
+                : 'Voltage regulator: protects against power spikes and drops (no battery backup).';
+    }
+    return '';
+}
+
+/**
+ * The in-stock part to suggest instead of a sold-out one: a part the model recommends first,
+ * then a good fit, then any compatible part; within that, the price closest to the sold-out part.
+ *
+ * @param array<int,array<string,mixed>> $scored in-stock products after pc_recommend_apply()
+ * @return array{id:int,name:string,price:float}|null
+ */
+function pc_recommend_pick_alternative(array $scored, float $price, int $skipId = 0): ?array
+{
+    $best = null;
+    $bestKey = null;
+    foreach ($scored as $p) {
+        if ((int)$p['id'] === $skipId || (int)($p['stock'] ?? 0) <= 0 || !isset($p['recommend_score'])) {
+            continue;
+        }
+        $gap = $price > 0 ? -abs(log(max(1.0, (float)$p['price']) / $price)) : 0.0;
+        $key = [!empty($p['recommended']) ? 2 : (!empty($p['recommend_reason']) ? 1 : 0), $gap, (float)$p['recommend_score']];
+        if ($bestKey === null || $key > $bestKey) {
+            $best = $p;
+            $bestKey = $key;
         }
     }
-    return $catalog;
+    return $best === null ? null : ['id' => (int)$best['id'], 'name' => (string)$best['name'], 'price' => (float)$best['price']];
 }
 
 /**
@@ -210,10 +356,13 @@ function pc_recommend_build_map(PDO $db, array $raw): array
             'id' => $id,
             'name' => $name,
             'price' => $price,
+            /* Current stock (0 when the product no longer exists). */
+            'stock' => $row ? (int)$row['stock'] : 0,
             'tier' => pc_recommend_price_tier(array_column($catalog[$slot] ?? [], 'price'), $price),
             'brand' => (string)($tax['brand'] ?? ''),
             'category' => $category,
             'compat' => ep_pc_compat_tags($name, $description, $category),
+            'warranty' => ep_product_warranty($description),
         ];
     }
     return $map;
@@ -386,6 +535,10 @@ function pc_recommend_budget_room(string $slot, array $candidate, array $buildMa
     $required = [['processor'], ['motherboard'], ['memory'], ['ssd', 'ssd_sata', 'hdd'], ['psu'], ['case']];
     if (pc_recommend_gpu_needed($with, (string)($ctx['purpose'] ?? 'balanced'))) {
         $required[] = ['gpu'];
+    }
+    /* A CPU sold without a cooler (MPK / tray) needs one. */
+    if (!empty($with['processor']) && !pc_recommend_spec('processor', $with['processor'])['cooler']) {
+        $required[] = ['cooler'];
     }
     $catalog = pc_recommend_catalog();
     $reserve = 0.0;
@@ -707,7 +860,7 @@ function pc_recommend_explain(string $slot, array $candidate, array $buildMap, a
                 return ['', $balance > 0 ? 'More CPU than your ' . $gpu['label'] . ' can use' . ($p === 'gaming' ? ' in games.' : '.') : 'This CPU will hold back your ' . $gpu['label'] . '.'];
             }
             if (!$buildMap) {
-                return ['', $balance > 0 ? 'A high-end part; more than most builds like this need.' : 'An entry-level part; fine for light use only.'];
+                return ['', pc_recommend_level_note($balance, $ctx)];
             }
             return ['', $balance > 0 ? 'Higher-end than the parts you picked so far.' : 'Lower-end than the parts you picked so far.'];
         case 'gpu':
@@ -739,7 +892,7 @@ function pc_recommend_explain(string $slot, array $candidate, array $buildMap, a
                 return ['', $balance > 0 ? 'Your ' . $cpu['label'] . ' will hold back this ' . $spec['label'] . '.' : 'Weak for your ' . $cpu['label'] . '; it will limit performance.'];
             }
             if (!$buildMap) {
-                return ['', $balance > 0 ? 'A high-end part; more than most builds like this need.' : 'An entry-level part; fine for light use only.'];
+                return ['', pc_recommend_level_note($balance, $ctx)];
             }
             return ['', $balance > 0 ? 'Higher-end than the parts you picked so far.' : 'Lower-end than the parts you picked so far.'];
         case 'motherboard':
@@ -853,6 +1006,18 @@ function pc_recommend_explain(string $slot, array $candidate, array $buildMap, a
             return ['', $light ? 'Optional: extra fans are not needed for ' . $use . '.' : pc_recommend_tier_note((float)$f['tier_gap'])];
     }
     return [$good ? 'Fits the parts you already picked.' : '', ''];
+}
+
+/**
+ * Note for the first CPU / GPU of an empty build that is above or below the build's level. With a
+ * budget the level comes from the budget, so the note says that instead of calling the part weak.
+ */
+function pc_recommend_level_note(float $balance, array $ctx): string
+{
+    if ((float)($ctx['budget'] ?? 0) > 0) {
+        return $balance > 0 ? 'Pricier than your budget comfortably allows.' : 'Your budget can get a stronger one.';
+    }
+    return $balance > 0 ? 'A high-end part; more than most builds like this need.' : 'An entry-level part; fine for light use only.';
 }
 
 /** Note for a part that only misses on price level: tier_gap > 0 means pricier than the rest of the build. */
@@ -1033,10 +1198,31 @@ function pc_recommend_review(array $buildMap, array $ctx): array
             $notes[] = ['slot' => $slot, 'text' => $scored['note']];
         }
     }
+    /* Current price and stock of every picked part, and an in-stock alternative for sold-out ones
+       (scored with the budget, like the picker, so both suggest the same part). */
+    $altCtx = ['purpose' => $purpose, 'budget' => (float)($ctx['budget'] ?? 0)];
+    $parts = [];
+    $soldOut = [];
+    foreach ($buildMap as $slot => $part) {
+        $parts[$slot] = ['id' => (int)$part['id'], 'price' => (float)$part['price'], 'stock' => (int)($part['stock'] ?? 0), 'warranty' => (string)($part['warranty'] ?? '')];
+        if ((int)($part['stock'] ?? 0) > 0) {
+            continue;
+        }
+        $others = $buildMap;
+        unset($others[$slot]);
+        $options = pc_recommend_apply($slot, pc_recommend_catalog()[$slot] ?? [], $others, $altCtx);
+        $soldOut[] = [
+            'slot' => $slot,
+            'name' => (string)$part['name'],
+            'alternative' => pc_recommend_pick_alternative($options, (float)$part['price'], (int)$part['id']),
+        ];
+    }
     return [
         'gpu_needed' => pc_recommend_gpu_needed($buildMap, $purpose),
         'warnings' => $warnings,
         'notes' => $notes,
+        'parts' => $parts,
+        'sold_out' => $soldOut,
     ];
 }
 
@@ -1169,8 +1355,14 @@ function pc_recommend_auto_build(PDO $db, array $ctx, array $keep = []): array
         if (!empty($build[$slot]) || ($slot === 'ssd' && (!empty($build['ssd_sata']) || !empty($build['hdd'])))) {
             continue;
         }
+        /* A CPU sold with its own cooler needs no other; one sold without (MPK / tray) cannot run without one. */
+        $cpuCooler = !empty($build['processor']) && pc_recommend_spec('processor', $build['processor'])['cooler'];
+        if ($slot === 'cooler' && $cpuCooler) {
+            continue;
+        }
         $required = in_array($slot, ['processor', 'motherboard', 'memory', 'ssd', 'psu', 'case'], true)
-            || ($slot === 'gpu' && pc_recommend_gpu_needed($build, $purpose));
+            || ($slot === 'gpu' && pc_recommend_gpu_needed($build, $purpose))
+            || ($slot === 'cooler' && !empty($build['processor']));
         $best = null;
         $bestKey = null;
         $target = $budget * ($shares[$slot] ?? 0.05);
@@ -1224,5 +1416,192 @@ function pc_recommend_auto_build(PDO $db, array $ctx, array $keep = []): array
                 : 'Cheapest compatible option in stock; the budget is tight for this build.';
         }
     }
+    if ($budget > 0 && !$missing) {
+        $changes = pc_recommend_auto_upgrade($build, $added, $ctx);
+        foreach ($changes as $from => [$slot, $candidate, $reason]) {
+            unset($added[$from], $reasons[$from], $build[$from]);
+            $fallback = array_values(array_diff($fallback, [$from]));
+            $added[$slot] = $candidate;
+            $build[$slot] = $candidate;
+            $reasons[$slot] = $reason;
+        }
+        /* Reasons name the other parts ("a good match for the Ryzen 5 5600"), so reword them for the final build. */
+        if ($changes) {
+            foreach ($added as $slot => $candidate) {
+                $rest = $build;
+                unset($rest[$slot]);
+                $scored = pc_recommend_score($slot, $candidate, $rest, $ctx);
+                if ($scored !== null && $scored['recommended']) {
+                    $reasons[$slot] = $slot === 'ssd_sata'
+                        ? pc_recommend_size_label(pc_spec_storage((string)$candidate['name'])['gb']) . ' SATA SSD as the main drive keeps the build within budget.'
+                        : $scored['reason'];
+                }
+            }
+        }
+    }
     return ['added' => $added, 'reasons' => $reasons, 'fallback' => $fallback, 'missing' => $missing];
+}
+
+/** The Build Score (pc_rating.php) before rounding, so small differences between two builds still count. */
+function pc_recommend_build_points(array $buildMap, string $purpose): float
+{
+    $rating = pc_build_rating($buildMap, $purpose);
+    $points = (float)$rating['base'];
+    $cap = 100.0;
+    foreach ($rating['adjustments'] as $a) {
+        $points += (float)($a['points'] ?? 0);
+        $cap = min($cap, (float)($a['cap'] ?? 100));
+    }
+    return min($cap, $points);
+}
+
+/** Whether $candidate does everything $current does in this build (same or better specs), so a cheaper one is a pure saving. */
+function pc_recommend_not_worse(string $slot, array $candidate, string $currentSlot, array $current, array $rest): bool
+{
+    $new = pc_recommend_spec($slot, $candidate);
+    $old = pc_recommend_spec($currentSlot, $current);
+    switch ($slot) {
+        case 'processor':
+            /* Built-in graphics only matters while there is no graphics card. */
+            return $new['tier'] >= $old['tier'] && ($new['igpu'] || !$old['igpu'] || !empty($rest['gpu']));
+        case 'gpu':
+            return $new['tier'] >= $old['tier'] && $new['vram'] >= $old['vram'];
+        case 'memory':
+            return $new['gb'] >= $old['gb'] && $new['sticks'] >= $old['sticks'];
+        case 'ssd':
+        case 'ssd_sata':
+            /* NVMe is faster than SATA, so a SATA drive never replaces an NVMe one as "not worse". */
+            return $new['gb'] >= $old['gb'] && ($slot === $currentSlot || $slot === 'ssd');
+    }
+    return false;
+}
+
+/**
+ * Second pass of "Build it for me": puts the money the first pass left over to work, judged by the
+ * Build Score so the build and its score agree. Each round makes one change to a part this pass or the
+ * first one picked: first a part swapped for one at least ₱1,000 cheaper with the same or better
+ * specs (e.g. no paying for built-in graphics next to a graphics card), otherwise the upgrade that
+ * adds the most score per peso and still fits the budget (more or dual-channel memory, a bigger
+ * drive, a stronger CPU / GPU, a better PSU, or a graphics card the purpose can use). Every new part
+ * must also be one the forest recommends for that build.
+ *
+ * @param array<string,array<string,mixed>> $build the finished build
+ * @param array<string,array<string,mixed>> $added the parts "Build it for me" picked (others are the customer's)
+ * @return array<string,array{0:string,1:array<string,mixed>,2:string}> replaced slot => [new slot, part, reason]
+ */
+function pc_recommend_auto_upgrade(array $build, array $added, array $ctx): array
+{
+    $purpose = pc_purpose_key($ctx['purpose'] ?? '');
+    $budget = (float)($ctx['budget'] ?? 0);
+    $catalog = pc_recommend_catalog();
+    $changes = [];
+    for ($round = 0; $round < 8; $round++) {
+        $left = $budget - array_sum(array_map(static fn(array $p): float => (float)($p['price'] ?? 0), $build));
+        $base = pc_recommend_build_points($build, $purpose);
+        $best = null;
+        foreach (['processor', 'gpu', 'memory', 'ssd', 'psu'] as $step) {
+            /* The main drive can move between NVMe and SATA. */
+            $from = $step === 'ssd' && empty($build['ssd']) && !empty($build['ssd_sata']) ? 'ssd_sata' : $step;
+            $current = $build[$from] ?? null;
+            if (($current && !isset($added[$from])) || (!$current && $step !== 'gpu')) {
+                continue;
+            }
+            $rest = $build;
+            unset($rest[$from]);
+            foreach ($step === 'ssd' ? ['ssd', 'ssd_sata'] : [$step] as $slot) {
+                foreach ($catalog[$slot] ?? [] as $candidate) {
+                    $extra = (float)$candidate['price'] - (float)($current['price'] ?? 0);
+                    if ($extra > $left || ($current && (int)$candidate['id'] === (int)$current['id'])) {
+                        continue;
+                    }
+                    $saving = $current && $extra <= -1000 && pc_recommend_not_worse($slot, $candidate, $from, $current, $rest);
+                    if ($extra <= 0 && !$saving) {
+                        continue;
+                    }
+                    /* Without a cooler in the build, the CPU has to come with its own. */
+                    if ($slot === 'processor' && empty($rest['cooler']) && !pc_recommend_spec('processor', $candidate)['cooler']) {
+                        continue;
+                    }
+                    $with = $rest;
+                    $with[$slot] = $candidate;
+                    $gain = pc_recommend_build_points($with, $purpose) - $base;
+                    if ($saving ? $gain < 0 : $gain < 0.5) {
+                        continue;
+                    }
+                    $rank = $saving ? [1, -$extra] : [0, $gain / $extra];
+                    if ($best !== null && $rank <= $best[0]) {
+                        continue;
+                    }
+                    $scored = pc_recommend_score($slot, $candidate, $rest, $ctx);
+                    if ($scored !== null && $scored['recommended']) {
+                        $best = [$rank, $from, $slot, $candidate, $scored['reason']];
+                    }
+                }
+            }
+        }
+        if ($best === null) {
+            break;
+        }
+        [, $from, $slot, $candidate, $reason] = $best;
+        unset($build[$from], $added[$from]);
+        $build[$slot] = $candidate;
+        $added[$slot] = $candidate;
+        /* Keyed by the slot the first pass filled, so a drive that moved from SATA to NVMe replaces the right one. */
+        $origin = $from;
+        foreach ($changes as $key => $change) {
+            if ($change[0] === $from) {
+                $origin = $key;
+            }
+        }
+        $changes[$origin] = [$slot, $candidate, $reason];
+    }
+    return $changes;
+}
+
+/**
+ * Ready-made starter builds for the Build a PC page: "Build it for me" at the suggested budget of a few
+ * common purposes, built live from today's stock, each with its total, Build Score and what it can run.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function pc_recommend_starter_builds(PDO $db): array
+{
+    $guide = pc_recommend_budget_guide($db);
+    $levels = ['starter' => 'Starter', 'recommended' => 'Recommended', 'high' => 'High-end'];
+    $presets = [['school', 'recommended'], ['office', 'recommended'], ['balanced', 'recommended'], ['gaming', 'starter'], ['gaming', 'recommended'], ['creation', 'recommended']];
+    $out = [];
+    foreach ($presets as [$purpose, $level]) {
+        $budget = (float)($guide['purposes'][$purpose][$level] ?? 0);
+        if ($budget <= 0) {
+            continue;
+        }
+        $result = pc_recommend_auto_build($db, ['purpose' => $purpose, 'budget' => $budget]);
+        if ($result['missing'] || !$result['added']) {
+            continue;
+        }
+        $build = $result['added'];
+        $rating = pc_build_rating($build, $purpose);
+        $cpu = pc_recommend_spec('processor', $build['processor']);
+        $mem = !empty($build['memory']) ? pc_recommend_spec('memory', $build['memory']) : null;
+        $drive = $build['ssd'] ?? $build['ssd_sata'] ?? $build['hdd'] ?? null;
+        $out[] = [
+            'purpose' => $purpose,
+            'purpose_label' => pc_purposes()[$purpose]['label'],
+            'level' => $level,
+            'level_label' => $levels[$level],
+            'budget' => (int)$budget,
+            'total' => array_sum(array_map(static fn(array $p): float => (float)$p['price'], $build)),
+            'score' => $rating['score'],
+            'verdict' => $rating['verdict'],
+            'specs' => array_values(array_filter([
+                $cpu['label'],
+                !empty($build['gpu']) ? pc_recommend_spec('gpu', $build['gpu'])['label'] : 'Built-in graphics',
+                $mem ? $mem['gb'] . ' GB RAM' . ($mem['sticks'] >= 2 ? ' (2 sticks)' : '') : '',
+                $drive ? pc_recommend_size_label(pc_spec_storage((string)$drive['name'])['gb']) . (isset($build['ssd']) ? ' NVMe SSD' : (isset($build['ssd_sata']) ? ' SATA SSD' : ' hard disk')) : '',
+            ])),
+            'can_run' => pc_rating_can_run($build),
+            'parts' => $build,
+        ];
+    }
+    return $out;
 }

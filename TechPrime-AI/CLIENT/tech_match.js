@@ -17,12 +17,26 @@
         { id: 'psu', group: 'GRAPHICS & POWER', label: 'POWER SUPPLY', name: 'Power Supply', select: 'Select Power Supply', icon: 'fa-plug', step: 5, watts: 0 },
         { id: 'case', group: 'CHASSIS & COOLING', label: 'CASE', name: 'Case', select: 'Select Case', icon: 'fa-cube', step: 6, watts: 0 },
         { id: 'cooler', group: 'CHASSIS & COOLING', label: 'CPU COOLER', name: 'CPU Cooler', select: 'Select CPU Cooler', icon: 'fa-fan', step: 7, watts: 15, optional: true },
-        { id: 'case_fan', group: 'CHASSIS & COOLING', label: 'CASE FAN', name: 'Case Fan', select: 'Select Case Fan', icon: 'fa-wind', step: 7, watts: 5, optional: true }
+        { id: 'case_fan', group: 'CHASSIS & COOLING', label: 'CASE FAN', name: 'Case Fan', select: 'Select Case Fan', icon: 'fa-wind', step: 7, watts: 5, optional: true },
+        /* Add-ons (tech_match_api.php, pc_recommend_addon_map()): not part of the PC itself, so no compatibility
+           check, no Build Score and not in the component count, but in the total, the cart and saved builds. */
+        { id: 'monitor', group: 'ADD-ONS', label: 'MONITOR', name: 'Monitor', select: 'Select Monitor', icon: 'fa-desktop', step: 8, watts: 0, optional: true, addon: true },
+        { id: 'keyboard', group: 'ADD-ONS', label: 'KEYBOARD', name: 'Keyboard', select: 'Select Keyboard (or keyboard + mouse set)', icon: 'fa-keyboard', step: 8, watts: 0, optional: true, addon: true },
+        { id: 'mouse', group: 'ADD-ONS', label: 'MOUSE', name: 'Mouse', select: 'Select Mouse', icon: 'fa-mouse', step: 8, watts: 0, optional: true, addon: true },
+        { id: 'os', group: 'ADD-ONS', label: 'WINDOWS', name: 'Windows', select: 'Select Windows', icon: 'fa-compact-disc', step: 8, watts: 0, optional: true, addon: true },
+        { id: 'ups', group: 'ADD-ONS', label: 'UPS / AVR', name: 'UPS / AVR', select: 'Select UPS / AVR', icon: 'fa-car-battery', step: 8, watts: 0, optional: true, addon: true }
     ];
-    var TOTAL_SLOTS = SLOTS.length;
-    /* Build Summary line order (matches the EasyPC website summary). */
+    /* The PC itself: what the component count, "Add Missing Components" and the 3D case cover. */
+    var PARTS = SLOTS.filter(function (s) { return !s.addon; });
+    var TOTAL_SLOTS = PARTS.length;
+    /* Build Summary line order (matches the EasyPC website summary), add-ons last. */
     var PSU_SAFE_LOAD = 0.8; // keep the build under 80% of the PSU's rated wattage
-    var SUMMARY_ORDER =['processor', 'cooler', 'motherboard', 'memory', 'gpu', 'ssd', 'ssd_sata', 'hdd', 'psu', 'case', 'case_fan'];
+    var SUMMARY_ORDER =['processor', 'cooler', 'motherboard', 'memory', 'gpu', 'ssd', 'ssd_sata', 'hdd', 'psu', 'case', 'case_fan',
+        'monitor', 'keyboard', 'mouse', 'os', 'ups'];
+    /* Stock at or below this shows "Only N left" (same as the picker). */
+    var LOW_STOCK = 5;
+    /* EasyPC One Oasis contact (same as the site footer), for "Ask EasyPC about this build". */
+    var STORE = { phone: '+639176255078', phoneLabel: '0917 625 5078', messenger: 'https://m.me/EASYPCOneOasisPasigBranch', hours: 'Open daily, 10:00 AM to 7:00 PM' };
 
     var STEPS = [
         { id: 1, label: 'Core' },
@@ -31,7 +45,8 @@
         { id: 4, label: 'Storage' },
         { id: 5, label: 'Power' },
         { id: 6, label: 'Case' },
-        { id: 7, label: 'Cooling' }
+        { id: 7, label: 'Cooling' },
+        { id: 8, label: 'Add-ons' }
     ];
 
     var FORM_LABELS = { ITX: 'Mini-ITX', MATX: 'Micro-ATX', ATX: 'ATX', EATX: 'E-ATX' };
@@ -48,12 +63,34 @@
     var budget = DEFAULT_BUDGET;
     /* False until the shopper picks a budget; the button then reads "Change budget". */
     var budgetSet = false;
+    /* Which suggested budget is in use: 'starter' / 'recommended' / 'high', or '' for an amount the shopper
+       typed. A suggested budget follows the purpose; a typed one is kept and only gets a hint. */
+    var budgetTier = '';
+    /* Last automatic budget change (purpose switch), for the Undo link: { prev }. Not saved. */
+    var budgetNotice = null;
+    var BUDGET_TIERS = { starter: 'Starter', recommended: 'Recommended', high: 'High-end' };
     /* Suggested budgets from tech_match_api.php (action=budget_guide), fetched once. */
     var budgetGuide = null;
+    /* The same suggestions once loaded, for synchronous use (budget bar, purpose switch). */
+    var budgetGuideData = null;
+    /* Ready-made starter builds (tech_match_api.php action=starter_builds), loaded once. */
+    var starters = null;
+    /* Add-ons group in the slot list: null = open only when an add-on is picked; true/false once the shopper toggles it. */
+    var addonsOpen = null;
+    /* "What can it run?" shows the uses that matter for the purpose first; the rest behind "Show all". */
+    var canRunAll = false;
     /* Build purpose chip (keys from includes/pc_purpose.php); steers the recommendations. */
     var purpose = 'balanced';
-    /* Last build check from tech_match_api.php (action=review); rating = Build Score + Performance Balance (pc_rating.php). */
-    var review = { key: '', gpuNeeded: false, warnings: [], notes: [], rating: null, pending: false };
+    /* Last build check from tech_match_api.php (action=review); rating = Build Score + Performance Balance (pc_rating.php).
+       parts = today's price / stock per slot, soldOut = picked parts out of stock (with an in-stock alternative),
+       checkedAt = when those prices were read. */
+    var review = { key: '', gpuNeeded: false, warnings: [], notes: [], rating: null, canRun: [], pending: false, parts: {}, soldOut: [], checkedAt: null };
+    /* slot -> { id, old } for parts whose saved price was replaced by today's price. */
+    var priceChanges = {};
+    /* Shown on the Build Summary, the printed summary and the shared text. */
+    var DISCLAIMER = 'Prices are VAT-inclusive and may change without notice; stock is not reserved until you check out. ' +
+        'Compatibility checks and the Build Score are advisory, based on the product specifications we list. ' +
+        'Please confirm with EasyPC staff before buying.';
     var reviewTimer = null;
     var lastPower = null;
     var pickerProducts = [];
@@ -98,6 +135,7 @@
                 name: pendingBuildName,
                 budget: budget,
                 budgetSet: budgetSet,
+                budgetTier: budgetTier,
                 purpose: purpose
             }));
         } catch (e) {}
@@ -120,6 +158,7 @@
             pendingBuildName = String(d.name || '');
             if (Number(d.budget) > 0) budget = Number(d.budget);
             budgetSet = !!d.budgetSet || (Number(d.budget) > 0 && Number(d.budget) !== DEFAULT_BUDGET);
+            budgetTier = budgetSet && BUDGET_TIERS[d.budgetTier] ? d.budgetTier : '';
             applyPurpose(d.purpose);
             applyComponents(d.components);
         } catch (e) {
@@ -129,16 +168,35 @@
 
     /* ---------- Derived values ---------- */
 
+    /* PC parts picked (add-ons are counted separately). */
     function filledCount(comps) {
         comps = comps || build;
-        return SLOTS.reduce(function (n, s) { return n + (comps[s.id] ? 1 : 0); }, 0);
+        return PARTS.reduce(function (n, s) { return n + (comps[s.id] ? 1 : 0); }, 0);
     }
 
+    function addonCount(comps) {
+        comps = comps || build;
+        return SLOTS.reduce(function (n, s) { return n + (s.addon && comps[s.id] ? 1 : 0); }, 0);
+    }
+
+    /* What the customer pays: every part and add-on except the ones they already have ("I have this"). */
     function totalPrice(comps) {
         comps = comps || build;
         return SLOTS.reduce(function (sum, s) {
-            return sum + (comps[s.id] ? Number(comps[s.id].price || 0) : 0);
+            var it = comps[s.id];
+            return sum + (it && !it.owned ? Number(it.price || 0) : 0);
         }, 0);
+    }
+
+    function addonTotal() {
+        return SLOTS.reduce(function (sum, s) {
+            return sum + (s.addon && build[s.id] ? Number(build[s.id].price || 0) : 0);
+        }, 0);
+    }
+
+    /* Parts and add-ons the customer would buy (not the ones they already have). */
+    function buyableSlots() {
+        return SLOTS.filter(function (s) { return build[s.id] && !build[s.id].owned; });
     }
 
     function powerDraw() {
@@ -348,12 +406,13 @@
     function nextSlot() {
         var essentials = missingEssentials();
         if (essentials.length) return essentials[0];
-        return SLOTS.find(function (s) { return !build[s.id]; }) || null;
+        return PARTS.find(function (s) { return !build[s.id]; }) || null;
     }
 
     function stepDone(stepId) {
         var related = SLOTS.filter(function (s) { return s.step === stepId; });
         if (stepId === 4) return hasStorage();
+        if (stepId === 8) return addonCount() > 0;
         /* Graphics: done once a card is picked, or once the processor is in and the purpose does not need one. */
         if (stepId === 3) return !!build.gpu || (!!build.processor && !gpuNeeded());
         return related.every(function (s) { return !!build[s.id] || s.optional; }) &&
@@ -380,31 +439,58 @@
         var next = nextSlot();
         var html = '';
         var lastGroup = '';
+        var addonsShown = addonsOpen === null ? addonCount() > 0 : addonsOpen;
         SLOTS.forEach(function (s) {
             if (s.group !== lastGroup) {
-                html += '<div class="tm-section-label">' + escapeHtml(s.group) + '</div>';
+                if (s.addon) {
+                    /* Add-ons are optional, so the group stays folded until it is opened or one is picked. */
+                    var added = addonCount();
+                    html += '<button type="button" class="tm-addons-toggle" data-addons-toggle aria-expanded="' + (addonsShown ? 'true' : 'false') + '" aria-controls="tmAddonList">' +
+                        '<span class="tm-section-label">' + escapeHtml(s.group) + ' <em class="tm-tag">Optional</em></span>' +
+                        '<span class="tm-addons-sub">' + (added ? added + ' added · ' + peso(addonTotal()) : 'Monitor, keyboard, mouse, Windows, UPS') + '</span>' +
+                        '<i class="fas fa-chevron-down" aria-hidden="true"></i></button>' +
+                        '<div class="tm-addon-list" id="tmAddonList"' + (addonsShown ? '' : ' hidden') + '>' +
+                        '<p class="tm-section-note">Not part of the PC itself, but a first PC also needs a screen, a keyboard and mouse, and Windows.</p>';
+                } else {
+                    html += '<div class="tm-section-label">' + escapeHtml(s.group) + '</div>';
+                }
                 lastGroup = s.group;
             }
             var item = build[s.id];
-            var cls = 'tm-slot' + (item ? ' is-filled' : '') + (!item && next && next.id === s.id ? ' is-next' : '');
+            var out = isSoldOut(s.id);
+            var stock = partStock(s.id);
+            var low = item && !out && !item.owned && stock !== null && stock > 0 && stock <= LOW_STOCK;
+            var cls = 'tm-slot' + (item ? ' is-filled' : '') + (!item && next && next.id === s.id ? ' is-next' : '') +
+                (out ? ' is-soldout' : '') + (item && item.owned ? ' is-owned' : '');
             var icon = item && item.image
                 ? '<img src="' + escapeHtml(item.image) + '" alt="">'
                 : '<i class="fas ' + s.icon + '" aria-hidden="true"></i>';
             html += '<div class="' + cls + '" id="tm-slot-' + s.id + '" data-pick="' + s.id + '" role="button" tabindex="0">' +
                 '<span class="tm-slot-icon">' + icon + '</span>' +
                 '<span class="tm-slot-text">' +
-                '<span class="tm-slot-name">' + escapeHtml(s.label) + ((s.optional || (s.id === 'gpu' && !gpuNeeded())) && !item ? '<em class="tm-tag">Optional</em>' : '') +
-                (item && item.auto ? '<em class="tm-tag tm-tag-auto" title="Picked by Build it for me">Auto</em>' : '') + '</span>' +
+                '<span class="tm-slot-name">' + escapeHtml(s.label) + (!s.addon && (s.optional || (s.id === 'gpu' && !gpuNeeded())) && !item ? '<em class="tm-tag">Optional</em>' : '') +
+                (item && item.auto ? '<em class="tm-tag-auto-icon" title="Picked by Build it for me"><i class="fas fa-magic" aria-hidden="true"></i><span class="sf-sr">Picked by Build it for me</span></em>' : '') +
+                (out ? '<em class="tm-tag tm-tag-out"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Out of stock</em>' : '') +
+                (low ? '<em class="tm-tag tm-tag-low">Only ' + stock + ' left</em>' : '') +
+                (item && item.owned ? '<em class="tm-tag tm-tag-owned"><i class="fas fa-check" aria-hidden="true"></i> You have this</em>' : '') + '</span>' +
                 (item
                     ? '<span class="tm-slot-hint" title="' + escapeHtml(item.name) + '">' + escapeHtml(item.name) + '</span>' +
-                      '<span class="tm-slot-price">' + peso(item.price) + '</span>' +
+                      (item.owned
+                          ? '<span class="tm-slot-price is-owned"><s>' + peso(item.price) + '</s> Not in your total</span>'
+                          : '<span class="tm-slot-price">' + peso(item.price) +
+                            (item.warranty ? '<span class="tm-slot-wty"><i class="fas fa-shield-alt" aria-hidden="true"></i> ' + escapeHtml(item.warranty) + '</span>' : '') + '</span>') +
+                      (out ? '<span class="tm-slot-warn">Can\'t be bought right now. Keep it to plan your build, then swap it before checkout.</span>' : '') +
                       '<span class="tm-slot-actions">' +
                       '<button type="button" class="tm-change" data-pick="' + s.id + '">Change</button>' +
                       '<button type="button" class="tm-remove" data-remove="' + s.id + '">Remove</button>' +
+                      /* "I already have this": stays in the checks, leaves the total and the cart. Add-ons can just be removed. */
+                      (s.addon ? '' : '<button type="button" class="tm-own" data-own="' + s.id + '" aria-pressed="' + (item.owned ? 'true' : 'false') + '">' +
+                          (item.owned ? 'I need to buy this' : 'I already have this') + '</button>') +
                       '</span>'
                     : '<span class="tm-slot-hint">+ ' + escapeHtml(s.select) + '</span>') +
                 '</span></div>';
         });
+        if (lastGroup === 'ADD-ONS') html += '</div>';
         el.innerHTML = html;
     }
 
@@ -452,21 +538,109 @@
         return { pct: pct, psu: psu };
     }
 
-    /* Per-component price lines; each line reopens the picker for that slot. */
+    /* One line per part (component, product, price, stock / price flags); each line reopens the picker for that slot. */
     function renderSummaryList() {
         var el = $('tmSummaryList');
         if (!el) return;
         var html = '';
+        var addonHead = false;
         SUMMARY_ORDER.forEach(function (id) {
             var s = slotMeta(id);
             var item = build[id];
             if (!s || !item) return;
-            html += '<button type="button" class="tm-summary-line" data-pick="' + s.id + '" title="' + escapeHtml(item.name) + ' (click to change)">' +
+            if (s.addon && !addonHead) {
+                html += '<p class="tm-summary-sub">Add-ons</p>';
+                addonHead = true;
+            }
+            var change = item.owned ? null : priceChange(id);
+            var out = isSoldOut(id);
+            var flags = (out ? '<span class="tm-summary-flag is-out"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Out of stock: can\'t be bought now</span>' : '') +
+                (item.owned ? '<span class="tm-summary-flag is-owned"><i class="fas fa-check" aria-hidden="true"></i> You already have this</span>' : '') +
+                (change ? '<span class="tm-summary-flag is-price"><i class="fas fa-tag" aria-hidden="true"></i> Price updated (was ' + peso(change.old) + ')</span>' : '');
+            html += '<button type="button" class="tm-summary-line' + (out ? ' is-out' : '') + (item.owned ? ' is-owned' : '') + '" data-pick="' + s.id + '" title="' + escapeHtml(item.name) + ' (click to change)">' +
                 '<span class="tm-summary-label">' + escapeHtml(s.name) + '</span>' +
-                '<strong class="tm-summary-price">' + peso(item.price) + '</strong>' +
+                '<strong class="tm-summary-price">' + (item.owned ? '₱0' : peso(item.price)) + '</strong>' +
+                (flags ? '<span class="tm-summary-flags">' + flags + '</span>' : '') +
                 '</button>';
         });
         el.innerHTML = html || '<p class="tm-summary-empty">No components selected yet.</p>';
+        var asOf = $('tmSummaryAsOf');
+        if (asOf) {
+            var when = filledCount() + addonCount() ? asOfLabel() : '';
+            asOf.hidden = !when;
+            asOf.textContent = when ? 'Prices as of ' + when + ' (Manila time)' : '';
+        }
+    }
+
+    function formatPoints(n) {
+        var v = Math.round(Number(n || 0) * 10) / 10;
+        return String(v % 1 === 0 ? v.toFixed(0) : v.toFixed(1));
+    }
+
+    /* "How this score is computed": each part's points (weight x fit for the purpose), then deductions and caps (pc_rating.php). */
+    function renderScoreWhy(rating) {
+        var box = $('tmScoreWhy');
+        var body = $('tmScoreWhyBody');
+        if (!box || !body) return;
+        if (!rating || !rating.axes || !filledCount()) {
+            box.hidden = true;
+            return;
+        }
+        box.hidden = false;
+        var need = purpose === 'balanced' ? 'everyday use' : purposeLabel();
+        var rows = rating.axes.map(function (a) {
+            return '<li><span class="tm-why-axis">' + escapeHtml(a.label) + '</span>' +
+                '<span class="tm-why-text">' + escapeHtml(a.text) + '</span>' +
+                '<strong class="tm-why-pts">' + formatPoints(a.points) + '<small>/' + Number(a.weight) + '</small></strong></li>';
+        }).join('');
+        var adjust = (rating.adjustments || []).map(function (x) {
+            return '<li class="is-adjust"><span class="tm-why-axis">' + (x.cap ? 'Limit' : 'Minus') + '</span>' +
+                '<span class="tm-why-text">' + escapeHtml(x.text) + '</span>' +
+                '<strong class="tm-why-pts">' + (x.cap ? 'max ' + Number(x.cap) : formatPoints(x.points)) + '</strong></li>';
+        }).join('');
+        body.innerHTML = '<p class="tm-why-lead">Each part earns points for how well it meets what <strong>' + escapeHtml(need) +
+            '</strong> needs. How many points a part can earn depends on the purpose.</p>' +
+            '<ul class="tm-why-list">' + rows + '</ul>' +
+            (adjust ? '<ul class="tm-why-list">' + adjust + '</ul>' : '') +
+            '<p class="tm-why-total"><span>Parts ' + formatPoints(rating.base) + (adjust ? ', after deductions and limits' : '') + '</span>' +
+            '<strong>' + Number(rating.score) + '/100</strong></p>';
+    }
+
+    /* "What can it run?" (pc_rating.php pc_rating_can_run): plain-language estimates for common uses. */
+    var CAN_RUN_ICON = { great: 'fa-check-circle', good: 'fa-check', limited: 'fa-exclamation-circle', no: 'fa-times-circle' };
+    var CAN_RUN_WORD = { great: 'Great', good: 'Good', limited: 'Limited', no: 'Not suited' };
+    var CAN_RUN_PREVIEW = 3;
+    var CAN_RUN_FIRST = {
+        balanced: ['everyday', 'esports', 'photo'],
+        school: ['everyday', 'esports', 'photo'],
+        office: ['everyday', 'video', 'photo'],
+        gaming: ['popular', 'aaa', 'esports'],
+        creation: ['video', 'photo', 'stream']
+    };
+
+    function renderCanRun() {
+        var list = $('tmCanRun');
+        if (!list) return;
+        var rows = build.processor ? (review.canRun || []).slice() : [];
+        var first = CAN_RUN_FIRST[purpose] || CAN_RUN_FIRST.balanced;
+        rows.sort(function (a, b) {
+            var ia = first.indexOf(a.key), ib = first.indexOf(b.key);
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+        list.hidden = !rows.length;
+        if ($('tmCanRunEmpty')) $('tmCanRunEmpty').hidden = rows.length > 0;
+        var more = $('tmCanRunMore');
+        if (more) {
+            more.hidden = rows.length <= CAN_RUN_PREVIEW;
+            more.setAttribute('aria-expanded', canRunAll ? 'true' : 'false');
+            more.textContent = canRunAll ? 'Show fewer' : 'Show all ' + rows.length + ' uses';
+        }
+        if (!canRunAll) rows = rows.slice(0, CAN_RUN_PREVIEW);
+        list.innerHTML = rows.map(function (r) {
+            return '<li class="is-' + escapeHtml(r.level) + '"><i class="fas ' + (CAN_RUN_ICON[r.level] || 'fa-circle') + '" aria-hidden="true"></i>' +
+                '<span><strong>' + escapeHtml(r.label) + '</strong><small>' + escapeHtml(r.text) + '</small></span>' +
+                '<em>' + (CAN_RUN_WORD[r.level] || '') + '</em></li>';
+        }).join('');
     }
 
     function renderRight(power) {
@@ -487,6 +661,8 @@
             scoreNotes.hidden = !noteList.length;
             scoreNotes.innerHTML = noteList.map(function (n) { return '<li>' + escapeHtml(n) + '</li>'; }).join('');
         }
+        renderScoreWhy(rating);
+        renderCanRun();
         if ($('tmSummaryCount')) $('tmSummaryCount').textContent = count + ' / ' + TOTAL_SLOTS;
         if ($('tmSummaryBar')) $('tmSummaryBar').style.width = Math.round((count / TOTAL_SLOTS) * 100) + '%';
         if ($('tmSummaryTotal')) $('tmSummaryTotal').textContent = peso(total);
@@ -502,6 +678,7 @@
         var p = power || {};
         setBadge('tmScoreBadgePower', p.psu && p.psu.watts ? (p.pct > 80 ? 'bad' : 'good') : '',
             p.psu && p.psu.watts ? ('Power supply load: ' + p.pct + '%') : 'Power: no power supply selected');
+        if ($('tmAddMissing')) $('tmAddMissing').hidden = !nextSlot();
 
         var compat = $('tmCompatStatus');
         if (compat) {
@@ -517,10 +694,26 @@
             review.warnings.forEach(function (msg) {
                 html += '<div class="tm-compat-line is-warn"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>' + escapeHtml(msg) + '</span></div>';
             });
+            /* Sold-out parts stay in the build (marked red), with the in-stock part the model suggests instead. */
+            review.soldOut.forEach(function (s) {
+                if (!isSoldOut(s.slot)) return;
+                var meta = slotMeta(s.slot);
+                var alt = s.alternative;
+                html += '<div class="tm-compat-line is-out"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span><strong>' +
+                    escapeHtml(meta ? meta.name : s.slot) + ':</strong> out of stock. ' +
+                    (alt ? 'In stock instead: ' + escapeHtml(alt.name) + ' (' + peso(alt.price) + '). ' : 'No in-stock part fits this build right now. ') +
+                    '<button type="button" class="tm-inline-link" data-pick="' + escapeHtml(s.slot) + '">See options</button></span></div>';
+            });
             review.notes.slice(0, 3).forEach(function (n) {
                 var meta = slotMeta(n.slot);
                 html += '<div class="tm-compat-line is-tip"><i class="fas fa-lightbulb" aria-hidden="true"></i><span><strong>' +
                     escapeHtml(meta ? meta.name : n.slot) + ':</strong> ' + escapeHtml(n.text) + '</span></div>';
+            });
+            /* Sold-out add-ons have no model alternative: just say so. */
+            SLOTS.forEach(function (s) {
+                if (!s.addon || !isSoldOut(s.id)) return;
+                html += '<div class="tm-compat-line is-out"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span><strong>' +
+                    escapeHtml(s.name) + ':</strong> out of stock. <button type="button" class="tm-inline-link" data-pick="' + s.id + '">See options</button></span></div>';
             });
             var missing = missingNames();
             if (count > 0 && missing.length) {
@@ -545,6 +738,11 @@
         }
 
         if ($('tmSaveLabel')) $('tmSaveLabel').textContent = editingBuildId > 0 ? 'Update Build' : 'Save Build';
+        var owned = PARTS.filter(function (s) { return build[s.id] && build[s.id].owned; }).length;
+        if ($('tmSummaryOwned')) {
+            $('tmSummaryOwned').hidden = !owned;
+            $('tmSummaryOwned').textContent = owned ? 'Not counting ' + owned + ' part' + (owned === 1 ? '' : 's') + ' you already have.' : '';
+        }
         renderRadar();
         renderBudget(total);
         renderCompareSlots();
@@ -561,11 +759,95 @@
     function renderBudget(total) {
         var wrap = document.querySelector('.bp-budget');
         if ($('tmBudgetUsed')) $('tmBudgetUsed').textContent = peso(total);
-        if ($('tmBudgetAmount')) $('tmBudgetAmount').textContent = peso(budget);
+        if ($('tmBudgetAmount')) $('tmBudgetAmount').textContent = budgetSet ? ' / ' + peso(budget) : ' · No budget set';
         if ($('tmBudgetEditLabel')) $('tmBudgetEditLabel').textContent = budgetSet ? 'Change budget' : 'Set budget';
         if ($('tmBudgetEdit')) $('tmBudgetEdit').classList.toggle('is-unset', !budgetSet);
-        if ($('tmBudgetBar')) $('tmBudgetBar').style.width = Math.min(100, budget > 0 ? (total / budget) * 100 : 0) + '%';
-        if (wrap) wrap.classList.toggle('is-over', total > budget);
+        if ($('tmBudgetBar')) $('tmBudgetBar').style.width = Math.min(100, budgetSet && budget > 0 ? (total / budget) * 100 : 0) + '%';
+        if (wrap) wrap.classList.toggle('is-over', budgetSet && total > budget);
+        var tierEl = $('tmBudgetTier');
+        if (tierEl) {
+            var showTier = budgetSet && !!budgetTier;
+            tierEl.hidden = !showTier;
+            tierEl.textContent = showTier ? BUDGET_TIERS[budgetTier] + ' · ' + purposeFor() : '';
+        }
+        renderBudgetNote();
+    }
+
+    /* Budget sent to the recommender: 0 (no budget) until the shopper sets one, so the ₱200,000
+       placeholder never steers it toward high-end parts. */
+    function apiBudget() {
+        return budgetSet ? budget : 0;
+    }
+
+    function purposeFor() {
+        return purpose !== 'balanced' ? purposeLabel() : 'most uses';
+    }
+
+    function guideTiers(key) {
+        var g = budgetGuideData;
+        return g && g.purposes ? g.purposes[key || purpose] || null : null;
+    }
+
+    /* The suggested level an amount matches for the current purpose, or '' when it is the shopper's own amount. */
+    function tierFor(amount) {
+        var tiers = guideTiers();
+        if (!tiers) return '';
+        var found = '';
+        Object.keys(BUDGET_TIERS).forEach(function (k) { if (!found && Number(tiers[k]) === Number(amount)) found = k; });
+        return found;
+    }
+
+    /* Line under the budget bar: what changed after a purpose switch (with Undo), or a hint when the
+       budget is unset or a typed amount is outside the usual range for this purpose. */
+    function renderBudgetNote() {
+        var el = $('tmBudgetNote');
+        if (!el) return;
+        var tiers = guideTiers();
+        var html = '';
+        var tone = '';
+        if (budgetNotice) {
+            html = '<i class="fas fa-sync-alt" aria-hidden="true"></i><span>Budget updated to <strong>' + peso(budget) + '</strong>, the ' +
+                BUDGET_TIERS[budgetTier].toLowerCase() + ' budget for ' + escapeHtml(purposeFor()) + '.</span>' +
+                '<button type="button" class="bp-budget-note-btn" data-budget-undo>Undo</button>';
+        } else if (tiers) {
+            var range = peso(tiers.starter) + '–' + peso(tiers.high);
+            var minimum = Number(((budgetGuideData || {}).minimum || {})[purpose]) || 0;
+            var use = '<button type="button" class="bp-budget-note-btn" data-budget-use>Use ' + peso(tiers.recommended) + '</button>';
+            if (!budgetSet) {
+                html = '<i class="fas fa-lightbulb" aria-hidden="true"></i><span>Suggested budget for ' + escapeHtml(purposeFor()) + ': <strong>' + range + '</strong>.</span>' + use;
+            } else if (!budgetTier && minimum && budget < minimum) {
+                tone = 'is-warn';
+                html = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>Your budget is below the cheapest complete ' +
+                    (purpose !== 'balanced' ? escapeHtml(purposeLabel()) + ' ' : '') + 'PC in stock (about <strong>' + peso(minimum) + '</strong>).</span>' + use;
+            } else if (!budgetTier && (budget < Number(tiers.starter) || budget > Number(tiers.high))) {
+                html = '<i class="fas fa-info-circle" aria-hidden="true"></i><span>' + (purpose !== 'balanced' ? escapeHtml(purposeLabel()) + ' builds' : 'Most builds') +
+                    ' usually cost <strong>' + range + '</strong>.</span>' + use;
+            }
+        }
+        el.hidden = !html;
+        el.className = 'bp-budget-note' + (tone ? ' ' + tone : '');
+        el.innerHTML = html;
+    }
+
+    /* Purpose switch: a suggested budget moves to the same level for the new purpose. Returns true when it changed. */
+    function retargetBudget() {
+        budgetNotice = null;
+        if (!budgetSet || !budgetTier) return false;
+        var tiers = guideTiers();
+        var next = tiers ? Number(tiers[budgetTier]) : 0;
+        if (!next || next === budget) return false;
+        budgetNotice = { prev: budget };
+        budget = next;
+        return true;
+    }
+
+    function setBudget(amount, tier) {
+        budget = amount;
+        budgetSet = true;
+        budgetTier = tier || '';
+        budgetNotice = null;
+        refresh();
+        if (activeSlot) loadProducts(activeSlot);
     }
 
     function renderRadar() {
@@ -688,6 +970,17 @@
     function setPurpose(key) {
         if (key === purpose) return;
         applyPurpose(key);
+        if (!budgetGuideData && budgetSet && budgetTier) {
+            /* Suggestions not loaded yet: move the budget as soon as they arrive. */
+            loadBudgetGuide().then(function () {
+                if (retargetBudget()) {
+                    refresh();
+                    if (activeSlot) loadProducts(activeSlot);
+                }
+            }).catch(function () {});
+        } else {
+            retargetBudget();
+        }
         refresh();
         if (activeSlot) loadProducts(activeSlot);
     }
@@ -709,6 +1002,9 @@
             review.gpuNeeded = false;
             review.rating = null;
             review.pending = false;
+            review.parts = {};
+            review.soldOut = [];
+            review.checkedAt = null;
             return;
         }
         /* The last score stays on screen (dimmed) until the new rating arrives. */
@@ -720,7 +1016,7 @@
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'review', csrf_token: window.EP_CSRF || '', build: pickedParts(''), purpose: purpose })
+                body: JSON.stringify({ action: 'review', csrf_token: window.EP_CSRF || '', build: pickedParts(''), purpose: purpose, budget: apiBudget() })
             })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
@@ -730,7 +1026,12 @@
                     review.warnings = data.warnings || [];
                     review.notes = data.notes || [];
                     review.rating = data.rating || null;
+                    review.canRun = data.can_run || [];
+                    review.parts = data.parts || {};
+                    review.soldOut = data.sold_out || [];
+                    review.checkedAt = new Date();
                     review.pending = false;
+                    syncPrices();
                     renderSlots();
                     renderRight(lastPower);
                 })
@@ -742,8 +1043,60 @@
         }, 250);
     }
 
+    /* A draft or a loaded saved build can hold old prices: keep every picked part at today's price. */
+    function syncPrices() {
+        var changed = false;
+        Object.keys(review.parts).forEach(function (slot) {
+            var now = review.parts[slot];
+            var item = build[slot];
+            if (!item || Number(item.id) !== Number(now.id)) return;
+            if (now.warranty) item.warranty = now.warranty;
+            item.stock = Number(now.stock);
+            var old = Number(item.price) || 0;
+            if (Math.abs(old - Number(now.price)) < 0.01) return;
+            priceChanges[slot] = { id: Number(item.id), old: old };
+            item.price = Number(now.price);
+            changed = true;
+        });
+        if (changed) saveDraft();
+    }
+
+    function priceChange(slot) {
+        var c = priceChanges[slot];
+        return c && build[slot] && Number(build[slot].id) === c.id ? c : null;
+    }
+
+    /* Today's stock of a picked part (from the last build check, else from when it was picked), or null. */
+    function partStock(slot) {
+        var item = build[slot];
+        if (!item) return null;
+        var p = review.parts[slot];
+        if (p && Number(p.id) === Number(item.id)) return Number(p.stock);
+        return item.stock != null && item.stock !== '' ? Number(item.stock) : null;
+    }
+
+    /* Out of stock and still to be bought (a part the customer already has never counts). */
+    function isSoldOut(slot) {
+        var item = build[slot];
+        if (!item || item.owned) return false;
+        var stock = partStock(slot);
+        return stock !== null && stock <= 0;
+    }
+
+    function asOfLabel() {
+        return review.checkedAt
+            ? review.checkedAt.toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' })
+            : '';
+    }
+
     /* Scroll so a slot row is visible, and highlight it. */
     function revealSlot(slotId) {
+        var meta = slotMeta(slotId);
+        var addonList = $('tmAddonList');
+        if (meta && meta.addon && addonList && addonList.hidden) {
+            addonsOpen = true;
+            renderSlots();
+        }
         var row = $('tm-slot-' + slotId);
         if (!row) return;
         var rect = row.getBoundingClientRect();
@@ -1049,9 +1402,10 @@
         brandFilter = {};
         if ($('tmPickerTitle')) $('tmPickerTitle').textContent = meta.select;
         if ($('tmPickerSearch')) $('tmPickerSearch').value = '';
-        var hasParts = Object.keys(build).some(function (k) { return k !== slotId && build[k]; });
-        if ($('tmPickerSort')) $('tmPickerSort').value = hasParts || purpose !== 'balanced' ? 'recommended' : 'price-asc';
-        if ($('tmPickerInStock')) $('tmPickerInStock').checked = true;
+        /* Every component opens on the recommender's order; the shopper can still change the sort. */
+        if ($('tmPickerSort')) $('tmPickerSort').value = 'recommended';
+        /* Sold-out parts are listed too (marked, with an in-stock alternative); the toggle hides them. */
+        if ($('tmPickerInStock')) $('tmPickerInStock').checked = false;
         if ($('tmPickerCompatOnly')) $('tmPickerCompatOnly').checked = true;
         setFiltersOpen(false);
         renderPickerCurrent();
@@ -1112,7 +1466,7 @@
                 csrf_token: window.EP_CSRF || '',
                 build: pickedParts(slotId),
                 purpose: purpose,
-                budget: budget
+                budget: apiBudget()
             })
         })
             .then(function (r) { return r.json(); })
@@ -1148,7 +1502,7 @@
         if (!listEl || !activeSlot) return;
         var meta = slotMeta(activeSlot);
         var q = String(($('tmPickerSearch') || {}).value || '').trim().toLowerCase();
-        var sort = ($('tmPickerSort') || {}).value || 'price-asc';
+        var sort = ($('tmPickerSort') || {}).value || 'recommended';
         var inStock = !!($('tmPickerInStock') || {}).checked;
         var compatOnly = !!($('tmPickerCompatOnly') || {}).checked;
         var brands = Object.keys(brandFilter).filter(function (b) { return brandFilter[b]; });
@@ -1179,12 +1533,14 @@
         });
 
         if ($('tmPickerCount')) {
+            var soldOutCount = list.filter(function (x) { return Number(x.p.stock || 0) <= 0; }).length;
             $('tmPickerCount').textContent = list.length + ' product' + (list.length === 1 ? '' : 's') +
+                (soldOutCount ? ' · ' + soldOutCount + ' out of stock' : '') +
                 (hidden ? ' · ' + hidden + ' incompatible hidden' : '');
         }
         if (!pickerProducts.length) {
             listEl.innerHTML = '<div class="tm-picker-empty"><i class="fas fa-box-open" aria-hidden="true"></i>' +
-                'No ' + escapeHtml(meta ? meta.name : 'products') + ' in stock right now.<br>Please check back soon.</div>';
+                'No ' + escapeHtml(meta ? meta.name : 'products') + ' available right now.<br>Please check back soon.</div>';
             return;
         }
         if (!list.length) {
@@ -1207,24 +1563,39 @@
             var btn;
             if (isCurrent) btn = '<button type="button" class="tm-select-btn is-current" data-close-drawer>Selected</button>';
             else if (x.reason) btn = '<button type="button" class="tm-select-btn" disabled>Incompatible</button>';
-            else if (out) btn = '<button type="button" class="tm-select-btn" disabled>Out of stock</button>';
+            /* Sold-out parts can still be picked to plan the build (panel feedback); they stay marked red. */
+            else if (out) btn = '<button type="button" class="tm-select-btn is-out" data-select="' + pid + '">Select anyway</button>';
             else btn = '<button type="button" class="tm-select-btn" data-select="' + pid + '">Select</button>';
             var recommended = !x.reason && p.recommended && p.recommend_reason;
             /* Good fits outside the top picks: same reason, lighter "Good fit" label. */
             var goodFit = !x.reason && !p.recommended && p.recommend_reason;
-            return '<article class="tm-product-card' + (x.reason ? ' is-incompatible' : '') + (recommended ? ' is-recommended' : '') + (isCurrent ? ' is-current' : '') + '">' +
+            /* Sold out: still recommended when it fits; the in-stock alternative can be picked right here. */
+            var alt = out && !x.reason ? p.alternative : null;
+            var altHtml = out && !x.reason
+                ? '<p class="tm-soldout-alt">' + (alt
+                    ? '<span>In stock instead: <strong>' + escapeHtml(alt.name) + '</strong> · ' + peso(alt.price) + '</span>' +
+                      '<button type="button" class="tm-alt-btn" data-select="' + (parseInt(alt.id, 10) || 0) + '">Select this</button>'
+                    : '<span>No in-stock part fits this build right now.</span>') + '</p>'
+                : '';
+            return '<article class="tm-product-card' + (x.reason ? ' is-incompatible' : '') + (recommended ? ' is-recommended' : '') + (out ? ' is-soldout' : '') + (isCurrent ? ' is-current' : '') + '">' +
                 img +
                 '<div class="tm-product-body">' +
+                (out ? '<span class="tm-out-label"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Out of stock</span>' : '') +
                 (recommended ? '<span class="tm-recommend">Recommended</span>' : '') +
                 (goodFit ? '<span class="tm-recommend tm-recommend-fit">Good fit</span>' : '') +
                 (p.brand ? '<span class="tm-product-brand">' + escapeHtml(p.brand) + '</span>' : '') +
                 '<h4 title="' + escapeHtml(p.name || '') + '">' +
-                (pid > 0 ? '<a href="products.php?id=' + pid + '" target="_blank" rel="noopener">' + escapeHtml(p.name || '') + '</a>' : escapeHtml(p.name || '')) +
+                /* The product page only lists in-stock products, so sold-out names are not links. */
+                (pid > 0 && !out ? '<a href="products.php?id=' + pid + '" target="_blank" rel="noopener">' + escapeHtml(p.name || '') + '</a>' : escapeHtml(p.name || '')) +
                 '</h4>' +
                 specChips(p, false) +
                 (recommended || goodFit ? '<p class="tm-recommend-why">' + escapeHtml(p.recommend_reason) + '</p>' : '') +
-                (!recommended && !goodFit && !x.reason && p.recommend_note ? '<p class="tm-recommend-note">' + escapeHtml(p.recommend_note) + '</p>' : '') +
+                /* Add-ons are not rated by the recommender: their note just describes the product (neutral, not the orange "not recommended" note). */
+                (!recommended && !goodFit && !x.reason && p.recommend_note ? '<p class="' + (p.addon ? 'tm-addon-desc' : 'tm-recommend-note') + '">' + escapeHtml(p.recommend_note) + '</p>' : '') +
                 (x.reason ? '<p class="tm-compat-warn">' + escapeHtml(x.reason) + '</p>' : '') +
+                (p.warranty ? '<p class="tm-product-wty"><i class="fas fa-shield-alt" aria-hidden="true"></i> ' + escapeHtml(p.warranty) + '</p>' : '') +
+                (out && !x.reason ? '<p class="tm-out-note">Can\'t be bought right now. You can still add it to plan your build, then swap it before checkout.</p>' : '') +
+                altHtml +
                 '</div>' +
                 '<div class="tm-product-side">' +
                 '<span class="tm-product-price">' + peso(p.price) + '</span>' +
@@ -1250,7 +1621,9 @@
             image: product.image,
             category: product.category,
             description: product.description || '',
-            compat: product.compat || null
+            compat: product.compat || null,
+            warranty: product.warranty || '',
+            stock: Number(product.stock || 0)
         };
         activeStep = slotMeta(slot).step;
         /* Drop other parts that no longer fit after this change. */
@@ -1385,6 +1758,7 @@
 
     function clearCurrentBuild() {
         build = {};
+        priceChanges = {};
         activeStep = 1;
         activeSlot = null;
         editingBuildId = 0;
@@ -1461,8 +1835,12 @@
 
     function purchaseBuild(action) {
         if (buying) return;
-        if (filledCount() <= 0) {
+        if (filledCount() + addonCount() <= 0) {
             alertUi('Select at least one component first.', 'info');
+            return;
+        }
+        if (!buyableSlots().length) {
+            alertUi('You already have every part in this build, so there is nothing to buy.', 'info');
             return;
         }
         if (action === 'buy_now'
@@ -1476,6 +1854,32 @@
             return;
         }
         var label = action === 'buy_now' ? 'Buy Now' : 'Add to Cart';
+        /* Sold-out parts can't be bought: Buy Now needs every part, Add to Cart skips them. */
+        var soldOut = buyableSlots().filter(function (s) { return isSoldOut(s.id); });
+        if (soldOut.length) {
+            var inStock = buyableSlots().length - soldOut.length;
+            var names = '<ul class="tm-out-list">' + soldOut.map(function (s) {
+                return '<li><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span><strong>' + escapeHtml(s.name) + ':</strong> ' + escapeHtml(build[s.id].name) + '</span></li>';
+            }).join('') + '</ul>';
+            openDialog(
+                '<h3 id="tmDialogTitle">' + (soldOut.length === 1 ? 'A part is out of stock' : soldOut.length + ' parts are out of stock') + '</h3>' +
+                '<p class="tm-save-lead">' + (action === 'buy_now'
+                    ? 'Buy Now needs every part in stock. Swap ' + (soldOut.length === 1 ? 'it' : 'them') + ' for an in-stock part, or add the rest of the build to your cart.'
+                    : (soldOut.length === 1 ? 'It' : 'They') + ' can\'t be added to your cart yet. Swap ' + (soldOut.length === 1 ? 'it' : 'them') + ', or add the other parts now.') + '</p>' +
+                names +
+                '<div class="tm-save-actions">' +
+                '<button type="button" class="tm-save-cancel" data-dialog-cancel>Keep building</button>' +
+                (inStock ? '<button type="button" class="tm-save-confirm" data-dialog-ok>Add the other ' + inStock + ' to cart</button>' : '') +
+                '</div>',
+                function (overlay, close) {
+                    var ok = overlay.querySelector('[data-dialog-ok]');
+                    if (!ok) return;
+                    ok.focus();
+                    ok.onclick = function () { close(); sendBuildPurchase('add_to_cart'); };
+                }
+            );
+            return;
+        }
         var missing = missingNames();
         if (!missing.length) {
             sendBuildPurchase(action);
@@ -1500,8 +1904,8 @@
     function sendBuildPurchase(action) {
         var btns = [$('tmBuildToCart'), $('tmBuildBuyNow'), $('tmMobileCart')].filter(Boolean);
         var components = {};
-        Object.keys(build).forEach(function (slot) {
-            if (build[slot] && build[slot].id) components[slot] = Number(build[slot].id);
+        buyableSlots().forEach(function (s) {
+            if (build[s.id].id && !isSoldOut(s.id)) components[s.id] = Number(build[s.id].id);
         });
         buying = true;
         btns.forEach(function (b) { b.disabled = true; });
@@ -1566,9 +1970,13 @@
 
     function savedListHtml(builds, extraTop) {
         var items = (extraTop || '') + builds.map(function (b) {
+            /* A saved build expires when a part's price changed since it was saved (pc_saved_builds.php). */
+            var expired = !!(b.price_check && b.price_check.expired);
+            var when = savedDate(b.priced_at || b.created_at);
             return '<button type="button" class="tm-list-item" data-build-id="' + Number(b.id) + '">' +
                 '<span><strong>' + escapeHtml(b.name) + '</strong>' +
-                '<small>' + Number(b.component_count || 0) + ' components' + (savedDate(b.created_at) ? ' · ' + savedDate(b.created_at) : '') + '</small></span>' +
+                '<small>' + Number(b.component_count || 0) + ' components' + (when ? ' · prices as of ' + when : '') +
+                (expired ? ' · <b class="tm-list-flag">Prices changed</b>' : '') + '</small></span>' +
                 '<em>' + peso(b.total_price) + '</em></button>';
         }).join('');
         return items ? '<div class="tm-list">' + items + '</div>' : '<div class="tm-list-empty">You have no saved builds yet.</div>';
@@ -1707,14 +2115,36 @@
 
     /* ---------- Share / Report / Budget ---------- */
 
+    /* Plain-text summary for Share (pasted into chats, Notepad, email). Pasted text is usually shown in a
+       proportional font, so it relies on line breaks, numbering and indents rather than aligned columns. */
     function buildSummaryText() {
-        var lines = ['My EasyPC Build (' + filledCount() + ' / ' + TOTAL_SLOTS + ' components)'];
-        if (purpose !== 'balanced') lines.push('Built for: ' + purposeLabel());
-        SLOTS.forEach(function (s) {
-            if (build[s.id]) lines.push('• ' + s.name + ': ' + build[s.id].name + ' — ' + peso(build[s.id].price));
+        var rule = '────────────────────────────';
+        var title = (pendingBuildName || 'My EasyPC Build').toUpperCase();
+        var lines = [title];
+        lines.push((purpose !== 'balanced' ? 'Built for ' + purposeLabel() + ' · ' : '') + filledCount() + ' of ' + TOTAL_SLOTS + ' components' +
+            (addonCount() ? ' + ' + addonCount() + ' add-on' + (addonCount() === 1 ? '' : 's') : ''));
+        if (asOfLabel()) lines.push('Prices as of ' + asOfLabel() + ' (Manila time)');
+        lines.push(rule, '', 'PARTS');
+        var n = 0;
+        var addonHead = false;
+        SUMMARY_ORDER.forEach(function (id) {
+            var s = slotMeta(id);
+            var item = build[id];
+            if (!s || !item) return;
+            if (s.addon && !addonHead) {
+                lines.push('', 'ADD-ONS');
+                addonHead = true;
+            }
+            n++;
+            lines.push(n + '. ' + s.name + ' — ' + (item.owned ? 'already have it (not in the total)' : peso(item.price)) + (isSoldOut(id) ? '  (OUT OF STOCK)' : ''));
+            lines.push('    ' + item.name);
+            if (item.warranty && !item.owned) lines.push('    ' + item.warranty);
         });
-        lines.push('Total: ' + peso(totalPrice()));
+        lines.push('', rule);
+        lines.push('TOTAL: ' + peso(totalPrice()) + ' (VAT-inclusive)');
+        if (review.rating) lines.push('Build Score: ' + buildScore() + '/100, ' + review.rating.verdict);
         lines.push('Estimated power draw: ~' + powerDraw() + 'W');
+        lines.push(rule, '', 'Note: ' + DISCLAIMER, '', 'EasyPC One Oasis Branch · Rosario, Pasig City');
         return lines.join('\n');
     }
 
@@ -1746,7 +2176,7 @@
         openDialog(
             '<h3 id="tmDialogTitle">Share Your Build</h3>' +
             '<p class="tm-save-lead">Copy this summary and paste it anywhere.</p>' +
-            '<textarea class="tm-save-input" rows="9" readonly id="tmShareText">' + escapeHtml(text) + '</textarea>' +
+            '<textarea class="tm-save-input" rows="14" readonly id="tmShareText">' + escapeHtml(text) + '</textarea>' +
             '<div class="tm-save-actions"><button type="button" class="tm-save-confirm" id="tmShareCopy">Copy</button></div>',
             function (overlay, close) {
                 var ta = $('tmShareText');
@@ -1761,42 +2191,112 @@
         );
     }
 
+    /* Printable Build Summary in a business format: header, build details, parts table with VAT,
+       Build Score breakdown, compatibility and the disclaimer. Printed in the same tab (hidden iframe). */
     function reportBuild() {
         if (filledCount() <= 0) {
-            alertUi('Add at least one component to generate a build report.', 'info');
+            alertUi('Add at least one component to print a build summary.', 'info');
             return;
         }
+        /* A part was just changed: wait (up to 5 s) for its new Build Score and prices before printing. */
+        if (review.pending) {
+            var tries = 0;
+            var wait = setInterval(function () {
+                if (!review.pending || ++tries > 50) {
+                    clearInterval(wait);
+                    printBuildSummary();
+                }
+            }, 100);
+            return;
+        }
+        printBuildSummary();
+    }
+
+    function printBuildSummary() {
         var issues = validateCurrentBuild();
         var missing = missingNames();
-        var rows = SLOTS.filter(function (s) { return build[s.id]; }).map(function (s) {
-            return '<tr><td>' + escapeHtml(s.name) + '</td><td>' + escapeHtml(build[s.id].name) + '</td><td class="r">' + peso(build[s.id].price) + '</td></tr>';
-        }).join('');
+        var rating = review.rating;
+        var total = totalPrice();
+        var vatable = total / 1.12;
         var now = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' });
-        var html = '<!doctype html><html><head><meta charset="utf-8"><title>EasyPC Build Report</title>' +
-            '<style>body{font-family:Arial,sans-serif;color:#1f2328;margin:32px;}h1{font-size:20px;margin:0 0 4px;}' +
-            'p{margin:4px 0;font-size:13px;color:#4b5563;}table{width:100%;border-collapse:collapse;margin:18px 0;font-size:13px;}' +
-            'th,td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;}th{background:#f7f8fa;}.r{text-align:right;white-space:nowrap;}' +
-            'tfoot td{font-weight:700;font-size:14px;}.ok{color:#3d7422;}.bad{color:#b91c1c;}small{color:#8a93a0;}</style></head><body>' +
-            '<h1>EasyPC Build Report' + (pendingBuildName ? ': ' + escapeHtml(pendingBuildName) : '') + '</h1>' +
-            '<p>Generated ' + escapeHtml(now) + ' · EasyPC One Oasis' +
-            (purpose !== 'balanced' ? ' · Built for: ' + escapeHtml(purposeLabel()) : '') + '</p>' +
-            '<table><thead><tr><th>Component</th><th>Product</th><th class="r">Price</th></tr></thead><tbody>' + rows + '</tbody>' +
-            '<tfoot><tr><td colspan="2">Total</td><td class="r">' + peso(totalPrice()) + '</td></tr></tfoot></table>' +
-            '<p>Build score: <strong>' + buildScore() + '/100</strong>' +
-            (review.rating && review.rating.verdict ? ' (' + escapeHtml(review.rating.verdict) + ')' : '') + ' · Components: ' + filledCount() + ' / ' + TOTAL_SLOTS +
-            ' · Estimated power draw: ~' + powerDraw() + 'W</p>' +
+        var n = 0;
+        var addonHead = false;
+        var rows = SUMMARY_ORDER.filter(function (id) { return build[id]; }).map(function (id) {
+            var s = slotMeta(id);
+            var item = build[id];
+            var change = item.owned ? null : priceChange(id);
+            var head = '';
+            if (s.addon && !addonHead) {
+                head = '<tr class="sub"><td colspan="7">Add-ons</td></tr>';
+                addonHead = true;
+            }
+            n++;
+            return head + '<tr><td class="c">' + n + '</td><td>' + escapeHtml(s.name) + '</td><td>' + escapeHtml(item.name) +
+                (change ? '<small>Price updated (was ' + peso(change.old) + ')</small>' : '') + '</td>' +
+                '<td>' + escapeHtml(item.owned ? '' : item.warranty || '') + '</td>' +
+                '<td class="c">' + (item.owned ? 'Customer has it' : (isSoldOut(id) ? '<span class="bad">Out of stock</span>' : 'In stock')) + '</td>' +
+                '<td class="c">' + (item.owned ? '0' : '1') + '</td><td class="r">' + (item.owned ? '—' : peso(item.price)) + '</td></tr>';
+        }).join('');
+        var why = rating && rating.axes ? rating.axes.map(function (a) {
+            return '<tr><td>' + escapeHtml(a.label) + '</td><td>' + escapeHtml(a.text) + '</td><td class="r">' + formatPoints(a.points) + ' / ' + Number(a.weight) + '</td></tr>';
+        }).join('') + (rating.adjustments || []).map(function (x) {
+            return '<tr><td>' + (x.cap ? 'Limit' : 'Deduction') + '</td><td>' + escapeHtml(x.text) + '</td><td class="r">' + (x.cap ? 'max ' + Number(x.cap) : formatPoints(x.points)) + '</td></tr>';
+        }).join('') : '';
+        var html = '<!doctype html><html><head><meta charset="utf-8"><title>Build Summary</title>' +
+            '<style>@page{margin:14mm;}body{font-family:Arial,Helvetica,sans-serif;color:#16201a;margin:0;font-size:12px;}' +
+            '.head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #3d7422;padding-bottom:10px;margin-bottom:14px;}' +
+            '.head h1{margin:0;font-size:20px;}.head p{margin:2px 0 0;color:#45514a;}.doc{text-align:right;}.doc strong{display:block;font-size:16px;color:#3d7422;letter-spacing:.04em;}' +
+            'table{width:100%;border-collapse:collapse;margin:0 0 14px;}th,td{border:1px solid #d5ddd1;padding:6px 8px;text-align:left;vertical-align:top;}' +
+            'th{background:#eef4ea;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}.r{text-align:right;white-space:nowrap;}.c{text-align:center;}' +
+            'tr.sub td{background:#f6f8f4;font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.04em;}td small{display:block;color:#5c6862;}.meta td{border:0;padding:2px 8px 2px 0;}.meta td:first-child{color:#5c6862;width:130px;}' +
+            '.tot td{border:0;padding:3px 8px;}.tot .grand td{border-top:2px solid #16201a;font-size:15px;font-weight:700;padding-top:6px;}' +
+            'h2{font-size:13px;margin:16px 0 6px;text-transform:uppercase;letter-spacing:.05em;color:#3d7422;}' +
+            '.ok{color:#3d7422;}.bad{color:#b42318;font-weight:700;}.note{border:1px solid #d5ddd1;background:#f6f8f4;padding:8px 10px;color:#45514a;line-height:1.5;}' +
+            '.foot{margin-top:18px;color:#5c6862;font-size:10.5px;text-align:center;}</style></head><body>' +
+            '<div class="head"><div><h1>EasyPC One Oasis Branch</h1><p>Rosario, Pasig City</p></div>' +
+            '<div class="doc"><strong>PC BUILD SUMMARY</strong><span>Generated ' + escapeHtml(now) + '</span></div></div>' +
+            '<table class="meta"><tbody>' +
+            '<tr><td>Build name</td><td>' + escapeHtml(pendingBuildName || 'Untitled build') + '</td></tr>' +
+            '<tr><td>Built for</td><td>' + escapeHtml(purpose === 'balanced' ? 'Everyday use (not sure yet)' : purposeLabel()) + '</td></tr>' +
+            '<tr><td>Prices as of</td><td>' + escapeHtml(asOfLabel() || now) + ' (Manila time)</td></tr>' +
+            '<tr><td>Components</td><td>' + filledCount() + ' of ' + TOTAL_SLOTS + (missing.length ? ' (still needed: ' + escapeHtml(missing.join(', ')) + ')' : ', all required parts included') +
+                (addonCount() ? ', plus ' + addonCount() + ' add-on' + (addonCount() === 1 ? '' : 's') : '') + '</td></tr>' +
+            '</tbody></table>' +
+            '<table><thead><tr><th class="c">#</th><th>Component</th><th>Product</th><th>Warranty</th><th class="c">Availability</th><th class="c">Qty</th><th class="r">Price</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody></table>' +
+            '<table class="tot"><tbody>' +
+            '<tr><td class="r">VATable amount</td><td class="r" style="width:140px">' + peso(vatable) + '</td></tr>' +
+            '<tr><td class="r">VAT (12%)</td><td class="r">' + peso(total - vatable) + '</td></tr>' +
+            '<tr class="grand"><td class="r">Total (VAT-inclusive)</td><td class="r">' + peso(total) + '</td></tr>' +
+            '</tbody></table>' +
+            '<h2>Build Score: ' + buildScore() + '/100' + (rating && rating.verdict ? ' · ' + escapeHtml(rating.verdict) : '') + '</h2>' +
+            (why ? '<table><thead><tr><th>Part</th><th>Assessment</th><th class="r">Points</th></tr></thead><tbody>' + why + '</tbody></table>' : '') +
+            '<h2>Compatibility and power</h2>' +
             '<p class="' + (issues.length ? 'bad' : 'ok') + '">' + (issues.length ? 'Compatibility issues: ' + escapeHtml(issues.join(' | ')) : 'All selected parts are compatible.') + '</p>' +
-            (missing.length ? '<p>Still needed: ' + escapeHtml(missing.join(', ')) + '</p>' : '') +
-            '<p><small>Compatibility checks are for guidance only and may not cover all scenarios. Please verify component specifications before purchasing. Prices may change.</small></p>' +
-            '<script>window.onload=function(){window.print();};<\/script></body></html>';
-        var w = window.open('', '_blank');
-        if (!w) {
-            alertUi('Please allow pop-ups to open the build report.', 'info');
-            return;
-        }
-        w.document.open();
-        w.document.write(html);
-        w.document.close();
+            '<p>Estimated power draw: about ' + powerDraw() + ' W.</p>' +
+            '<h2>Disclaimer</h2><p class="note">' + escapeHtml(DISCLAIMER) + '</p>' +
+            '<p class="foot">Generated by TechPrime AI Build a PC · This summary is not an official receipt or a reservation.</p>' +
+            '</body></html>';
+        var old = $('tmPrintFrame');
+        if (old) old.remove();
+        var frame = document.createElement('iframe');
+        frame.id = 'tmPrintFrame';
+        frame.setAttribute('aria-hidden', 'true');
+        frame.tabIndex = -1;
+        frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+        document.body.appendChild(frame);
+        var doc = frame.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        setTimeout(function () {
+            try {
+                frame.contentWindow.focus();
+                frame.contentWindow.print();
+            } catch (e) {
+                alertUi('Could not open the print dialog.', 'error');
+            }
+        }, 150);
     }
 
     /* Suggested budgets for each purpose, from current catalog prices; fetched once and reused. */
@@ -1806,6 +2306,7 @@
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (!data || !data.ok) throw new Error('budget_guide');
+                    budgetGuideData = data;
                     return data;
                 })
                 .catch(function (err) {
@@ -1862,10 +2363,8 @@
                         $('tmBudgetError').hidden = false;
                         return;
                     }
-                    budget = v;
-                    budgetSet = true;
                     close();
-                    refresh();
+                    setBudget(v, tierFor(v));
                 };
                 overlay.addEventListener('click', function (e) {
                     var preset = e.target.closest('[data-amount]');
@@ -1919,25 +2418,33 @@
     /* ---------- Build it for me (tech_match_api.php action=auto_build) ---------- */
 
     function buildSnapshot() {
-        return { build: JSON.parse(JSON.stringify(build)), budget: budget, budgetSet: budgetSet, purpose: purpose };
+        return { build: JSON.parse(JSON.stringify(build)), budget: budget, budgetSet: budgetSet, budgetTier: budgetTier, purpose: purpose };
     }
 
     function restoreSnapshot(snap) {
         build = snap.build;
         budget = snap.budget;
         budgetSet = snap.budgetSet;
+        budgetTier = snap.budgetTier || '';
+        budgetNotice = null;
         applyPurpose(snap.purpose);
         refresh();
         if (activeSlot) loadProducts(activeSlot);
     }
 
-    /* Always builds from an empty PC: the parts already in the build are not sent. */
+    /* Builds the PC from scratch, except the parts the customer already has (sent as kept, at no cost).
+       Add-ons stay as they are, so their cost comes off the budget first. */
     function requestAutoBuild(amount) {
+        var owned = {};
+        PARTS.forEach(function (s) {
+            var it = build[s.id];
+            if (it && it.owned) owned[s.id] = { id: it.id, name: it.name, owned: true };
+        });
         return fetch('tech_match_api.php', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'auto_build', csrf_token: window.EP_CSRF || '', build: {}, purpose: purpose, budget: amount })
+            body: JSON.stringify({ action: 'auto_build', csrf_token: window.EP_CSRF || '', build: owned, purpose: purpose, budget: Math.max(1000, amount - addonTotal()) })
         })
             .then(function (r) { return r.json(); })
             .then(function (data) {
@@ -1946,9 +2453,14 @@
             });
     }
 
-    /* Replaces the whole build with the server's picks. */
+    /* Replaces the PC parts with the server's picks; parts the customer has and add-ons stay. */
     function mergeAutoBuild(data) {
-        build = {};
+        var kept = {};
+        Object.keys(build).forEach(function (slot) {
+            var meta = slotMeta(slot);
+            if (build[slot] && (build[slot].owned || (meta && meta.addon))) kept[slot] = build[slot];
+        });
+        build = kept;
         var added = data.added || {};
         Object.keys(added).forEach(function (slot) {
             var p = added[slot];
@@ -1961,6 +2473,8 @@
                 category: p.category,
                 description: p.description || '',
                 compat: p.compat || null,
+                warranty: p.warranty || '',
+                stock: Number(p.stock || 0),
                 auto: true
             };
         });
@@ -1975,8 +2489,10 @@
 
     function openAutoBuildDialog() {
         var label = purposeLabel();
-        /* Builds from scratch: every part already in the build is replaced (Undo brings them back). */
-        var parts = filledCount();
+        /* Builds from scratch: every part already in the build is replaced (Undo brings them back),
+           except parts the customer already has and add-ons. */
+        var parts = PARTS.filter(function (s) { return build[s.id] && !build[s.id].owned; }).length;
+        var keeps = PARTS.length - PARTS.filter(function (s) { return !build[s.id] || !build[s.id].owned; }).length;
         openDialog(
             '<h3 id="tmDialogTitle"><i class="fas fa-magic" aria-hidden="true"></i> Build it for me</h3>' +
             '<p class="tm-save-lead">EasyPC\'s recommendation model picks a complete ' +
@@ -1988,6 +2504,9 @@
             '<p class="tm-budget-note" id="tmAutoBudgetHint"></p>' +
             (parts > 0 ? '<p class="tm-autobuild-tip"><i class="fas fa-info-circle" aria-hidden="true"></i> This starts a new build and replaces the ' + parts +
                 ' part' + (parts === 1 ? '' : 's') + ' you picked. You can Undo afterwards.</p>' : '') +
+            (keeps > 0 || addonCount() ? '<p class="tm-autobuild-tip"><i class="fas fa-check-circle" aria-hidden="true"></i> Kept as they are: ' +
+                [keeps ? keeps + ' part' + (keeps === 1 ? '' : 's') + ' you already have' : '', addonCount() ? 'your add-ons (' + peso(addonTotal()) + ' of the budget)' : '']
+                    .filter(Boolean).join(' and ') + '.</p>' : '') +
             '<div class="tm-save-error" id="tmAutoError" hidden></div>' +
             '<div class="tm-save-actions">' +
             '<button type="button" class="tm-save-cancel" data-dialog-cancel>Cancel</button>' +
@@ -2058,6 +2577,8 @@
         mergeAutoBuild(data);
         budget = newBudget;
         budgetSet = true;
+        budgetTier = tierFor(newBudget);
+        budgetNotice = null;
         activeStep = 1;
         refresh();
         installParts(Object.keys(data.added || {}));
@@ -2126,10 +2647,12 @@
                 image: item.image || '',
                 category: item.category || '',
                 description: item.description || '',
-                compat: item.compat || null
+                compat: item.compat || null,
+                warranty: item.warranty || ''
             };
             /* Picked by "Build it for me" (kept in the draft only; saved builds drop it). */
             if (item.auto) build[k].auto = true;
+            if (item.owned) build[k].owned = true;
         });
         return dropped;
     }
@@ -2167,6 +2690,179 @@
         }
     }
 
+    /* ---------- Ask EasyPC about this build ---------- */
+
+    function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text).then(function () { return true; }).catch(function () { return false; });
+        }
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) {}
+        ta.remove();
+        return Promise.resolve(ok);
+    }
+
+    /* Short version of the build for a text message: one line per part, then the total. */
+    function buildShortText() {
+        var lines = ['Hi EasyPC! I\'d like to ask about this build' + (purpose !== 'balanced' ? ' (' + purposeLabel() + ')' : '') + ':'];
+        SUMMARY_ORDER.forEach(function (id) {
+            var s = slotMeta(id);
+            var item = build[id];
+            if (!s || !item) return;
+            lines.push('- ' + s.name + ': ' + item.name + (item.owned ? ' (I have this)' : ' ' + peso(item.price)));
+        });
+        lines.push('Total: ' + peso(totalPrice()));
+        return lines.join('\n');
+    }
+
+    /* Messenger, text, call or copy: the build summary goes along so staff see the exact parts. */
+    function askStore() {
+        var empty = filledCount() + addonCount() <= 0;
+        var text = empty ? 'Hi EasyPC! I need help choosing parts for a new PC.' : buildSummaryText();
+        var sms = empty ? text : buildShortText();
+        openDialog(
+            '<h3 id="tmDialogTitle"><i class="fas fa-headset" aria-hidden="true"></i> Ask EasyPC about this build</h3>' +
+            '<p class="tm-save-lead">Our staff at EasyPC One Oasis can check your build, confirm stock or suggest changes. ' +
+            (empty ? '' : 'Your build summary goes with your message.') + '</p>' +
+            '<div class="tm-ask-options">' +
+            '<a class="tm-ask-opt" href="' + STORE.messenger + '" target="_blank" rel="noopener" data-ask-copy>' +
+            '<i class="fab fa-facebook-messenger" aria-hidden="true"></i><span><strong>Message us on Messenger</strong>' +
+            '<small>We copy your build summary first. Paste it in the chat.</small></span></a>' +
+            '<a class="tm-ask-opt" href="sms:' + STORE.phone + '?body=' + encodeURIComponent(sms) + '">' +
+            '<i class="fas fa-sms" aria-hidden="true"></i><span><strong>Text ' + STORE.phoneLabel + '</strong>' +
+            '<small>Opens your messages app with your build filled in.</small></span></a>' +
+            '<a class="tm-ask-opt" href="tel:' + STORE.phone + '">' +
+            '<i class="fas fa-phone-alt" aria-hidden="true"></i><span><strong>Call ' + STORE.phoneLabel + '</strong>' +
+            '<small>' + STORE.hours + '.</small></span></a>' +
+            '<button type="button" class="tm-ask-opt" data-ask-copy-only>' +
+            '<i class="far fa-copy" aria-hidden="true"></i><span><strong>Copy build summary</strong>' +
+            '<small>Paste it anywhere: Viber, email or a note.</small></span></button>' +
+            '</div>' +
+            '<p class="tm-ask-status" id="tmAskStatus" role="status" aria-live="polite"></p>',
+            function (overlay) {
+                var status = $('tmAskStatus');
+                overlay.addEventListener('click', function (e) {
+                    var copyOnly = e.target.closest('[data-ask-copy-only]');
+                    var copyFirst = e.target.closest('[data-ask-copy]');
+                    if (!copyOnly && !copyFirst) return;
+                    /* The Messenger link still opens (new tab); the copy runs in the same click. */
+                    copyText(text).then(function (ok) {
+                        if (status) status.textContent = ok ? 'Build summary copied.' + (copyFirst ? ' Paste it in the Messenger chat.' : '') : 'Could not copy. Use Share to copy the summary.';
+                    });
+                });
+            }
+        );
+    }
+
+    /* ---------- Starter builds (tech_match_api.php action=starter_builds) ---------- */
+
+    var STARTER_RUN = { school: 'everyday', office: 'video', balanced: 'esports', gaming: 'aaa', creation: 'video' };
+    var CAN_RUN_SHORT = { everyday: 'Everyday use', esports: 'Esports games', popular: 'Popular games', aaa: 'Newest big games', photo: 'Photo editing', video: 'Video editing', stream: 'Streaming' };
+
+    function purposeIcon(key) {
+        var icon = document.querySelector('[data-purpose="' + key + '"] .bp-purpose-icon i');
+        return icon ? icon.className : 'fas fa-desktop';
+    }
+
+    function setStartersOpen(open) {
+        var list = $('bpStartersList');
+        var btn = $('bpStartersToggle');
+        if (list) list.hidden = !open;
+        if (btn) {
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.innerHTML = open ? 'Hide <i class="fas fa-chevron-up" aria-hidden="true"></i>' : 'Show builds <i class="fas fa-chevron-down" aria-hidden="true"></i>';
+        }
+    }
+
+    function renderStarters() {
+        var box = $('bpStartersList');
+        if (!box) return;
+        if (!starters || !starters.length) {
+            if ($('bpStarters')) $('bpStarters').hidden = !!starters;
+            return;
+        }
+        box.innerHTML = starters.map(function (b, i) {
+            var key = STARTER_RUN[b.purpose];
+            var r = (b.can_run || []).find(function (x) { return x.key === key; });
+            var run = r ? '<p class="bp-starter-run is-' + escapeHtml(r.level) + '"><i class="fas ' + (CAN_RUN_ICON[r.level] || 'fa-circle') + '" aria-hidden="true"></i>' +
+                '<span><strong>' + escapeHtml(CAN_RUN_SHORT[key] || r.label) + ':</strong> ' + escapeHtml(r.text) + '</span></p>' : '';
+            return '<article class="bp-starter" role="listitem">' +
+                '<div class="bp-starter-top">' +
+                '<span class="bp-starter-icon" aria-hidden="true"><i class="' + escapeHtml(purposeIcon(b.purpose)) + '"></i></span>' +
+                '<div class="bp-starter-title"><h3>' + escapeHtml(b.purpose === 'balanced' ? 'All-round PC' : b.purpose_label + ' PC') + '</h3>' +
+                '<small>' + escapeHtml(b.level_label) + ' budget · ' + peso(b.budget) + '</small></div>' +
+                '<span class="bp-starter-score" title="Build Score: ' + Number(b.score) + '/100, ' + escapeHtml(b.verdict) + '">' + Number(b.score) + '<small>/100</small></span>' +
+                '</div>' +
+                '<p class="bp-starter-specs">' + escapeHtml((b.specs || []).join(' · ')) + '</p>' +
+                run +
+                '<div class="bp-starter-foot"><strong>' + peso(b.total) + '</strong>' +
+                '<button type="button" class="bp-starter-use" data-starter="' + i + '">Use this build</button></div>' +
+                '</article>';
+        }).join('');
+        if ($('bpStarters')) $('bpStarters').hidden = false;
+    }
+
+    function loadStarters() {
+        if (!$('bpStarters')) return;
+        fetch('tech_match_api.php?action=starter_builds', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                starters = data && data.ok ? data.builds || [] : [];
+                renderStarters();
+            })
+            .catch(function () {
+                starters = [];
+                renderStarters();
+            });
+    }
+
+    function useStarter(index) {
+        var b = starters && starters[index];
+        if (!b) return;
+        var apply = function () {
+            var before = buildSnapshot();
+            var kept = {};
+            /* Add-ons stay; the PC parts are replaced by the starter build. */
+            Object.keys(build).forEach(function (slot) {
+                var meta = slotMeta(slot);
+                if (meta && meta.addon) kept[slot] = build[slot];
+            });
+            build = kept;
+            mergeAutoBuild({ added: b.parts });
+            applyPurpose(b.purpose);
+            budget = b.budget;
+            budgetSet = true;
+            budgetTier = BUDGET_TIERS[b.level] ? b.level : '';
+            budgetNotice = null;
+            activeStep = 1;
+            setStartersOpen(false);
+            refresh();
+            installParts(Object.keys(b.parts || {}));
+            var ws = $('ep-tech-match');
+            if (ws) ws.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (typeof IAS_UI !== 'undefined') {
+                IAS_UI.alert('Change any part you like, or add a monitor, keyboard and Windows under Add-ons.', 'success', 0, {
+                    title: 'Starter build loaded',
+                    detail: (b.purpose === 'balanced' ? 'All-round PC' : b.purpose_label + ' PC') + ' · ' + peso(b.total),
+                    actions: [{ label: 'Undo', value: 'undo' }, { label: 'Start editing', primary: true }],
+                    onClose: function (value) { if (value === 'undo') restoreSnapshot(before); }
+                });
+            }
+        };
+        var parts = PARTS.filter(function (s) { return build[s.id]; }).length;
+        if (parts > 0) {
+            confirmDialog('Replace your current build?', 'The ' + parts + ' part' + (parts === 1 ? '' : 's') + ' you picked will be replaced by this starter build. Your add-ons stay. You can Undo afterwards.', 'Use this build', apply);
+            return;
+        }
+        apply();
+    }
+
     /* ---------- Events ---------- */
 
     function bind() {
@@ -2176,6 +2872,26 @@
                 var remove = e.target.closest('[data-remove]');
                 if (remove) {
                     removeSlot(remove.getAttribute('data-remove'));
+                    return;
+                }
+                /* "I already have this": the part stays in the checks but leaves the total and the cart. */
+                var own = e.target.closest('[data-own]');
+                if (own) {
+                    var ownSlot = own.getAttribute('data-own');
+                    if (build[ownSlot]) {
+                        build[ownSlot].owned = !build[ownSlot].owned;
+                        refresh();
+                        var again = document.querySelector('[data-own="' + ownSlot + '"]');
+                        if (again) again.focus();
+                    }
+                    return;
+                }
+                var addons = e.target.closest('[data-addons-toggle]');
+                if (addons) {
+                    addonsOpen = addons.getAttribute('aria-expanded') !== 'true';
+                    renderSlots();
+                    var toggle = document.querySelector('[data-addons-toggle]');
+                    if (toggle) toggle.focus();
                     return;
                 }
                 var pick = e.target.closest('[data-pick]');
@@ -2272,6 +2988,17 @@
         if ($('tmReportBuild')) $('tmReportBuild').addEventListener('click', reportBuild);
         if ($('tmBudgetEdit')) $('tmBudgetEdit').addEventListener('click', editBudget);
         if ($('tmAutoBuild')) $('tmAutoBuild').addEventListener('click', openAutoBuildDialog);
+        if ($('tmBudgetNote')) {
+            $('tmBudgetNote').addEventListener('click', function (e) {
+                if (e.target.closest('[data-budget-undo]') && budgetNotice) {
+                    /* Keep the earlier amount as the shopper's own budget. */
+                    setBudget(budgetNotice.prev, '');
+                    return;
+                }
+                var tiers = guideTiers();
+                if (e.target.closest('[data-budget-use]') && tiers) setBudget(Number(tiers.recommended), 'recommended');
+            });
+        }
         var purposeChips = $('bpPurposeChips');
         if (purposeChips) {
             purposeChips.addEventListener('click', function (e) {
@@ -2295,6 +3022,24 @@
             });
         }
         if ($('tmCompareGo')) $('tmCompareGo').addEventListener('click', openCompareDialog);
+        if ($('tmAskStore')) $('tmAskStore').addEventListener('click', askStore);
+        if ($('tmCanRunMore')) {
+            $('tmCanRunMore').addEventListener('click', function () {
+                canRunAll = !canRunAll;
+                renderCanRun();
+            });
+        }
+        if ($('bpStartersToggle')) {
+            $('bpStartersToggle').addEventListener('click', function () {
+                setStartersOpen(this.getAttribute('aria-expanded') !== 'true');
+            });
+        }
+        if ($('bpStartersList')) {
+            $('bpStartersList').addEventListener('click', function (e) {
+                var use = e.target.closest('[data-starter]');
+                if (use) useStarter(Number(use.getAttribute('data-starter')));
+            });
+        }
         if ($('tmClearBuild')) {
             $('tmClearBuild').addEventListener('click', function () {
                 if (filledCount() === 0 && !editingBuildId) return;
@@ -2314,8 +3059,11 @@
         bind();
         pcxBind();
         if (!loadPendingBuild()) refresh();
-        /* Fetch budget suggestions in the background so the budget dialog opens with them ready. */
-        setTimeout(function () { loadBudgetGuide().catch(function () {}); }, 1500);
+        /* Budget suggestions: the budget hint, purpose switches and the budget dialog use them. */
+        loadBudgetGuide().then(function () { renderBudget(totalPrice()); }).catch(function () {});
+        /* Starter builds: open on an empty builder, folded away once the shopper has parts. */
+        setStartersOpen(filledCount() === 0);
+        loadStarters();
     }
 
     if (document.readyState === 'loading') {

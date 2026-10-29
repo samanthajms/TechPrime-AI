@@ -1038,6 +1038,33 @@ function ep_users_has_phone(PDO $db): bool
 }
 
 /**
+ * Warranty from the "Product/Warranty Type: ..." line of a product description (catalog import), in plain words:
+ * "1 YR WTY." -> "1-year warranty", "6 MON WTY" -> "6-month warranty", "12 Months EasyFix Warranty" ->
+ * "12-month EasyFix warranty", "EASYFIX WTY." -> "EasyFix warranty", "NO WTY." -> "No warranty",
+ * "7 DAYS REPLACEMENT." -> "7-day replacement". '' when the description lists none.
+ */
+function ep_product_warranty(string $description): string
+{
+    if (!preg_match('/warranty[^:\n]*:[ \t]*([^\n]+)/i', $description, $m)) {
+        return '';
+    }
+    $raw = strtoupper(trim(rtrim(trim($m[1]), '.')));
+    if ($raw === '') {
+        return '';
+    }
+    if (preg_match('/^NO\b/', $raw)) {
+        return 'No warranty';
+    }
+    $easyFix = str_contains($raw, 'EASYFIX');
+    if (preg_match('/(\d+)\s*(YRS?|YEARS?|MONTHS?|MON|WKS?|WEEKS?|DAYS?)\b/', $raw, $n)) {
+        $unit = ['Y' => 'year', 'M' => 'month', 'W' => 'week', 'D' => 'day'][$n[2][0]];
+        $what = str_contains($raw, 'REPLACEMENT') ? 'replacement' : ($easyFix ? 'EasyFix warranty' : 'warranty');
+        return $n[1] . '-' . $unit . ' ' . $what;
+    }
+    return $easyFix ? 'EasyFix warranty' : ucfirst(strtolower($raw));
+}
+
+/**
  * Derive a brand label from real product name text (first token).
  * No hardcoded brand list — values come from existing product names.
  */

@@ -3,6 +3,7 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/client_helpers.php';
+require_once __DIR__ . '/../includes/pc_saved_builds.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -40,6 +41,12 @@ $slotLabels = [
     'case' => 'PC Case',
     'cooler' => 'CPU Cooler',
     'case_fan' => 'Case Fan',
+    /* Build a PC add-ons (pc_recommend_addon_map()). */
+    'monitor' => 'Monitor',
+    'keyboard' => 'Keyboard',
+    'mouse' => 'Mouse',
+    'os' => 'Operating System',
+    'ups' => 'UPS / AVR',
     'extras' => 'Extras',
 ];
 
@@ -60,6 +67,9 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $savedLabel = $dt->setTimezone(new DateTimeZone('Asia/Manila'))->format('M j, Y · g:i A');
     } catch (Throwable $e) {
     }
+    $comps = is_array($comps) ? $comps : [];
+    /* A saved build is a quote: it expires when a part's price changes (pc_saved_builds.php). */
+    $pricedAt = pc_saved_build_priced_at($comps, (string)$row['created_at']);
     $builds[] = [
         'id' => (int)$row['id'],
         'name' => (string)$row['build_name'],
@@ -67,7 +77,9 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         'count' => (int)$row['component_count'],
         'saved_label' => $savedLabel,
         'saved_ts' => $savedTs,
-        'components' => is_array($comps) ? $comps : [],
+        'priced_label' => pc_saved_build_time_label($pricedAt),
+        'price_check' => pc_saved_build_price_check($comps, pc_saved_build_products($db, $comps)),
+        'components' => $comps,
     ];
 }
 $buildsJson = json_encode($builds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
@@ -283,7 +295,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var slotIcons = {
         processor: 'fa-microchip', motherboard: 'fa-server', memory: 'fa-memory', gpu: 'fa-tv',
         ssd: 'fa-hdd', ssd_sata: 'fa-hdd', hdd: 'fa-database', psu: 'fa-plug', 'case': 'fa-cube',
-        cooler: 'fa-fan', case_fan: 'fa-wind', extras: 'fa-plus-circle'
+        cooler: 'fa-fan', case_fan: 'fa-wind', monitor: 'fa-desktop', keyboard: 'fa-keyboard', mouse: 'fa-mouse',
+        os: 'fa-compact-disc', ups: 'fa-car-battery', extras: 'fa-plus-circle'
     };
     var pageSize = 8;
     var currentPage = 1;
@@ -334,6 +347,33 @@ document.addEventListener('DOMContentLoaded', function () {
         return out;
     }
 
+    /* Price check from pc_saved_builds.php: expired = a price changed or a part is no longer sold. */
+    function priceCheck(build) {
+        return build.price_check || { expired: false, changes: [], missing: [], sold_out: [], current_total: build.total };
+    }
+
+    function priceChange(build, slot) {
+        return (priceCheck(build).changes || []).find(function (c) { return c.slot === slot; }) || null;
+    }
+
+    function quoteStatus(build) {
+        var chk = priceCheck(build);
+        var html = '';
+        if (chk.expired) {
+            var n = (chk.changes || []).length;
+            var what = [];
+            if (n) what.push(n + ' price' + (n === 1 ? '' : 's') + ' changed');
+            if ((chk.missing || []).length) what.push((chk.missing || []).length + ' part' + ((chk.missing || []).length === 1 ? ' is' : 's are') + ' no longer sold');
+            html += '<span class="sb-status is-expired"><i class="fas fa-clock" aria-hidden="true"></i><span>Quote expired: ' +
+                escapeHtml(what.join(', ')) + ' since ' + escapeHtml(build.priced_label || 'you saved it') + '. Update it to today\'s prices before buying.</span></span>';
+        }
+        if ((chk.sold_out || []).length) {
+            html += '<span class="sb-status is-soldout"><i class="fas fa-box-open" aria-hidden="true"></i><span>Out of stock: ' +
+                escapeHtml(chk.sold_out.join(', ')) + '</span></span>';
+        }
+        return html;
+    }
+
     function thumb(slot, item) {
         var inner = item && item.image
             ? '<img src="' + escapeHtml(item.image) + '" alt="" loading="lazy">'
@@ -374,16 +414,24 @@ document.addEventListener('DOMContentLoaded', function () {
             ? '<span class="sb-status is-partial"><i class="fas fa-list-ul" aria-hidden="true"></i><span>Still needs: ' + escapeHtml(missing.join(', ')) + '</span></span>'
             : '<span class="sb-status is-complete"><i class="fas fa-check-circle" aria-hidden="true"></i><span>Complete build: all essential parts included</span></span>';
         var count = list.length || b.count;
-        return '<article class="sb-card">' +
+        var chk = priceCheck(b);
+        var price = chk.expired
+            ? '<s>' + peso(b.total) + '</s> ' + peso(chk.current_total) + '<small>Today\'s total</small>'
+            : peso(b.total);
+        return '<article class="sb-card' + (chk.expired ? ' is-expired' : '') + '">' +
             '<header class="sb-card-head"><div>' +
             '<h3 class="sb-card-name">' + escapeHtml(b.name) + '</h3>' +
-            '<p class="sb-card-meta">' + count + ' part' + (count === 1 ? '' : 's') + (b.saved_label ? ' · Saved ' + escapeHtml(b.saved_label) : '') + '</p>' +
-            '</div><div class="sb-card-price">' + peso(b.total) + '</div></header>' +
+            '<p class="sb-card-meta">' + count + ' part' + (count === 1 ? '' : 's') +
+            (b.priced_label ? ' · Prices as of ' + escapeHtml(b.priced_label) : (b.saved_label ? ' · Saved ' + escapeHtml(b.saved_label) : '')) + '</p>' +
+            '</div><div class="sb-card-price">' + price + '</div></header>' +
             (thumbs ? '<div class="sb-thumbs">' + thumbs + '</div>' : '') +
             (keyHtml ? '<ul class="sb-keyparts">' + keyHtml + '</ul>' : '') +
             '<div>' + status + '</div>' +
+            (quoteStatus(b) ? '<div class="sb-quote">' + quoteStatus(b) + '</div>' : '') +
             '<footer class="sb-card-actions">' +
-            '<button type="button" class="sb-btn sb-btn-cart" data-cart="' + b.id + '"><i class="fas fa-shopping-cart" aria-hidden="true"></i> Add to Cart</button>' +
+            (chk.expired
+                ? '<button type="button" class="sb-btn sb-btn-refresh" data-refresh="' + b.id + '"><i class="fas fa-sync-alt" aria-hidden="true"></i> Update prices</button>'
+                : '<button type="button" class="sb-btn sb-btn-cart" data-cart="' + b.id + '"><i class="fas fa-shopping-cart" aria-hidden="true"></i> Add to Cart</button>') +
             '<button type="button" class="sb-btn sb-btn-ghost" data-view="' + b.id + '"><i class="fas fa-eye" aria-hidden="true"></i> View</button>' +
             '<button type="button" class="sb-btn sb-btn-ghost" data-edit="' + b.id + '"><i class="fas fa-pen" aria-hidden="true"></i> Edit</button>' +
             '<button type="button" class="sb-btn sb-btn-delete" data-delete="' + b.id + '" aria-label="Delete ' + escapeHtml(b.name) + '" title="Delete"><i class="fas fa-trash-alt" aria-hidden="true"></i></button>' +
@@ -459,25 +507,42 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function openViewModal(build) {
+        var chk = priceCheck(build);
+        var soldOut = chk.sold_out || [];
+        var gone = chk.missing || [];
         var rows = parts(build).map(function (p) {
             var pid = parseInt(p.item.id, 10) || 0;
             var name = escapeHtml(p.item.name || '');
+            var change = priceChange(build, p.slot);
+            /* "I already have this" parts are not bought: no stock or price flags, no price. */
+            var owned = !!p.item.owned;
+            var flag = owned ? '<span class="sb-flag is-price">You already have this</span>'
+                : gone.indexOf(p.item.name) !== -1 ? '<span class="sb-flag">No longer sold</span>'
+                : (soldOut.indexOf(p.item.name) !== -1 ? '<span class="sb-flag">Out of stock</span>'
+                : (change ? '<span class="sb-flag is-price">Price ' + (change.new > change.old ? 'went up' : 'went down') + '</span>' : ''));
             return '<div class="sb-view-row">' + thumb(p.slot, p.item) +
                 '<div><small>' + escapeHtml(slotLabels[p.slot] || p.slot) + '</small>' +
-                (pid > 0 ? '<a href="products.php?id=' + pid + '">' + name + '</a>' : '<b>' + name + '</b>') + '</div>' +
-                '<em>' + peso(p.item.price) + '</em></div>';
+                (pid > 0 ? '<a href="products.php?id=' + pid + '">' + name + '</a>' : '<b>' + name + '</b>') + flag + '</div>' +
+                '<em>' + (owned ? 'Owned' : change ? '<s>' + peso(change.old) + '</s>' + peso(change.new) : peso(p.item.price)) + '</em></div>';
         }).join('');
         var missing = missingEssentials(build);
         openDialog(
             '<h3 id="sbDialogTitle">' + escapeHtml(build.name || 'Saved Build') + '</h3>' +
-            '<p class="sb-dialog-meta">' + (build.saved_label ? 'Saved ' + escapeHtml(build.saved_label) + ' · ' : '') +
+            '<p class="sb-dialog-meta">' + (build.priced_label ? 'Prices as of ' + escapeHtml(build.priced_label) + ' · ' : '') +
             (missing.length ? 'Still needs: ' + escapeHtml(missing.join(', ')) : 'All essential parts included') + '</p>' +
+            (chk.expired || soldOut.length ? '<div class="sb-quote" style="margin-bottom:12px">' + quoteStatus(build) + '</div>' : '') +
             '<div class="sb-view-list">' + rows + '</div>' +
-            '<div class="sb-view-total"><span>Total</span><strong>' + peso(build.total) + '</strong></div>' +
+            '<div class="sb-view-total"><span>' + (chk.expired ? 'Saved total' : 'Total') + '</span><strong>' +
+            (chk.expired ? '<s>' + peso(build.total) + '</s>' : peso(build.total)) + '</strong></div>' +
+            (chk.expired ? '<div class="sb-view-total"><span>Today\'s total</span><strong>' + peso(chk.current_total) + '</strong></div>' : '') +
+            '<p class="sb-quote-note"><i class="fas fa-info-circle" aria-hidden="true"></i>Prices are VAT-inclusive and valid as of the date shown. ' +
+            'A saved build expires when a part\'s price changes. Stock is not reserved, and compatibility checks are advisory: please confirm with EasyPC staff before buying.</p>' +
             '<div class="sb-dialog-actions">' +
             '<button type="button" class="sb-btn sb-btn-ghost" data-close>Close</button>' +
             '<button type="button" class="sb-btn sb-btn-ghost" data-edit="' + build.id + '"><i class="fas fa-pen" aria-hidden="true"></i> Edit</button>' +
-            '<button type="button" class="sb-btn sb-btn-cart" data-cart="' + build.id + '"><i class="fas fa-shopping-cart" aria-hidden="true"></i> Add to Cart</button>' +
+            (chk.expired
+                ? '<button type="button" class="sb-btn sb-btn-refresh" data-refresh="' + build.id + '"><i class="fas fa-sync-alt" aria-hidden="true"></i> Update prices</button>'
+                : '<button type="button" class="sb-btn sb-btn-cart" data-cart="' + build.id + '"><i class="fas fa-shopping-cart" aria-hidden="true"></i> Add to Cart</button>') +
             '</div>'
         );
     }
@@ -548,11 +613,54 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    /* Updates a saved build to today's prices (saved_builds_api.php action=refresh_prices). */
+    function refreshPrices(id, btn, close) {
+        btn.disabled = true;
+        postJson({ action: 'refresh_prices', id: Number(id) })
+            .then(function (data) {
+                btn.disabled = false;
+                if (!data || !data.ok || !data.build) {
+                    alertUi((data && data.message) || 'Could not update this build.', 'error');
+                    return;
+                }
+                var old = findBuild(id) || {};
+                var fresh = {
+                    id: data.build.id,
+                    name: data.build.name,
+                    total: Number(data.build.total_price) || 0,
+                    count: Number(data.build.component_count) || 0,
+                    saved_label: old.saved_label || '',
+                    saved_ts: old.saved_ts || 0,
+                    priced_label: data.build.priced_label || '',
+                    price_check: data.build.price_check,
+                    components: data.build.components || {}
+                };
+                builds = builds.map(function (b) { return Number(b.id) === Number(id) ? fresh : b; });
+                window.SB_BUILDS = builds;
+                render();
+                if (close) close();
+                var lines = (data.changes || []).map(function (c) { return c.name + ': ' + peso(c.old) + ' → ' + peso(c.new); });
+                (data.removed || []).forEach(function (n) { lines.push(n + ': removed (no longer sold)'); });
+                alertUi((data.message || 'Build updated.') + (lines.length ? '\n• ' + lines.slice(0, 6).join('\n• ') : '') +
+                    '\nNew total: ' + peso(fresh.total), 'success');
+            })
+            .catch(function () {
+                btn.disabled = false;
+                alertUi('Could not update this build.', 'error');
+            });
+    }
+
     function addToCart(id, btn) {
         btn.disabled = true;
         postJson({ action: 'add_to_cart', id: Number(id) })
             .then(function (data) {
                 btn.disabled = false;
+                if (data && data.error === 'prices_changed' && data.price_check) {
+                    /* Prices moved while the page was open: show the build as expired. */
+                    var b = findBuild(id);
+                    if (b) b.price_check = data.price_check;
+                    render();
+                }
                 if (!data || !data.ok) {
                     alertUi((data && data.message) || 'Could not add to cart.', 'error');
                     return;
@@ -569,7 +677,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function handleAction(e, close) {
-        var btn = e.target.closest('[data-view],[data-edit],[data-delete],[data-cart],[data-confirm-delete]');
+        var btn = e.target.closest('[data-view],[data-edit],[data-delete],[data-cart],[data-confirm-delete],[data-refresh]');
         if (!btn || btn.disabled) return;
         var id;
         if ((id = btn.getAttribute('data-view'))) {
@@ -584,6 +692,8 @@ document.addEventListener('DOMContentLoaded', function () {
             deleteBuild(id, btn, close || function () {});
         } else if ((id = btn.getAttribute('data-cart'))) {
             addToCart(id, btn);
+        } else if ((id = btn.getAttribute('data-refresh'))) {
+            refreshPrices(id, btn, close);
         }
     }
 

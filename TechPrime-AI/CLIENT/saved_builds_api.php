@@ -8,6 +8,7 @@ require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/pc_compatibility.php';
 require_once __DIR__ . '/../includes/pc_purpose.php';
+require_once __DIR__ . '/../includes/pc_saved_builds.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -38,6 +39,25 @@ function sb_json(array $payload, int $code = 200): void
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+/** A saved_builds row as returned to the page, with its prices checked against today's (pc_saved_builds.php). */
+function sb_build_payload(PDO $db, array $row): array
+{
+    $comps = json_decode((string)$row['components_json'], true);
+    $comps = is_array($comps) ? $comps : [];
+    $pricedAt = pc_saved_build_priced_at($comps, (string)$row['created_at']);
+    return [
+        'id' => (int)$row['id'],
+        'name' => (string)$row['build_name'],
+        'total_price' => (float)$row['total_price'],
+        'component_count' => (int)$row['component_count'],
+        'created_at' => (string)$row['created_at'],
+        'priced_at' => $pricedAt,
+        'priced_label' => pc_saved_build_time_label($pricedAt),
+        'price_check' => pc_saved_build_price_check($comps, pc_saved_build_products($db, $comps)),
+        'components' => $comps ?: new stdClass(),
+    ];
 }
 
 checkSessionTimeout();
@@ -72,18 +92,9 @@ if ($action === 'list') {
          FROM saved_builds WHERE user_id = ? ORDER BY created_at DESC, id DESC'
     );
     $stmt->execute([$uid]);
-    $res = $stmt;
     $builds = [];
-    while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
-        $comps = json_decode((string)$row['components_json'], true);
-        $builds[] = [
-            'id' => (int)$row['id'],
-            'name' => (string)$row['build_name'],
-            'total_price' => (float)$row['total_price'],
-            'component_count' => (int)$row['component_count'],
-            'created_at' => (string)$row['created_at'],
-            'components' => is_array($comps) ? $comps : new stdClass(),
-        ];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $builds[] = sb_build_payload($db, $row);
     }
     sb_json(['ok' => true, 'builds' => $builds]);
 }
@@ -102,18 +113,7 @@ if ($action === 'get') {
     if (!$row) {
         sb_json(['ok' => false, 'error' => 'not_found'], 404);
     }
-    $comps = json_decode((string)$row['components_json'], true);
-    sb_json([
-        'ok' => true,
-        'build' => [
-            'id' => (int)$row['id'],
-            'name' => (string)$row['build_name'],
-            'total_price' => (float)$row['total_price'],
-            'component_count' => (int)$row['component_count'],
-            'created_at' => (string)$row['created_at'],
-            'components' => is_array($comps) ? $comps : new stdClass(),
-        ],
-    ]);
+    sb_json(['ok' => true, 'build' => sb_build_payload($db, $row)]);
 }
 
 if ($action === 'save' && $method === 'POST') {
@@ -130,6 +130,8 @@ if ($action === 'save' && $method === 'POST') {
         sb_json(['ok' => false, 'error' => 'empty_build', 'message' => 'Select at least one component before saving.'], 400);
     }
 
+    /* The saved build is a quote: prices come from the database at save time, not from the page. */
+    $current = pc_saved_build_products($db, $components);
     $clean = [];
     $total = 0.0;
     $count = 0;
@@ -143,7 +145,7 @@ if ($action === 'save' && $method === 'POST') {
         }
         $pid = (int)($item['id'] ?? 0);
         $pname = trim((string)($item['name'] ?? ''));
-        $price = (float)($item['price'] ?? 0);
+        $price = (float)($current[$pid]['price'] ?? $item['price'] ?? 0);
         if ($pid <= 0 || $pname === '') {
             continue;
         }
@@ -155,7 +157,12 @@ if ($action === 'save' && $method === 'POST') {
             'category' => mb_substr((string)($item['category'] ?? ''), 0, 100),
             'description' => mb_substr((string)($item['description'] ?? ''), 0, 500),
         ];
-        $total += $price;
+        /* "I already have this": kept for compatibility and the Build Score, not bought, so not in the total. */
+        if (!empty($item['owned'])) {
+            $clean[$slotKey]['owned'] = true;
+        } else {
+            $total += $price;
+        }
         $count++;
     }
     if ($count <= 0) {
@@ -173,6 +180,7 @@ if ($action === 'save' && $method === 'POST') {
     if ($purpose !== 'balanced') {
         $clean['_purpose'] = $purpose;
     }
+    $clean['_priced_at'] = gmdate('Y-m-d H:i:s');
     $json = json_encode($clean, JSON_UNESCAPED_UNICODE);
 
     /* Update existing owned build when editing. */
@@ -249,6 +257,17 @@ if ($action === 'add_to_cart' && $method === 'POST') {
         sb_json(['ok' => false, 'error' => 'incompatible', 'message' => $msg, 'issues' => $compat['issues']], 400);
     }
 
+    /* An expired quote (a price changed, or a part is no longer sold) is updated first. */
+    $check = pc_saved_build_price_check($comps, pc_saved_build_products($db, $comps));
+    if ($check['expired']) {
+        sb_json([
+            'ok' => false,
+            'error' => 'prices_changed',
+            'message' => 'Prices changed since you saved this build. Update it to today\'s prices, then add it to your cart.',
+            'price_check' => $check,
+        ], 400);
+    }
+
     $added = [];
     $skipped = [];
     foreach ($comps as $slot => $item) {
@@ -257,7 +276,7 @@ if ($action === 'add_to_cart' && $method === 'POST') {
         }
         $pid = (int)($item['id'] ?? 0);
         $pname = trim((string)($item['name'] ?? 'Product'));
-        if ($pid <= 0) {
+        if ($pid <= 0 || !empty($item['owned'])) {
             continue;
         }
         if (ep_add_product_to_cart($db, $pid, 1)) {
@@ -293,6 +312,47 @@ if ($action === 'add_to_cart' && $method === 'POST') {
         'skipped' => $skipped,
         'message' => $msg,
         'cart' => ep_get_cart_preview($db),
+    ]);
+}
+
+if ($action === 'refresh_prices' && $method === 'POST') {
+    $id = (int)($payload['id'] ?? 0);
+    if ($id <= 0) {
+        sb_json(['ok' => false, 'error' => 'invalid_id'], 400);
+    }
+    $stmt = $db->prepare(
+        'SELECT id, build_name, components_json, total_price, component_count, created_at
+         FROM saved_builds WHERE id = ? AND user_id = ? LIMIT 1'
+    );
+    $stmt->execute([$id, $uid]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        sb_json(['ok' => false, 'error' => 'not_found', 'message' => 'Build not found.'], 404);
+    }
+    $comps = json_decode((string)$row['components_json'], true);
+    $comps = is_array($comps) ? $comps : [];
+    $current = pc_saved_build_products($db, $comps);
+    $check = pc_saved_build_price_check($comps, $current);
+    $new = pc_saved_build_reprice($comps, $current);
+    if ($new['count'] <= 0) {
+        sb_json(['ok' => false, 'error' => 'empty_build', 'message' => 'None of the parts in this build are sold anymore.'], 400);
+    }
+    $json = json_encode($new['components'], JSON_UNESCAPED_UNICODE);
+    $upd = $db->prepare(
+        'UPDATE saved_builds SET components_json = ?, total_price = ?, component_count = ? WHERE id = ? AND user_id = ?'
+    );
+    $upd->execute([$json, $new['total'], $new['count'], $id, $uid]);
+    logActivity($db, $uid, 'refresh_pc_build_prices', 'Updated build #' . $id . ' to current prices: ₱'
+        . number_format((float)$row['total_price'], 2) . ' → ₱' . number_format($new['total'], 2));
+    $row['components_json'] = $json;
+    $row['total_price'] = $new['total'];
+    $row['component_count'] = $new['count'];
+    sb_json([
+        'ok' => true,
+        'build' => sb_build_payload($db, $row),
+        'changes' => $check['changes'],
+        'removed' => $check['missing'],
+        'message' => 'Build updated to today\'s prices.',
     ]);
 }
 

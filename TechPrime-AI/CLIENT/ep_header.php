@@ -89,7 +89,7 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <?php /* Storefront v2 (the homepage design) for every page: components, then the page-level styles.
              Token-driven dark mode; loaded last so they win over styles.css and the generated dark rules. */ ?>
     <link rel="stylesheet" href="storefront.css?v=sf-5">
-    <link rel="stylesheet" href="storefront-pages.css?v=sfp-8">
+    <link rel="stylesheet" href="storefront-pages.css?v=sfp-20">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">

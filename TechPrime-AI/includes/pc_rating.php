@@ -158,6 +158,8 @@ function pc_build_rating(array $buildMap, string $purpose): array
     $notes = [];
     $penalty = 0;
     $cap = 100;
+    /* Deductions and caps, listed in the "How this score is computed" breakdown. */
+    $adjust = [];
 
     $cpu = !empty($buildMap['processor']) ? pc_recommend_spec('processor', $buildMap['processor']) : null;
     $gpu = !empty($buildMap['gpu']) ? pc_recommend_spec('gpu', $buildMap['gpu']) : null;
@@ -209,7 +211,9 @@ function pc_build_rating(array $buildMap, string $purpose): array
         $apu = (bool)preg_match('/\d{4}gt?$/i', $cpu['label']);
         $axGpu = [
             'v' => pc_rating_fit($apu ? 1.5 : 0.5, $prof['gpu'], 1.5),
-            'text' => 'Built-in graphics only: fine for light use, too weak for ' . $use,
+            'text' => $apu
+                ? 'Built-in Radeon graphics of the ' . $cpu['label'] . ': fine for everyday use and light games; add a graphics card for newer games'
+                : 'Built-in graphics only: fine for light use, too weak for ' . $use,
         ];
     }
 
@@ -294,11 +298,15 @@ function pc_build_rating(array $buildMap, string $purpose): array
     if ($cpu && $gpu && $prof['gpu'] !== null) {
         $gap = $cpu['tier'] - $gpu['tier'];
         if ($gap < -2) {
-            $penalty += min(30, (-$gap - 2) * 6);
+            $minus = min(30, (-$gap - 2) * 6);
+            $penalty += $minus;
             $notes[] = 'Bottleneck: the ' . $cpu['label'] . ' holds back the ' . $gpu['label'] . '.';
+            $adjust[] = ['points' => -$minus, 'text' => 'CPU / GPU imbalance: the processor is ' . (-$gap) . ' tiers below the graphics card'];
         } elseif ($gap > 2 && $purpose !== 'creation') {
-            $penalty += min(30, ($gap - 2) * 6);
+            $minus = min(30, ($gap - 2) * 6);
+            $penalty += $minus;
             $notes[] = 'Bottleneck: the ' . $gpu['label'] . ' limits what the ' . $cpu['label'] . ' can do in games.';
+            $adjust[] = ['points' => -$minus, 'text' => 'CPU / GPU imbalance: the graphics card is ' . $gap . ' tiers below the processor'];
         }
     }
 
@@ -313,11 +321,13 @@ function pc_build_rating(array $buildMap, string $purpose): array
     if ($over > 0) {
         $penalty += min(20, $over * 3);
         $notes[] = 'More performance than ' . $use . ' needs: a cheaper processor or graphics card would do the same job.';
+        $adjust[] = ['points' => -min(20, $over * 3), 'text' => 'More performance than ' . $use . ' needs (money better spent elsewhere)'];
     }
 
     if ($cpu && !$cpu['igpu'] && !$gpu) {
         $cap = min($cap, 40);
         $notes[] = 'No display output: the ' . $cpu['label'] . ' needs a graphics card.';
+        $adjust[] = ['cap' => 40, 'text' => 'No display output until a graphics card is added'];
     }
 
     $issues = 0;
@@ -331,6 +341,7 @@ function pc_build_rating(array $buildMap, string $purpose): array
     if ($issues > 0) {
         $cap = min($cap, 40);
         $notes[] = 'Some parts are not compatible with each other, so this build will not work as it is.';
+        $adjust[] = ['cap' => 40, 'text' => 'Incompatible parts: the build will not work as it is'];
     }
 
     $score = $buildMap ? (int)max(0, min($cap, round($raw - $penalty))) : 0;
@@ -359,6 +370,7 @@ function pc_build_rating(array $buildMap, string $purpose): array
     /* value = fit for the purpose (drives the score); power / target = radar fill / dashed outline. */
     $power = pc_rating_strength($buildMap);
     $target = pc_rating_targets($purpose, $buildMap);
+    /* weight = points the axis is worth for this purpose; points = weight x fit (the score's building blocks). */
     $out = [];
     foreach ($axes as $key => $a) {
         $out[] = [
@@ -368,7 +380,86 @@ function pc_build_rating(array $buildMap, string $purpose): array
             'power' => $power[$key],
             'target' => $target[$key],
             'text' => $a['text'],
+            'weight' => $prof['weights'][$key],
+            'points' => round($prof['weights'][$key] * $a['v'], 1),
         ];
     }
-    return ['score' => $score, 'verdict' => $verdict, 'complete' => $complete, 'notes' => array_slice($notes, 0, 3), 'axes' => $out];
+    return [
+        'score' => $score,
+        'verdict' => $verdict,
+        'complete' => $complete,
+        'notes' => array_slice($notes, 0, 3),
+        'axes' => $out,
+        /* base = sum of the axis points before deductions and caps */
+        'base' => round($raw, 1),
+        'adjustments' => $buildMap ? $adjust : [],
+    ];
+}
+
+/**
+ * "What can it run?": plain-language expectations for common uses, from the CPU / GPU tiers
+ * (pc_specs.php; Ryzen G / GT built-in graphics count as about tier 1.5) and the memory size.
+ * Rough estimates at typical settings, not benchmarks: the page says so next to the list.
+ *
+ * @param array<string,array<string,mixed>> $buildMap from pc_recommend_build_map()
+ * @return array<int,array{key:string,label:string,level:string,text:string}> level: great | good | limited | no
+ */
+function pc_rating_can_run(array $buildMap): array
+{
+    if (empty($buildMap['processor'])) {
+        return [];
+    }
+    $cpu = pc_recommend_spec('processor', $buildMap['processor']);
+    $gpu = !empty($buildMap['gpu']) ? pc_recommend_spec('gpu', $buildMap['gpu']) : null;
+    if (!$gpu && !$cpu['igpu']) {
+        return [['key' => 'display', 'label' => 'Anything on screen', 'level' => 'no', 'text' => 'No display output until a graphics card is added']];
+    }
+    $ram = !empty($buildMap['memory']) ? (int)pc_recommend_spec('memory', $buildMap['memory'])['gb'] : 0;
+    $c = (int)$cpu['tier'];
+    $g = $gpu ? (float)$gpu['tier'] : (preg_match('/\d{4}gt?$/i', $cpu['label']) ? 1.5 : 0.5);
+    $row = static fn(string $key, string $label, string $level, string $text): array => compact('key', 'label', 'level', 'text');
+
+    $out = [];
+    $out[] = $ram > 0 && $ram < 8
+        ? $row('everyday', 'Browsing, YouTube, Office, video calls', 'limited', 'Works, but 8 GB of memory or more keeps many tabs smooth')
+        : $row('everyday', 'Browsing, YouTube, Office, video calls', 'great', 'Smooth');
+    $out[] = match (true) {
+        $g < 1 => $row('esports', 'Esports games (Valorant, League of Legends, CS2)', 'limited', 'Light play at the lowest settings'),
+        $g < 3 => $row('esports', 'Esports games (Valorant, League of Legends, CS2)', 'good', 'Playable at 1080p, low settings'),
+        $g < 6 => $row('esports', 'Esports games (Valorant, League of Legends, CS2)', 'great', 'Smooth at 1080p, high settings'),
+        default => $row('esports', 'Esports games (Valorant, League of Legends, CS2)', 'great', 'High frame rates at 1080p and 1440p'),
+    };
+    $out[] = match (true) {
+        $g < 1 => $row('popular', 'Popular games (Fortnite, GTA V, Genshin Impact)', 'no', 'Not suited: needs a graphics card'),
+        $g < 3 => $row('popular', 'Popular games (Fortnite, GTA V, Genshin Impact)', 'limited', '720p to 1080p at low settings'),
+        $g < 5 => $row('popular', 'Popular games (Fortnite, GTA V, Genshin Impact)', 'good', '1080p, medium settings'),
+        $g < 7 => $row('popular', 'Popular games (Fortnite, GTA V, Genshin Impact)', 'great', '1080p, high settings'),
+        default => $row('popular', 'Popular games (Fortnite, GTA V, Genshin Impact)', 'great', '1440p, high settings'),
+    };
+    $out[] = match (true) {
+        $g < 3 => $row('aaa', 'Newest big games (Cyberpunk 2077, Black Myth: Wukong)', 'no', 'Not suited: needs a stronger graphics card'),
+        $g < 4 => $row('aaa', 'Newest big games (Cyberpunk 2077, Black Myth: Wukong)', 'limited', '1080p, low settings'),
+        $g < 6 => $row('aaa', 'Newest big games (Cyberpunk 2077, Black Myth: Wukong)', 'good', '1080p, medium settings'),
+        $g < 7 => $row('aaa', 'Newest big games (Cyberpunk 2077, Black Myth: Wukong)', 'good', '1080p, high settings'),
+        $g < 8 => $row('aaa', 'Newest big games (Cyberpunk 2077, Black Myth: Wukong)', 'great', '1440p, high settings'),
+        default => $row('aaa', 'Newest big games (Cyberpunk 2077, Black Myth: Wukong)', 'great', '1440p at top settings, or 4K'),
+    };
+    $out[] = match (true) {
+        $ram > 0 && $ram < 8 => $row('photo', 'Photo editing (Photoshop, Lightroom, Canva)', 'limited', 'Small edits only; 16 GB of memory is better'),
+        $ram >= 16 && $c >= 4 => $row('photo', 'Photo editing (Photoshop, Lightroom, Canva)', 'great', 'Smooth, even with large files'),
+        default => $row('photo', 'Photo editing (Photoshop, Lightroom, Canva)', 'good', 'Fine for everyday edits; 16 GB of memory helps with big files'),
+    };
+    $out[] = match (true) {
+        $c >= 8 && $ram >= 32 && $gpu !== null => $row('video', 'Video editing (Premiere Pro, DaVinci Resolve, CapCut)', 'great', '1080p and 4K projects'),
+        $c >= 6 && $ram >= 16 && $gpu !== null => $row('video', 'Video editing (Premiere Pro, DaVinci Resolve, CapCut)', 'great', 'Smooth 1080p; 4K with proxy files'),
+        $c >= 4 && $ram >= 16 => $row('video', 'Video editing (Premiere Pro, DaVinci Resolve, CapCut)', 'good', '1080p projects'),
+        default => $row('video', 'Video editing (Premiere Pro, DaVinci Resolve, CapCut)', 'limited', 'Short, simple 1080p clips'),
+    };
+    $out[] = match (true) {
+        $gpu === null => $row('stream', 'Streaming while gaming', 'no', 'Not suited: needs a graphics card'),
+        $g >= 6 && $c >= 6 && $ram >= 16 => $row('stream', 'Streaming while gaming', 'great', '1080p streams while you play'),
+        $g >= 4 && $c >= 5 && $ram >= 16 => $row('stream', 'Streaming while gaming', 'good', '720p to 1080p streams in lighter games'),
+        default => $row('stream', 'Streaming while gaming', 'limited', 'Possible at lower quality'),
+    };
+    return $out;
 }
