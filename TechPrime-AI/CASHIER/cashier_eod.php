@@ -201,9 +201,19 @@ staff_page_start([
                     <a class="cx-btn cx-btn-outline eod-step" href="cashier_eod.php?date=<?php echo h($prevDate); ?>" aria-label="Previous day">
                         <i class="ph ph-caret-left" aria-hidden="true"></i>
                     </a>
-                    <label class="cx-sr" for="eodDate">Business day</label>
-                    <input type="date" id="eodDate" name="date" class="form-control" value="<?php echo h($date); ?>"
-                           min="2020-01-01" max="<?php echo h($today); ?>" required>
+                    <div class="eod-cal-wrap">
+                        <button type="button" class="cx-btn cx-btn-outline eod-cal-btn" id="eodCalBtn" aria-haspopup="dialog"
+                                aria-expanded="false" aria-controls="eodCal" hidden>
+                            <i class="ph ph-calendar-blank" aria-hidden="true"></i>
+                            <span><span class="cx-sr">Business day: </span><?php echo h($dateLabel); ?></span>
+                            <i class="ph ph-caret-down eod-cal-caret" aria-hidden="true"></i>
+                        </button>
+                        <label class="cx-sr" for="eodDate">Business day</label>
+                        <input type="date" id="eodDate" name="date" class="form-control" value="<?php echo h($date); ?>"
+                               min="2020-01-01" max="<?php echo h($today); ?>" required>
+                        <div class="eod-cal-scrim" id="eodCalScrim" hidden></div>
+                        <div class="eod-cal" id="eodCal" role="dialog" aria-label="Pick a business day" tabindex="-1" hidden></div>
+                    </div>
                     <?php if ($date < $today): ?>
                         <a class="cx-btn cx-btn-outline eod-step" href="cashier_eod.php?date=<?php echo h($nextDate); ?>" aria-label="Next day">
                             <i class="ph ph-caret-right" aria-hidden="true"></i>
@@ -447,6 +457,7 @@ staff_page_start([
 <?php
 $eodJson = json_encode([
     'sales' => array_map(fn($row) => $row['total'], $sum['methods']),
+    'cal' => ['days' => (object)pos_eod_calendar($db, $uid), 'date' => $date, 'today' => $today, 'min' => '2020-01-01'],
 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 $script = '<script src="receipt_print.js?v=2"></script>'
     . '<script>var EOD_DATA = ' . $eodJson . ';</script>'
@@ -540,11 +551,185 @@ $script = '<script src="receipt_print.js?v=2"></script>'
         }
     });
 
+    /* ---- Business-day calendar: replaces the native date field and marks the days with sales ---- */
+    var CAL = EOD_DATA.cal;
+    var dateForm = document.getElementById('eodDateForm');
     var dateInput = document.getElementById('eodDate');
-    dateInput.addEventListener('change', function () {
-        if (dateInput.value && dateInput.checkValidity()) document.getElementById('eodDateForm').submit();
+    var calBtn = document.getElementById('eodCalBtn');
+    var cal = document.getElementById('eodCal');
+    var scrim = document.getElementById('eodCalScrim');
+    var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    var WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    var view = null, focusKey = CAL.date;
+
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function toKey(dt) { return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()); }
+    function toDate(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2], 12); }   /* noon: no DST edge */
+    function clamp(k) { return k < CAL.min ? CAL.min : (k > CAL.today ? CAL.today : k); }
+    function addDays(k, n) { var dt = toDate(k); dt.setDate(dt.getDate() + n); return toKey(dt); }
+    function addMonths(k, n) {
+        var dt = toDate(k), y = dt.getFullYear(), m = dt.getMonth() + n;
+        var last = new Date(y, m + 1, 0, 12).getDate();
+        return toKey(new Date(y, m, Math.min(dt.getDate(), last), 12));
+    }
+    function monthIndex(k) { var dt = toDate(k); return dt.getFullYear() * 12 + dt.getMonth(); }
+    function hasSales(info) { return !!info && (info.n > 0 || info.v > 0); }
+
+    var latest = null;
+    Object.keys(CAL.days).forEach(function (k) { if (hasSales(CAL.days[k]) && (!latest || k > latest)) latest = k; });
+
+    function describe(k) {
+        var dt = toDate(k), info = CAL.days[k];
+        var s = WEEK[dt.getDay()] + ', ' + MONTHS[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+        if (k > CAL.today) return s;
+        if (!hasSales(info)) s += ': no sales';
+        else {
+            s += ': ' + info.n + ' sale' + (info.n === 1 ? '' : 's') + ', ' + peso(info.g);
+            if (info.v) s += ', ' + info.v + ' voided';
+        }
+        if (info && info.c) s += info.s ? ', closed, but sales changed after closing' : ', closed, ' + info.c;
+        else if (hasSales(info) && k < CAL.today) s += ', not closed';
+        return s;
+    }
+
+    cal.innerHTML =
+        '<div class="eod-cal-head">'
+        + '<button type="button" class="eod-cal-nav" data-nav="-1" aria-label="Previous month"><i class="ph ph-caret-left" aria-hidden="true"></i></button>'
+        + '<div class="eod-cal-title"><strong id="eodCalTitle" aria-live="polite"></strong><span id="eodCalSum"></span></div>'
+        + '<button type="button" class="eod-cal-nav" data-nav="1" aria-label="Next month"><i class="ph ph-caret-right" aria-hidden="true"></i></button>'
+        + '</div>'
+        + '<table class="eod-cal-grid" role="grid" aria-labelledby="eodCalTitle"><thead><tr>'
+        + WEEK.map(function (w) { return '<th scope="col" abbr="' + w + '">' + w.slice(0, 2) + '</th>'; }).join('')
+        + '</tr></thead><tbody id="eodCalBody"></tbody></table>'
+        + '<ul class="eod-cal-legend">'
+        + '<li><span class="eod-cal-count" aria-hidden="true">3</span> Sales that day</li>'
+        + '<li><i class="ph-fill ph-check-circle is-ok" aria-hidden="true"></i> Closed</li>'
+        + '<li><i class="ph-fill ph-warning-circle is-warn" aria-hidden="true"></i> Short, over or changed</li>'
+        + '</ul>'
+        + '<div class="eod-cal-foot">'
+        + (latest ? '<button type="button" class="cx-btn cx-btn-ghost cx-btn-sm" data-go="' + latest + '"><i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i> Last sale: '
+            + MONTHS[toDate(latest).getMonth()].slice(0, 3) + ' ' + toDate(latest).getDate() + '</button>' : '')
+        + '<button type="button" class="cx-btn cx-btn-outline cx-btn-sm" data-go="' + CAL.today + '">Today</button>'
+        + '</div>';
+    var body = document.getElementById('eodCalBody');
+    var prevBtn = cal.querySelector('[data-nav="-1"]');
+    var nextBtn = cal.querySelector('[data-nav="1"]');
+
+    function render() {
+        var y = Math.floor(view / 12), m = view % 12;
+        var lead = new Date(y, m, 1, 12).getDay();
+        var count = new Date(y, m + 1, 0, 12).getDate();
+        var cells = [], days = 0, gross = 0;
+        for (var i = 0; i < lead; i++) cells.push('<td role="gridcell"></td>');
+        for (var d = 1; d <= count; d++) {
+            var k = y + '-' + pad(m + 1) + '-' + pad(d), info = CAL.days[k], sales = hasSales(info);
+            var cls = 'eod-cal-day', mark = '';
+            if (sales) { cls += ' has-sales'; days++; gross += info.g; }
+            if (k === CAL.date) cls += ' is-selected';
+            if (k === CAL.today) cls += ' is-today';
+            if (info && info.c) {
+                var ok = info.c === 'balanced' && !info.s;
+                cls += ok ? ' is-closed' : ' is-flagged';
+                mark = '<i class="ph-fill ' + (ok ? 'ph-check-circle' : 'ph-warning-circle') + ' eod-cal-flag" aria-hidden="true"></i>';
+            }
+            var label = describe(k);
+            cells.push('<td role="gridcell"' + (k === CAL.date ? ' aria-selected="true"' : '') + '>'
+                + '<button type="button" class="' + cls + '" data-date="' + k + '" tabindex="' + (k === focusKey ? '0' : '-1') + '"'
+                + (k < CAL.min || k > CAL.today ? ' disabled' : '') + (k === CAL.today ? ' aria-current="date"' : '')
+                + ' aria-label="' + label + '" title="' + label + '">'
+                + '<span class="eod-cal-num" aria-hidden="true">' + d + '</span>'
+                + (sales ? '<span class="eod-cal-count" aria-hidden="true">' + info.n + '</span>' : '') + mark
+                + '</button></td>');
+        }
+        while (cells.length % 7) cells.push('<td role="gridcell"></td>');
+        var rows = '';
+        for (var r = 0; r < cells.length; r += 7) rows += '<tr>' + cells.slice(r, r + 7).join('') + '</tr>';
+        body.innerHTML = rows;
+        document.getElementById('eodCalTitle').textContent = MONTHS[m] + ' ' + y;
+        document.getElementById('eodCalSum').textContent = days
+            ? days + ' day' + (days === 1 ? '' : 's') + ' with sales · ' + peso(gross)
+            : 'No sales this month';
+        prevBtn.disabled = view <= monthIndex(CAL.min);
+        nextBtn.disabled = view >= monthIndex(CAL.today);
+    }
+
+    function focusDay(k) {
+        focusKey = clamp(k);
+        if (monthIndex(focusKey) !== view) { view = monthIndex(focusKey); render(); }
+        else {
+            body.querySelectorAll('[data-date]').forEach(function (b) {
+                b.tabIndex = b.getAttribute('data-date') === focusKey ? 0 : -1;
+            });
+        }
+        var btn = body.querySelector('[data-date="' + focusKey + '"]');
+        if (btn) btn.focus();
+    }
+
+    function open() {
+        focusKey = CAL.date;
+        view = monthIndex(CAL.date);
+        render();
+        cal.hidden = false;
+        scrim.hidden = false;
+        calBtn.setAttribute('aria-expanded', 'true');
+        focusDay(CAL.date);
+    }
+    function close(refocus) {
+        if (cal.hidden) return;
+        cal.hidden = true;
+        scrim.hidden = true;
+        calBtn.setAttribute('aria-expanded', 'false');
+        if (refocus) calBtn.focus();
+    }
+    function choose(k) {
+        k = clamp(k);
+        if (k === CAL.date) { close(true); return; }
+        dateInput.value = k;
+        dateForm.submit();
+    }
+
+    calBtn.addEventListener('click', function () { if (cal.hidden) open(); else close(true); });
+    scrim.addEventListener('click', function () { close(false); });
+    cal.addEventListener('click', function (e) {
+        var t = e.target.closest('button');
+        if (!t || t.disabled) return;
+        if (t.hasAttribute('data-nav')) {
+            var step = +t.getAttribute('data-nav');
+            focusKey = clamp(addMonths(focusKey, step));
+            view += step;
+            render();
+        } else if (t.hasAttribute('data-date')) {
+            choose(t.getAttribute('data-date'));
+        } else if (t.hasAttribute('data-go')) {
+            choose(t.getAttribute('data-go'));
+        }
     });
-    document.querySelector('.eod-show').hidden = true;   /* the date field submits on change */
+    cal.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { e.preventDefault(); close(true); return; }
+        var k = e.target.getAttribute && e.target.getAttribute('data-date');
+        if (!k) return;
+        var step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+        var dow = toDate(k).getDay(), next = null;
+        if (step) next = addDays(k, step);
+        else if (e.key === 'Home') next = addDays(k, -dow);
+        else if (e.key === 'End') next = addDays(k, 6 - dow);
+        else if (e.key === 'PageUp') next = addMonths(k, e.shiftKey ? -12 : -1);
+        else if (e.key === 'PageDown') next = addMonths(k, e.shiftKey ? 12 : 1);
+        if (next) { e.preventDefault(); focusDay(next); }
+    });
+    cal.addEventListener('focusout', function (e) {
+        if (!e.relatedTarget || (!cal.contains(e.relatedTarget) && e.relatedTarget !== calBtn)) {
+            /* focus moved away (Tab, or a click outside); a click inside lands on the dialog itself */
+            setTimeout(function () { if (!cal.contains(document.activeElement)) close(false); }, 0);
+        }
+    });
+    document.addEventListener('mousedown', function (e) {
+        if (!cal.hidden && !cal.contains(e.target) && !calBtn.contains(e.target)) close(false);
+    });
+
+    calBtn.hidden = false;
+    dateInput.hidden = true;
+    document.querySelector('.eod-show').hidden = true;   /* the calendar submits the form itself */
 
     document.getElementById('eodPrint').addEventListener('click', function () { window.print(); });
 })();

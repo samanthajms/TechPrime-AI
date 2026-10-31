@@ -444,6 +444,71 @@ body.cx-receipt-frame { min-height: 0; background: #fff; padding: 16px; }
 .eod-hist-main span { font-size: 12.5px; color: var(--cx-muted); }
 /* .eod-pill (short / over / balanced) is shared with the manager review: includes/staff_app.css §12 */
 
+/* Business-day calendar: days with sales carry a count, closed days a check / warning mark */
+.eod-cal-wrap { position: relative; }
+.eod-cal-btn { min-width: 220px; justify-content: flex-start; font-weight: 600; }
+.eod-cal-btn > i:first-child { font-size: 18px; color: var(--cx-green-700); }
+.eod-cal-caret { margin-left: auto; font-size: 14px; color: var(--cx-muted); transition: transform var(--cx-fast) var(--cx-ease); }
+.eod-cal-btn[aria-expanded="true"] .eod-cal-caret { transform: rotate(180deg); }
+.eod-cal {
+    position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; width: 352px; padding: 14px;
+    background: var(--cx-surface); border: 1px solid var(--cx-border); border-radius: var(--cx-r-lg);
+    box-shadow: var(--cx-shadow-lg); transform-origin: top left;
+    animation: eodCalIn 180ms var(--cx-ease);
+}
+.eod-cal:focus { outline: none; }
+@keyframes eodCalIn { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+.eod-cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.eod-cal-title { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.eod-cal-title strong { font-size: 16px; font-weight: 600; color: var(--cx-text); }
+.eod-cal-title span { font-size: 12.5px; color: var(--cx-muted); }
+.eod-cal-nav {
+    width: 40px; height: 40px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--cx-border); border-radius: var(--cx-r-sm); background: var(--cx-surface);
+    color: var(--cx-text); font-size: 16px; cursor: pointer;
+    transition: background-color var(--cx-fast) var(--cx-ease), border-color var(--cx-fast) var(--cx-ease);
+}
+.eod-cal-nav:hover:not(:disabled) { background: var(--cx-surface-2); border-color: var(--cx-border-strong); }
+.eod-cal-nav:disabled { opacity: 0.4; cursor: default; }
+.eod-cal-nav:focus-visible { outline: 2px solid var(--cx-green-700); outline-offset: 2px; }
+.eod-cal-grid { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 3px; }
+.eod-cal-grid th { padding: 4px 0; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--cx-muted); text-align: center; }
+.eod-cal-grid td { padding: 0; }
+.eod-cal-day {
+    position: relative; width: 100%; height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    border: 1px solid transparent; border-radius: var(--cx-r-sm); background: transparent; color: var(--cx-text);
+    font: inherit; cursor: pointer;
+    transition: background-color var(--cx-fast) var(--cx-ease), border-color var(--cx-fast) var(--cx-ease);
+}
+.eod-cal-num { font-size: 14px; line-height: 1; font-variant-numeric: tabular-nums; }
+.eod-cal-day:hover:not(:disabled) { background: var(--cx-surface-2); border-color: var(--cx-border); }
+.eod-cal-day:disabled { color: #aab3ad; cursor: default; }
+.eod-cal-day:focus-visible { outline: 2px solid var(--cx-green-700); outline-offset: 1px; }
+.eod-cal-day.has-sales { background: var(--cx-green-50); border-color: var(--cx-green-200); }
+.eod-cal-day.has-sales:hover { background: var(--cx-green-100); border-color: var(--cx-green-200); }
+.eod-cal-day.has-sales .eod-cal-num { font-weight: 700; color: var(--cx-green-800); }
+.eod-cal-count {
+    min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--cx-green-700); color: #fff;
+    font-family: var(--cx-font-num); font-size: 10.5px; font-weight: 600; line-height: 15px; text-align: center;
+}
+.eod-cal-day.is-today { box-shadow: inset 0 0 0 1.5px var(--cx-green-700); }
+.eod-cal-day.is-selected, .eod-cal-day.is-selected:hover { background: var(--cx-green-700); border-color: var(--cx-green-700); color: #fff; }
+.eod-cal-day.is-selected .eod-cal-num { color: #fff; font-weight: 700; }
+.eod-cal-day.is-selected .eod-cal-count { background: #fff; color: var(--cx-green-700); }
+.eod-cal-flag { position: absolute; top: 2px; right: 2px; font-size: 13px; line-height: 1; }
+.eod-cal-day.is-closed .eod-cal-flag, .eod-cal-legend .is-ok { color: var(--cx-green-600); }
+.eod-cal-day.is-flagged .eod-cal-flag, .eod-cal-legend .is-warn { color: var(--cx-amber-600); }
+.eod-cal-day.is-selected .eod-cal-flag { color: #fff; }
+.eod-cal-legend {
+    list-style: none; margin: 8px 0 0; padding: 10px 2px 0; border-top: 1px solid var(--cx-border);
+    display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--cx-text-2);
+}
+.eod-cal-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.eod-cal-legend i { font-size: 14px; }
+.eod-cal-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.eod-cal-foot .cx-btn:only-child { margin-left: auto; }
+.eod-cal-scrim { display: none; }
+
 /* =========================================================================
    6. Responsive
    ========================================================================= */
@@ -478,6 +543,18 @@ body.cx-receipt-frame { min-height: 0; background: #fff; padding: 16px; }
     .pos { grid-template-columns: minmax(0, 1fr); }
     .pos-register { position: static; }
     .eod-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+    /* The calendar becomes a sheet above the tab bar */
+    .eod-cal {
+        position: fixed; top: auto; left: 8px; right: 8px; width: auto; z-index: 70; transform-origin: bottom center;
+        bottom: calc(var(--cx-tabbar-h) + env(safe-area-inset-bottom, 0px) + 8px);
+    }
+    .eod-cal-scrim:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 65; background: rgba(19, 35, 13, 0.32); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .eod-cal { animation: none; }
+    .eod-cal-caret, .eod-cal-day, .eod-cal-nav { transition: none; }
 }
 @media (max-width: 720px) {
     .pos-scan-hint .pos-keys { display: none; }

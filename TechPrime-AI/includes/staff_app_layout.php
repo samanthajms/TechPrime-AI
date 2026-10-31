@@ -41,7 +41,7 @@ if (!function_exists('staff_app_role_css')) {
     function staff_app_role_css(string $role): string
     {
         $map = [
-            'cashier' => 'cashier.css?v=19',
+            'cashier' => 'cashier.css?v=20',
             'admin' => 'admin.css?v=4',
             'retail_officer' => 'retail.css?v=2',
             'inventory_custodian' => 'inventory.css?v=3',

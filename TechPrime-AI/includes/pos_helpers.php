@@ -811,6 +811,43 @@ function pos_eod_recent(PDO $db, int $cashierId, int $limit = 7): array
     return array_map('pos_eod_row', $st->fetchAll(PDO::FETCH_ASSOC));
 }
 
+/**
+ * Marks for the End of Day calendar: every business day a cashier has POS sales or a saved closing.
+ * ['Y-m-d' => ['n' => completed sales, 'v' => voided, 'g' => gross cents,
+ *              'c' => balanced|short|over (all-payments result, only when closed), 's' => sales changed after closing]]
+ */
+function pos_eod_calendar(PDO $db, int $cashierId): array
+{
+    [$startUtc] = pos_day_bounds_utc('2020-01-01');
+    $st = $db->prepare(
+        "SELECT ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Manila')::date AS d,
+                COUNT(*) FILTER (WHERE status = 'completed') AS cnt,
+                COUNT(*) FILTER (WHERE status <> 'completed') AS voided,
+                COALESCE(SUM(total) FILTER (WHERE status = 'completed'), 0) AS gross
+         FROM pos_sales
+         WHERE cashier_id = ? AND created_at >= ?
+         GROUP BY d"
+    );
+    $st->execute([$cashierId, $startUtc]);
+    $days = [];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $days[substr((string)$r['d'], 0, 10)] = ['n' => (int)$r['cnt'], 'v' => (int)$r['voided'], 'g' => pos_db_money_cents($r['gross'])];
+    }
+
+    if (pos_eod_available($db)) {
+        $st = $db->prepare('SELECT * FROM pos_eod_reports WHERE cashier_id = ?');
+        $st->execute([$cashierId]);
+        foreach (array_map('pos_eod_row', $st->fetchAll(PDO::FETCH_ASSOC)) as $c) {
+            $d = $days[$c['business_date']] ?? ['n' => 0, 'v' => 0, 'g' => 0];
+            $d['c'] = pos_eod_result($c['difference'])['key'];
+            $d['s'] = $d['n'] !== (int)$c['sales_count'] || $d['v'] !== (int)$c['voided_count'] || $d['g'] !== $c['gross_cents'];
+            $days[$c['business_date']] = $d;
+        }
+    }
+    ksort($days);
+    return $days;
+}
+
 function pos_eod_row(array $row): array
 {
     $row['business_date'] = substr((string)$row['business_date'], 0, 10);
