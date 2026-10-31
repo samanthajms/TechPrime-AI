@@ -855,7 +855,7 @@ body.cx-sheet-open #cwFab, body.cx-sheet-open #cwPanel { display: none !importan
 .cx-app a.staff-page:focus-visible { outline-color: var(--cx-green-700); }
 .cx-app .staff-page.active { background: var(--cx-green-700); border-color: var(--cx-green-700); color: #fff; }
 
-/* Forecast cards (includes/forecast_cards.php) */
+/* Forecast cards (includes/trends_cards.php) */
 .cx-app .fc-card { margin-bottom: 20px; }
 .cx-app .fc-card .card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cx-app .fc-seg { border-color: var(--cx-border-strong); border-radius: 10px; }
@@ -1110,7 +1110,7 @@ body.cx-app #cwHeaderCount { color: var(--cx-green-700); }
 .cx-chart { position: relative; height: 300px; margin: 0 20px 20px; }
 .cx-chart-sm { height: 240px; }
 
-/* Forecast pages (cards: includes/forecast_cards.php) */
+/* Forecast pages (cards: includes/trends_cards.php) */
 .cx-app .filter-modal { z-index: 9500; } /* above the chat widget (9000/9001), below IAS_UI dialogs (9999) */
 .cx-app .card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .cx-app .detail-panel { display: none; margin-top: 14px; }
@@ -1285,4 +1285,65 @@ body.cx-side-collapsed .cx-side-link .cx-nav-badge { position: absolute; top: 4p
 @media print {
     .eodr-table { min-width: 0; font-size: 12px; }
     .eodr-act { display: none !important; }
+}
+
+/* =========================================================================
+   13. Report pages: Stock Movements (includes/stock_movement_report.php)
+       and PC Build Report (includes/build_report.php). The filter bar reuses .eodr-filters (§12).
+   ========================================================================= */
+.rep { display: flex; flex-direction: column; gap: 20px; }
+.rep .cx-table-wrap { position: relative; }
+.rep-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.rep-search { position: relative; display: inline-flex; align-items: center; flex: 1 1 220px; min-width: 200px; }
+.rep-search i { position: absolute; left: 12px; font-size: 18px; color: var(--cx-muted); pointer-events: none; }
+.cx-app .rep-search .form-control { width: 100%; min-height: 44px; padding-left: 38px; }
+.rep-sub { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 400; color: var(--cx-muted); }
+.rep-name strong { font-weight: 600; overflow-wrap: anywhere; }
+.rep-when { white-space: nowrap; }
+.rep-ref { font-size: 13px; overflow-wrap: anywhere; }
+.rep-note { margin: 0; padding: 10px 20px 16px; font-size: 12.5px; color: var(--cx-muted); }
+.rep-small-table tbody th { padding: 12px 16px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--cx-border); }
+.rep-small-table tfoot th, .rep-small-table tfoot td { padding: 12px 16px; font-weight: 700; text-align: left; border-top: 1px solid var(--cx-border-strong); }
+.rep-small-table tfoot td.num { text-align: right; }
+
+/* Stock in / out: icon + text, never colour alone; a coloured left edge on log rows */
+.mv-dir {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px 3px 7px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid transparent;
+}
+.mv-dir i { font-size: 14px; }
+.mv-dir.is-in { background: var(--cx-green-50); color: var(--cx-green-700); border-color: var(--cx-green-200); }
+.mv-dir.is-out { background: var(--cx-surface-2); color: var(--cx-text-2); border-color: var(--cx-border-strong); }
+.mv-qty { font-weight: 600; }
+.mv-qty.is-in { color: var(--cx-green-700); }
+.mv-qty.is-out { color: var(--cx-red-700); }
+.mv-log-table tbody tr.is-in td:first-child { box-shadow: inset 3px 0 0 var(--cx-green-500); }
+.mv-log-table tbody tr.is-out td:first-child { box-shadow: inset 3px 0 0 var(--cx-border-strong); }
+
+@media (max-width: 1100px) {
+    .rep-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+    .rep-search { flex: 1 1 100%; }
+    /* Report tables as cards: the name on top, then labelled figures two per line */
+    .rep-table thead { display: none; }
+    .rep-table tbody tr {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px;
+        padding: 14px 16px; border-bottom: 1px solid var(--cx-border);
+    }
+    .rep-table td { padding: 0 !important; border: none; text-align: left !important; }
+    .rep-table td.rep-name { grid-column: 1 / -1; order: -1; }
+    .rep-table td[data-label]:not(.rep-name)::before {
+        content: attr(data-label); display: block; margin-bottom: 2px;
+        font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--cx-muted);
+    }
+    .mv-log-table tbody tr.is-in, .mv-log-table tbody tr.is-out { padding-left: 20px; }
+    .mv-log-table tbody tr.is-in { box-shadow: inset 3px 0 0 var(--cx-green-500); }
+    .mv-log-table tbody tr.is-out { box-shadow: inset 3px 0 0 var(--cx-border-strong); }
+    .mv-log-table tbody tr.is-in td:first-child, .mv-log-table tbody tr.is-out td:first-child { box-shadow: none; }
+    /* Small summary tables keep their columns: tighter cells and wrapping headers fit 4 columns at 360px */
+    .rep-small-table thead th, .rep-small-table tbody > tr > *, .rep-small-table tfoot > tr > * { padding: 10px 8px; }
+    .rep-small-table thead th:first-child, .rep-small-table tr > :first-child { padding-left: 16px; }
+    .rep-small-table thead th:last-child, .rep-small-table tr > :last-child { padding-right: 16px; }
+    .rep-small-table thead th, .rep-small-table thead th.num { white-space: normal; font-size: 10.5px; letter-spacing: 0.04em; vertical-align: bottom; }
 }

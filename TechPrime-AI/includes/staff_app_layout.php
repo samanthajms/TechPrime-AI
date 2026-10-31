@@ -216,7 +216,7 @@ if (!function_exists('staff_app_nav_badge')) {
 if (!function_exists('staff_app_css_href')) {
     function staff_app_css_href(): string
     {
-        return str_replace('staff_shared.css', 'staff_app.css', staff_css_href()) . '?v=8';
+        return str_replace('staff_shared.css', 'staff_app.css', staff_css_href()) . '?v=11';
     }
 }
 
@@ -341,7 +341,7 @@ if (!function_exists('staff_app_shell_start')) {
     <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-motion-2">
     <link rel="stylesheet" href="<?php echo h(staff_app_css_href()); ?>">
     <?php if ($roleCss !== ''): ?><link rel="stylesheet" href="<?php echo h($roleCss); ?>"><?php endif; ?>
-    <?php if ($report): ?><link rel="stylesheet" href="<?php echo h(str_replace('staff_shared.css', 'staff_print.css', $css)); ?>?v=3"><?php endif; ?>
+    <?php if ($report): ?><link rel="stylesheet" href="<?php echo h(str_replace('staff_shared.css', 'staff_print.css', $css)); ?>?v=5"><?php endif; ?>
     <?php echo $extraHead; ?>
 </head>
 <body class="cx-app cx-role-<?php echo h(str_replace('_', '-', $role)); ?> cx-page-<?php echo h($active !== '' ? $active : 'other'); ?><?php echo $report ? ' cx-report' : ''; ?>">

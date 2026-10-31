@@ -1,6 +1,6 @@
 <?php
 // Proxy: browser/PHP pages -> Render forecast service. Keeps the API key server-side.
-// Usage: forecast_api.php?type=demand|revenue|actions|metrics|categories&horizon=1|2|3&category=Memory&top=50&from=2026-01-01&to=2026-08-31
+// Usage: trends_api.php?type=demand|revenue|actions|metrics|categories&horizon=1|2|3&category=Memory&top=50&from=2026-01-01&to=2026-08-31
 // from/to (optional, Y-m-d) choose which ACTUAL sales months are shown next to the forecast; they never change the forecast.
 // `category` = a Client/Custodian label (Memory, Monitor, CPU Cooling ...) or a Client group (Component, Peripherals ...).
 // .env (TechPrime-AI/.env, never committed):  FORECAST_URL=https://techprime-forecast.onrender.com   FORECAST_API_KEY=<same value as on Render>
@@ -20,7 +20,7 @@ function forecast_fail(int $code, string $error): never
 }
 
 // Who may see which forecast (matches the screens): the Forecast page is shared by Admin, Retail Officer and
-// Inventory Custodian (includes/staff_forecast_page.php), so all three see Product Demand (with the inventory
+// Inventory Custodian (includes/staff_trends_page.php), so all three see Product Demand (with the inventory
 // actions: reorder point, safety stock, days of inventory, order qty), Sales / Revenue, categories and model accuracy.
 $role = (string)($_SESSION['role'] ?? '');
 $allowed = [
@@ -38,8 +38,8 @@ if (!in_array($role, $allowed[$type], true)) { forecast_fail(403, 'forbidden'); 
 // Render start) would block every other request from the same browser, including the parallel demand/actions fetch.
 release_session_lock();
 
-// The service call (config, HTTPS check, timeouts, error mapping) is shared with forecast_export.php
-require_once __DIR__ . '/includes/forecast_client.php';
+// The service call (config, HTTPS check, timeouts, error mapping) is shared with trends_export.php
+require_once __DIR__ . '/includes/trends_client.php';
 
 try {
     $query = ias_forecast_query($_GET);

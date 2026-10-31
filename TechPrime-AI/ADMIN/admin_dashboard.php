@@ -46,7 +46,7 @@ $statusLabels = ['out' => 'Out of Stock', 'critical' => 'Critical', 'low' => 'Lo
 $statusIcons = ['out' => 'ph-x-circle', 'critical' => 'ph-warning-circle', 'low' => 'ph-warning'];
 $people = [
     ['tab' => 'client', 'label' => 'Clients', 'hint' => 'Storefront accounts', 'icon' => 'ph-user', 'count' => (int)$cnt['clients']],
-    ['tab' => 'retail_officer', 'label' => 'Retail Officers', 'hint' => 'Reports and forecasting', 'icon' => 'ph-storefront', 'count' => (int)$cnt['retail_officer']],
+    ['tab' => 'retail_officer', 'label' => 'Retail Officers', 'hint' => 'Reports and trend analysis', 'icon' => 'ph-storefront', 'count' => (int)$cnt['retail_officer']],
     ['tab' => 'inventory_custodian', 'label' => 'Inventory Custodians', 'hint' => 'Stock and receiving', 'icon' => 'ph-warehouse', 'count' => (int)$cnt['inventory_custodian']],
     ['tab' => 'cashier', 'label' => 'Cashiers', 'hint' => 'Walk-in POS checkout', 'icon' => 'ph-cash-register', 'count' => (int)$cnt['cashier']],
     ['tab' => 'admin', 'label' => 'Admins', 'hint' => 'Full system access', 'icon' => 'ph-shield-check', 'count' => (int)$cnt['admin']],
@@ -115,7 +115,7 @@ staff_page_start([
                                 <span class="no-print">· showing <?php echo $restockShown; ?> of <?php echo (int)$restockTotal; ?></span><span class="cx-print-only">· all <?php echo (int)$restockTotal; ?> products</span><?php endif; ?>
                             </p>
                         </div>
-                        <a href="admin_forecast.php?view=demand" class="cx-link no-print">Demand forecast <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+                        <a href="admin_trends.php?view=demand" class="cx-link no-print">Product trends <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
                     </div>
                     <?php if (empty($restockAlerts)): ?>
                         <div class="cx-empty">

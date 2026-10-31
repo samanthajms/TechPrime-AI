@@ -260,8 +260,8 @@
     body.cx-report .rpt-sign span:last-child { color: var(--rp-muted) !important; }
     body.cx-report .rpt-end { display: block !important; margin-top: 16pt; text-align: center; font-size: 8pt; letter-spacing: 0.04em; color: var(--rp-muted) !important; }
 
-    /* ---- 11. Forecast page (includes/forecast_cards.php: older .card / .ias-table markup) ----
-       Chart and table views both print (forecast_cards.php), so every charted figure is also in a table.
+    /* ---- 11. Forecast page (includes/trends_cards.php: older .card / .ias-table markup) ----
+       Chart and table views both print (trends_cards.php), so every charted figure is also in a table.
        The demand table has 14 columns, so that report prints on landscape pages. */
     @page fc-wide { size: A4 landscape; }
     body.cx-report .cx-main:has(#fc-demand) { page: fc-wide; }
@@ -311,4 +311,15 @@
     body.cx-report .fc-subhead { margin: 10pt 0 3pt !important; font-size: 9pt; font-weight: 700; break-after: avoid; color: var(--rp-green) !important; }
     body.cx-report .fc-note { margin-top: 4pt; font-size: 8pt; color: var(--rp-muted) !important; }
     body.cx-report .fc-card .empty-state { padding: 4pt !important; text-align: left; font-size: 9pt; }
+
+    /* ---- 12. Stock Movements + PC Build Report (staff_app.css §13) ---- */
+    body.cx-report .rep-grid { display: block !important; }
+    body.cx-report .rep-sub { display: block; font-size: 7.5pt; color: var(--rp-muted) !important; }
+    body.cx-report .rep-note { padding: 0 !important; margin: 3pt 0 0; font-size: 8pt; color: var(--rp-muted) !important; }
+    body.cx-report .rep-search { display: none !important; }
+    body.cx-report .cx-table td.rep-when { white-space: nowrap !important; }
+    body.cx-report .mv-dir { display: inline; padding: 0 !important; border: 0 !important; border-radius: 0 !important; font-size: inherit; font-weight: 600; }
+    body.cx-report :is(.mv-dir.is-in, .mv-qty.is-in) { color: var(--rp-green) !important; }
+    body.cx-report :is(.mv-dir.is-out, .mv-qty.is-out) { color: var(--rp-red) !important; }
+    body.cx-report .mv-log-table tbody tr td:first-child { box-shadow: none !important; }
 }

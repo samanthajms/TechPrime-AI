@@ -1,7 +1,7 @@
 <?php
 /**
- * Server-side client for the Render forecast service (XGBoost). Shared by forecast_api.php (JSON proxy for the
- * Forecast page) and forecast_export.php (CSV / Excel / PDF downloads), so the API key never reaches the browser.
+ * Server-side client for the Render forecast service (XGBoost). Shared by trends_api.php (JSON proxy for the
+ * Forecast page) and trends_export.php (CSV / Excel / PDF downloads), so the API key never reaches the browser.
  * .env (TechPrime-AI/.env, never committed):  FORECAST_URL=https://techprime-forecast.onrender.com   FORECAST_API_KEY=<same value as on Render>
  */
 
@@ -73,7 +73,7 @@ function ias_forecast_call(string $type, array $query): array
     $host      = (string)($baseParts['host'] ?? '');
     $isPrivate = in_array($host, ['localhost', '127.0.0.1'], true) || ($host !== '' && !str_contains($host, '.'));
     if (($baseParts['scheme'] ?? '') !== 'https' && !$isPrivate) {
-        error_log('forecast_api: FORECAST_URL must use https');
+        error_log('trends_api: FORECAST_URL must use https');
         return $fail(500, 'Forecast service is not configured');
     }
 
@@ -93,7 +93,7 @@ function ias_forecast_call(string $type, array $query): array
     curl_close($ch);
 
     if ($response === false || $err) {
-        error_log('forecast_api: upstream unreachable: ' . $err);
+        error_log('trends_api: upstream unreachable: ' . $err);
         return $fail(503, 'Forecast service unreachable (it may be waking up - retry in a minute)');
     }
     // The inventory-actions route answers 503 until a stock-on-hand snapshot exists on the forecast service. That is an
@@ -102,7 +102,7 @@ function ias_forecast_call(string $type, array $query): array
         return $fail(503, 'Stock levels are not connected to the forecast service yet');
     }
     if ($code === 401 || $code === 403 || $code >= 500 || $code === 0) {   // never relay upstream auth/internal details
-        error_log('forecast_api: upstream returned HTTP ' . $code);
+        error_log('trends_api: upstream returned HTTP ' . $code);
         return $fail(502, 'Forecast service error');
     }
     return ['ok' => true, 'code' => $code, 'body' => (string)$response, 'error' => ''];

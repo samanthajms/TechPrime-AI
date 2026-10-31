@@ -1,12 +1,13 @@
 <?php
 /**
- * Product Demand + Sales Forecast cards (shared Forecast page: includes/staff_forecast_page.php; Retail dashboard).
+ * Product Trends + Sales Trends cards (shared Trend Analysis page: includes/staff_trends_page.php). On screen the
+ * service's predictions are called "Projected"; code and query keys keep the old "forecast" names.
  *
- * Data comes from the XGBoost forecast service through forecast_api.php (browser -> PHP proxy -> Render), so the API
+ * Data comes from the XGBoost forecast service through trends_api.php (browser -> PHP proxy -> Render), so the API
  * key never reaches the browser. Each card has:
  *   - a Chart | Table toggle  -> same data as a chart or as a table (choice is remembered per card)
  *   - a filter popup          -> Date Range (which ACTUAL sales months are shown next to the forecast), Category (demand card
- *                                only) and Forecast window (1, 2 or 3 months ahead)
+ *                                only) and Projection window (1, 2 or 3 months ahead)
  * Query keys: df_preset/df_from/df_to/df_category/df_months (demand), sf_preset/sf_from/sf_to/sf_months (sales).
  *
  * Forecast figures shown: MoM growth and, for Admin, Retail Officer + Inventory Custodian,
@@ -75,7 +76,7 @@ function ias_forecast_months_field(string $name, int $selected): void
 {
     ?>
             <div class="form-group">
-                <label class="form-label">Forecast window</label>
+                <label class="form-label">Projection window</label>
                 <select name="<?php echo $name; ?>" class="staff-select">
                     <?php foreach ([1 => 'Next 1 month', 2 => 'Next 2 months', 3 => 'Next 3 months'] as $n => $label): ?>
                     <option value="<?php echo $n; ?>" <?php echo $selected === $n ? 'selected' : ''; ?>><?php echo h($label); ?></option>
@@ -147,27 +148,27 @@ function ias_forecast_cards_render(array $fc, array $categories, string $which =
 <div class="card fc-card" id="fc-demand" data-view="table">
     <div class="card-header">
         <div>
-            <h3><span class="card-icon"><i class="fas fa-box-open"></i></span> Product Demand Forecasting</h3>
+            <h3><span class="card-icon"><i class="fas fa-box-open"></i></span> Product Trends</h3>
             <div class="card-subtitle" id="fcDemandSub">Loading&hellip;</div>
         </div>
         <div class="card-actions no-print">
             <?php ias_forecast_view_toggle(); ?>
-            <button type="button" class="btn btn-outline btn-xs" onclick="openFilterModal('dfModal')" title="Date range, category and forecast window"><i class="fas fa-filter"></i></button>
+            <button type="button" class="btn btn-outline btn-xs" onclick="openFilterModal('dfModal')" title="Date range, category and projection window"><i class="fas fa-filter"></i></button>
         </div>
     </div>
     <div class="card-body">
         <div class="fc-kpis" id="fcDemandKpis"></div>
         <div class="fc-view-chart">
             <div class="chart-wrap" style="height:340px;"><canvas id="fcDemandChart"></canvas></div>
-            <div class="fc-note">Top 10 products by forecast. Average units per month, so the last 3 months and the forecast window are comparable.</div>
+            <div class="fc-note">Top 10 products by projected units. Average units per month, so the last 3 months and the projection window are comparable.</div>
         </div>
         <div class="fc-view-table">
             <div class="table-wrap fc-scroll">
                 <table class="ias-table fc-noinv" id="fcDemandTable">
                     <thead><tr>
                         <th>Product</th><th>Category</th>
-                        <th>Units sold (date range)</th><th>Forecast units</th><th>Likely range</th><th>Forecast revenue</th><th>Trend</th><th>Confidence</th>
-                        <th class="fc-inv">Stock</th><th class="fc-inv" title="Stock on hand / forecast daily demand">Days left</th>
+                        <th>Units sold (date range)</th><th>Projected units</th><th>Likely range</th><th>Projected revenue</th><th>Trend</th><th>Confidence</th>
+                        <th class="fc-inv">Stock</th><th class="fc-inv" title="Stock on hand / projected daily sales">Days left</th>
                         <th class="fc-inv">Safety stock</th><th class="fc-inv">Reorder point</th><th class="fc-inv">Stockout risk</th><th class="fc-inv">Order qty</th>
                     </tr></thead>
                     <tbody id="fcDemandBody"><tr><td colspan="14" class="empty-state">Loading&hellip;</td></tr></tbody>
@@ -184,12 +185,12 @@ function ias_forecast_cards_render(array $fc, array $categories, string $which =
 <div class="card fc-card" id="fc-sales" data-view="chart" data-sub="monthly">
     <div class="card-header">
         <div>
-            <h3><span class="card-icon"><i class="fas fa-chart-line"></i></span> Sales Forecasting</h3>
+            <h3><span class="card-icon"><i class="fas fa-chart-line"></i></span> Sales Trends</h3>
             <div class="card-subtitle" id="fcRevSub">Loading&hellip;</div>
         </div>
         <div class="card-actions no-print">
             <?php ias_forecast_view_toggle(); ?>
-            <button type="button" class="btn btn-outline btn-xs" onclick="openFilterModal('sfModal')" title="Date range and forecast window"><i class="fas fa-filter"></i></button>
+            <button type="button" class="btn btn-outline btn-xs" onclick="openFilterModal('sfModal')" title="Date range and projection window"><i class="fas fa-filter"></i></button>
         </div>
     </div>
     <div class="card-body">
@@ -209,14 +210,14 @@ function ias_forecast_cards_render(array $fc, array $categories, string $which =
                     <tbody id="fcRevBody"><tr><td colspan="7" class="empty-state">Loading&hellip;</td></tr></tbody>
                 </table>
             </div>
-            <div class="fc-subhead fc-sub-cat">By category (whole forecast window)</div>
+            <div class="fc-subhead fc-sub-cat">By category (whole projection window)</div>
             <div class="table-wrap fc-scroll fc-sub-cat">
                 <table class="ias-table">
-                    <thead><tr><th>Category</th><th>Group</th><th>Forecast units</th><th>Forecast sales (PHP)</th><th title="First forecast month vs the latest actual month">Sales MoM (next month)</th><th title="First forecast month vs the latest actual month">Units MoM (next month)</th></tr></thead>
+                    <thead><tr><th>Category</th><th>Group</th><th>Projected units</th><th>Projected sales (PHP)</th><th title="First projected month vs the latest actual month">Sales MoM (next month)</th><th title="First projected month vs the latest actual month">Units MoM (next month)</th></tr></thead>
                     <tbody id="fcRevCatBody"><tr><td colspan="6" class="empty-state">Loading&hellip;</td></tr></tbody>
                 </table>
             </div>
-            <div class="fc-note">MoM = change versus the month before. For the first forecast month that is the latest actual month. A jump from a very small base can look extreme.</div>
+            <div class="fc-note">MoM = change versus the month before. For the first projected month that is the latest actual month. A jump from a very small base can look extreme.</div>
         </div>
     </div>
 </div>
@@ -226,7 +227,7 @@ function ias_forecast_cards_render(array $fc, array $categories, string $which =
     ?>
 <div id="dfModal" class="filter-modal no-print" onclick="if(event.target===this)closeFilterModal('dfModal')">
     <div class="filter-modal-card">
-        <h4><i class="fas fa-filter"></i> Demand Forecast Filters</h4>
+        <h4><i class="fas fa-filter"></i> Product Trend Filters</h4>
         <form method="get">
             <?php ias_forecast_preserve_hidden(['df_preset', 'df_from', 'df_to', 'df_category', 'df_months']); ?>
             <?php ias_forecast_range_fields('df', $df['range'], $fc['presets'], 'dfCustom'); ?>
@@ -251,7 +252,7 @@ function ias_forecast_cards_render(array $fc, array $categories, string $which =
     ?>
 <div id="sfModal" class="filter-modal no-print" onclick="if(event.target===this)closeFilterModal('sfModal')">
     <div class="filter-modal-card">
-        <h4><i class="fas fa-filter"></i> Sales Forecast Filters</h4>
+        <h4><i class="fas fa-filter"></i> Sales Trend Filters</h4>
         <form method="get">
             <?php ias_forecast_preserve_hidden(['sf_preset', 'sf_from', 'sf_to', 'sf_months']); ?>
             <?php ias_forecast_range_fields('sf', $sf['range'], $fc['presets'], 'sfCustom'); ?>
@@ -265,7 +266,7 @@ function ias_forecast_cards_render(array $fc, array $categories, string $which =
     endif;
 }
 
-/** <script> that loads both cards from forecast_api.php (path is relative to the page's role folder, e.g. ADMIN/). */
+/** <script> that loads both cards from trends_api.php (path is relative to the page's role folder, e.g. ADMIN/). */
 function ias_forecast_cards_script(array $fc, string $which = 'both'): string
 {
     $role = (string)($_SESSION['role'] ?? '');
@@ -280,7 +281,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
             'from' => $fc['sf']['range']['from']->format('Y-m-d'), 'to' => $fc['sf']['range']['to']->format('Y-m-d'),
             'label' => $fc['sf']['range']['label'],
         ],
-        // Same roles as forecast_api.php type=actions; everyone else never asks for it.
+        // Same roles as trends_api.php type=actions; everyone else never asks for it.
         'actions' => in_array($role, ['admin', 'inventory_custodian', 'retail_officer'], true),
     ];
     $cfg['which'] = $which;
@@ -288,7 +289,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
     return '<script>window.IAS_FORECAST_CFG = ' . $json . ';</script>' . <<<'HTML'
 <script>
 (function () {
-    var API = '../forecast_api.php';
+    var API = '../trends_api.php';
     var cfg = window.IAS_FORECAST_CFG, charts = {};
 
     function peso(n, d) { return '₱' + Number(n || 0).toLocaleString('en-PH', { maximumFractionDigits: d || 0 }); }
@@ -410,7 +411,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
     function renderDemand(data, acts, actsError, c) {
         var rows = data.products || [], total = data.total || [];
         document.getElementById('fcDemandSub').textContent =
-            c.label + ' · ' + (c.category || 'All products') + ' · forecast ' + windowLabel(c.months);
+            c.label + ' · ' + (c.category || 'All products') + ' · projected ' + windowLabel(c.months);
         var body = document.getElementById('fcDemandBody'), table = document.getElementById('fcDemandTable');
         var note = document.getElementById('fcDemandNote');
         var byMsku = {};
@@ -418,7 +419,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
         table.className = 'ias-table' + (acts ? '' : ' fc-noinv');
 
         if (!rows.length) {
-            emptyRow(body, 14, data.message || 'No forecast available for this selection.');
+            emptyRow(body, 14, data.message || 'No projection available for this selection.');
             kpis('fcDemandKpis', []);
             if (charts.demand) { charts.demand.destroy(); charts.demand = null; }
             return;
@@ -427,8 +428,8 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
         // KPI tiles
         var first = total[0] || {};
         var tiles = [
-            { label: 'Forecast units', value: num(sum(total, 'predicted_units')), sub: windowLabel(c.months) },
-            { label: 'Forecast revenue', value: peso(sum(total, 'predicted_revenue')), sub: windowLabel(c.months) },
+            { label: 'Projected units', value: num(sum(total, 'predicted_units')), sub: windowLabel(c.months) },
+            { label: 'Projected revenue', value: peso(sum(total, 'predicted_revenue')), sub: windowLabel(c.months) },
             { label: 'Units MoM', value: pctText(first.units_mom_pct), tone: tone(first.units_mom_pct), sub: (first.month || '') + ' vs last actual month' }
         ];
         if (acts) {
@@ -475,7 +476,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
                 note.appendChild(w);
             }
         } else if (c.actionsWanted) {
-            note.textContent = (actsError || 'Stock levels are not connected to the forecast yet') +
+            note.textContent = (actsError || 'Stock levels are not connected to the trend analysis yet') +
                 '. Reorder point, safety stock, days left and order quantity appear here once they are.';
         }
 
@@ -490,7 +491,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
                 type: 'bar',
                 data: { labels: labels, datasets: [
                     { label: 'Last 3 months (avg / month)', data: past, backgroundColor: 'rgba(97,179,55,.75)' },
-                    { label: 'Forecast (avg / month)', data: fut, backgroundColor: 'rgba(254,215,0,.9)' }
+                    { label: 'Projected (avg / month)', data: fut, backgroundColor: 'rgba(254,215,0,.9)' }
                 ] },
                 options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
                     // every product name stays on the axis, also at the shorter printed height
@@ -504,9 +505,9 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
         var total = data.total || [], hist = data.history || [], cats = data.by_category || [], g = data.growth || {};
         var projected = sum(total, 'predicted_revenue');
         document.getElementById('fcRevSub').textContent = total.length
-            ? c.label + ' · forecast ' + windowLabel(c.months) + ' · projected ' + peso(projected) +
+            ? c.label + ' · ' + windowLabel(c.months) + ' · projected ' + peso(projected) +
               (hist.length ? '' : ' · no sales recorded in this date range')
-            : (data.message || 'No forecast available for this selection.');
+            : (data.message || 'No projection available for this selection.');
 
         var first = total[0] || {};
         kpis('fcRevKpis', total.length ? [
@@ -534,7 +535,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
                 type: 'line',
                 data: { labels: labels, datasets: [
                     { label: 'Actual sales', data: actual, borderColor: '#61b337', backgroundColor: 'rgba(97,179,55,.12)', fill: true, tension: .3, borderWidth: 3, pointRadius: 3 },
-                    { label: 'Forecast', data: fcast, borderColor: '#c9a200', borderDash: [6, 4], fill: false, tension: .3, borderWidth: 3, pointRadius: 3 },
+                    { label: 'Projected', data: fcast, borderColor: '#c9a200', borderDash: [6, 4], fill: false, tension: .3, borderWidth: 3, pointRadius: 3 },
                     { label: '_low', data: low, borderWidth: 0, pointRadius: 0, fill: false, tension: .3 },
                     { label: 'Likely range', data: high, borderWidth: 0, pointRadius: 0, backgroundColor: 'rgba(254,215,0,.22)', fill: '-1', tension: .3 }
                 ] },
@@ -558,7 +559,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
         });
         total.forEach(function (r) {
             var tr = document.createElement('tr');
-            cell(tr, r.month); cell(tr, 'Forecast'); cell(tr, num(r.predicted_units)); cell(tr, peso(r.predicted_revenue, 2));
+            cell(tr, r.month); cell(tr, 'Projected'); cell(tr, num(r.predicted_units)); cell(tr, peso(r.predicted_revenue, 2));
             momCell(tr, r.revenue_mom_pct); momCell(tr, r.units_mom_pct);
             cell(tr, peso(r.revenue_confidence_low) + ' – ' + peso(r.revenue_confidence_high));
             body.appendChild(tr);
@@ -594,7 +595,7 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
             ? get('actions', c, '&top=300').then(function (a) { return { acts: a }; }, function (e) { return { acts: null, err: e.message }; })
             : Promise.resolve({ acts: null });
         Promise.all([demandReq, actsReq]).then(function (r) { renderDemand(r[0], r[1].acts, r[1].err, c); }).catch(function (e) {
-            emptyRow(document.getElementById('fcDemandBody'), 14, 'Forecast unavailable: ' + e.message);
+            emptyRow(document.getElementById('fcDemandBody'), 14, 'Trend analysis unavailable: ' + e.message);
             document.getElementById('fcDemandSub').textContent = c.label;
         });
     }
@@ -602,10 +603,10 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
         initToggle('fc-sales', 'sales', 'chart', function (v) { if (v === 'chart') { resizeChart('sales'); } });
         initSubToggle('fc-sales', 'sales');
         get('revenue', cfg.sales).then(function (d) { renderSales(d, cfg.sales); }).catch(function (e) {
-            document.getElementById('fcRevSub').textContent = 'Forecast unavailable: ' + e.message;
+            document.getElementById('fcRevSub').textContent = 'Trend analysis unavailable: ' + e.message;
             // Don't leave the tables on "Loading…" when the request fails.
-            emptyRow(document.getElementById('fcRevBody'), 7, 'Forecast unavailable: ' + e.message);
-            emptyRow(document.getElementById('fcRevCatBody'), 6, 'Forecast unavailable: ' + e.message);
+            emptyRow(document.getElementById('fcRevBody'), 7, 'Trend analysis unavailable: ' + e.message);
+            emptyRow(document.getElementById('fcRevCatBody'), 6, 'Trend analysis unavailable: ' + e.message);
         });
     }
 })();

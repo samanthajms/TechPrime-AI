@@ -45,7 +45,7 @@ if ($svc === 'forecast') {
     warmup_reply(400, ['ok' => false, 'error' => 'bad svc']);
 }
 
-// Same env lookups as forecast_api.php and primo_chat.php. Including database.php only loads Composer + Dotenv.
+// Same env lookups as trends_api.php and primo_chat.php. Including database.php only loads Composer + Dotenv.
 require_once __DIR__ . '/../config/database.php';
 if ($svc === 'forecast') {
     $base = (string)($_ENV['FORECAST_URL'] ?? getenv('FORECAST_URL') ?: '');

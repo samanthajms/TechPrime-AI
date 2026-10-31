@@ -1,17 +1,17 @@
 <?php
 /**
- * Forecast page downloads: the Product Demand or Sales forecast as CSV, Excel (.xlsx) or PDF.
- * Same filters as the page (query keys from includes/forecast_cards.php: df_* for demand, sf_* for sales), and the same
- * figures the page script shows (includes/forecast_cards.php ias_forecast_cards_script()), read from the forecast
- * service on the server (includes/forecast_client.php).
- * Usage: forecast_export.php?view=demand|sales&format=csv|xlsx|pdf&...   (links: includes/staff_forecast_page.php)
+ * Trend Analysis page downloads (Product Trends or Sales Trends) as CSV, Excel (.xlsx) or PDF.
+ * Same filters as the page (query keys from includes/trends_cards.php: df_* for demand, sf_* for sales), and the same
+ * figures the page script shows (includes/trends_cards.php ias_forecast_cards_script()), read from the forecast
+ * service on the server (includes/trends_client.php).
+ * Usage: trends_export.php?view=demand|sales&format=csv|xlsx|pdf&...   (links: includes/staff_trends_page.php)
  */
 session_start();
 require_once __DIR__ . '/includes/security.php';
-require_once __DIR__ . '/includes/forecast_client.php';   // also loads backend/config/database.php
+require_once __DIR__ . '/includes/trends_client.php';   // also loads backend/config/database.php
 require_once __DIR__ . '/includes/staff_layout.php';      // staff_role_label()
 require_once __DIR__ . '/includes/product_categories.php';
-require_once __DIR__ . '/includes/forecast_cards.php';    // ias_forecast_selection(); loads retail_reports.php (CSV + file name helpers)
+require_once __DIR__ . '/includes/trends_cards.php';    // ias_forecast_selection(); loads retail_reports.php (CSV + file name helpers)
 require_once __DIR__ . '/includes/pdf_report.php';
 require_once __DIR__ . '/includes/xlsx_writer.php';
 
@@ -37,8 +37,8 @@ if ($view === 'demand' && $sel['category'] !== '') {
 }
 $data = ias_forecast_json($view === 'sales' ? 'revenue' : 'demand', $query + ['top' => 50]);
 if ($data === null) {
-    // Back to the Forecast page, same filters, with a message (staff_forecast_page() shows it)
-    $pages = ['admin' => 'ADMIN/admin_forecast.php', 'retail_officer' => 'RETAIL/retail_forecast.php', 'inventory_custodian' => 'INVENTORY/inventory_forecast.php'];
+    // Back to the Trend Analysis page, same filters, with a message (staff_forecast_page() shows it)
+    $pages = ['admin' => 'ADMIN/admin_trends.php', 'retail_officer' => 'RETAIL/retail_trends.php', 'inventory_custodian' => 'INVENTORY/inventory_trends.php'];
     $back = array_diff_key($_GET, ['format' => 1]) + ['export_failed' => 1];
     header('Location: ' . $pages[$role] . '?' . http_build_query($back));
     exit;
@@ -49,12 +49,12 @@ $acts = $view === 'demand' ? ias_forecast_json('actions', $query + ['top' => 300
 /* ---------------------------------------------------------------- shared labels */
 $rangeText = $sel['range']['label'] . ' (' . $sel['range']['from']->format('M j, Y') . ' – ' . $sel['range']['to']->format('M j, Y') . ')';
 $windowText = 'Next ' . $sel['months'] . ($sel['months'] === 1 ? ' month' : ' months');
-$filterLines = ['Sales history shown: ' . $rangeText, 'Forecast window: ' . $windowText];
+$filterLines = ['Sales history shown: ' . $rangeText, 'Projection window: ' . $windowText];
 if ($view === 'demand') {
     $filterLines[] = 'Category: ' . ($sel['category'] !== '' ? $sel['category'] : 'All products');
 }
-$title = $view === 'sales' ? 'Sales Forecast Report' : 'Product Demand Forecast Report';
-$fileBase = $view === 'sales' ? 'sales_forecast' : 'product_demand_forecast';
+$title = $view === 'sales' ? 'Sales Trend Analysis Report' : 'Product Trend Analysis Report';
+$fileBase = $view === 'sales' ? 'sales_trends' : 'product_trends';
 $pct = fn($v) => ($v === null || $v === '') ? '' : (((float)$v > 0 ? '+' : '') . rtrim(rtrim(number_format((float)$v, 1, '.', ''), '0'), '.') . '%');
 $peso = fn($v) => 'PHP ' . number_format((float)$v, 2);
 $whole = fn($v) => number_format((float)$v, (floor((float)$v) == (float)$v) ? 0 : 1);
@@ -64,7 +64,7 @@ $xPct = fn($v) => $v === null || $v === '' ? '' : ['v' => round((float)$v / 100,
 $xHead = fn(array $names) => array_map(fn($n) => ['v' => $n, 's' => $X::STYLE_HEADER], $names);
 
 logActivity(getDbConnection(), $userId, 'export_forecast',
-    staff_role_label($role) . ' exported the ' . ($view === 'sales' ? 'sales' : 'product demand') . " forecast ($format)");
+    staff_role_label($role) . ' exported the ' . ($view === 'sales' ? 'sales' : 'product') . " trends ($format)");
 
 if ($view === 'demand') {
     /* ------------------------------------------------------------ Product demand */
@@ -106,14 +106,14 @@ if ($view === 'demand') {
         ];
     }
     $kpis = [
-        ['Forecast units (' . strtolower($windowText) . ')', $whole($units)],
-        ['Forecast revenue (' . strtolower($windowText) . ')', $peso($revenue)],
+        ['Projected units (' . strtolower($windowText) . ')', $whole($units)],
+        ['Projected revenue (' . strtolower($windowText) . ')', $peso($revenue)],
         ['Units MoM (' . ($first['month'] ?? '—') . ' vs last actual month)', $pct($first['units_mom_pct'] ?? null) ?: '—'],
     ];
     if ($hasActs) {
         $kpis[] = ['Need ordering', $need . ' (' . $urgent . ' urgent)'];
     }
-    $stockNote = 'Stock levels are not connected to the forecast yet, so stock, reorder point and order quantity are not included.';
+    $stockNote = 'Stock levels are not connected to the trend analysis yet, so stock, reorder point and order quantity are not included.';
     if ($hasActs) {
         try {   // ISO time from the service, shown in store time like on the page
             $asOf = (new DateTime((string)($acts['stock_as_of'] ?? 'invalid')))->setTimezone(new DateTimeZone('Asia/Manila'))->format('M d, Y g:i A');
@@ -124,9 +124,9 @@ if ($view === 'demand') {
             . ' · lead time assumed ' . ($acts['assumptions']['lead_time_days_default'] ?? '?') . ' days (no supplier data yet)'
             . ' · order quantity covers ' . ($acts['assumptions']['review_days'] ?? '?') . ' days of demand.';
     }
-    $baseHead = ['Product', 'Category', 'Units sold (date range)', 'Forecast units', 'Likely low', 'Likely high', 'Forecast revenue (PHP)', 'Trend', 'Confidence'];
+    $baseHead = ['Product', 'Category', 'Units sold (date range)', 'Projected units', 'Likely low', 'Likely high', 'Projected revenue (PHP)', 'Trend', 'Confidence'];
     $invHead = ['Stock', 'Days left', 'Safety stock', 'Reorder point', 'Stockout risk', 'Order qty'];
-    $monthHead = ['Month', 'Forecast units', 'Forecast revenue (PHP)', 'Units MoM'];
+    $monthHead = ['Month', 'Projected units', 'Projected revenue (PHP)', 'Units MoM'];
 
     if ($format === 'csv') {
         $csvRows = [];
@@ -140,9 +140,9 @@ if ($view === 'demand') {
         $csvMonths = array_map(fn($m) => [$m['month'], $m['predicted_units'], round((float)$m['predicted_revenue'], 2), $pct($m['units_mom_pct'] ?? null)], $total);
         ias_emit_csv_sections(ias_export_filename($fileBase, 'csv'), array_merge([[$title]], array_map(fn($l) => [$l], $filterLines), [[$preparedBy]]), [
             ['title' => 'Summary', 'headers' => ['Metric', 'Value'], 'rows' => $kpis],
-            ['title' => 'Forecast by month', 'headers' => $monthHead, 'rows' => $csvMonths],
-            ['title' => 'Products (top ' . count($items) . ' by forecast)', 'headers' => $hasActs ? array_merge($baseHead, $invHead) : $baseHead, 'rows' => $csvRows],
-            ['title' => 'Notes', 'headers' => [$stockNote], 'rows' => [['Likely low / high = the range the forecast expects actual units to fall in.']]],
+            ['title' => 'Projected by month', 'headers' => $monthHead, 'rows' => $csvMonths],
+            ['title' => 'Products (top ' . count($items) . ' by projected units)', 'headers' => $hasActs ? array_merge($baseHead, $invHead) : $baseHead, 'rows' => $csvRows],
+            ['title' => 'Notes', 'headers' => [$stockNote], 'rows' => [['Likely low / high = the range the projection expects actual units to fall in.']]],
         ]);
     }
 
@@ -154,8 +154,8 @@ if ($view === 'demand') {
         $sum[] = [['v' => $preparedBy, 's' => $X::STYLE_NOTE]];
         $sum[] = [];
         $sum[] = $xHead(['Metric', 'Value', '']);
-        $sum[] = ['Forecast units (' . strtolower($windowText) . ')', ['v' => $units, 's' => $X::STYLE_INT]];
-        $sum[] = ['Forecast revenue (' . strtolower($windowText) . ')', ['v' => round($revenue, 2), 's' => $X::STYLE_MONEY]];
+        $sum[] = ['Projected units (' . strtolower($windowText) . ')', ['v' => $units, 's' => $X::STYLE_INT]];
+        $sum[] = ['Projected revenue (' . strtolower($windowText) . ')', ['v' => round($revenue, 2), 's' => $X::STYLE_MONEY]];
         $sum[] = ['Units MoM (' . ($first['month'] ?? '—') . ' vs last actual month)', $xPct($first['units_mom_pct'] ?? null)];
         if ($hasActs) {
             $sum[] = ['Need ordering', ['v' => $need, 's' => $X::STYLE_INT]];
@@ -194,10 +194,10 @@ if ($view === 'demand') {
     // PDF: landscape, like the printed report (14 columns)
     $pdf = new IasPdfReport($title, array_merge($filterLines, [$preparedBy]), 'L');
     $pdf->summary($kpis);
-    $pdf->heading('Forecast by month', $windowText, 80);
+    $pdf->heading('Projected by month', $windowText, 80);
     $pdf->table($monthHead, array_map(fn($m) => [(string)$m['month'], $whole($m['predicted_units']), $peso($m['predicted_revenue']), $pct($m['units_mom_pct'] ?? null) ?: '—'], $total),
         ['widths' => [1, 1, 1.4, 1], 'align' => ['L', 'R', 'R', 'R']]);
-    $pdf->heading('Products', 'Top ' . count($items) . ' by forecast · likely low – high = the range the forecast expects actual units to fall in');
+    $pdf->heading('Products', 'Top ' . count($items) . ' by projected units · likely low – high = the range the projection expects actual units to fall in');
     $pdfRows = [];
     foreach ($items as $it) {
         $r = [$it['product'], $it['category'], $it['sold'] === null ? '—' : $whole($it['sold']), $whole($it['units']),
@@ -209,7 +209,7 @@ if ($view === 'demand') {
         }
         $pdfRows[] = $r;
     }
-    $pdfHead = ['Product', 'Category', 'Units sold', 'Forecast units', 'Likely range', 'Forecast revenue', 'Trend', 'Confidence'];
+    $pdfHead = ['Product', 'Category', 'Units sold', 'Projected units', 'Likely range', 'Projected revenue', 'Trend', 'Confidence'];
     if ($hasActs) {
         $pdf->table(array_merge($pdfHead, ['Stock', 'Days left', 'Safety stock', 'Reorder point', 'Stockout risk', 'Order qty']), $pdfRows, [
             'widths' => [2.8, 1.1, 0.6, 0.75, 1.15, 1.45, 0.7, 1.45, 0.55, 0.6, 0.6, 0.65, 0.8, 0.6],
@@ -218,7 +218,7 @@ if ($view === 'demand') {
         $pdf->table($pdfHead, $pdfRows, ['widths' => [3.6, 1.3, 0.9, 1, 1, 1.3, 0.8, 1.2], 'align' => ['L', 'L', 'R', 'R', 'R', 'R', 'R', 'L'], 'font_size' => 8]);
     }
     if (!$items) {
-        $pdf->paragraph((string)($data['message'] ?? 'No forecast available for this selection.'));
+        $pdf->paragraph((string)($data['message'] ?? 'No projection available for this selection.'));
     }
     $pdf->paragraph($stockNote, 8);
     $pdf->output(ias_export_filename($fileBase, 'pdf'));
@@ -243,7 +243,7 @@ foreach ($hist as $i => $r) {
         'low' => null, 'high' => null];
 }
 foreach ($total as $r) {
-    $months[] = ['month' => (string)$r['month'], 'type' => 'Forecast', 'units' => (float)$r['predicted_units'], 'sales' => (float)$r['predicted_revenue'],
+    $months[] = ['month' => (string)$r['month'], 'type' => 'Projected', 'units' => (float)$r['predicted_units'], 'sales' => (float)$r['predicted_revenue'],
         'smom' => $pctOrNull($r['revenue_mom_pct'] ?? null), 'umom' => $pctOrNull($r['units_mom_pct'] ?? null),
         'low' => (float)($r['revenue_confidence_low'] ?? 0), 'high' => (float)($r['revenue_confidence_high'] ?? 0)];
 }
@@ -269,16 +269,16 @@ $kpis = [
     ['Last actual month', $lastActual !== '' ? $lastActual . (isset($growth['last_actual_revenue']) ? ' · ' . $peso($growth['last_actual_revenue']) : '') : '—'],
 ];
 $monthHead = ['Month', 'Type', 'Units', 'Sales (PHP)', 'Sales MoM', 'Units MoM', 'Likely low (PHP)', 'Likely high (PHP)'];
-$catHead = ['Category', 'Group', 'Forecast units', 'Forecast sales (PHP)', 'Sales MoM (next month)', 'Units MoM (next month)'];
-$momNote = 'MoM = change versus the month before. For the first forecast month that is the latest actual month. A jump from a very small base can look extreme.';
+$catHead = ['Category', 'Group', 'Projected units', 'Projected sales (PHP)', 'Sales MoM (next month)', 'Units MoM (next month)'];
+$momNote = 'MoM = change versus the month before. For the first projected month that is the latest actual month. A jump from a very small base can look extreme.';
 
 if ($format === 'csv') {
     ias_emit_csv_sections(ias_export_filename($fileBase, 'csv'), array_merge([[$title]], array_map(fn($l) => [$l], $filterLines), [[$preparedBy]]), [
         ['title' => 'Summary', 'headers' => ['Metric', 'Value'], 'rows' => $kpis],
-        ['title' => 'By month (actual, then forecast)', 'headers' => $monthHead, 'rows' => array_map(fn($m) => [$m['month'], $m['type'], $m['units'], round($m['sales'], 2),
+        ['title' => 'By month (actual, then projected)', 'headers' => $monthHead, 'rows' => array_map(fn($m) => [$m['month'], $m['type'], $m['units'], round($m['sales'], 2),
             $pct($m['smom']), $pct($m['umom']), $m['low'] === null ? '' : round($m['low'], 2), $m['high'] === null ? '' : round($m['high'], 2)], $months)],
-        ['title' => 'By category (whole forecast window)', 'headers' => $catHead, 'rows' => array_map(fn($c) => [$c['category'], $c['group'], $c['units'], round($c['sales'], 2), $pct($c['smom']), $pct($c['umom'])], $byCat)],
-        ['title' => 'Notes', 'headers' => [$momNote], 'rows' => [['Likely low / high = the range the forecast expects actual sales to fall in.']]],
+        ['title' => 'By category (whole projection window)', 'headers' => $catHead, 'rows' => array_map(fn($c) => [$c['category'], $c['group'], $c['units'], round($c['sales'], 2), $pct($c['smom']), $pct($c['umom'])], $byCat)],
+        ['title' => 'Notes', 'headers' => [$momNote], 'rows' => [['Likely low / high = the range the projection expects actual sales to fall in.']]],
     ]);
 }
 
@@ -322,7 +322,7 @@ $pdf = new IasPdfReport($title, array_merge($filterLines, [$preparedBy]), 'P');
 $pdf->summary(array_slice($kpis, 0, 2));   // two per row: the peso amounts are long
 $pdf->summary(array_slice($kpis, 2, 2));
 $pdf->paragraph('Last actual month: ' . $kpis[4][1]);
-$pdf->heading('Sales by month', 'Actual months, then forecast months (F)', 190);
+$pdf->heading('Sales by month', 'Actual months, then projected months (P)', 190);
 $compact = function ($v): string {   // short bar labels, same as the retail exports
     $v = (float)$v;
     if ($v >= 1000000) {
@@ -330,15 +330,15 @@ $compact = function ($v): string {   // short bar labels, same as the retail exp
     }
     return $v >= 1000 ? number_format($v / 1000, $v >= 10000 ? 0 : 1) . 'k' : number_format($v);
 };
-$pdf->barChart(array_map(fn($m) => $m['month'] . ($m['type'] === 'Forecast' ? ' (F)' : ''), $months), array_column($months, 'sales'), 180, $compact);
+$pdf->barChart(array_map(fn($m) => $m['month'] . ($m['type'] === 'Projected' ? ' (P)' : ''), $months), array_column($months, 'sales'), 180, $compact);
 $pdf->table(['Month', 'Type', 'Units', 'Sales', 'Sales MoM', 'Units MoM', 'Likely range'], array_map(fn($m) => [$m['month'], $m['type'], $whole($m['units']), $peso($m['sales']),
     $pct($m['smom']) ?: '—', $pct($m['umom']) ?: '—', $m['low'] === null ? '—' : $peso($m['low']) . ' – ' . $peso($m['high'])], $months),
     ['widths' => [0.8, 0.8, 0.7, 1.3, 0.8, 0.8, 2.2], 'align' => ['L', 'L', 'R', 'R', 'R', 'R', 'R']]);
-$pdf->heading('By category', 'Whole forecast window');
+$pdf->heading('By category', 'Whole projection window');
 $pdf->table($catHead, array_map(fn($c) => [$c['category'], $c['group'] ?: '—', $whole($c['units']), $peso($c['sales']), $pct($c['smom']) ?: '—', $pct($c['umom']) ?: '—'], $byCat),
     ['widths' => [1.6, 1.1, 1, 1.4, 1.1, 1.1], 'align' => ['L', 'L', 'R', 'R', 'R', 'R']]);
 if (!$months) {
-    $pdf->paragraph((string)($data['message'] ?? 'No forecast available for this selection.'));
+    $pdf->paragraph((string)($data['message'] ?? 'No projection available for this selection.'));
 }
 $pdf->paragraph($momNote, 8);
 $pdf->output(ias_export_filename($fileBase, 'pdf'));
