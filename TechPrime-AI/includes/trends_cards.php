@@ -699,7 +699,10 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
             ctx.font = '600 12px ' + Chart.defaults.font.family;
             var text = 'Projected', w = ctx.measureText(text).width;
             if (a.right - x > w + 16) {
-                ctx.fillStyle = C.yellowEdge; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+                ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+                ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.lineWidth = 4; ctx.lineJoin = 'round';   // halo: readable over the line
+                ctx.strokeText(text, x + 8, a.top + 6);
+                ctx.fillStyle = C.yellowEdge;
                 ctx.fillText(text, x + 8, a.top + 6);
             }
             ctx.restore();
