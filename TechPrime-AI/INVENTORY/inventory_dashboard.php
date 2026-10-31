@@ -173,7 +173,7 @@ staff_page_start([
             <button type="button" class="cat-chip" data-category="<?php echo h($cat); ?>" aria-pressed="false"><?php echo h($cat); ?></button>
             <?php endforeach; ?>
         </div>
-        <div class="cx-chart"><canvas id="invStockinChart" role="img" aria-label="Products stocked per month chart"></canvas></div>
+        <div class="cx-chart no-print"><canvas id="invStockinChart" role="img" aria-label="Products stocked per month chart"></canvas></div>
         <div class="cx-print-only">
             <table class="cx-table">
                 <thead><tr><th scope="col">Month</th><th scope="col" class="num">Products stocked</th></tr></thead>

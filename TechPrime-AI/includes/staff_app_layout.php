@@ -69,7 +69,7 @@ if (!function_exists('staff_report_head')) {
         ?>
     <header class="rpt-head">
         <div class="rpt-brand">
-            <img src="<?php echo h(staff_logo_href()); ?>" alt="EasyPC">
+            <img src="<?php echo h(dirname(staff_logo_href()) . '/logo-color.png'); ?>" alt="EasyPC"><?php /* green + black logo for paper (the shell's logo.png is white) */ ?>
             <div class="rpt-org">
                 <strong>EasyPC One Oasis Branch</strong>
                 <span>Rosario, Pasig City</span>
@@ -341,7 +341,7 @@ if (!function_exists('staff_app_shell_start')) {
     <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-motion-2">
     <link rel="stylesheet" href="<?php echo h(staff_app_css_href()); ?>">
     <?php if ($roleCss !== ''): ?><link rel="stylesheet" href="<?php echo h($roleCss); ?>"><?php endif; ?>
-    <?php if ($report): ?><link rel="stylesheet" href="<?php echo h(str_replace('staff_shared.css', 'staff_print.css', $css)); ?>?v=1"><?php endif; ?>
+    <?php if ($report): ?><link rel="stylesheet" href="<?php echo h(str_replace('staff_shared.css', 'staff_print.css', $css)); ?>?v=3"><?php endif; ?>
     <?php echo $extraHead; ?>
 </head>
 <body class="cx-app cx-role-<?php echo h(str_replace('_', '-', $role)); ?> cx-page-<?php echo h($active !== '' ? $active : 'other'); ?><?php echo $report ? ' cx-report' : ''; ?>">

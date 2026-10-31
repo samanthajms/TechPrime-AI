@@ -38,77 +38,15 @@ if (!in_array($role, $allowed[$type], true)) { forecast_fail(403, 'forbidden'); 
 // Render start) would block every other request from the same browser, including the parallel demand/actions fetch.
 release_session_lock();
 
-// Load .env exactly like the rest of the app (backend/config/database.php uses Dotenv safeLoad: on Render there is no
-// .env file and the real environment variables are used). Including it only loads Composer + Dotenv; it opens no DB connection.
-require_once __DIR__ . '/backend/config/database.php';
+// The service call (config, HTTPS check, timeouts, error mapping) is shared with forecast_export.php
+require_once __DIR__ . '/includes/forecast_client.php';
 
-$base = rtrim((string)($_ENV['FORECAST_URL'] ?? getenv('FORECAST_URL') ?: ''), '/');
-$key  = (string)($_ENV['FORECAST_API_KEY'] ?? getenv('FORECAST_API_KEY') ?: '');
-if ($base === '' || $key === '') { forecast_fail(500, 'Forecast service is not configured'); }
-
-// Production must talk to the service over HTTPS. Plain http is accepted only where traffic never leaves the machine or
-// Render's private network: localhost, or a single-label host such as http://techprime-forecast:10000 (Private Service).
-$baseParts = parse_url($base);
-$host      = (string)($baseParts['host'] ?? '');
-$isPrivate = in_array($host, ['localhost', '127.0.0.1'], true) || ($host !== '' && !str_contains($host, '.'));
-if (($baseParts['scheme'] ?? '') !== 'https' && !$isPrivate) {
-    error_log('forecast_api: FORECAST_URL must use https');
-    forecast_fail(500, 'Forecast service is not configured');
+try {
+    $query = ias_forecast_query($_GET);
+} catch (InvalidArgumentException $e) {
+    forecast_fail(400, $e->getMessage());
 }
-
-$routes  = ['demand' => '/api/forecast/demand', 'revenue' => '/api/forecast/revenue', 'metrics' => '/api/metrics',
-            'actions' => '/api/inventory/actions',
-            'categories' => '/api/categories'];   // categories = canonical Client/Custodian list for the filter dropdown
-
-// Forecast window: 1-3 months ahead only. Out-of-range values are rejected (the service enforces the same rule).
-$horizon = 3;
-if (isset($_GET['horizon']) && $_GET['horizon'] !== '') {
-    $raw = (string)$_GET['horizon'];
-    if (!ctype_digit($raw) || (int)$raw < 1 || (int)$raw > 3) { forecast_fail(400, 'horizon must be 1, 2 or 3 months'); }
-    $horizon = (int)$raw;
-}
-$query = ['horizon' => $horizon, 'top' => max(1, min((int)($_GET['top'] ?? 50), 300))];
-if (!empty($_GET['category'])) {
-    $category = trim((string)$_GET['category']);
-    if (mb_strlen($category) > 80 || !preg_match('/^[\p{L}\p{N} &.,\'()+\/:-]+$/u', $category)) {
-        forecast_fail(400, 'invalid category');
-    }
-    $query['category'] = $category;
-}
-
-foreach (['from', 'to'] as $f) {
-    if (isset($_GET[$f]) && $_GET[$f] !== '') {
-        $d = DateTime::createFromFormat('!Y-m-d', (string)$_GET[$f]);
-        if (!$d || $d->format('Y-m-d') !== (string)$_GET[$f]) { forecast_fail(400, "$f must be a date like 2026-01-31"); }
-        $query[$f] = $d->format('Y-m-d');
-    }
-}
-
-$ch = curl_init($base . $routes[$type] . '?' . http_build_query($query));
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_CONNECTTIMEOUT => 10,
-    CURLOPT_TIMEOUT        => 75,               // Render free tier can need ~50 s to wake from idle
-    CURLOPT_HTTPHEADER     => ['X-API-Key: ' . $key, 'Accept: application/json'],
-    CURLOPT_FOLLOWLOCATION => false,            // never forward the API key to a redirect target
-    CURLOPT_SSL_VERIFYPEER => true,
-    CURLOPT_SSL_VERIFYHOST => 2,
-]);
-$response = curl_exec($ch);
-$code     = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$err      = curl_error($ch);
-curl_close($ch);
-
-if ($response === false || $err) {
-    error_log('forecast_api: upstream unreachable: ' . $err);
-    forecast_fail(503, 'Forecast service unreachable (it may be waking up - retry in a minute)');
-}
-// The inventory-actions route answers 503 until a stock-on-hand snapshot exists on the forecast service. That is an
-// expected "not connected yet" state, not an outage, so the screen gets a clear message instead of a generic error.
-if ($type === 'actions' && $code === 503) { forecast_fail(503, 'Stock levels are not connected to the forecast service yet'); }
-if ($code === 401 || $code === 403 || $code >= 500 || $code === 0) {   // never relay upstream auth/internal details
-    error_log('forecast_api: upstream returned HTTP ' . $code);
-    forecast_fail(502, 'Forecast service error');
-}
-http_response_code($code);
-echo $response;
+$r = ias_forecast_call($type, $query);
+if (!$r['ok']) { forecast_fail($r['code'], $r['error']); }
+http_response_code($r['code']);
+echo $r['body'];

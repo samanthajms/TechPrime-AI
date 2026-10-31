@@ -128,7 +128,8 @@ function ias_forecast_card_css(): void
 .fc-subhead { margin:18px 0 8px; font-size:13px; font-weight:700; color:var(--ep-green-dark, #4b8b2a); }
 .fc-noinv .fc-inv { display:none; }
 .fc-badges { display:inline-flex; gap:4px; flex-wrap:wrap; }
-@media print { .fc-seg { display:none !important; } .fc-card .fc-view-table, .fc-card .fc-view-chart, .fc-card .fc-sub-monthly, .fc-card .fc-sub-cat { display:block !important; } .fc-scroll { max-height:none; } }
+.fc-print-only { display:none; }
+@media print { .fc-seg { display:none !important; } .fc-print-only { display:block; } .fc-card .fc-view-table, .fc-card .fc-view-chart, .fc-card .fc-sub-monthly, .fc-card .fc-sub-cat { display:block !important; } .fc-scroll { max-height:none; } }
 </style>
     <?php
 }
@@ -201,6 +202,7 @@ function ias_forecast_cards_render(array $fc, array $categories, string $which =
                 <button type="button" data-sub="monthly" aria-pressed="true"><i class="fas fa-calendar-alt"></i> By month</button>
                 <button type="button" data-sub="category" aria-pressed="false"><i class="fas fa-layer-group"></i> By category</button>
             </div>
+            <div class="fc-subhead fc-print-only">By month</div>
             <div class="table-wrap fc-scroll fc-sub-monthly">
                 <table class="ias-table">
                     <thead><tr><th>Month</th><th>Type</th><th>Units</th><th>Sales (PHP)</th><th title="Change vs the month before">Sales MoM</th><th title="Change vs the month before">Units MoM</th><th>Likely range (PHP)</th></tr></thead>
@@ -391,6 +393,10 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
         set(v, false);
     }
     function resizeChart(name) { if (charts[name]) { charts[name].resize(); } }
+    // Printing from the Table view shows a chart that never drew: it must draw at once, not grow in after the page is captured
+    window.addEventListener('beforeprint', function () {
+        Object.keys(charts).forEach(function (k) { if (charts[k]) { charts[k].options.animation = false; charts[k].update('none'); } });
+    });
 
     // ---------------------------------------------------------------- Product demand
     function riskBadge(a) {
@@ -487,7 +493,8 @@ function ias_forecast_cards_script(array $fc, string $which = 'both'): string
                     { label: 'Forecast (avg / month)', data: fut, backgroundColor: 'rgba(254,215,0,.9)' }
                 ] },
                 options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
-                    scales: { x: { beginAtZero: true, title: { display: true, text: 'Units per month' } }, y: { grid: { display: false } } } }
+                    // every product name stays on the axis, also at the shorter printed height
+                    scales: { x: { beginAtZero: true, title: { display: true, text: 'Units per month' } }, y: { grid: { display: false }, ticks: { autoSkip: false } } } }
             });
         }
     }

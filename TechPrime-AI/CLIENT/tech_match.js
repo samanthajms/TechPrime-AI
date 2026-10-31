@@ -2198,7 +2198,8 @@
             return '<tr><td>' + (x.cap ? 'Limit' : 'Deduction') + '</td><td>' + escapeHtml(x.text) + '</td><td class="r">' + (x.cap ? 'max ' + Number(x.cap) : formatPoints(x.points)) + '</td></tr>';
         }).join('') : '';
         var html = '<!doctype html><html><head><meta charset="utf-8"><title>Build Summary</title>' +
-            '<style>@page{margin:14mm;}body{font-family:Arial,Helvetica,sans-serif;color:#16201a;margin:0;font-size:12px;}' +
+                        // exact: the green tints print in colour without the "Background graphics" option (B&W printing still reads)
+            '<style>@page{margin:14mm;}body{font-family:Arial,Helvetica,sans-serif;color:#16201a;margin:0;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
             '.head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #3d7422;padding-bottom:10px;margin-bottom:14px;}' +
             '.head h1{margin:0;font-size:20px;}.head p{margin:2px 0 0;color:#45514a;}.doc{text-align:right;}.doc strong{display:block;font-size:16px;color:#3d7422;letter-spacing:.04em;}' +
             'table{width:100%;border-collapse:collapse;margin:0 0 14px;}th,td{border:1px solid #d5ddd1;padding:6px 8px;text-align:left;vertical-align:top;}' +

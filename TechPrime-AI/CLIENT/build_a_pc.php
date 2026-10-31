@@ -345,7 +345,7 @@ window.EP_TM_USER = <?php echo (int)($_SESSION['user_id'] ?? 0); ?>;
 window.EP_TM_CAN_SAVE = <?php echo $canSaveBuilds ? 'true' : 'false'; ?>;
 window.EP_TM_LOGIN_URL = <?php echo json_encode($buildLoginUrl); ?>;
 </script>
-<script src="tech_match.js?v=pcx-44" defer></script>
+<script src="tech_match.js?v=pcx-45" defer></script>
 
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>
