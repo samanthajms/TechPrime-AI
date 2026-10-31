@@ -35,7 +35,7 @@ function staff_forecast_page(PDO $db, string $role): void
             . '<i class="ph ' . $icon . '" aria-hidden="true"></i> ' . h($label) . '</a>';
     };
 
-    // Card, dialog and print styles: includes/staff_app.css (§10, §11)
+    // Filter bar, summary + detail card styles: includes/staff_app.css §10; print: includes/staff_print.css §11
     staff_page_start([
         'role' => $role,
         'title' => $view === 'sales' ? 'Sales Trends' : 'Product Trends',
@@ -69,12 +69,6 @@ document.querySelectorAll('[data-fc-export]').forEach(function (a) {
         }
     });
 });
-function openFilterModal(id){ document.getElementById(id).classList.add('open'); }
-function closeFilterModal(id){ document.getElementById(id).classList.remove('open'); }
-function toggleDetail(id){ document.getElementById(id).classList.toggle('open'); }
-function toggleSectionCustom(sel, rowId){
-    document.getElementById(rowId).style.display = (sel.value === 'custom') ? '' : 'none';
-}
 </script>
 SCRIPTS);
 }

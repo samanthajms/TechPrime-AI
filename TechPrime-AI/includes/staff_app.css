@@ -855,39 +855,100 @@ body.cx-sheet-open #cwFab, body.cx-sheet-open #cwPanel { display: none !importan
 .cx-app a.staff-page:focus-visible { outline-color: var(--cx-green-700); }
 .cx-app .staff-page.active { background: var(--cx-green-700); border-color: var(--cx-green-700); color: #fff; }
 
-/* Forecast cards (includes/trends_cards.php) */
-.cx-app .fc-card { margin-bottom: 20px; }
-.cx-app .fc-card .card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.cx-app .fc-seg { border-color: var(--cx-border-strong); border-radius: 10px; }
-.cx-app .fc-seg button { min-height: 36px; padding: 0 14px; font-family: inherit; font-size: 13px; color: var(--cx-text-2); }
-.cx-app .fc-seg button + button { border-left-color: var(--cx-border-strong); }
-.cx-app .fc-seg button:hover:not([aria-pressed="true"]) { background: var(--cx-surface-2); color: var(--cx-text); }
-.cx-app .fc-seg button[aria-pressed="true"] { background: var(--cx-green-700); color: #fff; }
-.cx-app .fc-seg button:focus-visible { outline-color: var(--cx-green-700); }
-.cx-app .fc-card .card-actions .btn-xs { width: 40px; min-height: 38px; padding: 0; justify-content: center; }
-.cx-app .fc-kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
-.cx-app .fc-kpi {
-    position: relative; padding: 14px 16px 12px; border-radius: var(--cx-r); border: 1px solid var(--cx-border);
-    background: var(--cx-surface);
+/* Trend Analysis pages (includes/trends_cards.php): filter bar (.eodr-filters, §12), Summary card (.kpis, §5) and a
+   detail card with a Chart | Table switch (.cx-seg, §11); tables reuse .rep-table (§13, stacked cards on phones).
+   The section wrapper .fc-page carries data-state (loading | ready | empty | error), data-view and data-sub. */
+.fc-page[data-view="chart"] .fc-view-table, .fc-page[data-view="table"] .fc-view-chart { display: none; }
+.fc-page[data-sub="monthly"] .fc-sub-cat, .fc-page[data-sub="category"] .fc-sub-monthly { display: none; }
+.fc-page:not([data-state="ready"]) :is(.fc-kpis, .fc-detail) { display: none; }
+.fc-page[data-state="ready"] .fc-status { display: none; }
+.cx-app .fc-kpis[data-n="0"] { display: none; }
+.fc-noinv .fc-inv { display: none; }
+
+/* Summary figures: one row on a wide card, then pairs, then a list (sized by the card, not the window) */
+.fc-sum { container: fcsum / inline-size; }
+@media screen {
+    .cx-app .fc-sum .kpis { row-gap: 0; }
+    .cx-app .fc-sum .kpis[data-n="3"] { grid-template-columns: 1.3fr repeat(2, minmax(0, 1fr)); }
+    .cx-app .fc-sum .kpis[data-n="4"] { grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr)); }
+    .cx-app .fc-sum .kpis[data-n="5"] { grid-template-columns: 1.3fr repeat(4, minmax(0, 1fr)); }
+    .cx-app .fc-sum .kpi + .kpi { border-left: 1px solid var(--cx-border); }
+    @container fcsum (max-width: 820px) {
+        .cx-app .fc-sum .kpis[data-n] { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 10px; }
+        .cx-app .fc-sum .kpi-hero { grid-column: 1 / -1; }
+        .cx-app .fc-sum .kpi + .kpi { border-left: none; }
+        .cx-app .fc-sum .kpi:nth-child(2n+3) { border-left: 1px solid var(--cx-border); }
+        .fc-skel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @container fcsum (max-width: 440px) {
+        .cx-app .fc-sum .kpis[data-n] { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+        .cx-app .fc-sum .kpi { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 12px; }
+        .cx-app .fc-sum .kpi + .kpi, .cx-app .fc-sum .kpi:nth-child(2n+3) { border-left: none; border-top: 1px solid var(--cx-border); }
+        .cx-app .fc-sum .kpi-value { font-size: 20px; }
+        .cx-app .fc-sum .kpi-sub { display: none; }
+    }
 }
-.cx-app .fc-kpi::before {
-    content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; background: var(--cx-green-500);
+.cx-app .fc-sum .kpi-value i { margin-right: 4px; font-size: 0.8em; vertical-align: -0.04em; }
+
+/* Loading skeleton + status line (opacity pulse only), then empty / error messages in the same place */
+.fc-status { padding: 0 20px 20px; }
+.fc-skel { display: grid; grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fc-skel span, .fc-skel-block {
+    display: block; height: 72px; border-radius: var(--cx-r); background: var(--cx-surface-2); border: 1px solid var(--cx-border);
+    animation: cx-pulse 1.6s ease-in-out infinite;
 }
-.cx-app .fc-kpi-label { font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--cx-muted); }
-.cx-app .fc-kpi-value {
-    margin-top: 2px; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--cx-text);
-    font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
-}
-.cx-app .fc-kpi-sub { margin-top: 2px; font-size: 12.5px; color: var(--cx-muted); }
+.fc-skel-block { height: 200px; margin-top: 12px; animation-delay: 0.2s; }
+.fc-wait { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 13.5px; color: var(--cx-text-2); }
+.fc-wait i { font-size: 18px; color: var(--cx-green-700); }
+.fc-status .cx-empty { border-top: none; padding: 20px 16px 16px; }
+
+/* Detail card */
+.fc-detail .cx-chart { height: 340px; margin: 0 20px 4px; }
+.fc-detail .cx-chart.fc-chart-bars { height: 420px; }
+.cx-card-head > .fc-tools { flex: 0 0 auto; }   /* §3 lets every head div grow; the tools stay at the right edge */
+.fc-detail .cx-card-tools .cx-count { min-height: 36px; }
+.fc-sub { margin: 0 20px 14px; }
+.cx-app .fc-subhead { margin: 0; padding: 0 20px 10px; font-size: 13px; font-weight: 600; color: var(--cx-green-700); }
+.cx-app .fc-scroll { max-height: min(68dvh, 640px); overflow: auto; }
 .cx-app .fc-up { color: var(--cx-green-700); }
 .cx-app .fc-down { color: var(--cx-red-700); }
-.cx-app .fc-note { font-size: 12.5px; color: var(--cx-muted); line-height: 1.5; }
-.cx-app .fc-subhead { font-size: 13px; font-weight: 600; color: var(--cx-green-700); }
-.cx-app .fc-scroll { border: 1px solid var(--cx-border); border-radius: var(--cx-r); }
-.cx-app .fc-scroll thead th { background: var(--cx-surface-2); }
-.cx-app .fc-card table.ias-table td:first-child { min-width: 220px; }
-.cx-app .fc-card table.ias-table td { white-space: nowrap; }
-.cx-app .fc-card table.ias-table td:first-child { white-space: normal; }
+.fc-chg { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; }
+.fc-chg i { font-size: 15px; }
+.fc-badges { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.fc-badge-info { background: #eef3ff; color: #1d4ed8; border-color: #d7e2ff; }
+.fc-type {
+    display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid transparent;
+    font-size: 11.5px; font-weight: 600; vertical-align: 1px; white-space: nowrap;
+}
+.fc-type.is-actual { background: var(--cx-surface-2); color: var(--cx-text-2); border-color: var(--cx-border-strong); }
+.fc-type.is-proj { background: var(--cx-yellow-50); color: var(--cx-yellow-700); border-color: #f5df8a; }
+.fc-table td { white-space: nowrap; }
+.fc-table td.rep-name { white-space: normal; }
+#fcDemandTable td.rep-name { min-width: 240px; }
+/* Coloured left edge: projected months, and products at risk of running out (the pill also says it in words) */
+.fc-table tr.is-proj td:first-child, .fc-table tr.is-risk-medium td:first-child { box-shadow: inset 3px 0 0 var(--cx-yellow-400); }
+.fc-table tr.is-risk-high td:first-child { box-shadow: inset 3px 0 0 var(--cx-red-600); }
+/* Wide tables: header row and product column stay in view while the table scrolls */
+@media screen and (min-width: 721px) {
+    .fc-table thead th { position: sticky; top: 0; z-index: 2; }
+    .fc-table :is(th, td):first-child { position: sticky; left: 0; z-index: 1; background: var(--cx-surface); }
+    .fc-table thead th:first-child { z-index: 3; background: var(--cx-surface-2); }
+    .fc-table tbody tr:hover td:first-child { background: #fafcf9; }
+}
+@media (max-width: 720px) {
+    .fc-status { padding: 0 16px 16px; }
+    .fc-detail .cx-chart { height: 280px; margin: 0 12px 4px; }
+    .fc-detail .cx-chart.fc-chart-bars { height: 460px; }
+    .fc-sub { margin: 0 16px 12px; }
+    .cx-app .fc-subhead { padding: 0 16px 10px; }
+    .cx-app .fc-scroll { max-height: none; }      /* stacked cards: the page scrolls, not a box inside it */
+    .fc-table tr.is-proj, .fc-table tr.is-risk-medium { box-shadow: inset 3px 0 0 var(--cx-yellow-400); }
+    .fc-table tr.is-risk-high { box-shadow: inset 3px 0 0 var(--cx-red-600); }
+    .fc-table tr td:first-child { box-shadow: none !important; }
+    #fcDemandTable td.rep-name { min-width: 0; }
+    .fc-table .fc-minor { display: none; }   /* phone cards keep the figures a decision needs */
+    .fc-table td:not(.rep-name) { white-space: normal; }
+}
 
 /* Messages page: fill the space between the page header and the bottom of the window */
 .cx-app .chat-container { height: calc(100dvh - var(--cx-topbar-h) - 150px); min-height: 460px; }

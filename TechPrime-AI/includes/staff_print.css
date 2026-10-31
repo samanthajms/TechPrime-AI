@@ -260,57 +260,26 @@
     body.cx-report .rpt-sign span:last-child { color: var(--rp-muted) !important; }
     body.cx-report .rpt-end { display: block !important; margin-top: 16pt; text-align: center; font-size: 8pt; letter-spacing: 0.04em; color: var(--rp-muted) !important; }
 
-    /* ---- 11. Forecast page (includes/trends_cards.php: older .card / .ias-table markup) ----
-       Chart and table views both print (trends_cards.php), so every charted figure is also in a table.
-       The demand table has 14 columns, so that report prints on landscape pages. */
+    /* ---- 11. Trend Analysis pages (includes/trends_cards.php; cards, KPIs and tables use §5–§8) ----
+       Chart and table views both print, so every charted figure is also in a table.
+       The product table has 12 columns, so that report prints on landscape pages. */
     @page fc-wide { size: A4 landscape; }
     body.cx-report .cx-main:has(#fc-demand) { page: fc-wide; }
-    body.cx-report .fc-card { border: 0 !important; border-radius: 0 !important; margin: 0 0 16pt !important; overflow: visible !important; }
-    body.cx-report .fc-card .card-header {
-        display: block !important; padding: 0 0 3pt !important; margin: 0 0 6pt !important;
-        border-bottom: 1.5pt solid var(--rp-brand) !important; break-after: avoid;
-    }
-    body.cx-report .fc-card .card-header h3 {
-        margin: 0; font-size: 11pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rp-green) !important;
-    }
-    body.cx-report .fc-card .card-icon { display: none !important; }
-    body.cx-report .fc-card .card-subtitle { margin-top: 1pt; font-size: 8.5pt; color: var(--rp-muted) !important; }
-    body.cx-report .fc-card .card-body { padding: 0 !important; }
-    body.cx-report .fc-kpis {
-        display: grid !important; grid-template-columns: none !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
-        gap: 0 !important; margin: 0 0 10pt !important; background: var(--rp-tint) !important;
-        border: 0.75pt solid var(--rp-line) !important; border-left: 3pt solid var(--rp-brand) !important; break-inside: avoid;
-    }
-    body.cx-report .fc-kpi { padding: 5pt 8pt !important; border: 0 !important; border-radius: 0 !important; }
-    body.cx-report .fc-kpi::before { content: none !important; }
-    body.cx-report .fc-kpi + .fc-kpi { border-left: 0.75pt solid var(--rp-line) !important; }
-    body.cx-report .fc-kpi-label { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rp-green) !important; }
-    body.cx-report .fc-kpi-value { margin: 0; font-size: 13pt; font-weight: 700; line-height: 1.2; }
-    body.cx-report .fc-kpi-sub { font-size: 7.5pt; color: var(--rp-muted) !important; }
+    body.cx-report .fc-page { display: block !important; }
+    body.cx-report .fc-page[data-state="ready"] :is(.fc-view-chart, .fc-view-table, .fc-sub-monthly, .fc-sub-cat) { display: block !important; }
+    body.cx-report :is(.fc-skel, .fc-skel-block, .fc-wait) { display: none !important; }
+    body.cx-report .fc-scroll { max-height: none !important; overflow: visible !important; }
+    body.cx-report .fc-table :is(th, td) { position: static !important; box-shadow: none !important; min-width: 0 !important; }
+    body.cx-report .fc-table td:not(.num) { white-space: normal !important; }
+    body.cx-report .fc-table thead th { white-space: normal !important; vertical-align: bottom; }   /* wrapped headers leave room for the names */
+    body.cx-report #fcDemandTable td.rep-name { min-width: 120pt !important; }
     body.cx-report .fc-up { color: var(--rp-green) !important; }
     body.cx-report .fc-down { color: var(--rp-red) !important; }
-    body.cx-report .fc-card .chart-wrap { height: auto !important; margin: 0 0 4pt; break-inside: avoid; }
-    body.cx-report .fc-scroll { max-height: none !important; overflow: visible !important; border: 0 !important; border-radius: 0 !important; }
-    body.cx-report .fc-card table.ias-table { width: 100% !important; border-collapse: collapse !important; font-size: 7.5pt; }
-    body.cx-report .fc-card table.ias-table thead { display: table-header-group; }
-    body.cx-report .fc-card table.ias-table tr { break-inside: avoid; }
-    body.cx-report .fc-card table.ias-table :is(th, td) {
-        position: static !important; min-width: 0 !important; padding: 2.5pt 4pt !important; white-space: normal !important;
-        vertical-align: top; font-size: 7.5pt; border: 0 !important; border-bottom: 0.5pt solid var(--rp-rule) !important;
-    }
-    body.cx-report .fc-card table.ias-table thead th {
-        font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
-        background: var(--rp-green) !important; color: #fff !important; border-bottom: 1pt solid var(--rp-green) !important;
-    }
-    body.cx-report .fc-card table.ias-table tbody tr:nth-child(even) > * { background: var(--rp-zebra) !important; }
-    body.cx-report .fc-card .badge { display: inline; padding: 0 !important; border: 0 !important; border-radius: 0 !important; font-size: inherit; font-weight: 600; }
-    body.cx-report .fc-card .badge-locked { color: var(--rp-red) !important; }     /* stockout risk high */
-    body.cx-report .fc-card .badge-pending { color: var(--rp-yellow) !important; } /* medium */
-    body.cx-report .fc-card .badge-active { color: var(--rp-green) !important; }   /* low */
-    body.cx-report .fc-card .badge-info { color: var(--rp-blue) !important; }      /* overstock, on order */
-    body.cx-report .fc-subhead { margin: 10pt 0 3pt !important; font-size: 9pt; font-weight: 700; break-after: avoid; color: var(--rp-green) !important; }
-    body.cx-report .fc-note { margin-top: 4pt; font-size: 8pt; color: var(--rp-muted) !important; }
-    body.cx-report .fc-card .empty-state { padding: 4pt !important; text-align: left; font-size: 9pt; }
+    body.cx-report .fc-type { margin-left: 4pt; padding: 0 !important; border: 0 !important; background: none !important; font-size: inherit; font-weight: 600; }
+    body.cx-report .fc-type.is-proj { color: var(--rp-yellow) !important; }
+    body.cx-report .fc-badge-info { color: var(--rp-blue) !important; }  /* overstock, on order */
+    body.cx-report .fc-subhead { margin: 10pt 0 3pt !important; padding: 0 !important; font-size: 9pt; font-weight: 700; break-after: avoid; color: var(--rp-green) !important; }
+    body.cx-report .fc-detail .rep-note { padding: 0 !important; }
 
     /* ---- 12. Stock Movements + PC Build Report (staff_app.css §13) ---- */
     body.cx-report .rep-grid { display: block !important; }
