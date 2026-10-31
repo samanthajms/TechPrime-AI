@@ -369,6 +369,82 @@ body.cx-receipt-frame { min-height: 0; background: #fff; padding: 16px; }
 }
 
 /* =========================================================================
+   5b. End of Day (cashier_eod.php)
+   ========================================================================= */
+.eod { display: flex; flex-direction: column; gap: 20px; }
+.eod-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.eod-date { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0; }
+.cx-app .eod-date .form-control { width: auto; min-width: 172px; font-family: var(--cx-font-num); font-size: 14px; }
+.eod-step { width: 44px; padding: 0; justify-content: center; }
+.eod-step i { font-size: 18px; }
+.eod-chip {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 4px 12px; border-radius: 999px;
+    border: 1px solid var(--cx-border); background: var(--cx-surface); font-size: 13px; font-weight: 600; color: var(--cx-text-2);
+}
+.eod-chip i { font-size: 16px; }
+.eod-chip.is-ok { background: var(--cx-green-50); border-color: var(--cx-green-200); color: var(--cx-green-700); }
+.eod-chip.is-warn { background: var(--cx-yellow-50); border-color: #f5df8a; color: var(--cx-yellow-700); }
+.eod-chip.is-warn i { color: #c49a00; }
+
+.eod-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.eod-pad { margin-left: 20px; margin-right: 20px; }
+.eod-recon > .alert { margin-bottom: 14px; }
+.eod-recon > .alert i { font-size: 18px; flex-shrink: 0; }
+.eod-fund { margin-bottom: 16px; }
+.eod-money { display: inline-flex; align-items: center; gap: 6px; }
+.eod-money > span { font-family: var(--cx-font-num); font-size: 14px; color: var(--cx-muted); }
+.cx-app .eod-input { width: 150px; text-align: right; font-family: var(--cx-font-num); font-size: 15px; font-weight: 500; }
+.cx-app .eod-input[aria-invalid="true"] { border-color: var(--cx-red-600); }
+.eod-sub { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--cx-muted); }
+
+.eod-table th[scope="row"] { text-align: left; font-weight: 600; border-bottom: 1px solid var(--cx-border); }
+.eod-table tbody tr:last-child th { border-bottom: none; }
+.eod-table td, .eod-table th[scope="row"] { padding: 10px 16px; }
+.eod-table tbody tr:hover { background: transparent; }
+.eod-table tfoot th, .eod-table tfoot td {
+    padding: 12px 16px; border-top: 1px solid var(--cx-border-strong); background: var(--cx-surface-2); font-weight: 700;
+}
+.eod-diff { font-weight: 600; white-space: nowrap; }
+.eod-diff.is-balanced { color: var(--cx-green-700); }
+.eod-diff.is-short, .eod-diff.is-invalid { color: var(--cx-red-700); }
+.eod-diff.is-over { color: var(--cx-yellow-700); }
+
+.eod-result {
+    display: flex; align-items: center; gap: 12px; margin: 16px 20px 0; padding: 14px 16px;
+    border: 1px solid var(--cx-border); border-left-width: 4px; border-radius: var(--cx-r); background: var(--cx-surface-2);
+}
+.eod-result i { font-size: 26px; color: var(--cx-muted); flex-shrink: 0; }
+.eod-result strong { display: block; font-size: 16px; color: var(--cx-text); }
+.eod-result span { display: block; font-size: 13px; color: var(--cx-text-2); }
+.eod-result.is-balanced { background: var(--cx-green-50); border-color: var(--cx-green-200); border-left-color: var(--cx-green-700); }
+.eod-result.is-balanced i, .eod-result.is-balanced strong { color: var(--cx-green-700); }
+.eod-result.is-short, .eod-result.is-invalid { background: var(--cx-red-50); border-color: var(--cx-red-100); border-left-color: var(--cx-red-600); }
+.eod-result.is-short i, .eod-result.is-short strong, .eod-result.is-invalid i, .eod-result.is-invalid strong { color: var(--cx-red-700); }
+.eod-result.is-over { background: var(--cx-yellow-50); border-color: #f5df8a; border-left-color: var(--cx-yellow-400); }
+.eod-result.is-over i, .eod-result.is-over strong { color: var(--cx-yellow-700); }
+
+.eod-notes { margin-top: 16px; }
+.eod-optional { font-weight: 400; color: var(--cx-muted); }
+.cx-app .eod-notes textarea { min-height: 64px; resize: vertical; }
+.eod-actions { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; padding-bottom: 20px; }
+
+.eod-hist { list-style: none; margin: 0; padding: 0 0 8px; border-top: 1px solid var(--cx-border); }
+.eod-hist-item {
+    position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 56px; padding: 10px 20px; border-bottom: 1px solid var(--cx-border); color: var(--cx-text); text-decoration: none;
+    transition: background-color var(--cx-fast) ease;
+}
+.eod-hist li:last-child .eod-hist-item { border-bottom: none; }
+.eod-hist-item:hover { background: var(--cx-surface-2); }
+.eod-hist-item:focus-visible { outline: 2px solid var(--cx-green-700); outline-offset: -2px; }
+.eod-hist-item.is-current { background: var(--cx-green-50); }
+.eod-hist-item.is-current::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--cx-green-700); }
+.eod-hist-main { display: flex; flex-direction: column; min-width: 0; }
+.eod-hist-main strong { font-size: 14px; font-weight: 600; }
+.eod-hist-main span { font-size: 12.5px; color: var(--cx-muted); }
+/* .eod-pill (short / over / balanced) is shared with the manager review: includes/staff_app.css §12 */
+
+/* =========================================================================
    6. Responsive
    ========================================================================= */
 @media (max-width: 1240px) {
@@ -401,6 +477,7 @@ body.cx-receipt-frame { min-height: 0; background: #fff; padding: 16px; }
 @media (max-width: 900px) {
     .pos { grid-template-columns: minmax(0, 1fr); }
     .pos-register { position: static; }
+    .eod-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 720px) {
     .pos-scan-hint .pos-keys { display: none; }
@@ -436,6 +513,29 @@ body.cx-receipt-frame { min-height: 0; background: #fff; padding: 16px; }
     .pay-methods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .pay-method { min-height: 64px; flex-direction: row; gap: 10px; }
     .pay-method i { font-size: 22px; }
+    /* End of Day: one card per payment type */
+    .eod-table thead { display: none; }
+    .eod-table tbody tr, .eod-table tfoot tr {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px;
+        padding: 14px 16px; border-bottom: 1px solid var(--cx-border);
+    }
+    .eod-table tfoot tr { background: var(--cx-surface-2); }
+    .eod-table td, .eod-table td.num, .eod-table th[scope="row"], .eod-table tfoot th, .eod-table tfoot td { padding: 0; border: none; background: none; text-align: left; }
+    .eod-table th[scope="row"] { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .eod-table th[scope="row"] .eod-sub { margin: 0; }
+    .eod-table td[data-label="Sales"] { display: none; }
+    .eod-table td[data-label="Counted"] { grid-column: 1 / -1; grid-row: 2; }
+    .eod-table td[data-label]::before {
+        content: attr(data-label); display: block; margin-bottom: 4px;
+        font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--cx-muted);
+    }
+    .eod-table .eod-money, .cx-app .eod-table .eod-input { width: 100%; }
+    .eod-bar { align-items: stretch; }
+    .eod-date { flex: 1 1 100%; }
+    .cx-app .eod-date .form-control { flex: 1; min-width: 0; }
+    .eod-result { margin: 16px 16px 0; }
+    .eod-pad { margin-left: 16px; margin-right: 16px; }
+    .eod-hist-item { padding-left: 16px; padding-right: 16px; }
 }
 @media (max-width: 420px) {
     .watch-count strong { font-size: 22px; }
@@ -449,6 +549,17 @@ body.cx-receipt-frame { min-height: 0; background: #fff; padding: 16px; }
     .receipt-toolbar, .cx-print-frame { display: none !important; }
     body.cx-receipt-frame { padding: 0; }
     .receipt { max-width: none; border: none; padding: 0; margin: 0; font-size: 12px; }
+    /* End of Day report (letterhead, signatures and the ink-free look: includes/staff_print.css):
+       inputs print as plain amounts */
+    .eod-money { gap: 1pt; }
+    .cx-app .eod-input { width: auto; min-width: 0; text-align: left; }
+    .cx-app .eod-notes textarea { width: 100%; height: auto; min-height: 0; }
+    .eod-optional, .eod-tx .tx-action { display: none !important; }
+    .eod-pad { padding: 0 !important; }
+    .eod-fund, .eod-notes { margin: 6pt 0 !important; }
+    .eod-result { display: flex; gap: 6pt; margin: 6pt 0; padding: 4pt 6pt; border: 0.75pt solid #000 !important; border-radius: 0; }
+    .eod-result strong, .eod-result span { display: inline; font-size: 9pt; }
+    .eod-result strong::after { content: " — "; }
 }
 @media (prefers-reduced-motion: reduce) {
     .pay-method:active, .pay-chip-amt:active, .pos-remove:active { transform: none; }

@@ -101,6 +101,19 @@
     #msGraphView { display: none !important; }
     .drill-btn { display: none; }
     .deliv-table { min-width: 0; }
+    /* Every delivery prints with its detail row (customer email, order date, products, category) */
+    body.cx-report .deliv-table tr.drill-row { display: table-row !important; break-inside: avoid; break-before: avoid; }
+    body.cx-report .deliv-table tr.drill-toggle td { border-bottom: 0 !important; font-weight: 600; }
+    body.cx-report .deliv-table tr.drill-row td { padding-top: 0 !important; }
+    body.cx-report .drill-grid {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1pt 12pt; margin: 0;
+        padding: 0 !important; border: 0 !important; border-radius: 0; font-size: 8pt;
+    }
+    body.cx-report .drill-grid .drill-wide { grid-column: 1 / -1; }
+    body.cx-report .drill-grid div { display: flex; gap: 4pt; }
+    body.cx-report .drill-grid dt { font-size: 8pt; font-weight: 700; text-transform: none; letter-spacing: 0; white-space: nowrap; }
+    body.cx-report .drill-grid dt::after { content: ":"; }
+    body.cx-report .drill-grid dd { margin: 0; font-size: 8pt; }
     .rt-dash { gap: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {

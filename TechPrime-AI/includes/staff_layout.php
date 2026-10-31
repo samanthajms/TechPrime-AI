@@ -21,6 +21,7 @@ if (!function_exists('staff_nav_for_role')) {
                     ['key' => 'messages', 'href' => 'admin_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments', 'ph' => 'ph-chats-circle', 'short' => 'Messages'],
                     ['key' => 'users', 'href' => 'manage_users.php', 'label' => 'Manage Users', 'icon' => 'fa-users', 'ph' => 'ph-users-three', 'short' => 'Users', 'tab' => true],
                     ['key' => 'logs', 'href' => 'view_logs.php', 'label' => 'Activity Logs', 'icon' => 'fa-clipboard-list', 'ph' => 'ph-clipboard-text', 'short' => 'Activity', 'tab' => true],
+                    ['key' => 'closings', 'href' => 'admin_closings.php', 'label' => 'Cashier Closings', 'icon' => 'fa-calculator', 'ph' => 'ph-calculator', 'short' => 'Closings'],
                     ['key' => 'checker', 'href' => 'admin_build_checker.php', 'label' => 'Build Checker', 'icon' => 'fa-tasks', 'ph' => 'ph-list-checks', 'short' => 'Checker'],
                     ['key' => 'profile', 'href' => 'admin_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user', 'ph' => 'ph-user-circle', 'short' => 'Profile', 'section' => 'Account'],
                     ['key' => 'settings', 'href' => 'admin_settings.php', 'label' => 'Settings', 'icon' => 'fa-cog', 'ph' => 'ph-gear-six', 'short' => 'Settings'],
@@ -29,6 +30,7 @@ if (!function_exists('staff_nav_for_role')) {
                 return [
                     ['key' => 'dashboard', 'href' => 'retail_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt', 'ph' => 'ph-squares-four', 'short' => 'Home', 'tab' => true],
                     ['key' => 'history', 'href' => 'retail_history.php', 'label' => 'Sales History', 'icon' => 'fa-history', 'ph' => 'ph-clock-counter-clockwise', 'short' => 'History', 'tab' => true],
+                    ['key' => 'closings', 'href' => 'retail_closings.php', 'label' => 'Cashier Closings', 'icon' => 'fa-calculator', 'ph' => 'ph-calculator', 'short' => 'Closings'],
                     ['key' => 'forecast', 'href' => 'retail_forecast.php', 'label' => 'Forecast', 'icon' => 'fa-chart-line', 'ph' => 'ph-chart-line-up', 'short' => 'Forecast', 'tab' => true, 'children' => [
                         ['slug' => 'demand', 'href' => 'retail_forecast.php?view=demand', 'label' => 'Product Demand'],
                         ['slug' => 'sales', 'href' => 'retail_forecast.php?view=sales', 'label' => 'Sales'],
@@ -60,6 +62,7 @@ if (!function_exists('staff_nav_for_role')) {
                     ['key' => 'dashboard', 'href' => 'cashier_dashboard.php', 'label' => 'Dashboard', 'icon' => 'fa-tachometer-alt', 'ph' => 'ph-squares-four', 'short' => 'Home'],
                     ['key' => 'pos', 'href' => 'cashier_pos.php', 'label' => 'POS Checkout', 'icon' => 'fa-cash-register', 'ph' => 'ph-cash-register', 'short' => 'Checkout'],
                     ['key' => 'alerts', 'href' => 'cashier_stock_alerts.php', 'label' => 'Stock Alerts', 'icon' => 'fa-bell', 'ph' => 'ph-bell', 'short' => 'Alerts'],
+                    ['key' => 'eod', 'href' => 'cashier_eod.php', 'label' => 'End of Day', 'icon' => 'fa-calculator', 'ph' => 'ph-calculator', 'short' => 'Closing'],
                     ['key' => 'profile', 'href' => 'cashier_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user', 'ph' => 'ph-user-circle', 'short' => 'Profile'],
                 ];
             case 'courier':

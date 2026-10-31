@@ -70,18 +70,16 @@ staff_page_start([
     'heading' => $firstName !== '' ? 'Good to see you, ' . $firstName : 'Inventory Dashboard',
     'subtitle' => date('l, F j, Y') . ' · stock, shipments and receiving at a glance',
     'actions' => '<button type="button" class="cx-btn cx-btn-outline no-print" onclick="window.print()"><i class="ph ph-printer" aria-hidden="true"></i> Print</button>',
-    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><style>' . ias_retail_print_css() . '</style>',
+    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>',
+    'report' => [
+        'title' => 'Inventory Summary Report',
+        'lines' => [
+            'Stock and deliveries' => 'Current totals as of printing',
+            'Products stocked per month' => ['text' => 'This Year · All categories', 'id' => 'invPrintScope'],
+        ],
+    ],
 ]);
 ?>
-
-<div class="print-header">
-    <img src="<?php echo h(staff_logo_href()); ?>" alt="EasyPC">
-    <div>
-        <h1>Inventory Dashboard</h1>
-        <p>Deliveries and stock: current totals &middot; Products Stocked Per Month: <span id="invPrintScope">This Year &middot; All categories</span></p>
-        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Inventory Custodian'); ?> on <?php echo h(ias_report_datetime(gmdate('Y-m-d H:i:s'))); ?></p>
-    </div>
-</div>
 
 <div class="inv-dash">
     <section class="inv-attn" aria-labelledby="attnTitle">
@@ -176,6 +174,13 @@ staff_page_start([
             <?php endforeach; ?>
         </div>
         <div class="cx-chart"><canvas id="invStockinChart" role="img" aria-label="Products stocked per month chart"></canvas></div>
+        <div class="cx-print-only">
+            <table class="cx-table">
+                <thead><tr><th scope="col">Month</th><th scope="col" class="num">Products stocked</th></tr></thead>
+                <tbody id="invStockinPrintRows"></tbody>
+                <tfoot><tr><th scope="row">Total</th><td class="num" id="invStockinPrintTotal">0</td></tr></tfoot>
+            </table>
+        </div>
     </section>
 </div>
 
@@ -257,11 +262,33 @@ $chartScript = <<<SCRIPT
         }
     }
 
+    /* The printed report lists the chart's figures under it */
+    function renderPrintTable(series) {
+        var body = document.getElementById('invStockinPrintRows');
+        if (!body) return;
+        var total = 0;
+        body.textContent = '';
+        series.labels.forEach(function (label, i) {
+            var tr = document.createElement('tr');
+            var td1 = document.createElement('td');
+            var td2 = document.createElement('td');
+            td1.textContent = label;
+            td2.className = 'num';
+            td2.textContent = String(series.values[i]);
+            total += series.values[i];
+            tr.appendChild(td1);
+            tr.appendChild(td2);
+            body.appendChild(tr);
+        });
+        document.getElementById('invStockinPrintTotal').textContent = String(total);
+    }
+
     function renderStockinChart() {
         var canvas = document.getElementById('invStockinChart');
-        if (!canvas || typeof Chart === 'undefined') return;
         var series = buildSeries(selectedCategory, selectedPeriod);
         updateBadge();
+        renderPrintTable(series);
+        if (!canvas || typeof Chart === 'undefined') return;
         if (stockinChart) {
             stockinChart.data.labels = series.labels;
             stockinChart.data.datasets[0].data = series.values;

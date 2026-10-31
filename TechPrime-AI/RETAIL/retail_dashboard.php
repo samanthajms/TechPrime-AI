@@ -38,6 +38,17 @@ $to = $range['to'];
 $categoryTabs = ias_category_groups();
 $category = $dash['category'];
 
+// Printed figures under the Sales by Category chart (the chart itself prints in greyscale)
+$trendByMonth = $from->diff($to)->days > 62;
+$trendRows = [];
+foreach ($dash['trend_labels'] as $k => $label) {
+    $units = (int)($dash['trend_data'][$k] ?? 0);
+    if ($trendByMonth || $units > 0) {
+        $trendRows[] = [(string)$label, $units];
+    }
+}
+$msTotals = ['sales' => array_sum(array_column($monthlySales, 'total_sales')), 'tx' => array_sum(array_column($monthlySales, 'transactions')), 'units' => array_sum(array_column($monthlySales, 'units_sold'))];
+
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 $trendJson = json_encode(['labels' => $dash['trend_labels'], 'data' => $dash['trend_data'], 'total' => array_sum($dash['trend_data'])], $jsonFlags);
 $msChartJson = json_encode([
@@ -60,20 +71,18 @@ staff_page_start([
     'heading' => $firstName !== '' ? 'Good to see you, ' . $firstName : 'Retail Dashboard',
     'subtitle' => date('l, F j, Y') . ' · sales performance at a glance',
     'actions' => $actions,
-    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><style>' . ias_retail_print_css() . '</style>',
+    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>',
+    'report' => [
+        'title' => 'Sales Summary Report',
+        'lines' => [
+            'Summary period' => $cardRange['label'] . ' (' . $cardRange['from']->format('M j, Y') . ' – ' . $cardRange['to']->format('M j, Y') . ')',
+            'Monthly sales' => 'Last ' . $msMonths . ' months',
+            'Sales by category' => $range['label'] . ' (' . $from->format('M j, Y') . ' – ' . $to->format('M j, Y') . ')',
+            'Category' => $category !== '' ? $category : 'All categories',
+        ],
+    ],
 ]);
-
-$logoPath = staff_logo_href();
 ?>
-
-<div class="print-header">
-    <img src="<?php echo h($logoPath); ?>" alt="EasyPC">
-    <div>
-        <h1>Retail Dashboard</h1>
-        <p>Summary: <?php echo h($cardRange['label']); ?> &middot; Sales by Category: <?php echo h($range['label'] . ($category !== '' ? ' (' . $category . ')' : '')); ?></p>
-        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(ias_report_datetime(gmdate('Y-m-d H:i:s'))); ?></p>
-    </div>
-</div>
 
 <div class="rt-dash">
     <section class="cx-card" aria-labelledby="sumTitle">
@@ -163,6 +172,15 @@ $logoPath = staff_logo_href();
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
+                    <tfoot>
+                        <tr class="cx-print-row">
+                            <th scope="row">Total</th>
+                            <td class="num">₱<?php echo number_format((float)$msTotals['sales'], 2); ?></td>
+                            <td class="num"><?php echo number_format((int)$msTotals['tx']); ?></td>
+                            <td class="num"><?php echo number_format((int)$msTotals['units']); ?></td>
+                            <td class="num">₱<?php echo number_format($msTotals['tx'] > 0 ? $msTotals['sales'] / $msTotals['tx'] : 0, 2); ?></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>
@@ -197,6 +215,36 @@ $logoPath = staff_logo_href();
             <?php endforeach; ?>
         </nav>
         <div class="cx-chart"><canvas id="trendChart" role="img" aria-label="Units delivered per product<?php echo $category !== '' ? ' in ' . h($category) : ''; ?>"></canvas></div>
+        <div class="cx-print-only">
+            <p class="rpt-caption">Units delivered by <?php echo $trendByMonth ? 'month' : 'day'; ?><?php echo $trendByMonth ? '' : ' (days without deliveries are left out)'; ?></p>
+            <?php if (!$trendRows): ?>
+                <p>No units delivered in this period.</p>
+            <?php else: ?>
+            <table class="cx-table">
+                <thead><tr><th scope="col"><?php echo $trendByMonth ? 'Month' : 'Day'; ?></th><th scope="col" class="num">Units delivered</th></tr></thead>
+                <tbody>
+                    <?php foreach ($trendRows as $t): ?>
+                    <tr><td><?php echo h($t[0]); ?></td><td class="num"><?php echo number_format($t[1]); ?></td></tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot><tr><th scope="row">Total</th><td class="num"><?php echo number_format(array_sum(array_column($trendRows, 1))); ?></td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+            <p class="rpt-caption">Units delivered per product, by category</p>
+            <?php if (empty($dash['by_group'])): ?>
+                <p>No products delivered in this period.</p>
+            <?php else: ?>
+            <table class="cx-table">
+                <thead><tr><th scope="col">Category</th><th scope="col">Product</th><th scope="col" class="num">Units</th></tr></thead>
+                <tbody>
+                    <?php foreach ($dash['by_group'] as $group => $items): foreach ($items as $it): ?>
+                    <tr><td><?php echo h((string)$group); ?></td><td><?php echo h($it['product']); ?></td><td class="num"><?php echo number_format($it['units']); ?></td></tr>
+                    <?php endforeach; endforeach; ?>
+                </tbody>
+                <tfoot><tr><th scope="row" colspan="2">Total</th><td class="num"><?php echo number_format(array_sum(array_map(fn($items) => array_sum(array_column($items, 'units')), $dash['by_group']))); ?></td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+        </div>
     </section>
 </div>
 

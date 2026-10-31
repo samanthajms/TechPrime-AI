@@ -14,15 +14,14 @@ $retailId = (int)$_SESSION['user_id'];
 // Completed Deliveries has its own time filter (dperiod)
 $periods = ['month' => 'This Month', 'last' => 'Last Month', '3m' => 'Last 3 Months', 'year' => 'This Year'];
 $dRange = ias_sales_period_range((string)($_GET['dperiod'] ?? 'year'));
-// Server-side paging: count every delivery in the range, fetch only the current page.
-$totalRows = ias_count_delivery_rows($db, $dRange['from'], $dRange['to']);
+// Every delivery in the range is rendered: the screen shows one page of 20, Print shows them all.
+$rows = ias_fetch_delivery_rows($db, $retailId, $dRange['from'], $dRange['to']);
+$totalRows = count($rows);
 $perPage = 20;
 $totalPages = max(1, (int)ceil($totalRows / $perPage));
 $page = min(max(1, (int)($_GET['page'] ?? 1)), $totalPages);
-$rows = ias_fetch_delivery_rows($db, $retailId, $dRange['from'], $dRange['to'], [
-    'limit' => $perPage,
-    'offset' => ($page - 1) * $perPage,
-]);
+$firstOnPage = ($page - 1) * $perPage;
+$deliveredTotal = array_sum(array_map(static fn($r) => (float)$r['total'], $rows));
 $stats = ias_summarize_deliveries($db, $retailId, $dRange['from'], $dRange['to'], $totalRows);
 $historyPageUrl = static function (int $p) use ($dRange): string {
     return 'retail_history.php?' . http_build_query(['dperiod' => $dRange['key'], 'page' => $p]);
@@ -51,21 +50,17 @@ staff_page_start([
     'heading' => 'Sales History',
     'subtitle' => 'Completed deliveries only',
     'actions' => $actions,
-    'extra_head' => '<style>' . ias_retail_print_css() . '</style>',
+    'report' => [
+        'title' => 'Sales History Report',
+        'lines' => [
+            'Period covered' => $dRange['label'] . ' (' . $dRange['from']->format('M j, Y') . ' – ' . $dRange['to']->format('M j, Y') . ')',
+            'Scope' => 'Completed deliveries',
+        ],
+    ],
 ]);
 
-$logoPath = staff_logo_href();
 $rangeText = $dRange['from']->format('M j, Y') . ' – ' . $dRange['to']->format('M j, Y');
 ?>
-
-<div class="print-header">
-    <img src="<?php echo h($logoPath); ?>" alt="EasyPC">
-    <div>
-        <h1>Sales</h1>
-        <p><?php echo h($dRange['label']); ?> &middot; <?php echo h($dRange['from']->format('M d, Y') . ' - ' . $dRange['to']->format('M d, Y')); ?></p>
-        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(ias_report_datetime(gmdate('Y-m-d H:i:s'))); ?></p>
-    </div>
-</div>
 
 <div class="rt-dash">
     <section class="cx-card cx-kpi-card" aria-labelledby="sumTitle">
@@ -96,7 +91,7 @@ $rangeText = $dRange['from']->format('M j, Y') . ' – ' . $dRange['to']->format
         <div class="cx-card-head">
             <div>
                 <h2 id="delivTitle"><i class="ph ph-package" aria-hidden="true"></i> Completed deliveries</h2>
-                <p>Finished shipments for your products · open a row for the customer and products</p>
+                <p>Finished shipments for your products<span class="no-print"> · open a row for the customer and products</span><span class="cx-print-only"> · all <?php echo number_format($totalRows); ?> deliver<?php echo $totalRows === 1 ? 'y' : 'ies'; ?> in the period, newest first, with the customer and products of each</span></p>
             </div>
             <div class="cx-card-tools no-print">
                 <span class="cx-count"><i class="ph ph-list-checks" aria-hidden="true"></i> <?php echo number_format($totalRows); ?> deliver<?php echo $totalRows === 1 ? 'y' : 'ies'; ?></span>
@@ -135,8 +130,10 @@ $rangeText = $dRange['from']->format('M j, Y') . ' – ' . $dRange['to']->format
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($rows as $i => $r): $i = (int)$i; ?>
-                    <tr class="drill-toggle" data-drill="<?php echo $i; ?>">
+                    <?php foreach ($rows as $i => $r):
+                        $i = (int)$i;
+                        $offPage = $i < $firstOnPage || $i >= $firstOnPage + $perPage; /* printed, not shown on this screen page */ ?>
+                    <tr class="drill-toggle<?php echo $offPage ? ' cx-print-row' : ''; ?>" data-drill="<?php echo $i; ?>">
                         <td class="col-caret">
                             <button type="button" class="drill-btn" id="drillBtn-<?php echo $i; ?>" aria-expanded="false" aria-controls="drill-<?php echo $i; ?>">
                                 <i class="ph ph-caret-right" aria-hidden="true"></i>
@@ -151,7 +148,7 @@ $rangeText = $dRange['from']->format('M j, Y') . ' – ' . $dRange['to']->format
                         <td data-label="Delivered" class="deliv-when cx-num"><?php echo h(format_utc_datetime((string)$r['updated_at'], 'M j, Y g:i A', '—')); ?></td>
                         <td data-label="Status"><span class="stock-status-pill ok"><i class="ph-fill ph-check-circle" aria-hidden="true"></i> Delivered</span></td>
                     </tr>
-                    <tr class="drill-row" id="drill-<?php echo $i; ?>" hidden>
+                    <tr class="drill-row<?php echo $offPage ? ' cx-print-row' : ''; ?>" id="drill-<?php echo $i; ?>" hidden>
                         <td colspan="8">
                             <dl class="drill-grid">
                                 <div><dt>Customer email</dt><dd><?php echo h($r['customer_email']); ?></dd></div>
@@ -163,6 +160,14 @@ $rangeText = $dRange['from']->format('M j, Y') . ' – ' . $dRange['to']->format
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
+                <tfoot>
+                    <tr class="cx-print-row">
+                        <td class="col-caret"></td>
+                        <th scope="row" colspan="4">Total · <?php echo number_format($totalRows); ?> deliver<?php echo $totalRows === 1 ? 'y' : 'ies'; ?></th>
+                        <td class="num">₱<?php echo number_format($deliveredTotal, 2); ?></td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
         <?php endif; ?>

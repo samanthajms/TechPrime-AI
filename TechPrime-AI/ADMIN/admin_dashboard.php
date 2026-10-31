@@ -26,16 +26,17 @@ $statSalesRows = ias_fetch_all_sales_rows($db, $statRange['from'], $statRange['t
 $statSales = ias_summarize_sales($statSalesRows);
 $statDeliveries = ias_summarize_deliveries_all($db, $statRange['from'], $statRange['to']);
 
+// Every low-stock product is rendered: the screen shows the first 15, Print lists them all.
 $restockStmt = $db->prepare(
     'SELECT id, name, category, stock
      FROM products
      WHERE stock <= 15
-     ORDER BY stock ASC, name ASC
-     LIMIT 15'
+     ORDER BY stock ASC, name ASC'
 );
 $restockStmt->execute();
 $restockAlerts = $restockStmt->fetchAll(PDO::FETCH_ASSOC);
-$restockTotal = (int)$db->query('SELECT COUNT(*) FROM products WHERE stock <= 15')->fetchColumn();
+$restockTotal = count($restockAlerts);
+$restockShown = 15;
 
 logActivity($db, $admin_id, 'view_dashboard', 'Admin viewed dashboard');
 
@@ -58,18 +59,15 @@ staff_page_start([
     'heading' => $firstName !== '' ? 'Good to see you, ' . $firstName : 'Dashboard',
     'subtitle' => date('l, F j, Y') . ' · store sales, accounts and stock at a glance',
     'actions' => '<button type="button" class="cx-btn cx-btn-outline no-print" onclick="window.print()"><i class="ph ph-printer" aria-hidden="true"></i> Print</button>',
-    'extra_head' => '<style>' . ias_retail_print_css() . '</style>',
+    'report' => [
+        'title' => 'Store Summary Report',
+        'lines' => [
+            'Period covered' => $statRange['label'] . ' (' . $statRange['from']->format('M j, Y') . ' – ' . $statRange['to']->format('M j, Y') . ')',
+            'Orders, accounts, stock' => 'All-time totals as of printing',
+        ],
+    ],
 ]);
 ?>
-
-<div class="print-header">
-    <img src="<?php echo h(staff_logo_href()); ?>" alt="EasyPC">
-    <div>
-        <h1>Admin Dashboard</h1>
-        <p>Revenue &amp; deliveries: <?php echo h($statRange['label'] . ' (' . $statRange['from']->format('M d, Y') . ' – ' . $statRange['to']->format('M d, Y') . ')'); ?> &middot; Users and orders: all-time totals</p>
-        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Administrator'); ?> on <?php echo h(ias_report_datetime(gmdate('Y-m-d H:i:s'))); ?></p>
-    </div>
-</div>
 
         <div class="adm-dash">
             <div class="adm-top">
@@ -113,8 +111,8 @@ staff_page_start([
                         <div>
                             <h2 id="restockTitle"><i class="ph ph-package" aria-hidden="true"></i> Restocking alerts</h2>
                             <p>
-                                At or below the low-stock threshold (15), lowest stock first<?php if ($restockTotal > count($restockAlerts)): ?>
-                                · showing <?php echo count($restockAlerts); ?> of <?php echo (int)$restockTotal; ?><?php endif; ?>
+                                At or below the low-stock threshold (15), lowest stock first<?php if ($restockTotal > $restockShown): ?>
+                                <span class="no-print">· showing <?php echo $restockShown; ?> of <?php echo (int)$restockTotal; ?></span><span class="cx-print-only">· all <?php echo (int)$restockTotal; ?> products</span><?php endif; ?>
                             </p>
                         </div>
                         <a href="admin_forecast.php?view=demand" class="cx-link no-print">Demand forecast <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
@@ -134,12 +132,12 @@ staff_page_start([
                                 <th scope="col" class="col-status">Status</th>
                             </tr></thead>
                             <tbody>
-                            <?php foreach ($restockAlerts as $item):
+                            <?php foreach ($restockAlerts as $n => $item):
                                 $stock = (int)$item['stock'];
                                 $status = inv_stock_status_label($stock);
                                 $pct = max(0, min(100, (int)round($stock / 15 * 100)));
                             ?>
-                                <tr class="is-<?php echo h($status); ?>">
+                                <tr class="is-<?php echo h($status); ?><?php echo $n >= $restockShown ? ' cx-print-row' : ''; ?>">
                                     <td data-label="Product">
                                         <span class="stocks-pname"><?php echo h((string)$item['name']); ?></span>
                                         <span class="stocks-pcat"><?php echo h((string)$item['category']); ?></span>

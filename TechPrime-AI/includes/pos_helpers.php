@@ -667,6 +667,349 @@ function pos_get_sale_for_cashier(PDO $db, int $saleId, int $cashierId): ?array
     return $sale;
 }
 
+/* ---------------------------------------------------------------------
+ * End of Day (cashier closing / reconciliation). The pos_eod_reports table
+ * comes from database/migration_pos_eod.sql; pages feature-detect it so the
+ * report still renders (read-only) before the migration has been run.
+ * ------------------------------------------------------------------- */
+
+/** Today's Manila calendar date as 'Y-m-d'. */
+function pos_today_date(): string
+{
+    return (new DateTimeImmutable('now', new DateTimeZone(POS_TIMEZONE)))->format('Y-m-d');
+}
+
+/** A valid business day 'Y-m-d' (not in the future), or null. */
+function pos_parse_business_date(string $raw): ?string
+{
+    $raw = trim($raw);
+    $d = DateTimeImmutable::createFromFormat('!Y-m-d', $raw, new DateTimeZone(POS_TIMEZONE));
+    if (!$d || $d->format('Y-m-d') !== $raw || $raw < '2020-01-01' || $raw > pos_today_date()) {
+        return null;
+    }
+    return $raw;
+}
+
+/** [start, end) of a Manila calendar day, expressed as UTC timestamps for created_at filters. */
+function pos_day_bounds_utc(string $ymd): array
+{
+    $start = new DateTimeImmutable($ymd . ' 00:00:00', new DateTimeZone(POS_TIMEZONE));
+    $end = $start->modify('+1 day');
+    $utc = new DateTimeZone('UTC');
+    return [
+        $start->setTimezone($utc)->format('Y-m-d H:i:s'),
+        $end->setTimezone($utc)->format('Y-m-d H:i:s'),
+    ];
+}
+
+/** Every sale (completed and voided) a cashier rang up on one business day, oldest first. */
+function pos_day_sales(PDO $db, int $cashierId, string $ymd): array
+{
+    [$start, $end] = pos_day_bounds_utc($ymd);
+    $st = $db->prepare(
+        'SELECT s.id, s.invoice_no, s.total, s.payment_method, s.payment_ref, s.amount_tendered, s.change_due,
+                s.status, s.created_at,
+                (SELECT COALESCE(SUM(quantity), 0) FROM pos_sale_items i WHERE i.sale_id = s.id) AS units
+         FROM pos_sales s
+         WHERE s.cashier_id = ? AND s.created_at >= ? AND s.created_at < ?
+         ORDER BY s.created_at, s.id'
+    );
+    $st->execute([$cashierId, $start, $end]);
+    return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Totals of one day's sales. Voided sales are counted apart and left out of the money.
+ * Money is in centavos. methods: [method => ['count' => int, 'total' => cents]] for every POS method.
+ */
+function pos_day_summary(array $sales): array
+{
+    $sum = ['count' => 0, 'voided' => 0, 'units' => 0, 'gross' => 0, 'methods' => []];
+    foreach (array_keys(POS_PAYMENT_METHODS) as $m) {
+        $sum['methods'][$m] = ['count' => 0, 'total' => 0];
+    }
+    foreach ($sales as $s) {
+        if ((string)$s['status'] !== 'completed') {
+            $sum['voided']++;
+            continue;
+        }
+        $cents = pos_db_money_cents($s['total']);
+        $m = (string)$s['payment_method'];
+        $sum['count']++;
+        $sum['units'] += (int)$s['units'];
+        $sum['gross'] += $cents;
+        if (isset($sum['methods'][$m])) {
+            $sum['methods'][$m]['count']++;
+            $sum['methods'][$m]['total'] += $cents;
+        }
+    }
+    return $sum;
+}
+
+/** Expected amount per payment method in centavos; cash includes the opening (change) fund. */
+function pos_eod_expected(array $summary, int $openingCents): array
+{
+    $out = [];
+    foreach ($summary['methods'] as $m => $row) {
+        $out[$m] = $row['total'] + ($m === 'cash' ? $openingCents : 0);
+    }
+    return $out;
+}
+
+/** Short / over / balanced for a difference in centavos (counted - expected). */
+function pos_eod_result(int $diffCents): array
+{
+    if ($diffCents === 0) {
+        return ['key' => 'balanced', 'label' => 'Balanced', 'icon' => 'ph-check-circle'];
+    }
+    return $diffCents < 0
+        ? ['key' => 'short', 'label' => 'Short ' . pos_peso(-$diffCents / 100), 'icon' => 'ph-arrow-down']
+        : ['key' => 'over', 'label' => 'Over ' . pos_peso($diffCents / 100), 'icon' => 'ph-arrow-up'];
+}
+
+/** True once database/migration_pos_eod.sql has been run. */
+function pos_eod_available(PDO $db): bool
+{
+    static $ok = null;
+    if ($ok === null) {
+        try {
+            $st = $db->query(
+                "SELECT 1 FROM information_schema.tables
+                 WHERE table_schema = current_schema() AND table_name = 'pos_eod_reports'"
+            );
+            $ok = (bool)$st->fetchColumn();
+        } catch (Throwable $e) {
+            $ok = false;
+        }
+    }
+    return $ok;
+}
+
+/** A saved closing with its money as centavos (expected[] / counted[] per method), or null. */
+function pos_eod_get(PDO $db, int $cashierId, string $ymd): ?array
+{
+    if (!pos_eod_available($db)) {
+        return null;
+    }
+    $st = $db->prepare('SELECT * FROM pos_eod_reports WHERE cashier_id = ? AND business_date = ?');
+    $st->execute([$cashierId, $ymd]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    return $row ? pos_eod_row($row) : null;
+}
+
+/** The cashier's latest closings, newest day first. */
+function pos_eod_recent(PDO $db, int $cashierId, int $limit = 7): array
+{
+    if (!pos_eod_available($db)) {
+        return [];
+    }
+    $limit = max(1, min(31, $limit));
+    $st = $db->prepare(
+        'SELECT * FROM pos_eod_reports WHERE cashier_id = ? ORDER BY business_date DESC LIMIT ' . $limit
+    );
+    $st->execute([$cashierId]);
+    return array_map('pos_eod_row', $st->fetchAll(PDO::FETCH_ASSOC));
+}
+
+function pos_eod_row(array $row): array
+{
+    $row['business_date'] = substr((string)$row['business_date'], 0, 10);
+    $row['expected'] = [];
+    $row['counted'] = [];
+    foreach (array_keys(POS_PAYMENT_METHODS) as $m) {
+        $row['expected'][$m] = pos_db_money_cents($row['expected_' . $m] ?? 0);
+        $row['counted'][$m] = pos_db_money_cents($row['counted_' . $m] ?? 0);
+    }
+    $row['opening_cents'] = pos_db_money_cents($row['opening_fund']);
+    $row['gross_cents'] = pos_db_money_cents($row['gross_sales']);
+    $row['difference'] = array_sum($row['counted']) - array_sum($row['expected']);
+    $row['cash_difference'] = $row['counted']['cash'] - $row['expected']['cash'];
+    return $row;
+}
+
+/** One saved closing by id (any cashier), for the manager review page. */
+function pos_eod_get_by_id(PDO $db, int $id): ?array
+{
+    if ($id <= 0 || !pos_eod_available($db)) {
+        return null;
+    }
+    $st = $db->prepare('SELECT * FROM pos_eod_reports WHERE id = ?');
+    $st->execute([$id]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    return $row ? pos_eod_row($row) : null;
+}
+
+/**
+ * Manager review (Admin, Retail Officer): every saved closing in [from, to] plus every cashier day
+ * with POS sales that has no closing, newest day first. $cashierId 0 = all cashiers.
+ * Each row: business_date, cashier_id, cashier_name, closing (pos_eod_row() or null), status
+ * (open | balanced | short | over, from the all-payments difference), sales_count, gross_cents,
+ * stale (sales changed after the closing was saved).
+ */
+function pos_eod_review_rows(PDO $db, string $from, string $to, int $cashierId = 0): array
+{
+    [$startUtc] = pos_day_bounds_utc($from);
+    [, $endUtc] = pos_day_bounds_utc($to);
+    $cashierSql = $cashierId > 0 ? ' AND s.cashier_id = ?' : '';
+    $params = [$startUtc, $endUtc];
+    if ($cashierId > 0) {
+        $params[] = $cashierId;
+    }
+    $days = $db->prepare(
+        "SELECT s.cashier_id, MAX(s.cashier_name) AS cashier_name,
+                ((s.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Manila')::date AS d,
+                COUNT(*) FILTER (WHERE s.status = 'completed') AS cnt,
+                COUNT(*) FILTER (WHERE s.status <> 'completed') AS voided,
+                COALESCE(SUM(s.total) FILTER (WHERE s.status = 'completed'), 0) AS gross
+         FROM pos_sales s
+         WHERE s.cashier_id IS NOT NULL AND s.created_at >= ? AND s.created_at < ?" . $cashierSql . '
+         GROUP BY s.cashier_id, d'
+    );
+    $days->execute($params);
+    $live = [];
+    foreach ($days->fetchAll(PDO::FETCH_ASSOC) as $d) {
+        $live[(int)$d['cashier_id'] . '|' . substr((string)$d['d'], 0, 10)] = $d;
+    }
+
+    $closings = [];
+    if (pos_eod_available($db)) {
+        $st = $db->prepare(
+            'SELECT * FROM pos_eod_reports WHERE business_date BETWEEN ? AND ?' . ($cashierId > 0 ? ' AND cashier_id = ?' : '')
+        );
+        $st->execute($cashierId > 0 ? [$from, $to, $cashierId] : [$from, $to]);
+        $closings = array_map('pos_eod_row', $st->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    $rows = [];
+    foreach ($closings as $c) {
+        $key = (int)$c['cashier_id'] . '|' . $c['business_date'];
+        $d = $live[$key] ?? null;
+        unset($live[$key]);
+        $stale = (int)($d['cnt'] ?? 0) !== (int)$c['sales_count'] || (int)($d['voided'] ?? 0) !== (int)$c['voided_count']
+            || pos_db_money_cents($d['gross'] ?? 0) !== $c['gross_cents'];
+        $rows[] = [
+            'business_date' => $c['business_date'],
+            'cashier_id' => (int)$c['cashier_id'],
+            'cashier_name' => (string)$c['cashier_name'],
+            'closing' => $c,
+            'status' => pos_eod_result($c['difference'])['key'],
+            'sales_count' => (int)$c['sales_count'],
+            'gross_cents' => $c['gross_cents'],
+            'stale' => $stale,
+        ];
+    }
+    foreach ($live as $d) {
+        if ((int)$d['cnt'] === 0 && (int)$d['voided'] === 0) {
+            continue;
+        }
+        $rows[] = [
+            'business_date' => substr((string)$d['d'], 0, 10),
+            'cashier_id' => (int)$d['cashier_id'],
+            'cashier_name' => (string)$d['cashier_name'],
+            'closing' => null,
+            'status' => 'open',
+            'sales_count' => (int)$d['cnt'],
+            'gross_cents' => pos_db_money_cents($d['gross']),
+            'stale' => false,
+        ];
+    }
+    usort($rows, fn($a, $b) => strcmp($b['business_date'], $a['business_date']) ?: strcasecmp($a['cashier_name'], $b['cashier_name']));
+    return $rows;
+}
+
+/** Cashier accounts for the review filter: [id => display name]. */
+function pos_cashier_options(PDO $db): array
+{
+    $out = [];
+    foreach ($db->query("SELECT id, name, surname FROM users WHERE role = 'cashier' ORDER BY name, surname, id") as $u) {
+        $out[(int)$u['id']] = trim($u['name'] . ' ' . $u['surname']) ?: ('User #' . (int)$u['id']);
+    }
+    return $out;
+}
+
+/**
+ * Save (or re-save) a cashier's closing for one business day. The expected totals are always
+ * recomputed from pos_sales here, never taken from the form. $input: opening_fund, counted[method], notes.
+ * Every save is written to the activity log; a re-save records the previous counted cash.
+ */
+function pos_eod_save(PDO $db, int $cashierId, string $cashierName, string $ymd, array $input): array
+{
+    if (!pos_eod_available($db)) {
+        return pos_err('eod_unavailable', 'End-of-day closings cannot be saved until the database migration has been run.');
+    }
+    $day = pos_parse_business_date($ymd);
+    if ($day === null) {
+        return pos_err('eod_invalid', 'Choose a valid business day (not in the future).');
+    }
+    $opening = pos_parse_money_input(($input['opening_fund'] ?? '') === '' ? '0' : $input['opening_fund']);
+    if ($opening === null) {
+        return pos_err('eod_invalid', 'Enter the opening fund as an amount, e.g. 1000 or 1000.50.');
+    }
+    $counted = [];
+    foreach (POS_PAYMENT_METHODS as $m => $label) {
+        $c = pos_parse_money_input($input['counted'][$m] ?? '');
+        if ($c === null) {
+            return pos_err('eod_invalid', 'Enter the counted ' . $label . ' total (0 if none).');
+        }
+        $counted[$m] = $c;
+    }
+    $notes = trim((string)($input['notes'] ?? ''));
+    if (mb_strlen($notes) > 500) {
+        return pos_err('eod_invalid', 'Notes can be at most 500 characters.');
+    }
+    $cashierName = trim($cashierName) !== '' ? mb_substr(trim($cashierName), 0, 201) : ('User #' . $cashierId);
+
+    $sp = pos_tx_begin($db);
+    try {
+        $prev = $db->prepare('SELECT counted_cash FROM pos_eod_reports WHERE cashier_id = ? AND business_date = ? FOR UPDATE');
+        $prev->execute([$cashierId, $day]);
+        $prevCash = $prev->fetchColumn();
+
+        $sum = pos_day_summary(pos_day_sales($db, $cashierId, $day));
+        $expected = pos_eod_expected($sum, $opening);
+
+        $cols = ['cashier_id', 'cashier_name', 'business_date', 'sales_count', 'voided_count', 'units_sold',
+                 'gross_sales', 'opening_fund', 'notes'];
+        $vals = [$cashierId, $cashierName, $day, $sum['count'], $sum['voided'], $sum['units'],
+                 pos_cents_to_str($sum['gross']), pos_cents_to_str($opening), $notes !== '' ? $notes : null];
+        foreach (array_keys(POS_PAYMENT_METHODS) as $m) {
+            array_push($cols, 'expected_' . $m, 'counted_' . $m);
+            array_push($vals, pos_cents_to_str($expected[$m]), pos_cents_to_str($counted[$m]));
+        }
+        $updates = [];
+        foreach (array_slice($cols, 1) as $c) {
+            if ($c !== 'business_date') {
+                $updates[] = $c . ' = EXCLUDED.' . $c;
+            }
+        }
+        $updates[] = 'updated_at = CURRENT_TIMESTAMP';
+        $db->prepare(
+            'INSERT INTO pos_eod_reports (' . implode(', ', $cols) . ')
+             VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')
+             ON CONFLICT (cashier_id, business_date) DO UPDATE SET ' . implode(', ', $updates)
+        )->execute($vals);
+
+        $diff = array_sum($counted) - array_sum($expected);
+        $cashDiff = $counted['cash'] - $expected['cash'];
+        $details = 'End of day ' . $day . ': ' . $sum['count'] . ' sale' . ($sum['count'] === 1 ? '' : 's')
+            . ', ' . pos_peso($sum['gross'] / 100) . '; cash counted ' . pos_peso($counted['cash'] / 100)
+            . ' vs expected ' . pos_peso($expected['cash'] / 100) . ' (' . pos_eod_result($cashDiff)['label'] . ')'
+            . '; all methods ' . pos_eod_result($diff)['label'];
+        if ($prevCash !== false) {
+            $details .= '; updated, cash counted was ' . pos_peso((float)$prevCash);
+        }
+        logActivity($db, $cashierId, $prevCash !== false ? 'pos_eod_update' : 'pos_eod_close', $details);
+
+        pos_tx_commit($db, $sp);
+    } catch (Throwable $e) {
+        pos_tx_rollback($db, $sp);
+        error_log('pos_eod_save: ' . $e->getMessage());
+        return pos_err('server_error', 'Could not save the closing. Please try again.');
+    }
+
+    return ['ok' => true, 'updated' => $prevCash !== false, 'difference' => $diff, 'cash_difference' => $cashDiff];
+}
+
 function pos_recent_stock_ins(PDO $db, int $userId, int $limit = 10): array
 {
     $limit = max(1, min(50, $limit));

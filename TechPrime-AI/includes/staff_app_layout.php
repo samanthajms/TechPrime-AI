@@ -17,6 +17,8 @@
  * Extra staff_page_start() options read here only:
  *   actions   => string  HTML for the page-header action area
  *   hide_head => bool    no page header (an sr-only h1 is still printed)
+ *   report    => array   the page is a printable report (see staff_report_head()): loads
+ *                        includes/staff_print.css and prints a letterhead + signature block
  *
  * The inventory custodian also gets the notifications bell (staff_app_notif_bell()).
  *
@@ -39,12 +41,78 @@ if (!function_exists('staff_app_role_css')) {
     function staff_app_role_css(string $role): string
     {
         $map = [
-            'cashier' => 'cashier.css?v=15',
+            'cashier' => 'cashier.css?v=19',
             'admin' => 'admin.css?v=4',
-            'retail_officer' => 'retail.css?v=1',
+            'retail_officer' => 'retail.css?v=2',
             'inventory_custodian' => 'inventory.css?v=3',
         ];
         return $map[$role] ?? '';
+    }
+}
+
+if (!function_exists('staff_report_head')) {
+    /**
+     * Letterhead printed at the top of a report page (hidden on screen, see includes/staff_print.css).
+     * $report keys:
+     *   title => string  report name, e.g. "Sales History Report"
+     *   lines => array   label => value rows under the title ("Period covered" => "…"); a value can be
+     *                    ['text' => …, 'id' => …] when page JS keeps it up to date
+     *   sign  => array   signature boxes [['role' => 'Prepared by', 'name' => …, 'note' => …], …]
+     *                    (default: the signed-in user as "Prepared by" + a blank "Checked by")
+     * "Prepared by" and "Date generated" are always added to the lines.
+     */
+    function staff_report_head(array $report, string $role): void
+    {
+        $lines = (array)($report['lines'] ?? []);
+        $lines['Prepared by'] = staff_report_user_name() . ', ' . staff_role_label($role);
+        $lines['Date generated'] = (new DateTime('now', new DateTimeZone('Asia/Manila')))->format('M j, Y g:i A');
+        ?>
+    <header class="rpt-head">
+        <div class="rpt-brand">
+            <img src="<?php echo h(staff_logo_href()); ?>" alt="EasyPC">
+            <div class="rpt-org">
+                <strong>EasyPC One Oasis Branch</strong>
+                <span>Rosario, Pasig City</span>
+            </div>
+        </div>
+        <div class="rpt-title"><?php echo h((string)($report['title'] ?? 'Report')); ?></div>
+        <dl class="rpt-meta">
+            <?php foreach ($lines as $label => $value):
+                $id = is_array($value) ? (string)($value['id'] ?? '') : '';
+                $text = is_array($value) ? (string)($value['text'] ?? '') : (string)$value; ?>
+            <div><dt><?php echo h((string)$label); ?></dt><dd<?php echo $id !== '' ? ' id="' . h($id) . '"' : ''; ?>><?php echo h($text); ?></dd></div>
+            <?php endforeach; ?>
+        </dl>
+    </header>
+        <?php
+    }
+
+    function staff_report_user_name(): string
+    {
+        $name = trim((string)($_SESSION['name'] ?? '') . ' ' . (string)($_SESSION['surname'] ?? ''));
+        return $name !== '' ? $name : 'Staff';
+    }
+
+    /** Signature block + end mark printed at the bottom of a report page. */
+    function staff_report_sign(array $report, string $role): void
+    {
+        $sign = $report['sign'] ?? [
+            ['role' => 'Prepared by', 'name' => staff_report_user_name(), 'note' => staff_role_label($role)],
+            ['role' => 'Checked by', 'name' => '', 'note' => 'Signature over printed name'],
+        ];
+        ?>
+    <div class="rpt-sign">
+        <?php foreach ($sign as $s): ?>
+        <div>
+            <span class="rpt-sign-role"><?php echo h((string)($s['role'] ?? '')); ?>:</span>
+            <span class="rpt-sign-line"></span>
+            <span class="rpt-sign-name"><?php echo h((string)($s['name'] ?? '')); ?></span>
+            <span><?php echo h((string)($s['note'] ?? '')); ?></span>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <p class="rpt-end">*** End of report ***</p>
+        <?php
     }
 }
 
@@ -148,7 +216,7 @@ if (!function_exists('staff_app_nav_badge')) {
 if (!function_exists('staff_app_css_href')) {
     function staff_app_css_href(): string
     {
-        return str_replace('staff_shared.css', 'staff_app.css', staff_css_href()) . '?v=4';
+        return str_replace('staff_shared.css', 'staff_app.css', staff_css_href()) . '?v=8';
     }
 }
 
@@ -218,6 +286,7 @@ if (!function_exists('staff_app_shell_start')) {
         $actions = (string)($opts['actions'] ?? '');
         $hideHead = !empty($opts['hide_head']);
         $extraHead = $opts['extra_head'] ?? '';
+        $report = is_array($opts['report'] ?? null) ? $opts['report'] : null;
         $nav = staff_app_nav($role);
         $roleLabel = staff_role_label($role);
         $home = (string)($nav[0]['href'] ?? '#');
@@ -272,9 +341,10 @@ if (!function_exists('staff_app_shell_start')) {
     <link rel="stylesheet" href="<?php echo h($css); ?>?v=ep-motion-2">
     <link rel="stylesheet" href="<?php echo h(staff_app_css_href()); ?>">
     <?php if ($roleCss !== ''): ?><link rel="stylesheet" href="<?php echo h($roleCss); ?>"><?php endif; ?>
+    <?php if ($report): ?><link rel="stylesheet" href="<?php echo h(str_replace('staff_shared.css', 'staff_print.css', $css)); ?>?v=1"><?php endif; ?>
     <?php echo $extraHead; ?>
 </head>
-<body class="cx-app cx-role-<?php echo h(str_replace('_', '-', $role)); ?> cx-page-<?php echo h($active !== '' ? $active : 'other'); ?>">
+<body class="cx-app cx-role-<?php echo h(str_replace('_', '-', $role)); ?> cx-page-<?php echo h($active !== '' ? $active : 'other'); ?><?php echo $report ? ' cx-report' : ''; ?>">
 <script>
 /* Apply the saved sidebar width before first paint (same preference key as the other staff roles) */
 try {
@@ -425,7 +495,10 @@ try {
     <h1 class="cx-sr"><?php echo h($heading); ?></h1>
     <?php endif; ?>
         <?php
-        $GLOBALS['IAS_APP_NAV'] = ['role' => $role, 'nav' => $nav, 'active' => $active, 'active_child' => $activeChild, 'logout' => $logout];
+        if ($report) {
+            staff_report_head($report, $role);
+        }
+        $GLOBALS['IAS_APP_NAV'] = ['role' => $role, 'nav' => $nav, 'active' => $active, 'active_child' => $activeChild, 'logout' => $logout, 'report' => $report];
     }
 }
 
@@ -443,6 +516,10 @@ if (!function_exists('staff_app_shell_end')) {
         $useMore = count($nav) > 5;
         $tabs = $useMore ? array_values(array_filter($nav, static fn($i) => !empty($i['tab']))) : $nav;
         $moreOn = $useMore && !in_array($active, array_column($tabs, 'key'), true);
+        $report = $state['report'] ?? null;
+        if ($report) {
+            staff_report_sign($report, $role);
+        }
         ?>
 </main>
 </div><!-- /.cx-frame -->
@@ -502,6 +579,16 @@ if (!function_exists('staff_app_shell_end')) {
 <script src="../includes/ui_alerts.js"></script>
 <?php echo ias_session_timeout_assets(); ?>
 <?php echo $extraScripts; ?>
+<?php if ($report): ?>
+<script>
+/* Charts on a report: redraw at the printed width, then back to the screen size */
+(function () {
+    function charts() { return typeof Chart !== 'undefined' && Chart.instances ? Object.values(Chart.instances) : []; }
+    window.addEventListener('beforeprint', function () { charts().forEach(function (c) { c.resize(680, 260); }); });
+    window.addEventListener('afterprint', function () { charts().forEach(function (c) { c.resize(); }); });
+})();
+</script>
+<?php endif; ?>
 <?php if (in_array($role, ['admin', 'retail_officer', 'inventory_custodian'], true)): /* roles with the Forecast page */ ?>
 <script src="../includes/service_warmup.js?v=1" data-svc="forecast" defer></script>
 <?php endif; ?>
