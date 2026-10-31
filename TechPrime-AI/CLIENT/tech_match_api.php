@@ -96,7 +96,7 @@ if (($payload['action'] ?? '') === 'review') {
         }
     }
     echo json_encode(
-        ['ok' => true] + $review + ['rating' => pc_build_rating($buildMap, $ctx['purpose']), 'can_run' => pc_rating_can_run($buildMap)],
+        ['ok' => true] + $review + ['rating' => pc_build_rating($buildMap, $ctx['purpose'])],
         JSON_UNESCAPED_UNICODE
     );
     exit;

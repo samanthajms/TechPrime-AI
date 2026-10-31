@@ -77,14 +77,12 @@
     var starters = null;
     /* Add-ons group in the slot list: null = open only when an add-on is picked; true/false once the shopper toggles it. */
     var addonsOpen = null;
-    /* "What can it run?" shows the uses that matter for the purpose first; the rest behind "Show all". */
-    var canRunAll = false;
     /* Build purpose chip (keys from includes/pc_purpose.php); steers the recommendations. */
     var purpose = 'balanced';
     /* Last build check from tech_match_api.php (action=review); rating = Build Score + Performance Balance (pc_rating.php).
        parts = today's price / stock per slot, soldOut = picked parts out of stock (with an in-stock alternative),
        checkedAt = when those prices were read. */
-    var review = { key: '', gpuNeeded: false, warnings: [], notes: [], rating: null, canRun: [], pending: false, parts: {}, soldOut: [], checkedAt: null };
+    var review = { key: '', gpuNeeded: false, warnings: [], notes: [], rating: null, pending: false, parts: {}, soldOut: [], checkedAt: null };
     /* slot -> { id, old } for parts whose saved price was replaced by today's price. */
     var priceChanges = {};
     /* Shown on the Build Summary, the printed summary and the shared text. */
@@ -606,42 +604,8 @@
             '<strong>' + Number(rating.score) + '/100</strong></p>';
     }
 
-    /* "What can it run?" (pc_rating.php pc_rating_can_run): plain-language estimates for common uses. */
+    /* Icons for the ready-made builds' "can run" line (pc_rating.php pc_rating_can_run, via starter_builds). */
     var CAN_RUN_ICON = { great: 'fa-check-circle', good: 'fa-check', limited: 'fa-exclamation-circle', no: 'fa-times-circle' };
-    var CAN_RUN_WORD = { great: 'Great', good: 'Good', limited: 'Limited', no: 'Not suited' };
-    var CAN_RUN_PREVIEW = 3;
-    var CAN_RUN_FIRST = {
-        balanced: ['everyday', 'esports', 'photo'],
-        school: ['everyday', 'esports', 'photo'],
-        office: ['everyday', 'video', 'photo'],
-        gaming: ['popular', 'aaa', 'esports'],
-        creation: ['video', 'photo', 'stream']
-    };
-
-    function renderCanRun() {
-        var list = $('tmCanRun');
-        if (!list) return;
-        var rows = build.processor ? (review.canRun || []).slice() : [];
-        var first = CAN_RUN_FIRST[purpose] || CAN_RUN_FIRST.balanced;
-        rows.sort(function (a, b) {
-            var ia = first.indexOf(a.key), ib = first.indexOf(b.key);
-            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-        });
-        list.hidden = !rows.length;
-        if ($('tmCanRunEmpty')) $('tmCanRunEmpty').hidden = rows.length > 0;
-        var more = $('tmCanRunMore');
-        if (more) {
-            more.hidden = rows.length <= CAN_RUN_PREVIEW;
-            more.setAttribute('aria-expanded', canRunAll ? 'true' : 'false');
-            more.textContent = canRunAll ? 'Show fewer' : 'Show all ' + rows.length + ' uses';
-        }
-        if (!canRunAll) rows = rows.slice(0, CAN_RUN_PREVIEW);
-        list.innerHTML = rows.map(function (r) {
-            return '<li class="is-' + escapeHtml(r.level) + '"><i class="fas ' + (CAN_RUN_ICON[r.level] || 'fa-circle') + '" aria-hidden="true"></i>' +
-                '<span><strong>' + escapeHtml(r.label) + '</strong><small>' + escapeHtml(r.text) + '</small></span>' +
-                '<em>' + (CAN_RUN_WORD[r.level] || '') + '</em></li>';
-        }).join('');
-    }
 
     function renderRight(power) {
         var count = filledCount();
@@ -662,7 +626,6 @@
             scoreNotes.innerHTML = noteList.map(function (n) { return '<li>' + escapeHtml(n) + '</li>'; }).join('');
         }
         renderScoreWhy(rating);
-        renderCanRun();
         if ($('tmSummaryCount')) $('tmSummaryCount').textContent = count + ' / ' + TOTAL_SLOTS;
         if ($('tmSummaryBar')) $('tmSummaryBar').style.width = Math.round((count / TOTAL_SLOTS) * 100) + '%';
         if ($('tmSummaryTotal')) $('tmSummaryTotal').textContent = peso(total);
@@ -854,13 +817,10 @@
         var svg = $('tmRadarSvg');
         if (!svg) return;
         /*
-         * Green fill = absolute strength of each picked part (1 = top of the range), dashed outline =
-         * what the chosen purpose needs on the same scale (pc_rating.php). Where the fill reaches the
-         * outline the part is enough; amber dots mark parts that fall short.
+         * Green fill = absolute strength of each picked part (1 = top of the range, pc_rating.php);
+         * amber dots mark parts that fall short of what the chosen purpose needs.
          */
-        var need = purpose === 'balanced' ? 'everyday use' : purposeLabel();
         var rated = filledCount() && review.rating ? review.rating.axes || [] : [];
-        var preset = (window.EP_TM_TARGETS && window.EP_TM_TARGETS[purpose]) || {};
         function clamp(n) { return Math.max(0, Math.min(1, Number(n) || 0)); }
         var axes = [
             { key: 'cpu', label: 'CPU' },
@@ -871,14 +831,11 @@
         ].map(function (a) {
             var r = rated.find(function (x) { return x.key === a.key; });
             var power = r ? clamp(r.power) : 0;
-            var target = clamp(r ? r.target : preset[a.key]);
-            var tip = a.label + ': ' + (r ? r.text : 'not picked yet') + '. ' +
-                (power > 0 ? 'Strength ' + Math.round(power * 100) + '% · ' : '') + need + ' needs ' + Math.round(target * 100) + '%';
-            return { label: a.label, power: power, target: target, short: !!r && power > 0 && Number(r.value) < 0.85, tip: tip };
+            var tip = a.label + ': ' + (r ? r.text : 'not picked yet') + (power > 0 ? '. Strength ' + Math.round(power * 100) + '%' : '');
+            return { label: a.label, power: power, short: !!r && power > 0 && Number(r.value) < 0.85, tip: tip };
         });
-        svg.setAttribute('aria-label', 'Performance balance. Your parts compared with what ' + need + ' needs: ' +
-            axes.map(function (a) { return a.label + ' ' + Math.round(a.power * 100) + '% of ' + Math.round(a.target * 100) + '% needed'; }).join(', '));
-        if ($('tmRadarNeed')) $('tmRadarNeed').textContent = need;
+        svg.setAttribute('aria-label', 'Performance balance of your parts: ' +
+            axes.map(function (a) { return a.label + ' ' + Math.round(a.power * 100) + '%'; }).join(', '));
 
         var cx = 90, cy = 90, r = 58;
         function pt(i, rr) {
@@ -899,7 +856,6 @@
         var fill = rated.length
             ? '<polygon class="tm-radar-fill" points="' + poly(function (a) { return Math.max(0.03, a.power); }) + '"/>'
             : '';
-        var target = '<polygon class="tm-radar-target" points="' + poly(function (a) { return Math.max(0.03, a.target); }) + '"/>';
         var dots = axes.map(function (a, i) {
             if (a.power <= 0) return '';
             var p = pt(i, r * a.power);
@@ -911,7 +867,7 @@
             return '<text class="tm-radar-label' + (a.short ? ' is-short' : '') + '" x="' + p[0] + '" y="' + p[1] + '" text-anchor="middle" dominant-baseline="middle">' +
                 '<title>' + escapeHtml(a.tip) + '</title>' + a.label + '</text>';
         }).join('');
-        svg.innerHTML = grid + spokes + fill + target + dots + labels;
+        svg.innerHTML = grid + spokes + fill + dots + labels;
     }
 
     function renderEditBanner() {
@@ -1026,7 +982,6 @@
                     review.warnings = data.warnings || [];
                     review.notes = data.notes || [];
                     review.rating = data.rating || null;
-                    review.canRun = data.can_run || [];
                     review.parts = data.parts || {};
                     review.soldOut = data.sold_out || [];
                     review.checkedAt = new Date();
@@ -3023,12 +2978,6 @@
         }
         if ($('tmCompareGo')) $('tmCompareGo').addEventListener('click', openCompareDialog);
         if ($('tmAskStore')) $('tmAskStore').addEventListener('click', askStore);
-        if ($('tmCanRunMore')) {
-            $('tmCanRunMore').addEventListener('click', function () {
-                canRunAll = !canRunAll;
-                renderCanRun();
-            });
-        }
         if ($('bpStartersToggle')) {
             $('bpStartersToggle').addEventListener('click', function () {
                 setStartersOpen(this.getAttribute('aria-expanded') !== 'true');

@@ -82,14 +82,14 @@ if (!empty($isLoggedIn) && !empty($_SESSION['user_id'])) {
     <?php if ($epShowPrimo): ?><link rel="stylesheet" href="primo.css?v=ux-18"><?php endif; ?>
     <?php if (!empty($extraHead)) echo $extraHead; ?>
     <?php /* Dark theme: generated overrides, then hand-written fixes. Both only match html[data-theme="dark"]. */ ?>
-    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-33">
+    <link rel="stylesheet" href="ep_dark_auto.css?v=dark-34">
     <link rel="stylesheet" href="ep_dark.css?v=dark-19">
     <?php /* Header v2: after the dark files so its token-driven rules win over the old header ones. */ ?>
     <link rel="stylesheet" href="header.css?v=hd-10">
     <?php /* Storefront v2 (the homepage design) for every page: components, then the page-level styles.
              Token-driven dark mode; loaded last so they win over styles.css and the generated dark rules. */ ?>
     <link rel="stylesheet" href="storefront.css?v=sf-5">
-    <link rel="stylesheet" href="storefront-pages.css?v=sfp-20">
+    <link rel="stylesheet" href="storefront-pages.css?v=sfp-25">
     <?php echo ias_session_timeout_assets(); ?>
 </head>
 <body class="ep-body <?php echo h($bodyClass); ?>">

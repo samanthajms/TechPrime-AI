@@ -40,7 +40,7 @@ if (!function_exists('staff_app_role_css')) {
     {
         $map = [
             'cashier' => 'cashier.css?v=15',
-            'admin' => 'admin.css?v=1',
+            'admin' => 'admin.css?v=4',
             'retail_officer' => 'retail.css?v=1',
             'inventory_custodian' => 'inventory.css?v=3',
         ];

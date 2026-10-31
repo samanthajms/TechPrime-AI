@@ -21,6 +21,7 @@ if (!function_exists('staff_nav_for_role')) {
                     ['key' => 'messages', 'href' => 'admin_messages.php', 'label' => 'Messages', 'icon' => 'fa-comments', 'ph' => 'ph-chats-circle', 'short' => 'Messages'],
                     ['key' => 'users', 'href' => 'manage_users.php', 'label' => 'Manage Users', 'icon' => 'fa-users', 'ph' => 'ph-users-three', 'short' => 'Users', 'tab' => true],
                     ['key' => 'logs', 'href' => 'view_logs.php', 'label' => 'Activity Logs', 'icon' => 'fa-clipboard-list', 'ph' => 'ph-clipboard-text', 'short' => 'Activity', 'tab' => true],
+                    ['key' => 'checker', 'href' => 'admin_build_checker.php', 'label' => 'Build Checker', 'icon' => 'fa-tasks', 'ph' => 'ph-list-checks', 'short' => 'Checker'],
                     ['key' => 'profile', 'href' => 'admin_profile.php', 'label' => 'My Profile', 'icon' => 'fa-user', 'ph' => 'ph-user-circle', 'short' => 'Profile', 'section' => 'Account'],
                     ['key' => 'settings', 'href' => 'admin_settings.php', 'label' => 'Settings', 'icon' => 'fa-cog', 'ph' => 'ph-gear-six', 'short' => 'Settings'],
                 ];

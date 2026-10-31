@@ -1114,7 +1114,7 @@
 /* Desktop: the side columns grow with the screen (about 1 : 2 : 1.1) so the case view does not take all the extra width;
    tech_match.css keeps its own tablet/phone layouts */
 @media (min-width: 1201px) {
-    .ep-body.sf-page .bp-page .tm-workspace { grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr) minmax(290px, 1.1fr); gap: 24px; }
+    .ep-body.sf-page .bp-page .tm-workspace { grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr) minmax(300px, 1.1fr); gap: 24px; }
 }
 .ep-body.sf-page .bp-page .tm-section-label { font-size: 12px; letter-spacing: 0.08em; color: var(--sf-accent-text); }
 .ep-body.sf-page .bp-page .tm-slot {
@@ -1360,9 +1360,9 @@
 .ep-body.sf-page .bp-page .tm-tools {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 4px;
+    gap: 8px;
     margin-top: 12px;
-    padding-top: 10px;
+    padding-top: 12px;
     border-top: 1px solid var(--sf-border);
 }
 .ep-body.sf-page .bp-page .tm-tool {
@@ -1374,22 +1374,22 @@
     min-width: 0;
     min-height: 56px;
     padding: 6px 4px;
-    border: 0;
+    border: 1px solid var(--sf-border-strong);
     border-radius: var(--sf-r-sm);
-    background: none;
+    background: var(--sf-surface);
     color: var(--sf-text-2);
     font: inherit;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.15s var(--sf-ease), color 0.15s var(--sf-ease);
+    transition: background-color 0.15s var(--sf-ease), border-color 0.15s var(--sf-ease), color 0.15s var(--sf-ease);
 }
 .ep-body.sf-page .bp-page .tm-tool i { font-size: 16px; color: var(--sf-accent-text); }
 .ep-body.sf-page .bp-page .tm-tool span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ep-body.sf-page .bp-page .tm-tool:hover { background: var(--sf-accent-soft); color: var(--sf-text); }
+.ep-body.sf-page .bp-page .tm-tool:hover { border-color: var(--sf-accent-text); background: var(--sf-accent-soft); color: var(--sf-text); }
 .ep-body.sf-page .bp-page .tm-tool:active { background: var(--sf-border); }
 .ep-body.sf-page .bp-page .tm-tool:disabled { opacity: 0.5; cursor: wait; }
-/* "My Saved Builds" + "Clear build": two equal soft buttons (tinted surface, coloured on hover) */
+/* "My Saved Builds" + "Clear build": two equal outlined buttons, like the tools above (coloured on hover) */
 .ep-body.sf-page .bp-page .tm-tools-foot { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
 .ep-body.sf-page .bp-page .tm-link {
     display: inline-flex;
@@ -1399,9 +1399,9 @@
     min-width: 0;
     min-height: 44px;
     padding: 0 12px;
-    border: 1px solid var(--sf-border);
+    border: 1px solid var(--sf-border-strong);
     border-radius: var(--sf-r-sm);
-    background: var(--sf-surface-2);
+    background: var(--sf-surface);
     color: var(--sf-accent-text);
     font: inherit;
     font-size: 13px;
@@ -1696,30 +1696,11 @@
 .ep-body.sf-page .bp-page .bp-starters-toggle:focus-visible,
 .ep-body.sf-page .bp-page .bp-starter-use:focus-visible { outline: 2px solid var(--sf-focus); outline-offset: 2px; }
 
-/* "What can it run?" levels, shared by the card and the starter builds (icon + word, never colour alone) */
+/* "Can run" levels on the ready-made builds (icon + word, never colour alone) */
 .ep-body.sf-page .bp-page .is-great > i,
 .ep-body.sf-page .bp-page .is-good > i { color: var(--sf-accent-text); }
 .ep-body.sf-page .bp-page .is-limited > i { color: var(--sf-warn-text); }
 .ep-body.sf-page .bp-page .is-no > i { color: var(--sf-danger-text); }
-.ep-body.sf-page .bp-page .tm-canrun-empty { margin: 8px 0 0; font-size: 13px; color: var(--sf-muted); }
-.ep-body.sf-page .bp-page .tm-canrun-empty[hidden],
-.ep-body.sf-page .bp-page .tm-canrun[hidden] { display: none; }
-.ep-body.sf-page .bp-page .tm-canrun { display: grid; gap: 2px; margin: 8px 0 0; padding: 0; list-style: none; }
-.ep-body.sf-page .bp-page .tm-canrun li {
-    display: grid;
-    grid-template-columns: 18px minmax(0, 1fr) auto;
-    align-items: baseline;
-    gap: 8px;
-    padding: 7px 0;
-    border-bottom: 1px solid var(--sf-border);
-}
-.ep-body.sf-page .bp-page .tm-canrun li:last-child { border-bottom: 0; }
-.ep-body.sf-page .bp-page .tm-canrun strong { display: block; font-size: 13px; font-weight: 600; color: var(--sf-text); }
-.ep-body.sf-page .bp-page .tm-canrun small { display: block; font-size: 12px; color: var(--sf-text-2); }
-.ep-body.sf-page .bp-page .tm-canrun em { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--sf-text-2); white-space: nowrap; }
-.ep-body.sf-page .bp-page .tm-canrun .is-limited em { color: var(--sf-warn-text); }
-.ep-body.sf-page .bp-page .tm-canrun .is-no em { color: var(--sf-danger-text); }
-.ep-body.sf-page .bp-page .tm-canrun-note { display: flex; gap: 6px; margin: 10px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--sf-muted); }
 
 /* Slot list: add-ons note, out-of-stock (red), low stock, "I already have this" */
 .ep-body.sf-page .bp-page .tm-section-note { margin: 0 0 8px; font-size: 12px; line-height: 1.45; color: var(--sf-muted); }
@@ -1865,7 +1846,7 @@
 }
 
 /* Calmer Build a PC: one-line purpose options, compact starter cards, folded extras
-   (add-ons, price breakdown, all "can run" uses, compare) so the page shows less at once */
+   (add-ons, price breakdown, compare) so the page shows less at once */
 .ep-body.sf-page .bp-page .bp-purpose { gap: 10px 16px; padding: 12px 18px 14px; }
 .ep-body.sf-page .bp-page .bp-purpose-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .ep-body.sf-page .bp-page .bp-purpose-chip,
@@ -1986,33 +1967,22 @@
 .ep-body.sf-page .bp-page .tm-summary-more .tm-summary-list { margin-top: 0; padding-bottom: 8px; }
 .ep-body.sf-page .bp-page .tm-checkout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ep-body.sf-page .bp-page .tm-checkout .tm-btn-buy + .tm-btn-outline { min-height: 48px; }
+.ep-body.sf-page .bp-page .tm-checkout .tm-btn-buy,
+.ep-body.sf-page .bp-page .tm-checkout .tm-btn-buy + .tm-btn-outline { padding-inline: 10px; white-space: nowrap; }
 .ep-body.sf-page .bp-page .tm-checkout .tm-btn-missing { grid-column: 1 / -1; }
 @container (max-width: 260px) {
     .ep-body.sf-page .bp-page .tm-checkout { grid-template-columns: minmax(0, 1fr); }
 }
+/* Narrow centre column (small laptops): the part bar under the case puts its price and buttons on their own row */
+.ep-body.sf-page .bp-page .tm-center { container-type: inline-size; }
+@container (max-width: 420px) {
+    .ep-body.sf-page .bp-page .pcx-dock { flex-wrap: wrap; gap: 8px; }
+    .ep-body.sf-page .bp-page .pcx-dock-side { width: 100%; justify-content: flex-end; }
+    .ep-body.sf-page .bp-page .pcx-dock-side .pcx-info-price { margin-right: auto; }
+}
 .ep-body.sf-page .bp-page .tm-ask { border-color: var(--sf-border-strong); background: var(--sf-surface); color: var(--sf-text); font-weight: 600; }
 .ep-body.sf-page .bp-page .tm-ask i { color: var(--sf-accent-text); }
 .ep-body.sf-page .bp-page .tm-ask:hover { border-color: var(--sf-accent-text); background: var(--sf-accent-soft); color: var(--sf-accent-text); }
-.ep-body.sf-page .bp-page .tm-tools-foot .tm-link { border-color: transparent; background: none; }
-
-/* What can it run? (3 uses, "Show all") */
-.ep-body.sf-page .bp-page .tm-canrun-more {
-    display: inline-flex;
-    align-items: center;
-    min-height: 36px;
-    margin-top: 2px;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--sf-accent-text);
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-}
-.ep-body.sf-page .bp-page .tm-canrun-more[hidden] { display: none; }
-.ep-body.sf-page .bp-page .tm-canrun-more:hover { text-decoration: underline; }
-.ep-body.sf-page .bp-page .tm-canrun-more:focus-visible { outline: 2px solid var(--sf-focus); outline-offset: 2px; border-radius: 4px; }
 
 /* Compare builds: folded to one line until opened */
 .ep-body.sf-page .bp-page .tm-compare-card { padding: 6px 16px; }
@@ -2032,7 +2002,8 @@
 
 /* ---- §12 Responsive ------------------------------------------------------ */
 @media (min-width: 1001px) and (max-width: 1200px) {
-    .ep-body.sf-page .bp-page .tm-workspace { grid-template-columns: 230px minmax(0, 1fr) 260px; gap: 18px; }
+    /* Same 1 : 2 : 1.1 split as wider screens; the right column stays at least 300px so Buy Now and Add to Cart fit side by side */
+    .ep-body.sf-page .bp-page .tm-workspace { grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr) minmax(300px, 1.1fr); gap: 18px; }
 }
 @media (max-width: 1100px) {
     .ep-body.sf-page .epc-grid { grid-template-columns: minmax(0, 1fr); }

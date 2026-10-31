@@ -3,7 +3,10 @@
  * PC build compatibility helpers.
  * Derives socket / RAM / form-factor / wattage signals ONLY from existing
  * product name + description text (no invented DB columns).
+ * The compatibility rules themselves are in the knowledge base (pc_rules.php).
  */
+
+require_once __DIR__ . '/pc_inference.php';
 
 /**
  * Extract hardware tags from existing product text fields.
@@ -94,107 +97,59 @@ function ep_pc_compat_tags(string $name, string $description = '', string $categ
 /**
  * RAM generation a processor requires, when its socket supports only one
  * (AM4 = DDR4, AM5 / LGA1851 = DDR5; LGA1700 boards exist for both).
+ * Asks the same knowledge-base rules the compatibility check uses.
  */
 function ep_pc_cpu_ddr(array $cpuTags): ?string
 {
-    $bySocket = ['AM4' => 'DDR4', 'AM5' => 'DDR5', 'LGA1851' => 'DDR5'];
-    return $bySocket[$cpuTags['socket'] ?? ''] ?? null;
+    $facts = ['slot' => 'memory', 'cpu.socket' => $cpuTags['socket'] ?? null];
+    return pc_infer(pc_infer_rules('compat', 'memory'), $facts, 'cpu.ddr_needed')['facts']['cpu.ddr_needed'] ?? null;
+}
+
+/**
+ * Facts for the 'compat' rules (pc_rules.php): the candidate's tags (cand.*), the tags of the
+ * parts already picked (cpu.*, board.*, ram.*, case.*, psu.*) and which parts are in the build.
+ *
+ * @param array<string,array> $buildMap slot => ['name'=>,'category'=>,'compat'=>tags]
+ * @return array<string,mixed>
+ */
+function ep_pc_compat_facts(string $slot, array $candidateTags, array $buildMap): array
+{
+    $rank = ['ITX' => 1, 'MATX' => 2, 'ATX' => 3, 'EATX' => 4];
+    $parts = [
+        'cand' => $candidateTags,
+        'cpu' => $buildMap['processor']['compat'] ?? null,
+        'board' => $buildMap['motherboard']['compat'] ?? null,
+        'ram' => $buildMap['memory']['compat'] ?? null,
+        'case' => $buildMap['case']['compat'] ?? null,
+        'psu' => $buildMap['psu']['compat'] ?? null,
+    ];
+    $facts = ['slot' => $slot];
+    foreach ($parts as $prefix => $tags) {
+        foreach (['socket', 'ddr', 'form', 'storage', 'watts'] as $key) {
+            $facts[$prefix . '.' . $key] = $tags[$key] ?? null;
+        }
+        $facts[$prefix . '.form_rank'] = $rank[$tags['form'] ?? ''] ?? null;
+    }
+    $raw = (string)($candidateTags['raw'] ?? '');
+    $facts['cand.says_nvme'] = str_contains($raw, 'nvme') || str_contains($raw, 'm.2');
+    foreach (['processor', 'motherboard', 'gpu', 'memory'] as $s) {
+        $facts['has.' . $s] = !empty($buildMap[$s]);
+    }
+    $facts['has.storage'] = !empty($buildMap['ssd']) || !empty($buildMap['ssd_sata']) || !empty($buildMap['hdd']);
+    return $facts;
 }
 
 /**
  * Compare a candidate product for $slot against the current build selections.
  * Returns null if compatible / unknown, or a short reason string if incompatible.
+ * The rules are the 'compat' set in pc_rules.php, run by the inference engine (pc_inference.php).
  *
  * @param array<string,array> $buildMap slot => ['name'=>,'category'=>,'compat'=>tags]
  */
 function ep_pc_compat_reason_for_candidate(string $slot, array $candidateTags, array $buildMap): ?string
 {
-    $cpu = $buildMap['processor']['compat'] ?? null;
-    $mobo = $buildMap['motherboard']['compat'] ?? null;
-    $ram = $buildMap['memory']['compat'] ?? null;
-    $case = $buildMap['case']['compat'] ?? null;
-    $psu = $buildMap['psu']['compat'] ?? null;
-    $gpu = $buildMap['gpu']['compat'] ?? null;
-
-    if ($slot === 'processor' && $mobo && !empty($mobo['socket']) && !empty($candidateTags['socket'])) {
-        if ($mobo['socket'] !== $candidateTags['socket']) {
-            return 'Not compatible with the selected motherboard — CPU socket mismatch.';
-        }
-    }
-    if ($slot === 'motherboard' && $cpu && !empty($cpu['socket']) && !empty($candidateTags['socket'])) {
-        if ($cpu['socket'] !== $candidateTags['socket']) {
-            return 'Not compatible with the selected processor — CPU socket mismatch.';
-        }
-    }
-    if ($slot === 'motherboard' && $ram && !empty($ram['ddr']) && !empty($candidateTags['ddr'])) {
-        if ($ram['ddr'] !== $candidateTags['ddr']) {
-            return 'Not compatible with the selected memory — RAM type mismatch.';
-        }
-    }
-    if ($slot === 'memory' && $mobo && !empty($mobo['ddr']) && !empty($candidateTags['ddr'])) {
-        if ($mobo['ddr'] !== $candidateTags['ddr']) {
-            return 'Not compatible with the selected motherboard — RAM type mismatch.';
-        }
-    }
-    if ($slot === 'memory' && $cpu && !empty($candidateTags['ddr'])) {
-        $cpuDdr = ep_pc_cpu_ddr($cpu);
-        if ($cpuDdr !== null && $cpuDdr !== $candidateTags['ddr']) {
-            return 'Not compatible with the selected processor — it needs ' . $cpuDdr . ' memory.';
-        }
-    }
-    if ($slot === 'processor' && $ram && !empty($ram['ddr'])) {
-        $cpuDdr = ep_pc_cpu_ddr($candidateTags);
-        if ($cpuDdr !== null && $cpuDdr !== $ram['ddr']) {
-            return 'Not compatible with the selected memory — this processor needs ' . $cpuDdr . '.';
-        }
-    }
-    if ($slot === 'cooler') {
-        $refSocket = $cpu['socket'] ?? ($mobo['socket'] ?? null);
-        if ($refSocket && !empty($candidateTags['socket']) && $candidateTags['socket'] !== $refSocket) {
-            return 'Not compatible with the selected CPU/motherboard — cooler socket mismatch.';
-        }
-    }
-    if ($slot === 'case' && $mobo && !empty($mobo['form']) && !empty($candidateTags['form'])) {
-        $rank = ['ITX' => 1, 'MATX' => 2, 'ATX' => 3, 'EATX' => 4];
-        $caseRank = $rank[$candidateTags['form']] ?? null;
-        $moboRank = $rank[$mobo['form']] ?? null;
-        if ($caseRank !== null && $moboRank !== null && $caseRank < $moboRank) {
-            return 'Not compatible with the selected motherboard — case form factor too small.';
-        }
-    }
-    if ($slot === 'motherboard' && $case && !empty($case['form']) && !empty($candidateTags['form'])) {
-        $rank = ['ITX' => 1, 'MATX' => 2, 'ATX' => 3, 'EATX' => 4];
-        $caseRank = $rank[$case['form']] ?? null;
-        $moboRank = $rank[$candidateTags['form']] ?? null;
-        if ($caseRank !== null && $moboRank !== null && $caseRank < $moboRank) {
-            return 'Not compatible with the selected case — motherboard form factor too large.';
-        }
-    }
-    if ($slot === 'ssd' && !empty($candidateTags['storage']) && $candidateTags['storage'] === 'SATA') {
-        /* Prefer NVMe for the NVMe SSD slot when text clearly says SATA-only. */
-        if (strpos($candidateTags['raw'], 'nvme') === false && strpos($candidateTags['raw'], 'm.2') === false) {
-            return 'Not compatible with this SSD slot — SATA drive should use SSD (SATA).';
-        }
-    }
-    if ($slot === 'psu') {
-        $estimate = 0;
-        if (!empty($buildMap['processor'])) $estimate += 65;
-        if (!empty($buildMap['motherboard'])) $estimate += 40;
-        if (!empty($buildMap['gpu'])) $estimate += 180;
-        if (!empty($buildMap['memory'])) $estimate += 10;
-        if (!empty($buildMap['ssd']) || !empty($buildMap['ssd_sata']) || !empty($buildMap['hdd'])) $estimate += 15;
-        if (!empty($candidateTags['watts']) && $candidateTags['watts'] < $estimate) {
-            return 'Not compatible with the current build — PSU wattage too low for estimated power draw.';
-        }
-    }
-    if ($slot === 'gpu' && $psu && !empty($psu['watts'])) {
-        $estimate = 180 + (!empty($cpu) ? 65 : 0) + (!empty($mobo) ? 40 : 0) + 25;
-        if ($psu['watts'] < $estimate) {
-            return 'Not compatible with the selected power supply — estimated GPU build draw exceeds PSU wattage.';
-        }
-    }
-
-    return null;
+    $result = pc_infer(pc_infer_rules('compat', $slot), ep_pc_compat_facts($slot, $candidateTags, $buildMap), 'incompatible');
+    return $result['facts']['incompatible'] ?? null;
 }
 
 /**

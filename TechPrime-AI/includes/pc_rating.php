@@ -6,7 +6,7 @@
  * RAM size and channels, storage size and type, PSU wattage against the estimated draw.
  * A part far above what the purpose needs is not a better fit, a CPU / GPU pair that holds
  * each other back costs points, and a part that is not picked scores 0 on its axis.
- * Thresholds follow the expert rules in pc_recommend_slot_fit().
+ * Thresholds follow the expert rules in the knowledge base (the 'fit' set in pc_rules.php).
  */
 
 require_once __DIR__ . '/pc_recommend.php';

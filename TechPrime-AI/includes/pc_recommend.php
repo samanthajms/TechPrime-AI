@@ -686,111 +686,58 @@ function pc_recommend_features(string $slot, array $candidate, array $buildMap, 
 }
 
 /**
- * Expert rules that label the catalog training rows; real customer picks are added on top
- * by scripts/build_pc_recommend_dataset.php. Any purpose: the part must leave enough budget
- * for the required parts still missing. Then, per part and purpose (school = School & Everyday,
- * office = Office & Work, creation = Content Creation, balanced = Not sure yet):
- *  - CPU: school tier 2-5, office tier 4-7, both with built-in graphics unless a GPU is picked;
- *    creation tier 6+; gaming / balanced within 2 tiers of the GPU. Never with a too-weak cooler.
- *  - GPU: school / office only an entry card (tier 3 or lower), and only when the CPU has no
- *    built-in graphics; creation 12 GB VRAM (or 8 GB at tier 6+); gaming / balanced within 2 tiers of the CPU.
- *  - Motherboard: entry chipset for CPUs up to tier 5, mid-range above; at most one class higher.
- *  - Memory: school 8 GB+, office / creation 16 GB+, gaming / balanced 16 GB+ (8 GB in budget builds).
- *  - NVMe: school 256 GB+, office 500 GB+, creation 1 TB+, gaming / balanced 500 GB+ (256 GB in budget builds).
- *    SATA / HDD: 256 GB+ (creation 500 GB+).
- *  - PSU: 1x-1.7x the suggested wattage, Bronze or better; Gold or ATX 3.1 for tier 8+ GPUs.
- *  - Cooler: school / office not needed when the CPU has a cooler, else 1.1x-2x the CPU's power;
- *    gaming / balanced 1.1x-3x; creation 1.1x-4.5x.
- *  - Case: fits the board; no bundled PSU in gaming / creation or mid/high-end builds; similar price range.
- *  - Case fan: not needed for school / office; otherwise similar price range.
+ * Facts for the 'fit' rules (pc_rules.php): the model features plus the purpose and the
+ * features in plain units (the 1-10 tier, GB) so the rules read like a technician's.
+ *
+ * @param array<string,float> $f pc_recommend_features()
+ * @return array<string,mixed>
+ */
+function pc_recommend_fit_facts(string $slot, array $f): array
+{
+    $perf = (float)$f['perf_tier'];
+    return $f + [
+        'slot' => $slot,
+        'purpose' => pc_purpose_from_features($f),
+        'cpu_tier' => $perf * 10,
+        'ram_gb' => $perf * 32,
+        'disk_gb' => $perf * 2000,
+        'vram_gb' => $f['vram'] * 16,
+        'abs_balance' => abs((float)$f['balance']),
+        'abs_tier_gap' => abs((float)$f['tier_gap']),
+    ];
+}
+
+/**
+ * Asks the inference engine one question about a candidate: 'fit' (suits the purpose and the
+ * build) or 'good_pick' (fit and leaves enough budget). Not concluded = no (closed world).
+ *
+ * @param array<string,float> $f pc_recommend_features()
+ * @return array{yes:bool,rule:?string,fired:array<int,array<string,mixed>>} rule = the rule that decided
+ */
+function pc_recommend_fit_verdict(string $slot, array $f, string $goal = 'fit'): array
+{
+    $result = pc_infer(pc_infer_rules('fit', $slot), pc_recommend_fit_facts($slot, $f), $goal);
+    $rule = null;
+    foreach ($result['fired'] as $step) {
+        if (array_key_exists($goal, $step['then'])) {
+            $rule = $step['id'];
+        }
+    }
+    return ['yes' => ($result['facts'][$goal] ?? false) === true, 'rule' => $rule, 'fired' => $result['fired']];
+}
+
+/**
+ * Expert rules (the 'fit' set in pc_rules.php) that label the catalog training rows; real customer
+ * picks are added on top by scripts/build_pc_recommend_dataset.php.
  */
 function pc_recommend_is_positive(string $slot, array $f): bool
 {
-    return $f['budget_slack'] >= 0 && pc_recommend_slot_fit($slot, $f);
+    return pc_recommend_fit_verdict($slot, $f, 'good_pick')['yes'];
 }
 
 function pc_recommend_slot_fit(string $slot, array $f): bool
 {
-    $p = pc_purpose_from_features($f);
-    $light = $p === 'school' || $p === 'office';
-    $level = (float)$f['build_level'];
-    $balance = (float)$f['balance'];
-    $perf = (float)$f['perf_tier'];
-    switch ($slot) {
-        case 'processor':
-            if ($f['cooling_margin'] > 0 && $f['cooling_margin'] < 1.1) {
-                return false;
-            }
-            $t = $perf * 10;
-            $display = $f['cand_igpu'] > 0 || $f['gpu_level'] > 0;
-            if ($p === 'school') {
-                return $t >= 1.5 && $t <= 5.5 && $display;
-            }
-            if ($p === 'office') {
-                return $t >= 3.5 && $t <= 7.5 && $display;
-            }
-            if ($p === 'creation') {
-                return $t >= 5.5 && ($f['gpu_level'] <= 0 || $balance >= -0.3);
-            }
-            return abs($balance) <= 0.2;
-        case 'gpu':
-            if ($light) {
-                return $f['cpu_igpu'] == 0 && $perf <= 0.35;
-            }
-            if ($p === 'creation') {
-                $vram = $f['vram'] * 16;
-                return $vram >= 11.5 || ($vram >= 7.5 && $perf >= 0.55);
-            }
-            return abs($balance) <= 0.2;
-        case 'motherboard':
-            return $balance > -0.01 && $balance < 0.34;
-        case 'memory':
-            $gb = $perf * 32;
-            if ($p === 'school') {
-                return $gb >= 7.5;
-            }
-            if ($p === 'office' || $p === 'creation') {
-                return $gb >= 15.5;
-            }
-            return $gb >= 15.5 || ($gb >= 7.5 && $level <= 0.4);
-        case 'ssd':
-            $gb = $perf * 2000;
-            if ($p === 'school') {
-                return $gb >= 240;
-            }
-            if ($p === 'office') {
-                return $gb >= 480;
-            }
-            if ($p === 'creation') {
-                return $gb >= 960;
-            }
-            return $gb >= 480 || ($gb >= 240 && $level <= 0.4);
-        case 'ssd_sata':
-        case 'hdd':
-            return $perf * 2000 >= ($p === 'creation' ? 480 : 240);
-        case 'psu':
-            if ($f['psu_headroom'] < 1.0 || $f['psu_headroom'] > 1.7 || $f['psu_rating'] < 2) {
-                return false;
-            }
-            return $f['gpu_level'] < 0.8 || $f['psu_rating'] >= 3 || $f['psu_atx3'] > 0;
-        case 'cooler':
-            $m = (float)$f['cooling_margin'];
-            if ($light) {
-                return $f['cpu_cooler'] <= 0 && $m >= 1.1 && $m <= 2.0;
-            }
-            return $m >= 1.1 && $m <= ($p === 'creation' ? 4.5 : 3.0);
-        case 'case':
-            if ($f['form_slack'] > 1) {
-                return false;
-            }
-            if ($f['case_bundle'] > 0 && ($level >= 0.5 || $p === 'gaming' || $p === 'creation')) {
-                return false;
-            }
-            return abs((float)$f['tier_gap']) <= 0.35;
-        case 'case_fan':
-            return !$light && abs((float)$f['tier_gap']) <= 0.2;
-    }
-    return abs((float)$f['tier_gap']) <= 0.2;
+    return pc_recommend_fit_verdict($slot, $f)['yes'];
 }
 
 function pc_recommend_size_label(int $gb): string
@@ -812,7 +759,6 @@ function pc_recommend_explain(string $slot, array $candidate, array $buildMap, a
     $cpu = !empty($buildMap['processor']) ? pc_recommend_spec('processor', $buildMap['processor']) : null;
     $gpu = !empty($buildMap['gpu']) ? pc_recommend_spec('gpu', $buildMap['gpu']) : null;
     $balance = (float)$f['balance'];
-    $level = (float)$f['build_level'];
 
     if ($f['budget_slack'] < 0) {
         $room = pc_recommend_budget_room($slot, $candidate, $buildMap, $ctx);
@@ -821,7 +767,9 @@ function pc_recommend_explain(string $slot, array $candidate, array $buildMap, a
         }
         return ['', 'Leaves too little of your budget for the parts still needed.'];
     }
-    $good = pc_recommend_slot_fit($slot, $f);
+    /* The engine's verdict, and the rule that decided it (for the notes below). */
+    $verdict = pc_recommend_fit_verdict($slot, $f);
+    $good = $verdict['yes'];
 
     switch ($slot) {
         case 'processor':
@@ -839,7 +787,7 @@ function pc_recommend_explain(string $slot, array $candidate, array $buildMap, a
                 }
                 return [$why . ($spec['cooler'] ? ' Comes with its own cooler.' : ''), ''];
             }
-            if ($f['cooling_margin'] > 0 && $f['cooling_margin'] < 1.1) {
+            if ($verdict['rule'] === 'CPU-COOLER-TOO-WEAK') {
                 $cooler = pc_recommend_spec('cooler', $buildMap['cooler']);
                 return ['', 'Your ' . $cooler['type'] . ' is too weak for this CPU (~' . $spec['watts'] . ' W).'];
             }
@@ -966,13 +914,13 @@ function pc_recommend_explain(string $slot, array $candidate, array $buildMap, a
             if ($spec['watts'] <= 0) {
                 return ['', ''];
             }
-            if ($f['psu_rating'] < 2) {
+            if ($verdict['rule'] === 'PSU-LOW-RATING') {
                 return ['', ($f['psu_rating'] < 1 ? 'No 80 Plus rating' : 'Only basic 80 Plus efficiency') . '; a Bronze-rated or better PSU is safer.'];
             }
-            if ($f['psu_headroom'] < 1.0) {
+            if ($verdict['rule'] === 'PSU-TOO-SMALL') {
                 return ['', 'Below the ~' . pc_recommend_psu_need($buildMap) . ' W this build should have.'];
             }
-            if ($f['psu_headroom'] > 1.7) {
+            if ($verdict['rule'] === 'PSU-TOO-BIG') {
                 return ['', 'More wattage than this build needs.'];
             }
             return ['', 'For ' . ($gpu ? 'an ' . $gpu['label'] : 'this graphics card') . ', a Gold-rated or ATX 3.1 PSU is the safer pick.'];
@@ -992,10 +940,10 @@ function pc_recommend_explain(string $slot, array $candidate, array $buildMap, a
                 $fits = !empty($buildMap['motherboard']) ? 'Fits the motherboard in this build' : 'Fits this build';
                 return [$fits . (pc_spec_case((string)$candidate['name'])['airflow'] ? ', with an airflow-focused design.' : '.'), ''];
             }
-            if ($f['case_bundle'] > 0 && ($level >= 0.5 || $p === 'gaming' || $p === 'creation')) {
+            if (in_array($verdict['rule'], ['CASE-BUNDLED-PSU-LEVEL', 'CASE-BUNDLED-PSU-PURPOSE'], true)) {
                 return ['', 'Its bundled power supply is not suited to this build.'];
             }
-            if ($f['form_slack'] > 1) {
+            if ($verdict['rule'] === 'CASE-TOO-BIG') {
                 return ['', 'Much bigger than the motherboard needs.'];
             }
             return ['', pc_recommend_tier_note((float)$f['tier_gap'])];

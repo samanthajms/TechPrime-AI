@@ -23,7 +23,7 @@ $isHomePage = false;
 $pageTitle = 'Build a PC';
 $csrf = generateCsrfToken();
 
-$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-30">';
+$extraHead = '<link rel="stylesheet" href="tech_match.css?v=pcx-31">';
 
 include __DIR__ . '/ep_header.php';
 ?>
@@ -239,7 +239,6 @@ include __DIR__ . '/ep_header.php';
                 </div>
                 <ul class="tm-radar-legend">
                     <li class="is-parts"><span aria-hidden="true"></span>Your parts</li>
-                    <li class="is-need"><span aria-hidden="true"></span>Needed for <strong id="tmRadarNeed">everyday use</strong></li>
                 </ul>
             </div>
             <div class="tm-card tm-summary-card">
@@ -286,15 +285,6 @@ include __DIR__ . '/ep_header.php';
                     <i class="fas fa-info-circle" aria-hidden="true"></i>
                     <span>Prices and stock can change until you check out. Compatibility checks and the Build Score are guides; EasyPC staff can confirm before you buy.</span>
                 </p>
-            </div>
-            <?php /* Plain-language estimates for common uses (pc_rating.php pc_rating_can_run, via the build check);
-                     the uses that matter for the purpose come first (tech_match.js renderCanRun). */ ?>
-            <div class="tm-card tm-canrun-card">
-                <h3>What can it run?</h3>
-                <p class="tm-canrun-empty" id="tmCanRunEmpty">Pick a processor to see what this PC can handle.</p>
-                <ul class="tm-canrun" id="tmCanRun" hidden></ul>
-                <button type="button" class="tm-canrun-more" id="tmCanRunMore" aria-controls="tmCanRun" aria-expanded="false" hidden></button>
-                <p class="tm-canrun-note"><i class="fas fa-info-circle" aria-hidden="true"></i><span>Rough estimates at typical settings, not benchmarks.</span></p>
             </div>
             <details class="tm-card tm-compare-card">
                 <summary><h3>Compare Builds</h3><span>Put two saved builds side by side</span></summary>
@@ -352,12 +342,10 @@ include __DIR__ . '/ep_header.php';
 <script>
 window.EP_CSRF = <?php echo json_encode($csrf); ?>;
 window.EP_TM_USER = <?php echo (int)($_SESSION['user_id'] ?? 0); ?>;
-/* What each purpose needs, for the radar's dashed outline before any part is picked (pc_rating.php). */
-window.EP_TM_TARGETS = <?php echo json_encode(pc_rating_all_targets()); ?>;
 window.EP_TM_CAN_SAVE = <?php echo $canSaveBuilds ? 'true' : 'false'; ?>;
 window.EP_TM_LOGIN_URL = <?php echo json_encode($buildLoginUrl); ?>;
 </script>
-<script src="tech_match.js?v=pcx-40" defer></script>
+<script src="tech_match.js?v=pcx-44" defer></script>
 
 <?php include __DIR__ . '/ep_footer.php'; ?>
 <?php ias_alert_footer(); ?>
