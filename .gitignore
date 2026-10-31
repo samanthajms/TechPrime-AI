@@ -1,0 +1,18 @@
+# Agent skills installed locally with `npx skills add ...` (e.g. usestrix/strix).
+# Personal tooling, not part of the app — each developer installs their own.
+# .agents/skills is the shared folder the CLI writes for the "universal" agents
+# (Cursor, Codex, Copilot, Gemini CLI, Cline, ...); .claude/skills is Claude Code's.
+/.agents/
+/skills-lock.json
+
+# AI/editor tool state (per-developer, not part of the app)
+/.claude/
+/.serena/
+/.playwright-mcp/
+
+# Security scan reports (may describe open vulnerabilities — never commit)
+/CLAUDE-SECURITY-*/
+
+# Capstone documents and screenshots (kept locally, not part of the app)
+/Evaluation/
+/Screenshots/

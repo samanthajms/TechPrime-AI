@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
+require_once __DIR__ . '/../includes/staff_layout.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -12,15 +13,13 @@ $error    = '';
 
 // Ensure settings table & default rows exist (idempotent)
 $db->query("
-    CREATE TABLE IF NOT EXISTS `site_settings` (
-        `id`            INT(11)      NOT NULL AUTO_INCREMENT,
-        `setting_key`   VARCHAR(100) NOT NULL,
-        `setting_value` TEXT         NOT NULL,
-        `updated_by`    INT(11)      DEFAULT NULL,
-        `updated_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (`id`),
-        UNIQUE KEY `uq_setting_key` (`setting_key`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    CREATE TABLE IF NOT EXISTS site_settings (
+        id SERIAL PRIMARY KEY,
+        setting_key VARCHAR(100) NOT NULL UNIQUE,
+        setting_value TEXT NOT NULL,
+        updated_by INTEGER DEFAULT NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
 ");
 
 $defaults = [
@@ -32,16 +31,14 @@ $defaults = [
     'max_failed_attempts'=> '3',
 ];
 foreach ($defaults as $k => $v) {
-    $ins = $db->prepare("INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES (?, ?)");
-    $ins->bind_param('ss', $k, $v);
-    $ins->execute();
-    $ins->close();
+    $ins = $db->prepare("INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT (setting_key) DO NOTHING");
+    $ins->execute([$k, $v]);
 }
 
 function getSettings($db) {
     $res = $db->query("SELECT setting_key, setting_value FROM site_settings");
     $out = [];
-    while ($row = $res->fetch_assoc()) {
+    while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
         $out[$row['setting_key']] = $row['setting_value'];
     }
     return $out;
@@ -72,9 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ok = true;
     foreach ($updates as $k => $v) {
         $upd = $db->prepare("UPDATE site_settings SET setting_value = ?, updated_by = ? WHERE setting_key = ?");
-        $upd->bind_param('sis', $v, $admin_id, $k);
-        if (!$upd->execute()) { $ok = false; }
-        $upd->close();
+        if (!$upd->execute([$v, $admin_id, $k])) { $ok = false; }
     }
 
     if ($ok) {
@@ -87,296 +82,144 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $cfg = getSettings($db);
 $adminInitials = strtoupper(substr($_SESSION['name'] ?? 'A', 0, 1));
+
+$pwToggles = [
+    ['key' => 'upper', 'id' => 'toggleUpper', 'name' => 'pw_require_upper', 'title' => 'Require uppercase letter', 'desc' => 'At least one uppercase letter (A–Z).', 'preview' => 'Contains an uppercase letter (A–Z)'],
+    ['key' => 'lower', 'id' => 'toggleLower', 'name' => 'pw_require_lower', 'title' => 'Require lowercase letter', 'desc' => 'At least one lowercase letter (a–z).', 'preview' => 'Contains a lowercase letter (a–z)'],
+    ['key' => 'num', 'id' => 'toggleNum', 'name' => 'pw_require_number', 'title' => 'Require number', 'desc' => 'At least one digit (0–9).', 'preview' => 'Contains a number (0–9)'],
+    ['key' => 'spec', 'id' => 'toggleSpec', 'name' => 'pw_require_special', 'title' => 'Require special character', 'desc' => 'At least one special character (e.g. !@#$%^&*).', 'preview' => 'Contains a special character (!@#$%^&* …)'],
+];
+
+staff_page_start([
+    'role' => 'admin',
+    'title' => 'Settings',
+    'active' => 'settings',
+    'heading' => 'Security Settings',
+    'subtitle' => 'Configure authentication and password policies',
+]);
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings — EasyPC Admin</title>
-    <link rel="stylesheet" href="admin_shared.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <style>
-        .rule-row {
-            display: flex; align-items: flex-start;
-            gap: 16px; padding: 18px 0;
-            border-bottom: 1px solid var(--border);
-        }
-        .rule-row:last-child { border-bottom: none; padding-bottom: 0; }
-        .rule-info { flex: 1; }
-        .rule-info strong { display: block; font-size: 14px; font-weight: 600; margin-bottom: 3px; }
-        .rule-info .rule-desc { font-size: 12.5px; color: var(--text-muted); }
-        .rule-ctrl { flex-shrink: 0; display: flex; align-items: center; }
-
-        .num-stepper {
-            display: flex; align-items: center; gap: 8px;
-        }
-        .stepper-btn {
-            width: 34px; height: 34px;
-            border: 1.5px solid var(--border);
-            background: var(--slate-50);
-            border-radius: 8px; cursor: pointer;
-            font-size: 18px; font-weight: 700; line-height: 1;
-            display: flex; align-items: center; justify-content: center;
-            color: var(--text-main);
-            transition: all .15s;
-        }
-        .stepper-btn:hover { background: var(--ep-green-light); border-color: var(--ep-green); color: var(--teal-deeper); }
-        .stepper-input {
-            width: 68px; padding: 7px 10px;
-            border: 1.5px solid var(--border);
-            border-radius: 8px; font-size: 16px;
-            font-weight: 700; text-align: center;
-            outline: none; transition: border-color .18s;
-            font-family: var(--font-mono);
-            color: var(--text-main);
-        }
-        .stepper-input:focus { border-color: var(--ep-green); box-shadow: 0 0 0 3px rgba(97,179,55,.15); }
-        .stepper-range { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
-
-        .preview-box {
-            background: var(--slate-50);
-            border: 1.5px solid var(--border);
-            border-radius: 10px; padding: 16px 20px;
-        }
-        .preview-box h4 { margin: 0 0 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--text-muted); font-weight: 700; }
-        .preview-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
-        .preview-list li { font-size: 13px; display: flex; align-items: center; gap: 9px; transition: opacity .2s; }
-        .pdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transition: background .2s; }
-        .pdot-on  { background: var(--ep-green); }
-        .pdot-off { background: var(--slate-300); }
-
-        .attempts-banner {
-            background: var(--ep-green-light);
-            border: 1.5px solid var(--teal-light);
-            border-radius: 10px;
-            padding: 16px 20px;
-            display: flex; gap: 14px; align-items: flex-start;
-            margin-bottom: 0;
-        }
-        .attempts-icon { font-size: 22px; flex-shrink: 0; color: var(--ep-green-dark); }
-        .attempts-desc strong { display: block; font-size: 14px; color: var(--teal-deeper); margin-bottom: 4px; }
-        .attempts-desc span { font-size: 12.5px; color: var(--slate-500); }
-    </style>
-</head>
-<body>
-
-<div class="sidebar">
-    <div class="sidebar-brand">
-        <img src="../assets/logo.png" alt="EasyPC" class="ep-logo-img brand-logo">
-        <div>
-            <div class="brand-text">EasyPC</div>
-            <div class="brand-sub">Admin</div>
-        </div>
-    </div>
-    <nav>
-        <a href="admin_dashboard.php"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
-        <a href="manage_users.php"><i class="fas fa-users"></i><span>Manage Users</span></a>
-        <a href="view_logs.php"><i class="fas fa-clipboard-list"></i><span>Activity Logs</span></a>
-        <a href="admin_profile.php"><i class="fas fa-user"></i><span>My Profile</span></a>
-        <a href="admin_settings.php" class="active"><i class="fas fa-cog"></i><span>Settings</span></a>
-    </nav>
-    <div class="sidebar-footer">
-        <a href="../logout.php"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
-    </div>
-</div>
-
-<div class="main">
-    <div class="topbar">
-        <div class="topbar-left">
-            <h2>Security Settings</h2>
-            <div class="breadcrumb">Configure authentication &amp; password policies</div>
-        </div>
-        <div class="topbar-right">
-            <div class="admin-badge">
-                <div class="avatar"><?php echo $adminInitials; ?></div>
-                <?php echo h($_SESSION['name']); ?>
-            </div>
-        </div>
-    </div>
-
-    <div class="page-content">
 
         <?php if ($success): ?>
-            <div class="alert alert-success">✔ <?php echo h($success); ?></div>
+            <div class="alert alert-success" role="status"><i class="ph-fill ph-check-circle" aria-hidden="true"></i><span><?php echo h($success); ?></span></div>
         <?php endif; ?>
         <?php if ($error): ?>
-            <div class="alert alert-error">✘ <?php echo h($error); ?></div>
+            <div class="alert alert-error" role="alert"><i class="ph-fill ph-warning-circle" aria-hidden="true"></i><span><?php echo h($error); ?></span></div>
         <?php endif; ?>
 
         <div class="alert alert-info">
-            ℹ️ Password complexity changes apply to <strong>new registrations only</strong>. The failed login attempts limit applies <strong>immediately</strong> for all users.
+            <i class="ph ph-info" aria-hidden="true"></i>
+            <span>Password complexity changes apply to <strong>new registrations only</strong>. The failed login attempts limit applies <strong>immediately</strong> for all users.</span>
         </div>
 
-        <form method="post" id="settingsForm">
+        <form method="post" id="settingsForm" class="settings-layout">
             <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
 
-            <!-- ── Failed Login Attempts ── -->
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <h3><span class="card-icon"><i class="fas fa-shield-alt"></i></span> Login Security</h3>
-                        <div class="card-subtitle">Controls how many failed attempts are allowed before an account is locked</div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="attempts-banner">
-                        <div class="attempts-icon"><i class="fas fa-ban"></i></div>
-                        <div class="attempts-desc">
-                            <strong>Maximum Failed Login Attempts</strong>
-                            <span>After this many consecutive wrong passwords, the user's account will be automatically locked. An admin must unlock it. Default is 3.</span>
+            <div class="settings-main">
+                <!-- Failed login attempts -->
+                <section class="cx-card" aria-labelledby="loginSecTitle">
+                    <div class="cx-card-head">
+                        <div>
+                            <h2 id="loginSecTitle"><i class="ph ph-shield-check" aria-hidden="true"></i> Login security</h2>
+                            <p>How many failed attempts are allowed before an account is locked</p>
                         </div>
                     </div>
-                    <div style="margin-top:20px;">
-                        <div class="rule-row" style="border:none;padding:0">
+                    <div class="rule-list">
+                        <div class="rule-row">
                             <div class="rule-info">
-                                <strong>Failed Attempts Before Lockout</strong>
-                                <div class="rule-desc">Range: 1 (strictest) to 10 (most lenient). Recommended: 3–5.</div>
-                                <div class="num-stepper" style="margin-top:12px">
-                                    <button type="button" class="stepper-btn" onclick="adjustVal('maxAttempts',-1,1,10)">−</button>
+                                <label for="maxAttempts">Failed attempts before lockout</label>
+                                <span class="rule-desc" id="maxAttemptsHint">After this many consecutive wrong passwords the account is locked until an admin unlocks it. 1 is strictest, 10 most lenient; 3–5 is recommended.</span>
+                            </div>
+                            <div class="rule-ctrl">
+                                <div class="num-stepper">
+                                    <button type="button" class="stepper-btn" onclick="adjustVal('maxAttempts',-1,1,10)" aria-label="Fewer attempts"><i class="ph ph-minus" aria-hidden="true"></i></button>
                                     <input type="number" name="max_failed_attempts" id="maxAttempts"
-                                           class="stepper-input" min="1" max="10"
+                                           class="stepper-input" min="1" max="10" inputmode="numeric" aria-describedby="maxAttemptsHint"
                                            value="<?php echo (int)$cfg['max_failed_attempts']; ?>">
-                                    <button type="button" class="stepper-btn" onclick="adjustVal('maxAttempts',1,1,10)">+</button>
+                                    <button type="button" class="stepper-btn" onclick="adjustVal('maxAttempts',1,1,10)" aria-label="More attempts"><i class="ph ph-plus" aria-hidden="true"></i></button>
                                 </div>
-                                <div class="stepper-range">min 1 · max 10</div>
+                                <span class="stepper-range">1 – 10</span>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </section>
 
-            <!-- ── Password Complexity ── -->
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <h3><span class="card-icon"><i class="fas fa-key"></i></span> Password Complexity</h3>
-                        <div class="card-subtitle">Rules new users must meet when registering or changing passwords</div>
+                <!-- Password complexity -->
+                <section class="cx-card" aria-labelledby="pwTitle">
+                    <div class="cx-card-head">
+                        <div>
+                            <h2 id="pwTitle"><i class="ph ph-key" aria-hidden="true"></i> Password complexity</h2>
+                            <p>Rules new users must meet when registering or changing passwords</p>
+                        </div>
                     </div>
-                </div>
-                <div class="card-body">
-
-                    <!-- Minimum Length -->
-                    <div class="rule-row">
-                        <div class="rule-info">
-                            <strong>Minimum Password Length</strong>
-                            <div class="rule-desc">How many characters a password must have at minimum (6–32).</div>
-                            <div class="num-stepper" style="margin-top:12px">
-                                <button type="button" class="stepper-btn" onclick="adjustVal('pwMinLen',-1,6,32)">−</button>
-                                <input type="number" name="pw_min_length" id="pwMinLen"
-                                       class="stepper-input" min="6" max="32"
-                                       value="<?php echo (int)$cfg['pw_min_length']; ?>">
-                                <button type="button" class="stepper-btn" onclick="adjustVal('pwMinLen',1,6,32)">+</button>
+                    <div class="rule-list">
+                        <div class="rule-row">
+                            <div class="rule-info">
+                                <label for="pwMinLen">Minimum password length</label>
+                                <span class="rule-desc" id="pwMinLenHint">How many characters a password must have at minimum.</span>
                             </div>
-                            <div class="stepper-range">min 6 · max 32</div>
+                            <div class="rule-ctrl">
+                                <div class="num-stepper">
+                                    <button type="button" class="stepper-btn" onclick="adjustVal('pwMinLen',-1,6,32)" aria-label="Shorter minimum"><i class="ph ph-minus" aria-hidden="true"></i></button>
+                                    <input type="number" name="pw_min_length" id="pwMinLen"
+                                           class="stepper-input" min="6" max="32" inputmode="numeric" aria-describedby="pwMinLenHint"
+                                           value="<?php echo (int)$cfg['pw_min_length']; ?>">
+                                    <button type="button" class="stepper-btn" onclick="adjustVal('pwMinLen',1,6,32)" aria-label="Longer minimum"><i class="ph ph-plus" aria-hidden="true"></i></button>
+                                </div>
+                                <span class="stepper-range">6 – 32</span>
+                            </div>
                         </div>
+                        <?php foreach ($pwToggles as $t): ?>
+                        <div class="rule-row">
+                            <div class="rule-info">
+                                <label for="<?php echo h($t['id']); ?>"><?php echo h($t['title']); ?></label>
+                                <span class="rule-desc"><?php echo h($t['desc']); ?></span>
+                            </div>
+                            <div class="rule-ctrl">
+                                <label class="toggle">
+                                    <input type="checkbox" name="<?php echo h($t['name']); ?>" id="<?php echo h($t['id']); ?>"
+                                           <?php echo $cfg[$t['name']] === '1' ? 'checked' : ''; ?>>
+                                    <span class="toggle-slider" aria-hidden="true"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
                     </div>
-
-                    <!-- Uppercase -->
-                    <div class="rule-row">
-                        <div class="rule-info">
-                            <strong>Require Uppercase Letter</strong>
-                            <div class="rule-desc">Password must contain at least one uppercase letter (A–Z).</div>
-                        </div>
-                        <div class="rule-ctrl">
-                            <label class="toggle">
-                                <input type="checkbox" name="pw_require_upper" id="toggleUpper"
-                                       <?php echo $cfg['pw_require_upper'] === '1' ? 'checked' : ''; ?>>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Lowercase -->
-                    <div class="rule-row">
-                        <div class="rule-info">
-                            <strong>Require Lowercase Letter</strong>
-                            <div class="rule-desc">Password must contain at least one lowercase letter (a–z).</div>
-                        </div>
-                        <div class="rule-ctrl">
-                            <label class="toggle">
-                                <input type="checkbox" name="pw_require_lower" id="toggleLower"
-                                       <?php echo $cfg['pw_require_lower'] === '1' ? 'checked' : ''; ?>>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Number -->
-                    <div class="rule-row">
-                        <div class="rule-info">
-                            <strong>Require Number</strong>
-                            <div class="rule-desc">Password must contain at least one digit (0–9).</div>
-                        </div>
-                        <div class="rule-ctrl">
-                            <label class="toggle">
-                                <input type="checkbox" name="pw_require_number" id="toggleNum"
-                                       <?php echo $cfg['pw_require_number'] === '1' ? 'checked' : ''; ?>>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Special Character -->
-                    <div class="rule-row">
-                        <div class="rule-info">
-                            <strong>Require Special Character</strong>
-                            <div class="rule-desc">Password must contain at least one special character (e.g. !@#$%^&*).</div>
-                        </div>
-                        <div class="rule-ctrl">
-                            <label class="toggle">
-                                <input type="checkbox" name="pw_require_special" id="toggleSpec"
-                                       <?php echo $cfg['pw_require_special'] === '1' ? 'checked' : ''; ?>>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
+                </section>
             </div>
 
-            <!-- ── Live Preview ── -->
-            <div class="card">
-                <div class="card-header">
-                    <h3><span class="card-icon"><i class="fas fa-eye"></i></span> Live Preview</h3>
-                </div>
-                <div class="card-body">
-                    <div class="preview-box">
-                        <h4>Password must satisfy:</h4>
-                        <ul class="preview-list" id="previewList">
-                            <li id="prev-len">
-                                <span class="pdot pdot-on" id="dot-len"></span>
-                                <span id="label-len">At least <?php echo (int)$cfg['pw_min_length']; ?> characters</span>
-                            </li>
-                            <li id="prev-upper" style="<?php echo $cfg['pw_require_upper'] !== '1' ? 'opacity:.4' : ''; ?>">
-                                <span class="pdot <?php echo $cfg['pw_require_upper'] === '1' ? 'pdot-on' : 'pdot-off'; ?>" id="dot-upper"></span>
-                                <span>Contains an uppercase letter (A–Z)</span>
-                            </li>
-                            <li id="prev-lower" style="<?php echo $cfg['pw_require_lower'] !== '1' ? 'opacity:.4' : ''; ?>">
-                                <span class="pdot <?php echo $cfg['pw_require_lower'] === '1' ? 'pdot-on' : 'pdot-off'; ?>" id="dot-lower"></span>
-                                <span>Contains a lowercase letter (a–z)</span>
-                            </li>
-                            <li id="prev-num" style="<?php echo $cfg['pw_require_number'] !== '1' ? 'opacity:.4' : ''; ?>">
-                                <span class="pdot <?php echo $cfg['pw_require_number'] === '1' ? 'pdot-on' : 'pdot-off'; ?>" id="dot-num"></span>
-                                <span>Contains a number (0–9)</span>
-                            </li>
-                            <li id="prev-spec" style="<?php echo $cfg['pw_require_special'] !== '1' ? 'opacity:.4' : ''; ?>">
-                                <span class="pdot <?php echo $cfg['pw_require_special'] === '1' ? 'pdot-on' : 'pdot-off'; ?>" id="dot-spec"></span>
-                                <span>Contains a special character (!@#$%^&* …)</span>
-                            </li>
-                        </ul>
+            <aside class="settings-side">
+                <!-- Live preview -->
+                <section class="cx-card preview-card" aria-labelledby="previewTitle">
+                    <div class="cx-card-head">
+                        <div>
+                            <h2 id="previewTitle"><i class="ph ph-eye" aria-hidden="true"></i> Live preview</h2>
+                            <p>What a new password must satisfy</p>
+                        </div>
                     </div>
-                </div>
-            </div>
-
-            <div style="display:flex; gap:12px; align-items:center;">
-                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Settings</button>
-                <span class="text-muted text-small">Changes to login attempts take effect immediately.</span>
-            </div>
+                    <ul class="preview-list" id="previewList">
+                        <li id="prev-len" class="is-on">
+                            <i class="ph-fill ph-check-circle" id="dot-len" aria-hidden="true"></i>
+                            <span id="label-len">At least <?php echo (int)$cfg['pw_min_length']; ?> characters</span>
+                            <span class="preview-state">Required</span>
+                        </li>
+                        <?php foreach ($pwToggles as $t): $on = $cfg[$t['name']] === '1'; ?>
+                        <li id="prev-<?php echo h($t['key']); ?>" class="<?php echo $on ? 'is-on' : 'is-off'; ?>">
+                            <i class="<?php echo $on ? 'ph-fill ph-check-circle' : 'ph ph-minus-circle'; ?>" id="dot-<?php echo h($t['key']); ?>" aria-hidden="true"></i>
+                            <span><?php echo h($t['preview']); ?></span>
+                            <span class="preview-state"><?php echo $on ? 'Required' : 'Not required'; ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <div class="settings-save">
+                        <button type="submit" class="cx-btn cx-btn-primary cx-btn-lg"><i class="ph ph-floppy-disk" aria-hidden="true"></i> Save settings</button>
+                        <span class="settings-save-hint">Changes to login attempts take effect immediately.</span>
+                    </div>
+                </section>
+            </aside>
         </form>
-    </div>
-</div>
 
-<script src="../includes/ui_alerts.js"></script>
+<?php
+staff_page_end(<<<'SCRIPTS'
 <script>
 function adjustVal(id, delta, min, max) {
     const inp = document.getElementById(id);
@@ -400,11 +243,13 @@ function updatePreview() {
     setPrev('spec',  spec);
 }
 
+// Required / not required is shown by icon + text, not by colour alone
 function setPrev(key, active) {
     const dot = document.getElementById('dot-' + key);
     const row = document.getElementById('prev-' + key);
-    dot.className = active ? 'pdot pdot-on' : 'pdot pdot-off';
-    row.style.opacity = active ? '1' : '0.4';
+    dot.className = active ? 'ph-fill ph-check-circle' : 'ph ph-minus-circle';
+    row.className = active ? 'is-on' : 'is-off';
+    row.querySelector('.preview-state').textContent = active ? 'Required' : 'Not required';
 }
 
 document.getElementById('pwMinLen').addEventListener('input', updatePreview);
@@ -413,5 +258,4 @@ document.getElementById('toggleLower').addEventListener('change', updatePreview)
 document.getElementById('toggleNum').addEventListener('change', updatePreview);
 document.getElementById('toggleSpec').addEventListener('change', updatePreview);
 </script>
-</body>
-</html>
+SCRIPTS);

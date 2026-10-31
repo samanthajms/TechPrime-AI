@@ -1,0 +1,1198 @@
+/* =========================================================================
+   EasyPC storefront v2 — the design of the homepage, used by every customer page.
+   ep_header.php adds body class "sf-page" and loads this file (after the dark
+   files and header.css) on every CLIENT page; markup helpers are in
+   includes/storefront_components.php, behaviour in storefront.js.
+   Page-level styles for the older page markup are in storefront-pages.css.
+
+   Dark mode is token-driven: html[data-theme="dark"] only re-points the
+   --sf-* variables below. This file is NOT a source of
+   scripts/build_client_dark_css.py — no regeneration needed after edits.
+
+   §1 Tokens (+ bridge for the older --ep-* variables)
+   §2 Primitives (buttons, links, section head, rail)
+   §3 Hero     §4 Perks strip   §5 Category tiles   §6 Product card
+   §7 Promo tiles   §8 Empty state   §9 Motion / reduced motion
+   §10 Page header (inner pages) §11 Product grid, pager, chips
+   §12 Panels and form controls  §13 Footer
+   ========================================================================= */
+
+/* ---- §1 Tokens -------------------------------------------------------- */
+.sf-page {
+    /* Brand (EasyPC): green fills/icons, darker green for actions + green text */
+    --sf-green-500: #62b236;
+    --sf-green-700: #3d7422;
+    --sf-green-800: #2c5618;
+    --sf-green-900: #13230d;
+    --sf-yellow-400: #fed700;
+
+    /* Semantic */
+    --sf-bg: #f4f6f3;
+    --sf-surface: #ffffff;
+    --sf-surface-2: #f7f9f6;
+    --sf-border: #e0e6dd;
+    --sf-border-strong: #c9d3c4;
+    --sf-text: #16201a;
+    --sf-text-2: #45514a;
+    --sf-muted: #5c6862;
+    --sf-accent-text: #3d7422;      /* green text on light surfaces (5.6:1) */
+    --sf-accent-soft: #eef8e6;
+    --sf-warn-text: #7a5c00;
+    --sf-warn-soft: #fff8d6;
+    --sf-action: #3d7422;           /* filled buttons, white label (5.6:1) */
+    --sf-action-hover: #2c5618;
+    --sf-on-action: #ffffff;
+    --sf-focus: #3d7422;
+    --sf-photo-plate: #f4f6f3;      /* white-background product photos blend into it */
+    --sf-promo-b-bg: #fff8d6;
+    --sf-promo-b-border: #f2e3a0;
+    --sf-danger-text: #b42318;      /* 6.6:1 on white */
+    --sf-danger-soft: #fef3f2;
+    --sf-star: #b7791f;             /* rating stars, 3.4:1 non-text on white */
+    --sf-hero-bg: #0a1307;          /* the header bar + homepage hero */
+
+    --sf-shadow-sm: 0 1px 2px rgba(22, 32, 26, 0.06);
+    --sf-shadow-md: 0 14px 28px -12px rgba(22, 32, 26, 0.22);
+    --sf-r-sm: 8px;
+    --sf-r-md: 12px;
+    --sf-r-lg: 16px;
+    --sf-r-xl: 20px;
+    --sf-ease: cubic-bezier(0.23, 1, 0.32, 1);
+    --sf-gutter: 40px;
+    --sf-max: 1680px;   /* same container as the header and .ep-main */
+
+    background: var(--sf-bg);
+    color: var(--sf-text);
+}
+html[data-theme="dark"] .ep-body.sf-page {
+    --sf-bg: #131518;
+    --sf-surface: #16181c;
+    --sf-surface-2: #1b1e23;
+    --sf-border: #2d3138;
+    --sf-border-strong: #3d424a;
+    --sf-text: #e4e6ea;
+    --sf-text-2: #c4cad3;
+    --sf-muted: #a3a9b3;
+    --sf-accent-text: #8fd468;
+    --sf-accent-soft: #1f2e18;
+    --sf-warn-text: #f3d35c;
+    --sf-warn-soft: #2e2810;
+    --sf-action: #62b236;
+    --sf-action-hover: #7cc653;
+    --sf-on-action: #0b1a05;        /* 6.8:1 on #62b236 */
+    --sf-focus: #8fd468;
+    --sf-photo-plate: #eceef1;      /* photos stay on a light plate in dark mode */
+    --sf-promo-b-bg: #2a2614;
+    --sf-promo-b-border: #3d3720;
+    --sf-danger-text: #f97066;
+    --sf-danger-soft: #2d1614;
+    --sf-star: #f3c400;
+    --sf-hero-bg: #070d05;
+    --sf-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --sf-shadow-md: 0 16px 32px -14px rgba(0, 0, 0, 0.7);
+
+    background: var(--sf-bg);
+    color: var(--sf-text);
+}
+
+/* Older page CSS (styles.css, tech_match.css, the pf-/epc-/ep-pd- blocks) reads the --ep-* variables.
+   Point them at the storefront tokens so those pages pick up the same palette in both themes.
+   --ep-green is used for filled buttons with white labels: the darker green keeps them at 5.6:1. */
+.ep-body.sf-page {
+    --ep-green: var(--sf-action);
+    --ep-green-dark: var(--sf-action-hover);
+    --ep-green-light: var(--sf-accent-soft);
+    --ep-black: var(--sf-text);
+    --ep-gray-bg: var(--sf-bg);
+    --ep-gray-text: var(--sf-muted);
+    --ep-border: var(--sf-border);
+    --ep-card-bg: var(--sf-surface);
+    --ep-white: var(--sf-surface);
+    --ep-footer-bg: #0a1307;
+}
+
+/* ---- §2 Primitives ---------------------------------------------------- */
+.sf-page .sf-main {
+    max-width: none;
+    padding: 0 0 72px;
+    font-size: 15px;
+    line-height: 1.5;
+}
+.sf-page .sf-wrap {
+    width: 100%;
+    max-width: var(--sf-max);
+    margin-inline: auto;
+    padding-inline: var(--sf-gutter);
+}
+.sf-page .sf-num { font-variant-numeric: tabular-nums; }
+.sf-page .sf-sr {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Buttons: 44px default, 48px large; label in sentence case */
+.sf-page .sf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 20px;
+    border: 1px solid transparent;
+    border-radius: var(--sf-r-sm);
+    font: 600 15px/1 'Poppins', Arial, sans-serif;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
+                box-shadow 200ms ease, transform 160ms var(--sf-ease);
+}
+.sf-page .sf-btn i { font-size: 0.95em; }
+.sf-page .sf-btn-lg { min-height: 50px; padding: 0 26px; font-size: 16px; border-radius: 10px; }
+.sf-page .sf-btn-block { width: 100%; }
+.sf-page .sf-btn-primary { background: var(--sf-action); color: var(--sf-on-action); }
+.sf-page .sf-btn-primary:hover { background: var(--sf-action-hover); }
+.sf-page .sf-btn-outline {
+    background: var(--sf-surface);
+    border-color: var(--sf-border-strong);
+    color: var(--sf-text);
+}
+.sf-page .sf-btn-outline:hover { border-color: var(--sf-accent-text); color: var(--sf-accent-text); }
+/* On dark imagery (hero, Build a PC tile) */
+.sf-page .sf-btn-bright { background: var(--sf-green-500); color: #0b1a05; }
+.sf-page .sf-btn-bright:hover { background: #7cc653; box-shadow: 0 10px 24px -10px rgba(98, 178, 54, 0.7); }
+.sf-page .sf-btn-glass {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.38);
+    color: #ffffff;
+}
+.sf-page .sf-btn-glass:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.6); }
+
+/* Square icon button (44px) — add to cart, rail arrows */
+.sf-page .sf-icon-btn {
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--sf-border-strong);
+    border-radius: var(--sf-r-sm);
+    background: var(--sf-surface);
+    color: var(--sf-text);
+    font-size: 16px;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
+                opacity 150ms ease, transform 160ms var(--sf-ease);
+}
+.sf-page .sf-icon-btn:hover:not(:disabled) {
+    border-color: var(--sf-accent-text);
+    color: var(--sf-accent-text);
+    background: var(--sf-accent-soft);
+}
+.sf-page .sf-icon-btn.is-round { border-radius: 999px; }
+.sf-page .sf-icon-btn:disabled { opacity: 0.38; cursor: default; }
+
+.sf-page .sf-btn:focus-visible,
+.sf-page .sf-icon-btn:focus-visible,
+.sf-page .sf-link:focus-visible,
+.sf-page .sf-tile:focus-visible,
+.sf-page .sf-card a:focus-visible,
+.sf-page .sf-perk-btn:focus-visible {
+    outline: 2px solid var(--sf-focus);
+    outline-offset: 2px;
+}
+.sf-page .sf-hero .sf-btn:focus-visible,
+.sf-page .sf-promo.is-dark .sf-btn:focus-visible { outline-color: var(--sf-yellow-400); }
+
+.sf-page .sf-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--sf-accent-text);
+    text-decoration: none;
+    border-radius: 6px;
+}
+.sf-page .sf-link i { font-size: 12px; transition: transform 160ms var(--sf-ease); }
+.sf-page .sf-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+.sf-page .sf-link:hover i { transform: translateX(3px); }
+
+/* Section + head */
+.sf-page .sf-section { margin-top: 56px; }
+.sf-page .sf-section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px 24px;
+    margin-bottom: 20px;
+}
+.sf-page .sf-eyebrow {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sf-accent-text);
+}
+.sf-page .sf-section-title {
+    margin: 0;
+    font-size: 26px;
+    line-height: 1.2;
+    font-weight: 700;
+    color: var(--sf-text);
+    text-wrap: balance;
+}
+.sf-page .sf-section-sub {
+    margin: 6px 0 0;
+    max-width: 60ch;
+    font-size: 15px;
+    color: var(--sf-muted);
+}
+.sf-page .sf-section-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.sf-page .sf-section-tools .sf-link { margin-right: 8px; }
+/* Arrows only matter when the rail actually overflows (set by the rail script) */
+.sf-page .sf-rail-arrows { display: flex; gap: 8px; }
+.sf-page .sf-rail-arrows[hidden] { display: none; }
+
+/* Horizontal rail: snap-scrolling grid; arrows live in the section head */
+.sf-page .sf-rail { --per: 5; --gap: 18px; position: relative; }
+.sf-page .sf-rail-track {
+    list-style: none;
+    margin: -6px;
+    padding: 6px 6px 10px;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - (var(--per) - 1) * var(--gap)) / var(--per));
+    gap: var(--gap);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 6px;
+    scrollbar-width: none;
+}
+.sf-page .sf-rail-track::-webkit-scrollbar { display: none; }
+.sf-page .sf-rail-track > li { min-width: 0; scroll-snap-align: start; }
+/* Fade the edge that has more items behind it */
+.sf-page .sf-rail.has-next .sf-rail-track {
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 56px), transparent);
+            mask-image: linear-gradient(90deg, #000 calc(100% - 56px), transparent);
+}
+.sf-page .sf-rail.has-prev .sf-rail-track {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 56px);
+            mask-image: linear-gradient(90deg, transparent, #000 56px);
+}
+.sf-page .sf-rail.has-prev.has-next .sf-rail-track {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
+.sf-page .sf-rail.is-cats { --per: 8; --gap: 14px; }
+
+/* ---- §3 Hero ---------------------------------------------------------- */
+.sf-page .sf-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: #0a1307;
+    color: #ffffff;
+}
+.sf-page .sf-hero-media {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 75% 50%;
+}
+.sf-page .sf-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+        linear-gradient(90deg, rgba(10, 19, 7, 0.97) 0%, rgba(10, 19, 7, 0.9) 34%, rgba(10, 19, 7, 0.45) 64%, rgba(10, 19, 7, 0.2) 100%),
+        linear-gradient(0deg, rgba(10, 19, 7, 0.6), transparent 40%);
+}
+.sf-page .sf-hero-inner {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: clamp(400px, 52vh, 520px);
+    padding-top: 64px;
+    padding-bottom: 96px;   /* room for the perks card that overlaps the bottom edge */
+}
+.sf-page .sf-hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 18px;
+    padding: 6px 14px 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+}
+.sf-page .sf-hero-kicker i { color: var(--sf-green-500); }
+.sf-page .sf-hero-title {
+    margin: 0;
+    max-width: 16ch;
+    font-size: clamp(34px, 4.4vw, 56px);
+    line-height: 1.08;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #ffffff;
+    text-wrap: balance;
+}
+.sf-page .sf-hero-title span { color: var(--sf-green-500); }
+.sf-page .sf-hero-sub {
+    margin: 18px 0 0;
+    max-width: 50ch;
+    font-size: 17px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.82);
+}
+.sf-page .sf-hero-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.sf-page .sf-hero-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    margin: 26px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.74);
+}
+.sf-page .sf-hero-facts li { display: inline-flex; align-items: center; gap: 8px; }
+.sf-page .sf-hero-facts strong { color: #ffffff; font-weight: 600; }
+.sf-page .sf-hero-facts i { color: var(--sf-green-500); font-size: 13px; }
+
+/* ---- §4 Perks strip (overlaps the hero's bottom edge) ----------------- */
+.sf-page .sf-perks-wrap { position: relative; z-index: 1; margin-top: -52px; }
+.sf-page .sf-perks {
+    list-style: none;
+    margin: 0;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    background: var(--sf-surface);
+    border: 1px solid var(--sf-border);
+    border-radius: var(--sf-r-lg);
+    box-shadow: var(--sf-shadow-md);
+}
+.sf-page .sf-perks > li { position: relative; display: flex; }
+.sf-page .sf-perks > li + li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 18px;
+    bottom: 18px;
+    width: 1px;
+    background: var(--sf-border);
+}
+.sf-page .sf-perk,
+.sf-page .sf-perk-btn {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: var(--sf-r-md);
+    text-align: left;
+    color: inherit;
+}
+.sf-page .sf-perk-btn {
+    border: 0;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 150ms ease;
+}
+.sf-page .sf-perk-btn:hover { background: var(--sf-surface-2); }
+.sf-page .sf-perk-icon {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--sf-r-md);
+    background: var(--sf-accent-soft);
+    color: var(--sf-accent-text);
+    font-size: 17px;
+}
+.sf-page .sf-perk-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sf-page .sf-perk-text strong { font-size: 15px; font-weight: 600; color: var(--sf-text); line-height: 1.35; }
+.sf-page .sf-perk-text span { font-size: 13.5px; color: var(--sf-muted); line-height: 1.45; }
+.sf-page .sf-perk-btn .sf-perk-text strong i { margin-left: 4px; font-size: 11px; color: var(--sf-accent-text); }
+
+/* ---- §5 Category tiles ------------------------------------------------ */
+.sf-page .sf-tile {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 12px 12px 16px;
+    border: 1px solid var(--sf-border);
+    border-radius: var(--sf-r-lg);
+    background: var(--sf-surface);
+    color: var(--sf-text);
+    text-align: center;
+    text-decoration: none;
+    box-shadow: var(--sf-shadow-sm);
+    transition: border-color 180ms ease, box-shadow 220ms ease, transform 220ms var(--sf-ease);
+}
+.sf-page .sf-tile-media {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    display: grid;
+    place-items: center;
+    margin-bottom: 10px;
+    border-radius: var(--sf-r-md);
+    background: var(--sf-photo-plate);
+    color: var(--sf-muted);
+    font-size: 26px;
+    overflow: hidden;
+}
+.sf-page .sf-tile-media img {
+    width: 78%;
+    height: 78%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+    transition: transform 260ms var(--sf-ease);
+}
+.sf-page .sf-tile-name { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.sf-page .sf-tile-count { font-size: 13px; color: var(--sf-muted); }
+
+/* ---- §6 Product card -------------------------------------------------- */
+.sf-page .sf-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--sf-border);
+    border-radius: var(--sf-r-lg);
+    background: var(--sf-surface);
+    box-shadow: var(--sf-shadow-sm);
+    transition: border-color 180ms ease, box-shadow 220ms ease, transform 220ms var(--sf-ease);
+}
+.sf-page .sf-card-media {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 5 / 4;
+    margin: 8px 8px 0;
+    border-radius: var(--sf-r-md);
+    background: var(--sf-photo-plate);
+    overflow: hidden;
+}
+.sf-page .sf-card-media img {
+    width: 84%;
+    height: 84%;
+    object-fit: contain;
+    mix-blend-mode: multiply;   /* white photo backgrounds melt into the plate */
+    transition: transform 300ms var(--sf-ease);
+}
+.sf-page .sf-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 16px 16px;
+}
+.sf-page .sf-card-cat {
+    margin: 0 0 4px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--sf-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sf-page .sf-card-title {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.4;
+    font-weight: 600;
+    min-height: 2.8em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+}
+.sf-page .sf-card-title a { color: var(--sf-text); text-decoration: none; border-radius: 4px; }
+.sf-page .sf-card-title a:hover { color: var(--sf-accent-text); }
+/* The whole card is clickable through the title link (stretched), buttons stay on top */
+.sf-page .sf-card { position: relative; }
+.sf-page .sf-card-title a::after { content: ""; position: absolute; inset: 0; z-index: 0; }
+.sf-page .sf-card-buy { position: relative; z-index: 1; }
+
+.sf-page .sf-card-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin: 10px 0 14px;
+}
+.sf-page .sf-card-price {
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--sf-text);
+    font-variant-numeric: tabular-nums;
+}
+.sf-page .sf-stock {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--sf-accent-text);
+}
+.sf-page .sf-stock.is-low { color: var(--sf-warn-text); }
+.sf-page .sf-stock i { font-size: 12px; }
+.sf-page .sf-card-buy {
+    margin: auto 0 0;
+    display: flex;
+    gap: 8px;
+}
+.sf-page .sf-card-buy .sf-btn { flex: 1; padding: 0 12px; }
+.sf-page .sf-btn:disabled,
+.sf-page .sf-btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+.sf-page .sf-stock.is-out { color: var(--sf-danger-text); }
+.sf-page .sf-card.is-out .sf-card-media img { opacity: 0.55; }
+.sf-page .sf-card-rating {
+    margin: 6px 0 0;
+    display: flex;
+    gap: 2px;
+    font-size: 12px;
+    color: var(--sf-star);
+}
+/* Wishlist heart over the photo (shop, wishlist) */
+.sf-page .sf-card-wish { position: absolute; top: 14px; right: 14px; z-index: 2; margin: 0; }
+.sf-page .sf-wish-btn {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--sf-border);
+    border-radius: 999px;
+    background: var(--sf-surface);
+    color: var(--sf-muted);
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: var(--sf-shadow-sm);
+    transition: color 150ms ease, border-color 150ms ease, transform 160ms var(--sf-ease);
+}
+.sf-page .sf-wish-btn:hover { color: var(--sf-danger-text); border-color: var(--sf-danger-text); }
+.sf-page .sf-wish-btn.is-on { color: var(--sf-danger-text); }
+.sf-page .sf-wish-btn:focus-visible { outline: 2px solid var(--sf-focus); outline-offset: 2px; }
+
+/* ---- §7 Promo tiles --------------------------------------------------- */
+.sf-page .sf-promos {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 20px;
+}
+.sf-page .sf-promo {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: 280px;
+    padding: 36px;
+    border: 1px solid var(--sf-promo-b-border);
+    border-radius: var(--sf-r-xl);
+    background: var(--sf-promo-b-bg);
+    color: var(--sf-text);
+}
+.sf-page .sf-promo.is-dark {
+    border-color: transparent;
+    background: radial-gradient(120% 140% at 100% 100%, #2c5618 0%, #13230d 55%, #0a1307 100%);
+    color: #ffffff;
+}
+.sf-page .sf-promo-copy { position: relative; z-index: 1; max-width: 30ch; }
+.sf-page .sf-promo.is-dark .sf-promo-copy { max-width: 34ch; }
+.sf-page .sf-promo .sf-eyebrow { color: var(--sf-warn-text); }
+.sf-page .sf-promo.is-dark .sf-eyebrow { color: var(--sf-green-500); }
+.sf-page .sf-promo-title {
+    margin: 0;
+    font-size: 26px;
+    line-height: 1.2;
+    font-weight: 700;
+    color: inherit;
+    text-wrap: balance;
+}
+.sf-page .sf-promo-text { margin: 10px 0 24px; font-size: 15px; line-height: 1.55; color: var(--sf-text-2); }
+.sf-page .sf-promo.is-dark .sf-promo-text { color: #d6e6cf; }
+.sf-page .sf-promo-list {
+    list-style: none;
+    margin: -8px 0 24px;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+    font-size: 14px;
+    color: #d6e6cf;
+}
+.sf-page .sf-promo-list li { display: flex; align-items: center; gap: 10px; }
+.sf-page .sf-promo-list i { color: var(--sf-green-500); font-size: 13px; }
+.sf-page .sf-promo .sf-btn { margin-top: auto; }
+/* The art PNGs are product shots on a white disc: show the disc on purpose, with a soft ring */
+.sf-page .sf-promo-art {
+    position: absolute;
+    z-index: 0;
+    top: 50%;
+    right: 36px;
+    width: min(36%, 230px);
+    height: auto;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    transform: translateY(-50%);
+    box-shadow: 0 0 0 10px rgba(98, 178, 54, 0.16), 0 0 0 22px rgba(98, 178, 54, 0.07),
+                0 24px 40px -12px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+}
+.sf-page .sf-promo:not(.is-dark) .sf-promo-art {
+    width: min(34%, 170px);
+    right: 32px;
+    box-shadow: 0 0 0 10px rgba(254, 215, 0, 0.22), 0 0 0 22px rgba(254, 215, 0, 0.1),
+                0 18px 30px -14px rgba(22, 32, 26, 0.35);
+}
+/* Each tile sizes with its grid column: drop the art when the copy would run into it */
+.sf-page .sf-promo { container-type: inline-size; }
+@container (max-width: 660px) {
+    .sf-page .sf-promo.is-dark .sf-promo-art { display: none; }
+}
+@container (max-width: 540px) {
+    .sf-page .sf-promo:not(.is-dark) .sf-promo-art { display: none; }
+}
+
+/* ---- §8 Empty state --------------------------------------------------- */
+.sf-page .sf-empty {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 20px 24px;
+    border: 1px dashed var(--sf-border-strong);
+    border-radius: var(--sf-r-lg);
+    background: var(--sf-surface);
+}
+.sf-page .sf-empty-icon {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    background: var(--sf-accent-soft);
+    color: var(--sf-accent-text);
+    font-size: 19px;
+}
+.sf-page .sf-empty-text { flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; }
+.sf-page .sf-empty-text strong { font-size: 16px; font-weight: 600; }
+.sf-page .sf-empty-text span { font-size: 14px; color: var(--sf-muted); }
+.sf-page .sf-empty-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+/* Whole-page empty state (cart, wishlist, search with no results) */
+.sf-page .sf-empty.is-center {
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+    padding: 56px 24px;
+    border-style: solid;
+    border-color: var(--sf-border);
+    text-align: center;
+}
+.sf-page .sf-empty.is-center .sf-empty-icon { width: 72px; height: 72px; font-size: 28px; }
+.sf-page .sf-empty.is-center .sf-empty-text { flex: 0 1 auto; max-width: 46ch; gap: 6px; }
+.sf-page .sf-empty.is-center .sf-empty-text strong { font-size: 20px; font-weight: 700; }
+.sf-page .sf-empty.is-center .sf-empty-text span { font-size: 15px; line-height: 1.55; }
+.sf-page .sf-empty.is-center .sf-empty-actions { justify-content: center; margin-top: 6px; }
+
+/* ---- Responsive ------------------------------------------------------- */
+@media (max-width: 1280px) {
+    .sf-page .sf-rail { --per: 4; }
+    .sf-page .sf-rail.is-cats { --per: 7; }
+}
+@media (max-width: 1100px) {
+    .sf-page .sf-perks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sf-page .sf-perks > li + li::before { display: none; }
+    .sf-page .sf-rail.is-cats { --per: 6; }
+}
+@media (max-width: 900px) {
+    .sf-page { --sf-gutter: 24px; }
+    .sf-page .sf-rail { --per: 3; }
+    .sf-page .sf-rail.is-cats { --per: 4.5; }
+    .sf-page .sf-promos { grid-template-columns: minmax(0, 1fr); }
+    .sf-page .sf-hero::before {
+        background: linear-gradient(90deg, rgba(10, 19, 7, 0.95) 0%, rgba(10, 19, 7, 0.78) 60%, rgba(10, 19, 7, 0.5) 100%);
+    }
+}
+@media (max-width: 640px) {
+    .sf-page { --sf-gutter: 16px; }
+    .sf-page .sf-main { padding-bottom: 48px; }
+    .sf-page .sf-section { margin-top: 40px; }
+    /* Head stacks: title block, then a row with "View all" on the left and the arrows on the right */
+    .sf-page .sf-section-head { flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 14px; }
+    .sf-page .sf-section-title { font-size: 22px; }
+    .sf-page .sf-section-sub { font-size: 14px; }
+    .sf-page .sf-section-tools { justify-content: space-between; }
+    .sf-page .sf-section-tools .sf-link { margin-right: 0; }
+    .sf-page .sf-section-tools .sf-rail-arrows { margin-left: auto; }
+    /* Peek the next card so the rail reads as swipeable; arrows stay as the non-swipe path */
+    .sf-page .sf-rail { --per: 1.7; --gap: 12px; }
+    .sf-page .sf-rail.is-cats { --per: 3.3; --gap: 10px; }
+    .sf-page .sf-tile { padding: 8px 8px 12px; }
+    .sf-page .sf-tile-name { font-size: 13px; }
+    .sf-page .sf-tile-count { font-size: 12px; }
+    .sf-page .sf-card-body { padding: 12px 12px 14px; }
+    .sf-page .sf-card-title { font-size: 14px; }
+    .sf-page .sf-card-price { font-size: 17px; }
+    .sf-page .sf-card-buy .sf-btn { font-size: 14px; padding: 0 8px; }
+
+    .sf-page .sf-hero-inner { min-height: 0; padding-top: 40px; padding-bottom: 84px; }
+    .sf-page .sf-hero-media { object-position: 70% 50%; }
+    .sf-page .sf-hero::before { background: linear-gradient(180deg, rgba(10, 19, 7, 0.8) 0%, rgba(10, 19, 7, 0.92) 100%); }
+    .sf-page .sf-hero-sub { font-size: 16px; }
+    .sf-page .sf-hero-ctas { width: 100%; }
+    .sf-page .sf-hero-ctas .sf-btn { flex: 1 1 100%; }
+    .sf-page .sf-hero-facts { gap: 6px 16px; font-size: 13px; }
+
+    .sf-page .sf-perks-wrap { margin-top: -44px; }
+    .sf-page .sf-perks { padding: 4px; }
+    .sf-page .sf-perk,
+    .sf-page .sf-perk-btn { flex-direction: column; gap: 10px; padding: 14px 12px; }
+    .sf-page .sf-perk-icon { width: 38px; height: 38px; font-size: 15px; }
+    .sf-page .sf-perk-text strong { font-size: 14px; }
+    .sf-page .sf-perk-text span { font-size: 13px; }
+
+    .sf-page .sf-promo { min-height: 0; padding: 24px 20px; }
+    .sf-page .sf-promo-title { font-size: 22px; }
+    .sf-page .sf-promo-copy,
+    .sf-page .sf-promo.is-dark .sf-promo-copy { max-width: none; }
+    .sf-page .sf-promo-art { display: none; }   /* decorative; the copy needs the width */
+    .sf-page .sf-promo .sf-btn { margin-top: 0; }
+}
+
+/* ---- §9 Motion -------------------------------------------------------- */
+@media (hover: hover) and (pointer: fine) {
+    .sf-page .sf-tile:hover,
+    .sf-page .sf-card:hover {
+        border-color: var(--sf-border-strong);
+        box-shadow: var(--sf-shadow-md);
+        transform: translateY(-3px);
+    }
+    .sf-page .sf-tile:hover .sf-tile-media img,
+    .sf-page .sf-card:hover .sf-card-media img { transform: scale(1.05); }
+    .sf-page .sf-tile:hover .sf-tile-name { color: var(--sf-accent-text); }
+}
+.sf-page .sf-btn:active,
+.sf-page .sf-icon-btn:active:not(:disabled),
+.sf-page .sf-perk-btn:active { transform: scale(0.97); }
+
+/* One-time entrance for the hero copy */
+@keyframes sf-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+.sf-page .sf-hero-inner > * { animation: sf-rise 420ms var(--sf-ease) both; }
+.sf-page .sf-hero-inner > :nth-child(2) { animation-delay: 50ms; }
+.sf-page .sf-hero-inner > :nth-child(3) { animation-delay: 100ms; }
+.sf-page .sf-hero-inner > :nth-child(4) { animation-delay: 150ms; }
+.sf-page .sf-hero-inner > :nth-child(5) { animation-delay: 200ms; }
+
+@media (prefers-reduced-motion: reduce) {
+    .sf-page .sf-hero-inner > * { animation: none; }
+    .sf-page .sf-tile,
+    .sf-page .sf-card,
+    .sf-page .sf-tile-media img,
+    .sf-page .sf-card-media img,
+    .sf-page .sf-link i { transition: border-color 150ms ease, box-shadow 150ms ease, color 150ms ease; }
+    .sf-page .sf-tile:hover,
+    .sf-page .sf-card:hover,
+    .sf-page .sf-tile:hover .sf-tile-media img,
+    .sf-page .sf-card:hover .sf-card-media img,
+    .sf-page .sf-link:hover i,
+    .sf-page .sf-btn:active,
+    .sf-page .sf-icon-btn:active:not(:disabled),
+    .sf-page .sf-perk-btn:active { transform: none; }
+}
+
+/* ---- §10 Page header (inner pages) --------------------------------------
+   sf_page_hero(): a light header on the page background — breadcrumb or back
+   link, optional icon tile, eyebrow, h1, one-line subtitle, chips and actions,
+   closed by a hairline above the content. The deep-green hero band is the
+   homepage's alone. */
+.sf-page .sf-pagehead { color: var(--sf-text); }
+.sf-page .sf-pagehead-inner { padding-top: 24px; }
+
+.sf-page .sf-crumbs ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 0;
+    margin: 0 0 12px;
+    padding: 0;
+    list-style: none;
+    font-size: 13.5px;
+    color: var(--sf-muted);
+}
+.sf-page .sf-crumbs li { display: inline-flex; align-items: center; min-width: 0; }
+.sf-page .sf-crumbs li + li::before {
+    content: "\f054";   /* chevron-right */
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    font-size: 9px;
+    margin: 0 10px;
+    color: var(--sf-border-strong);
+}
+.sf-page .sf-crumbs a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    color: var(--sf-text-2);
+    text-decoration: none;
+    border-radius: 4px;
+}
+.sf-page .sf-crumbs a:hover { color: var(--sf-accent-text); text-decoration: underline; text-underline-offset: 3px; }
+.sf-page .sf-crumbs [aria-current="page"] {
+    color: var(--sf-text);
+    font-weight: 500;
+    max-width: 48ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sf-page .sf-pagehead-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--sf-text-2);
+    text-decoration: none;
+    border-radius: 6px;
+}
+.sf-page .sf-pagehead-back i { font-size: 12px; transition: transform 160ms var(--sf-ease); }
+.sf-page .sf-pagehead-back:hover { color: var(--sf-accent-text); }
+.sf-page .sf-pagehead-back:hover i { transform: translateX(-3px); }
+
+.sf-page .sf-pagehead-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px 32px;
+    flex-wrap: wrap;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--sf-border);
+}
+.sf-page .sf-pagehead-copy { display: flex; align-items: flex-start; gap: 16px; min-width: 0; flex: 1 1 420px; }
+.sf-page .sf-pagehead-icon {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    margin-top: 2px;
+    border-radius: 14px;
+    background: var(--sf-accent-soft);
+    color: var(--sf-accent-text);
+    font-size: 21px;
+}
+.sf-page .sf-pagehead-eyebrow {
+    margin: 0 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sf-accent-text);
+}
+.sf-page .sf-pagehead-title {
+    margin: 0;
+    font-size: clamp(26px, 2.4vw, 34px);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--sf-text);
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+}
+.sf-page .sf-pagehead.is-sm .sf-pagehead-title { font-size: clamp(24px, 2.2vw, 30px); }
+.sf-page .sf-pagehead-sub {
+    margin: 8px 0 0;
+    max-width: 66ch;
+    font-size: 15.5px;
+    line-height: 1.55;
+    color: var(--sf-text-2);
+}
+.sf-page .sf-pagehead-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.sf-page .sf-pagehead-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.sf-page .sf-meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 14px;
+    border: 1px solid var(--sf-border);
+    border-radius: 999px;
+    background: var(--sf-surface);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--sf-text-2);
+    white-space: nowrap;
+}
+.sf-page .sf-meta-chip i { color: var(--sf-accent-text); font-size: 12px; }
+.sf-page .sf-meta-chip strong { color: var(--sf-text); font-weight: 600; }
+.sf-page .sf-pagehead a:focus-visible,
+.sf-page .sf-pagehead button:focus-visible { outline: 2px solid var(--sf-focus); outline-offset: 2px; }
+
+/* Page body under the header */
+.sf-page .sf-body { margin-top: 28px; }
+/* Narrower pages: the header (width => narrow) and the body share the same column */
+.sf-page .sf-wrap.is-narrow { max-width: 1240px; }
+.sf-page .sf-wrap.is-xnarrow { max-width: 800px; }
+
+/* ---- §11 Product grid, pager, chips ----------------------------------- */
+.sf-page .sf-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 232px), 1fr));
+    gap: 18px;
+}
+.sf-page .sf-grid > li { min-width: 0; }
+.sf-page .sf-results-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin: 0 0 16px;
+}
+.sf-page .sf-results-count { margin: 0; font-size: 14px; color: var(--sf-muted); }
+.sf-page .sf-results-count strong { color: var(--sf-text); font-weight: 600; }
+
+.sf-page .sf-pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 32px 0 0;
+}
+.sf-page .sf-pager-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--sf-border-strong);
+    border-radius: var(--sf-r-sm);
+    background: var(--sf-surface);
+    color: var(--sf-text);
+    font-size: 14.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.sf-page .sf-pager-link i { font-size: 11px; }
+.sf-page a.sf-pager-link:hover { border-color: var(--sf-accent-text); color: var(--sf-accent-text); background: var(--sf-accent-soft); }
+.sf-page .sf-pager-link.active,
+.sf-page .sf-pager-link.active:hover { background: var(--sf-action); border-color: var(--sf-action); color: var(--sf-on-action); }
+.sf-page .sf-pager-link.is-disabled { opacity: 0.45; cursor: default; }
+.sf-page .sf-pager-link:focus-visible { outline: 2px solid var(--sf-focus); outline-offset: 2px; }
+.sf-page .sf-pager-gap { min-width: 24px; text-align: center; color: var(--sf-muted); }
+
+/* Chips: wrap instead of clipping (filters, sort, sections) */
+.sf-page .sf-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.sf-page .sf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 16px;
+    border: 1px solid var(--sf-border-strong);
+    border-radius: 999px;
+    background: var(--sf-surface);
+    color: var(--sf-text);
+    font: 500 14px/1 'Poppins', Arial, sans-serif;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.sf-page .sf-chip i { font-size: 12px; color: var(--sf-muted); }
+.sf-page .sf-chip:hover { border-color: var(--sf-accent-text); color: var(--sf-accent-text); }
+.sf-page .sf-chip.is-active,
+.sf-page .sf-chip[aria-current="page"],
+.sf-page .sf-chip[aria-current="true"] {
+    background: var(--sf-action);
+    border-color: var(--sf-action);
+    color: var(--sf-on-action);
+}
+.sf-page .sf-chip.is-active i,
+.sf-page .sf-chip[aria-current] i { color: inherit; }
+.sf-page .sf-chip:focus-visible { outline: 2px solid var(--sf-focus); outline-offset: 2px; }
+
+/* ---- §12 Panels and form controls ------------------------------------- */
+.sf-page .sf-panel {
+    padding: 24px;
+    border: 1px solid var(--sf-border);
+    border-radius: var(--sf-r-lg);
+    background: var(--sf-surface);
+    box-shadow: var(--sf-shadow-sm);
+}
+.sf-page .sf-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 16px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--sf-text);
+}
+.sf-page .sf-panel-title i { color: var(--sf-accent-text); font-size: 16px; }
+.sf-page .sf-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--sf-border);
+    border-radius: var(--sf-r-md);
+    background: var(--sf-surface-2);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--sf-text-2);
+}
+.sf-page .sf-note > i { margin-top: 3px; color: var(--sf-accent-text); }
+.sf-page .sf-note.is-error { border-color: rgba(180, 35, 24, 0.35); background: var(--sf-danger-soft); color: var(--sf-danger-text); }
+.sf-page .sf-note.is-error > i { color: var(--sf-danger-text); }
+.sf-page .sf-note.is-warn { border-color: var(--sf-promo-b-border); background: var(--sf-warn-soft); color: var(--sf-warn-text); }
+.sf-page .sf-note.is-warn > i { color: var(--sf-warn-text); }
+
+/* Key/value rows (order lines, totals) */
+.sf-page .sf-rows { margin: 0; padding: 0; list-style: none; }
+.sf-page .sf-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--sf-border);
+    font-size: 15px;
+    color: var(--sf-text-2);
+}
+.sf-page .sf-row > :last-child { color: var(--sf-text); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.sf-page .sf-row.is-total { border-bottom: 0; padding-top: 16px; font-size: 16px; color: var(--sf-text); font-weight: 600; }
+.sf-page .sf-row.is-total > :last-child { font-size: 24px; font-weight: 700; }
+
+/* ---- §13 Footer -------------------------------------------------------- */
+.sf-page .sf-footer {
+    margin-top: auto;
+    padding: 0;
+    background: var(--sf-hero-bg);
+    color: rgba(255, 255, 255, 0.78);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.sf-page .sf-footer-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+    gap: 32px 40px;
+    padding-top: 56px;
+    padding-bottom: 40px;
+}
+.sf-page .sf-footer-logo { display: inline-block; border-radius: 6px; }
+.sf-page .sf-footer-logo img { display: block; height: 32px; width: auto; }
+.sf-page .sf-footer-tagline { margin: 16px 0 18px; max-width: 40ch; font-size: 14.5px; line-height: 1.6; }
+.sf-page .sf-footer-contact { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14.5px; }
+.sf-page .sf-footer-contact li { display: flex; align-items: center; gap: 12px; min-height: 32px; }
+.sf-page .sf-footer-contact i { width: 16px; text-align: center; color: var(--sf-green-500); font-size: 13px; }
+.sf-page .sf-footer-head {
+    margin: 4px 0 14px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sf-green-500);
+}
+.sf-page .sf-footer-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.sf-page .sf-footer a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 14.5px;
+    text-decoration: none;
+    border-radius: 4px;
+}
+.sf-page .sf-footer a:hover { color: #ffffff; text-decoration: underline; text-underline-offset: 3px; }
+.sf-page .sf-footer a:focus-visible { outline: 2px solid var(--sf-yellow-400); outline-offset: 2px; }
+.sf-page .sf-footer-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 24px;
+    padding-top: 20px;
+    padding-bottom: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.66);
+}
+.sf-page .sf-footer-pay i { margin-right: 6px; color: var(--sf-green-500); }
+/* Keep the last line clear of the floating Primo launcher (bottom right) */
+.sf-page .sf-footer-bottom { padding-right: calc(var(--sf-gutter) + 96px); }
+
+/* ---- §10–§13 responsive ---------------------------------------------- */
+@media (max-width: 1100px) {
+    .sf-page .sf-footer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .sf-page .sf-footer-brand { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+    .sf-page .sf-pagehead-inner { padding-top: 16px; }
+    .sf-page .sf-pagehead-row { padding-bottom: 18px; }
+    .sf-page .sf-pagehead-copy { gap: 12px; flex-basis: 100%; }
+    .sf-page .sf-pagehead-icon { width: 42px; height: 42px; font-size: 17px; border-radius: 12px; }
+    .sf-page .sf-pagehead-sub { font-size: 15px; }
+    .sf-page .sf-pagehead-actions { width: 100%; }
+    .sf-page .sf-pagehead-actions .sf-btn { flex: 1 1 auto; }
+    .sf-page .sf-crumbs ol { font-size: 13px; margin-bottom: 10px; }
+    .sf-page .sf-crumbs [aria-current="page"] { max-width: 24ch; }
+    .sf-page .sf-body { margin-top: 20px; }
+    .sf-page .sf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .sf-page .sf-grid .sf-card-wish { top: 12px; right: 12px; }
+    .sf-page .sf-grid .sf-wish-btn { width: 36px; height: 36px; font-size: 14px; }
+    .sf-page .sf-panel { padding: 18px 16px; }
+    .sf-page .sf-empty.is-center { padding: 40px 18px; }
+    .sf-page .sf-footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 20px; padding-top: 40px; padding-bottom: 28px; }
+    .sf-page .sf-footer-bottom { flex-direction: column; padding-right: var(--sf-gutter); padding-bottom: 104px; }
+}
+@media (max-width: 380px) {
+    .sf-page .sf-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sf-page .sf-pagehead-back i,
+    .sf-page .sf-wish-btn { transition: none; }
+    .sf-page .sf-pagehead-back:hover i { transform: none; }
+}

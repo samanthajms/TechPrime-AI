@@ -2,6 +2,9 @@
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/staff_layout.php';
+require_once __DIR__ . '/../includes/product_categories.php';
+require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
+require_once __DIR__ . '/../includes/retail_reports.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
@@ -9,668 +12,358 @@ checkRole('inventory_custodian');
 
 $uid = (int)$_SESSION['user_id'];
 
-$total = (int)($db->query('SELECT COUNT(*) FROM shipments')->fetch_row()[0] ?? 0);
-$pending = (int)($db->query("SELECT COUNT(*) FROM shipments WHERE shipment_status != 'delivered'")->fetch_row()[0] ?? 0);
-$done = (int)($db->query("SELECT COUNT(*) FROM shipments WHERE shipment_status = 'delivered'")->fetch_row()[0] ?? 0);
+$total = (int)($db->query('SELECT COUNT(*) FROM shipments')->fetchColumn() ?? 0);
+$pending = (int)($db->query("SELECT COUNT(*) FROM shipments WHERE shipment_status != 'delivered'")->fetchColumn() ?? 0);
+$done = (int)($db->query("SELECT COUNT(*) FROM shipments WHERE shipment_status = 'delivered'")->fetchColumn() ?? 0);
 
-$products = $db->query('SELECT * FROM products ORDER BY id DESC');
-$productRows = ($products && $products->num_rows > 0) ? $products->fetch_all(MYSQLI_ASSOC) : [];
+$products = $db->query('SELECT id, name, category, stock, price, created_at FROM products ORDER BY id DESC');
+$productRows = $products ? $products->fetchAll(PDO::FETCH_ASSOC) : [];
 
 $productCount = count($productRows);
 $totalStock = 0;
+$criticalStockCount = 0;
 $lowStockCount = 0;
 $outOfStockCount = 0;
-foreach ($productRows as $row) {
+// Same bands as inventory_stocks.php: critical 1–5, low 6–15
+foreach ($productRows as &$row) {
     $stock = (int)($row['stock'] ?? 0);
     $totalStock += $stock;
     if ($stock <= 0) {
         $outOfStockCount++;
     } elseif ($stock <= 5) {
+        $criticalStockCount++;
+    } elseif ($stock <= 15) {
         $lowStockCount++;
     }
+    $tax = ep_shop_classify_product($row);
+    $row['tax_parent_label'] = $tax['parent_label'];
+}
+unset($row);
+$categoryTabs = [];
+foreach (ep_shop_taxonomy() as $info) {
+    $categoryTabs[] = (string)$info['label'];
 }
 $completionRate = $total > 0 ? (int)round(($done / $total) * 100) : 0;
+$runningLowCount = $criticalStockCount + $lowStockCount;
 
-$perPage = 10;
-$currentPage = max(1, (int)($_GET['page'] ?? 1));
-$totalPages = max(1, (int)ceil($productCount / $perPage));
-if ($currentPage > $totalPages) {
-    $currentPage = $totalPages;
-}
-$pagedProducts = array_slice($productRows, ($currentPage - 1) * $perPage, $perPage);
+$stockYear = (int)date('Y');
+
+require_once __DIR__ . '/../includes/inventory_alerts.php';
+inv_sync_stock_alerts($db);
+
+$jsStockProducts = array_map(static function ($p) {
+    return [
+        'category' => trim((string)($p['tax_parent_label'] ?? 'Others')) ?: 'Others',
+        // Manila wall-clock time, so the chart's month buckets follow the branch calendar (DB value is UTC).
+        'created_at' => format_utc_datetime((string)($p['created_at'] ?? ''), 'Y-m-d H:i:s'),
+    ];
+}, $productRows);
+$stockProductsJson = json_encode($jsStockProducts, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
 logActivity($db, $uid, 'view_dashboard', 'Inventory Custodian viewed dashboard');
 
+$firstName = trim((string)($_SESSION['name'] ?? ''));
 staff_page_start([
     'role' => 'inventory_custodian',
     'title' => 'Inventory Dashboard',
     'active' => 'dashboard',
-    'heading' => 'Inventory Dashboard',
-    'subtitle' => 'Welcome, ' . ($_SESSION['name'] ?? 'Inventory'),
-    'extra_head' => <<<'EXTRA'
-<style>
-.inv-dash { display: flex; flex-direction: column; gap: 24px; }
-
-.inv-hero {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    flex-wrap: wrap;
-    padding: 26px 30px;
-    background: linear-gradient(135deg, var(--ep-green) 0%, var(--ep-green-dark) 100%);
-    border-radius: 16px;
-    color: #fff;
-    box-shadow: 0 10px 32px rgba(75, 139, 42, 0.3);
-    position: relative;
-    overflow: hidden;
-}
-.inv-hero::after {
-    content: '';
-    position: absolute;
-    right: -40px;
-    top: -40px;
-    width: 180px;
-    height: 180px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    pointer-events: none;
-}
-.inv-hero-text { position: relative; z-index: 1; max-width: 560px; }
-.inv-hero-kicker {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.4px;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.82);
-    margin-bottom: 6px;
-}
-.inv-hero h1 {
-    margin: 0 0 8px;
-    font-size: 24px;
-    font-weight: 800;
-    line-height: 1.2;
-}
-.inv-hero p {
-    margin: 0;
-    font-size: 13.5px;
-    line-height: 1.55;
-    color: rgba(255, 255, 255, 0.9);
-    font-weight: 500;
-}
-
-.inv-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px;
-}
-.inv-stat-card {
-    background: var(--card-bg);
-    border-radius: 14px;
-    border: 1px solid var(--border);
-    padding: 20px 22px;
-    box-shadow: var(--card-shadow);
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-}
-.inv-stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.1);
-    border-color: rgba(75, 139, 42, 0.25);
-}
-.inv-stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: var(--stat-accent, var(--ep-green));
-}
-.inv-stat-card.stat-deliveries { --stat-accent: var(--ep-green); }
-.inv-stat-card.stat-pending { --stat-accent: var(--ep-yellow); }
-.inv-stat-card.stat-completed { --stat-accent: #16a34a; }
-.inv-stat-card.stat-products { --stat-accent: var(--ep-green-dark); }
-.inv-stat-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 14px;
-}
-.inv-stat-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 11px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 17px;
-    background: var(--ep-green-light);
-    color: var(--ep-green-dark);
-    border: 1px solid var(--teal-light);
-    flex-shrink: 0;
-}
-.inv-stat-card.stat-pending .inv-stat-icon {
-    background: var(--yellow-pale);
-    color: var(--ep-yellow-dark);
-    border-color: #fde68a;
-}
-.inv-stat-card.stat-completed .inv-stat-icon {
-    background: #f0fdf4;
-    color: #16a34a;
-    border-color: #bbf7d0;
-}
-.inv-stat-label {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.85px;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-}
-.inv-stat-num {
-    font-size: 32px;
-    font-weight: 800;
-    color: var(--text-main);
-    line-height: 1;
-}
-.inv-stat-foot {
-    font-size: 12px;
-    color: var(--text-muted);
-    font-weight: 500;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
-}
-
-.inv-overview {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-}
-.inv-overview-chip {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 16px 18px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    box-shadow: var(--card-shadow);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-.inv-overview-chip:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
-    border-color: rgba(75, 139, 42, 0.22);
-}
-.inv-overview-chip i {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    background: var(--ep-green-light);
-    color: var(--ep-green-dark);
-}
-.inv-overview-chip.chip-warn i { background: var(--yellow-pale); color: #b45309; }
-.inv-overview-chip.chip-danger i { background: #fef2f2; color: #dc2626; }
-.inv-overview-chip strong {
-    display: block;
-    font-size: 18px;
-    font-weight: 800;
-    color: var(--text-main);
-    line-height: 1.1;
-}
-.inv-overview-chip span {
-    font-size: 12px;
-    color: var(--text-muted);
-    font-weight: 500;
-}
-
-.inv-panel {
-    background: var(--card-bg);
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    box-shadow: var(--card-shadow);
-    overflow: hidden;
-}
-.inv-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding: 22px 26px;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(to bottom, #fff 0%, var(--slate-50) 100%);
-}
-.inv-panel-header h3 {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-main);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.inv-panel-header .card-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-}
-.inv-panel-meta {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 4px;
-    font-weight: 500;
-}
-.inv-panel-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-.inv-panel-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 100px;
-    font-size: 12px;
-    font-weight: 600;
-    background: var(--ep-green-light);
-    color: var(--ep-green-dark);
-    border: 1px solid var(--teal-light);
-}
-.inv-panel-body { padding: 0; }
-
-.inv-table-wrap { overflow-x: auto; }
-.inv-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13.5px;
-}
-.inv-table thead tr {
-    background: var(--ep-green-light);
-    border-bottom: 2px solid var(--teal-light);
-}
-.inv-table th {
-    padding: 13px 20px;
-    text-align: left;
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--teal-deeper);
-    white-space: nowrap;
-}
-.inv-table td {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-}
-.inv-table tbody tr:last-child td { border-bottom: none; }
-.inv-table tbody tr {
-    transition: background 0.2s ease, transform 0.2s ease;
-}
-.inv-table tbody tr:hover { background: rgba(238, 248, 230, 0.75); }
-
-.inv-product-cell {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    min-width: 200px;
-}
-.inv-thumb {
-    width: 52px;
-    height: 52px;
-    object-fit: cover;
-    border-radius: 10px;
-    background: var(--ep-green-light);
-    border: 1px solid var(--border);
-    flex-shrink: 0;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.inv-table tbody tr:hover .inv-thumb {
-    transform: scale(1.04);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-.inv-thumb-placeholder {
-    width: 52px;
-    height: 52px;
-    border-radius: 10px;
-    background: var(--ep-green-light);
-    border: 1px dashed var(--teal-light);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--ep-green-dark);
-    font-size: 18px;
-    flex-shrink: 0;
-    opacity: 0.7;
-}
-.inv-product-name {
-    font-weight: 700;
-    color: var(--text-main);
-    font-size: 14px;
-    line-height: 1.3;
-}
-.inv-product-id {
-    font-size: 11px;
-    color: var(--text-muted);
-    font-weight: 500;
-    margin-top: 2px;
-}
-.category-pill {
-    display: inline-flex;
-    align-items: center;
-    background: var(--ep-green-light);
-    color: var(--ep-green-dark);
-    padding: 5px 12px;
-    border-radius: 100px;
-    font-size: 11.5px;
-    font-weight: 700;
-    border: 1px solid var(--teal-light);
-    white-space: nowrap;
-}
-.price-tag {
-    color: var(--ep-green-dark);
-    font-weight: 800;
-    font-size: 14px;
-    white-space: nowrap;
-}
-.stock-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 5px 11px;
-    border-radius: 100px;
-    font-size: 11.5px;
-    font-weight: 700;
-    white-space: nowrap;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.inv-table tbody tr:hover .stock-badge {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-.stock-badge.in-stock { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-.stock-badge.low-stock { background: var(--yellow-pale); color: #b45309; border: 1px solid #fde68a; }
-.stock-badge.out-stock { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-
-.inv-empty {
-    text-align: center;
-    padding: 56px 24px;
-    color: var(--text-muted);
-}
-.inv-empty i {
-    font-size: 40px;
-    color: var(--teal-light);
-    margin-bottom: 14px;
-    display: block;
-}
-.inv-empty p {
-    margin: 0 0 16px;
-    font-size: 14px;
-    font-weight: 500;
-}
-
-.inv-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    padding: 20px 26px;
-    border-top: 1px solid var(--border);
-    background: var(--slate-50);
-}
-.inv-page-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 36px;
-    height: 36px;
-    padding: 0 12px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    background: #fff;
-    color: var(--text-main);
-    font-size: 13px;
-    font-weight: 600;
-    text-decoration: none;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-}
-.inv-page-link:hover:not(.disabled):not(.active) {
-    border-color: var(--ep-green);
-    color: var(--ep-green-dark);
-    background: var(--ep-green-light);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(75, 139, 42, 0.15);
-}
-.inv-page-link.active {
-    background: var(--ep-green);
-    border-color: var(--ep-green);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(75, 139, 42, 0.28);
-}
-.inv-page-link.disabled {
-    opacity: 0.45;
-    pointer-events: none;
-    cursor: default;
-}
-.inv-page-nav { font-size: 12.5px; gap: 6px; }
-.inv-page-summary {
-    width: 100%;
-    text-align: center;
-    font-size: 12px;
-    color: var(--text-muted);
-    font-weight: 500;
-    margin-top: 4px;
-}
-
-@media (max-width: 1100px) {
-    .inv-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .inv-overview { grid-template-columns: 1fr; }
-}
-@media (max-width: 640px) {
-    .inv-stats-grid { grid-template-columns: 1fr; }
-    .inv-hero { padding: 20px; }
-    .inv-hero h1 { font-size: 20px; }
-    .inv-panel-header { padding: 18px; }
-    .inv-table th, .inv-table td { padding: 12px 14px; }
-}
-</style>
-EXTRA
+    'heading' => $firstName !== '' ? 'Good to see you, ' . $firstName : 'Inventory Dashboard',
+    'subtitle' => date('l, F j, Y') . ' · stock, shipments and receiving at a glance',
+    'actions' => '<button type="button" class="cx-btn cx-btn-outline no-print" onclick="window.print()"><i class="ph ph-printer" aria-hidden="true"></i> Print</button>',
+    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>',
+    'report' => [
+        'title' => 'Inventory Summary Report',
+        'lines' => [
+            'Stock and deliveries' => 'Current totals as of printing',
+            'Products stocked per month' => ['text' => 'This Year · All categories', 'id' => 'invPrintScope'],
+        ],
+    ],
 ]);
 ?>
 
-        <div class="inv-dash">
+<div class="inv-dash">
+    <section class="inv-attn" aria-labelledby="attnTitle">
+        <h2 id="attnTitle" class="cx-sr">Needs attention</h2>
+        <a class="level-tile inv-attn-tile <?php echo $outOfStockCount > 0 ? 'is-out' : 'is-ok'; ?>" href="inventory_stock_alerts.php?status=out">
+            <span class="level-tile-icon" aria-hidden="true"><i class="ph-fill <?php echo $outOfStockCount > 0 ? 'ph-x-circle' : 'ph-check-circle'; ?>"></i></span>
+            <span class="level-tile-body">
+                <strong class="cx-num"><?php echo number_format($outOfStockCount); ?></strong>
+                <span class="level-tile-label">Out of stock</span>
+                <span class="level-tile-hint"><?php echo $outOfStockCount > 0 ? 'Cannot be sold until restocked' : 'Every product has stock'; ?></span>
+            </span>
+            <i class="ph ph-caret-right inv-attn-go" aria-hidden="true"></i>
+        </a>
+        <a class="level-tile inv-attn-tile <?php echo $runningLowCount > 0 ? 'is-low' : 'is-ok'; ?>" href="inventory_stock_alerts.php?status=running">
+            <span class="level-tile-icon" aria-hidden="true"><i class="ph-fill <?php echo $runningLowCount > 0 ? 'ph-warning' : 'ph-check-circle'; ?>"></i></span>
+            <span class="level-tile-body">
+                <strong class="cx-num"><?php echo number_format($runningLowCount); ?></strong>
+                <span class="level-tile-label">Running low <span class="inv-attn-note">(15 or fewer)</span></span>
+                <span class="level-tile-hint"><?php echo (int)$criticalStockCount; ?> critical with 5 or fewer left</span>
+            </span>
+            <i class="ph ph-caret-right inv-attn-go" aria-hidden="true"></i>
+        </a>
+        <a class="level-tile inv-attn-tile <?php echo $pending > 0 ? 'is-info' : 'is-ok'; ?>" href="inventory_orders.php">
+            <span class="level-tile-icon" aria-hidden="true"><i class="ph-fill <?php echo $pending > 0 ? 'ph-truck' : 'ph-check-circle'; ?>"></i></span>
+            <span class="level-tile-body">
+                <strong class="cx-num"><?php echo number_format($pending); ?></strong>
+                <span class="level-tile-label">Pending shipments</span>
+                <span class="level-tile-hint"><?php echo $pending > 0 ? 'Not yet delivered' : 'All shipments delivered'; ?></span>
+            </span>
+            <i class="ph ph-caret-right inv-attn-go" aria-hidden="true"></i>
+        </a>
+    </section>
 
-            <section class="inv-hero">
-                <div class="inv-hero-text">
-                    <div class="inv-hero-kicker">Inventory Control Center</div>
-                    <h1>Operations Overview</h1>
-                    <p>Monitor deliveries, track stock levels, and manage your warehouse inventory from one centralized dashboard.</p>
+    <div class="inv-top">
+        <section class="cx-card cx-kpi-card" aria-labelledby="glanceTitle">
+            <div class="cx-card-head">
+                <h2 id="glanceTitle"><i class="ph ph-warehouse" aria-hidden="true"></i> At a glance</h2>
+                <span class="cx-card-meta">Current totals</span>
+            </div>
+            <div class="kpis kpis-3">
+                <div class="kpi kpi-hero">
+                    <span class="kpi-label">Units in stock</span>
+                    <strong class="kpi-value cx-num"><?php echo number_format($totalStock); ?></strong>
+                    <span class="kpi-sub"><?php echo $productCount > 0 ? number_format($totalStock / $productCount, 1) : '0'; ?> per product on average</span>
                 </div>
-            </section>
-
-            <div class="inv-stats-grid">
-                <div class="inv-stat-card stat-deliveries">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Total Deliveries</div>
-                            <div class="inv-stat-num"><?php echo $total; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-truck"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">All shipment records</div>
+                <div class="kpi">
+                    <span class="kpi-label">Products in catalog</span>
+                    <strong class="kpi-value cx-num"><?php echo number_format($productCount); ?></strong>
+                    <span class="kpi-sub">across <?php echo count($categoryTabs); ?> shop categories</span>
                 </div>
-                <div class="inv-stat-card stat-pending">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Pending Shipments</div>
-                            <div class="inv-stat-num"><?php echo $pending; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-clock"></i></div>
-                    </div>
-                    <div class="inv-stat-foot">Awaiting delivery</div>
-                </div>
-                <div class="inv-stat-card stat-completed">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Completed Deliveries</div>
-                            <div class="inv-stat-num"><?php echo $done; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-check-circle"></i></div>
-                    </div>
-                    <div class="inv-stat-foot"><?php echo $completionRate; ?>% completion rate</div>
-                </div>
-                <div class="inv-stat-card stat-products">
-                    <div class="inv-stat-top">
-                        <div>
-                            <div class="inv-stat-label">Products in Catalog</div>
-                            <div class="inv-stat-num"><?php echo $productCount; ?></div>
-                        </div>
-                        <div class="inv-stat-icon"><i class="fas fa-cubes"></i></div>
-                    </div>
-                    <div class="inv-stat-foot"><?php echo number_format($totalStock); ?> total units in stock</div>
+                <div class="kpi">
+                    <span class="kpi-label">Deliveries completed</span>
+                    <strong class="kpi-value cx-num"><?php echo number_format($done); ?> <small>of <?php echo number_format($total); ?></small></strong>
+                    <span class="inv-progress" role="progressbar" aria-valuenow="<?php echo $completionRate; ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Delivery completion"><span style="width: <?php echo $completionRate; ?>%;"></span></span>
+                    <span class="kpi-sub"><?php echo $completionRate; ?>% completion rate</span>
                 </div>
             </div>
+        </section>
 
-            <div class="inv-overview">
-                <div class="inv-overview-chip">
-                    <i class="fas fa-warehouse"></i>
-                    <div>
-                        <strong><?php echo number_format($totalStock); ?></strong>
-                        <span>Total stock units</span>
-                    </div>
-                </div>
-                <div class="inv-overview-chip chip-warn">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <div>
-                        <strong><?php echo $lowStockCount; ?></strong>
-                        <span>Low stock items (≤ 5)</span>
-                    </div>
-                </div>
-                <div class="inv-overview-chip chip-danger">
-                    <i class="fas fa-times-circle"></i>
-                    <div>
-                        <strong><?php echo $outOfStockCount; ?></strong>
-                        <span>Out of stock items</span>
-                    </div>
-                </div>
+        <a class="dash-cta no-print" href="inventory_stock_in.php">
+            <span class="dash-cta-icon" aria-hidden="true"><i class="ph ph-barcode"></i></span>
+            <span class="dash-cta-text">
+                <strong>Receive a delivery</strong>
+                <span>Scan each item to add it to stock</span>
+            </span>
+            <i class="ph ph-arrow-right dash-cta-arrow" aria-hidden="true"></i>
+        </a>
+    </div>
+
+    <section class="cx-card" aria-labelledby="stockinTitle">
+        <div class="cx-card-head">
+            <div>
+                <h2 id="stockinTitle"><i class="ph ph-chart-bar" aria-hidden="true"></i> Products stocked per month</h2>
+                <p>Products added to the catalog each month, by the date they were added</p>
             </div>
-
-            <section class="inv-panel">
-                <div class="inv-panel-header">
-                    <div>
-                        <h3><span class="card-icon"><i class="fas fa-boxes"></i></span> Current Inventory</h3>
-                        <div class="inv-panel-meta">Products currently in stock — sorted by most recent</div>
-                    </div>
-                    <div class="inv-panel-actions">
-                        <span class="inv-panel-badge"><i class="fas fa-layer-group"></i> <?php echo $productCount; ?> product<?php echo $productCount === 1 ? '' : 's'; ?></span>
-                    </div>
-                </div>
-                <div class="inv-panel-body">
-                    <?php if (!empty($productRows)): ?>
-                    <div class="inv-table-wrap">
-                        <table class="inv-table">
-                            <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>Category</th>
-                                    <th>Price</th>
-                                    <th>Stock Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($pagedProducts as $p):
-                                    $imgSrc = ias_product_image_url($p);
-                                    $stock = (int)($p['stock'] ?? 0);
-                                    if ($stock <= 0) {
-                                        $stockClass = 'out-stock';
-                                        $stockLabel = 'Out of Stock';
-                                        $stockIcon = 'fa-times-circle';
-                                    } elseif ($stock <= 5) {
-                                        $stockClass = 'low-stock';
-                                        $stockLabel = 'Low Stock';
-                                        $stockIcon = 'fa-exclamation-triangle';
-                                    } else {
-                                        $stockClass = 'in-stock';
-                                        $stockLabel = 'In Stock';
-                                        $stockIcon = 'fa-check-circle';
-                                    }
-                                ?>
-                                <tr>
-                                    <td>
-                                        <div class="inv-product-cell">
-                                            <?php if ($imgSrc !== ''): ?>
-                                                <img src="<?php echo h($imgSrc); ?>" alt="" class="inv-thumb">
-                                            <?php else: ?>
-                                                <div class="inv-thumb-placeholder" aria-hidden="true"><i class="fas fa-image"></i></div>
-                                            <?php endif; ?>
-                                            <div>
-                                                <div class="inv-product-name"><?php echo h($p['name']); ?></div>
-                                                <div class="inv-product-id">ID #<?php echo (int)$p['id']; ?></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td><span class="category-pill"><?php echo h($p['category'] ?? 'Accessories'); ?></span></td>
-                                    <td class="price-tag">₱<?php echo number_format((float)$p['price'], 2); ?></td>
-                                    <td>
-                                        <span class="stock-badge <?php echo $stockClass; ?>">
-                                            <i class="fas <?php echo $stockIcon; ?>"></i>
-                                            <?php echo $stockLabel; ?> (<?php echo $stock; ?>)
-                                        </span>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <?php if ($totalPages > 1): ?>
-                    <nav class="inv-pagination" aria-label="Product pagination">
-                        <?php
-                        $pageBase = 'inventory_dashboard.php';
-                        $prevPage = max(1, $currentPage - 1);
-                        $nextPage = min($totalPages, $currentPage + 1);
-                        ?>
-                        <a href="<?php echo h($pageBase . '?page=' . $prevPage); ?>"
-                           class="inv-page-link inv-page-nav<?php echo $currentPage <= 1 ? ' disabled' : ''; ?>"
-                           aria-disabled="<?php echo $currentPage <= 1 ? 'true' : 'false'; ?>">
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </a>
-                        <?php for ($p = 1; $p <= $totalPages; $p++): ?>
-                            <a href="<?php echo h($pageBase . '?page=' . $p); ?>"
-                               class="inv-page-link<?php echo $p === $currentPage ? ' active' : ''; ?>"
-                               <?php echo $p === $currentPage ? 'aria-current="page"' : ''; ?>><?php echo $p; ?></a>
-                        <?php endfor; ?>
-                        <a href="<?php echo h($pageBase . '?page=' . $nextPage); ?>"
-                           class="inv-page-link inv-page-nav<?php echo $currentPage >= $totalPages ? ' disabled' : ''; ?>"
-                           aria-disabled="<?php echo $currentPage >= $totalPages ? 'true' : 'false'; ?>">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </a>
-                        <div class="inv-page-summary">
-                            Showing <?php echo $productCount === 0 ? 0 : (($currentPage - 1) * $perPage + 1); ?>–<?php echo min($currentPage * $perPage, $productCount); ?> of <?php echo $productCount; ?> products
-                        </div>
-                    </nav>
-                    <?php endif; ?>
-                    <?php else: ?>
-                    <div class="inv-empty">
-                        <i class="fas fa-box-open"></i>
-                        <p>No products in inventory yet.</p>
-                        <a href="inventory_stocks.php" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add Products</a>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </section>
-
+            <div class="cx-card-tools">
+                <label class="sort-wrap" for="invPeriodSelect">
+                    <span>Period</span>
+                    <select id="invPeriodSelect">
+                        <option value="month">This Month</option>
+                        <option value="last">Last Month</option>
+                        <option value="3m">Last 3 Months</option>
+                        <option value="year" selected>This Year</option>
+                    </select>
+                </label>
+            </div>
         </div>
+        <div class="cat-chips" id="invCategoryBar" role="group" aria-label="Product category">
+            <button type="button" class="cat-chip active" data-category="" aria-pressed="true">All categories</button>
+            <?php foreach ($categoryTabs as $cat): ?>
+            <button type="button" class="cat-chip" data-category="<?php echo h($cat); ?>" aria-pressed="false"><?php echo h($cat); ?></button>
+            <?php endforeach; ?>
+        </div>
+        <div class="cx-chart"><canvas id="invStockinChart" role="img" aria-label="Products stocked per month chart"></canvas></div>
+        <div class="cx-print-only">
+            <table class="cx-table">
+                <thead><tr><th scope="col">Month</th><th scope="col" class="num">Products stocked</th></tr></thead>
+                <tbody id="invStockinPrintRows"></tbody>
+                <tfoot><tr><th scope="row">Total</th><td class="num" id="invStockinPrintTotal">0</td></tr></tfoot>
+            </table>
+        </div>
+    </section>
+</div>
 
-<?php staff_page_end(); ?>
+<?php
+$chartScript = <<<SCRIPT
+<script>
+(function () {
+    var STOCK_PRODUCTS = {$stockProductsJson};
+    var STOCK_YEAR = {$stockYear};
+    var MONTH_LABELS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var selectedCategory = '';
+    var selectedPeriod = 'year';
+    var stockinChart = null;
+    var now = new Date();
+    var currentMonth = now.getMonth();
+    var currentYear = now.getFullYear();
+
+    function monthIndexInRange(d) {
+        return { y: d.getFullYear(), m: d.getMonth() };
+    }
+
+    function buildSeries(category, period) {
+        var labels = [];
+        var values = [];
+        var points = [];
+
+        if (period === 'month') {
+            labels = [MONTH_LABELS[currentMonth]];
+            points = [{ y: currentYear, m: currentMonth }];
+        } else if (period === 'last') {
+            var lm = currentMonth - 1;
+            var ly = currentYear;
+            if (lm < 0) { lm = 11; ly -= 1; }
+            labels = [MONTH_LABELS[lm] + (ly !== currentYear ? ' ' + ly : '')];
+            points = [{ y: ly, m: lm }];
+        } else if (period === '3m') {
+            for (var i = 2; i >= 0; i--) {
+                var mm = currentMonth - i;
+                var yy = currentYear;
+                if (mm < 0) { mm += 12; yy -= 1; }
+                labels.push(MONTH_SHORT[mm] + ' ' + yy);
+                points.push({ y: yy, m: mm });
+            }
+        } else {
+            labels = MONTH_LABELS.slice();
+            for (var m = 0; m < 12; m++) {
+                points.push({ y: currentYear, m: m });
+            }
+        }
+
+        values = points.map(function () { return 0; });
+        STOCK_PRODUCTS.forEach(function (p) {
+            if (category && String(p.category) !== category) return;
+            if (!p.created_at) return;
+            var d = new Date(String(p.created_at).replace(' ', 'T'));
+            if (isNaN(d.getTime())) return;
+            var info = monthIndexInRange(d);
+            for (var i = 0; i < points.length; i++) {
+                if (points[i].y === info.y && points[i].m === info.m) {
+                    values[i] += 1;
+                    break;
+                }
+            }
+        });
+        return { labels: labels, values: values };
+    }
+
+    function updateBadge() {
+        var el = document.getElementById('invStockinBadge');
+        if (el) {
+            el.innerHTML = '<i class="ph ph-stack" aria-hidden="true"></i> ';
+            el.appendChild(document.createTextNode(selectedCategory || 'All categories'));
+        }
+        var scope = document.getElementById('invPrintScope');
+        var sel = document.getElementById('invPeriodSelect');
+        if (scope && sel) {
+            scope.textContent = sel.options[sel.selectedIndex].text + ' · ' + (selectedCategory || 'All categories');
+        }
+    }
+
+    /* The printed report lists the chart's figures under it */
+    function renderPrintTable(series) {
+        var body = document.getElementById('invStockinPrintRows');
+        if (!body) return;
+        var total = 0;
+        body.textContent = '';
+        series.labels.forEach(function (label, i) {
+            var tr = document.createElement('tr');
+            var td1 = document.createElement('td');
+            var td2 = document.createElement('td');
+            td1.textContent = label;
+            td2.className = 'num';
+            td2.textContent = String(series.values[i]);
+            total += series.values[i];
+            tr.appendChild(td1);
+            tr.appendChild(td2);
+            body.appendChild(tr);
+        });
+        document.getElementById('invStockinPrintTotal').textContent = String(total);
+    }
+
+    function renderStockinChart() {
+        var canvas = document.getElementById('invStockinChart');
+        var series = buildSeries(selectedCategory, selectedPeriod);
+        updateBadge();
+        renderPrintTable(series);
+        if (!canvas || typeof Chart === 'undefined') return;
+        if (stockinChart) {
+            stockinChart.data.labels = series.labels;
+            stockinChart.data.datasets[0].data = series.values;
+            stockinChart.update();
+            return;
+        }
+        Chart.defaults.font.family = "'Fira Sans', 'Segoe UI', system-ui, sans-serif";
+        Chart.defaults.color = '#45514a';
+        stockinChart = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: series.labels,
+                datasets: [{
+                    label: 'Products Stocked',
+                    data: series.values,
+                    backgroundColor: '#4b8b2a',
+                    borderRadius: 6,
+                    maxBarThickness: 42
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                var n = ctx.parsed.y;
+                                return n + ' product' + (n === 1 ? '' : 's') + ' stocked';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 12 }, maxRotation: 45, minRotation: 0, autoSkip: true }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, font: { size: 12 } },
+                        grid: { color: '#e0e6dd' },
+                        title: { display: true, text: 'Products stocked', font: { size: 12, weight: '600' } }
+                    }
+                }
+            }
+        });
+    }
+
+    var periodSelect = document.getElementById('invPeriodSelect');
+    if (periodSelect) {
+        periodSelect.addEventListener('change', function () {
+            selectedPeriod = periodSelect.value || 'year';
+            renderStockinChart();
+        });
+    }
+
+    var catBar = document.getElementById('invCategoryBar');
+    if (catBar) {
+        catBar.addEventListener('click', function (e) {
+            var btn = e.target.closest('.cat-chip');
+            if (!btn) return;
+            catBar.querySelectorAll('.cat-chip').forEach(function (b) {
+                b.classList.toggle('active', b === btn);
+                b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+            });
+            selectedCategory = btn.getAttribute('data-category') || '';
+            renderStockinChart();
+        });
+    }
+
+    renderStockinChart();
+})();
+</script>
+SCRIPT;
+staff_page_end($chartScript);
+?>

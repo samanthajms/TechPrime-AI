@@ -12,7 +12,6 @@ checkRole('retail_officer');
 
 $retailId = (int)$_SESSION['user_id'];
 $presets = ias_report_date_presets();
-$categories = ias_product_categories();
 
 function retail_dashboard_preserve_hidden(array $ownKeys): void
 {
@@ -24,377 +23,280 @@ function retail_dashboard_preserve_hidden(array $ownKeys): void
     }
 }
 
-$cardRange = ias_resolve_section_range($_GET, 'card', 'this_month');
-$cardRows = ias_fetch_sales_rows($db, $retailId, $cardRange['from'], $cardRange['to']);
-$cardSummary = ias_summarize_sales($cardRows);
+// Same data source as the CSV/PDF export (retail_export.php?type=dashboard), so the files match the screen.
+$dash = ias_retail_dashboard_data($db, $retailId, $_GET);
+$cardRange = $dash['card_range'];
+$cardSummary = $dash['card_summary'];
+$msMonths = $dash['ms_months'];
+$monthlySales = $dash['monthly_sales'];
 
-$msMonths = max(1, min(24, (int)($_GET['ms_months'] ?? 12)));
-$monthlySales = ias_monthly_sales_report($db, $retailId, $msMonths);
+// Sales by Category: same period + category filter as the Inventory dashboard's "Products Stocked Per Month"
+$periods = ['month' => 'This Month', 'last' => 'Last Month', '3m' => 'Last 3 Months', 'year' => 'This Year'];
+$range = $dash['range'];
+$from = $range['from'];
+$to = $range['to'];
+$categoryTabs = ias_category_groups();
+$category = $dash['category'];
 
-$dfRange = ias_resolve_section_range($_GET, 'df', 'this_month');
-$dfCategory = trim($_GET['df_category'] ?? '');
-$dfFilters = $dfCategory !== '' ? ['category' => $dfCategory] : [];
-$dfDays = max(7, min(90, (int)($_GET['df_days'] ?? 30)));
-$demandForecast = ias_product_demand_forecast($db, $retailId, $dfRange['from'], $dfRange['to'], $dfDays, $dfFilters);
+// Printed figures under the Sales by Category chart (the chart itself prints in greyscale)
+$trendByMonth = $from->diff($to)->days > 62;
+$trendRows = [];
+foreach ($dash['trend_labels'] as $k => $label) {
+    $units = (int)($dash['trend_data'][$k] ?? 0);
+    if ($trendByMonth || $units > 0) {
+        $trendRows[] = [(string)$label, $units];
+    }
+}
+$msTotals = ['sales' => array_sum(array_column($monthlySales, 'total_sales')), 'tx' => array_sum(array_column($monthlySales, 'transactions')), 'units' => array_sum(array_column($monthlySales, 'units_sold'))];
 
-$sfRange = ias_resolve_section_range($_GET, 'sf', 'this_month');
-$sfDays = max(7, min(60, (int)($_GET['sf_days'] ?? 14)));
-$salesForecast = ias_sales_forecast($db, $retailId, $sfRange['from'], $sfRange['to'], $sfDays);
+$jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+$trendJson = json_encode(['labels' => $dash['trend_labels'], 'data' => $dash['trend_data'], 'total' => array_sum($dash['trend_data'])], $jsonFlags);
+$msChartJson = json_encode([
+    'labels' => array_column($monthlySales, 'month'),
+    'sales' => array_map(fn($m) => round((float)$m['total_sales'], 2), $monthlySales),
+    'units' => array_map(fn($m) => (int)$m['units_sold'], $monthlySales),
+], $jsonFlags);
 
 logActivity($db, $retailId, 'view_dashboard', 'Retail Officer viewed dashboard');
 
-$dashboardCss = <<<'CSS'
-.report-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end; margin-bottom:12px; }
-.card-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.filter-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:3000; align-items:center; justify-content:center; padding:20px; }
-.filter-modal.open { display:flex; }
-.filter-modal-card { background:#fff; border-radius:12px; padding:22px; width:min(460px,100%); max-height:90vh; overflow-y:auto; border:2px solid var(--ep-green); }
-.filter-modal-card h4 { margin:0 0 14px; color:var(--ep-green-dark); }
-.detail-panel { display:none; margin-top:14px; }
-.detail-panel.open { display:block; }
-.print-header { display:none; }
-@media print {
-    .sidebar, .topbar, .no-print, .report-toolbar, .filter-modal { display:none !important; }
-    .main { margin:0 !important; }
-    .page-content { padding:0 !important; }
-    .detail-panel { display:block !important; }
-    .print-header { display:flex !important; align-items:center; gap:14px; border-bottom:2px solid #171717; padding-bottom:12px; margin-bottom:18px; }
-    .print-header img { height:48px; }
-}
-CSS;
+$firstName = trim((string)($_SESSION['name'] ?? ''));
+$actions = '<button type="button" class="cx-btn cx-btn-outline no-print" onclick="window.print()"><i class="ph ph-printer" aria-hidden="true"></i> Print</button>'
+    . '<a class="cx-btn cx-btn-outline no-print" href="retail_export.php?' . ias_dashboard_qs(['type' => 'dashboard', 'format' => 'csv']) . '" title="Summary, monthly sales and sales by category as CSV"><i class="ph ph-file-csv" aria-hidden="true"></i> Export CSV</a>'
+    . '<a class="cx-btn cx-btn-outline no-print" href="retail_export.php?' . ias_dashboard_qs(['type' => 'dashboard', 'format' => 'pdf']) . '" title="The dashboard as a PDF file"><i class="ph ph-file-pdf" aria-hidden="true"></i> Export PDF</a>';
 
 staff_page_start([
     'role' => 'retail_officer',
     'title' => 'Retail Dashboard',
     'active' => 'dashboard',
-    'heading' => 'Retail Dashboard',
-    'subtitle' => 'Real-time sales analytics and forecasting',
-    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><style>' . $dashboardCss . '</style>',
+    'heading' => $firstName !== '' ? 'Good to see you, ' . $firstName : 'Retail Dashboard',
+    'subtitle' => date('l, F j, Y') . ' · sales performance at a glance',
+    'actions' => $actions,
+    'extra_head' => '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>',
+    'report' => [
+        'title' => 'Sales Summary Report',
+        'lines' => [
+            'Summary period' => $cardRange['label'] . ' (' . $cardRange['from']->format('M j, Y') . ' – ' . $cardRange['to']->format('M j, Y') . ')',
+            'Monthly sales' => 'Last ' . $msMonths . ' months',
+            'Sales by category' => $range['label'] . ' (' . $from->format('M j, Y') . ' – ' . $to->format('M j, Y') . ')',
+            'Category' => $category !== '' ? $category : 'All categories',
+        ],
+    ],
 ]);
-
-$logoPath = staff_logo_href();
 ?>
 
-<div class="print-header">
-    <img src="<?php echo h($logoPath); ?>" alt="EasyPC">
-    <div>
-        <h1>Retail Dashboard</h1>
-        <p>Prepared by <?php echo h($_SESSION['name'] ?? 'Retail Officer'); ?> on <?php echo h(date('M d, Y g:i A')); ?></p>
-    </div>
-</div>
-
-<div class="report-toolbar no-print">
-    <button type="button" class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
-    <a class="btn btn-outline btn-sm" href="retail_export.php?<?php echo ias_dashboard_qs(['type' => 'sales', 'format' => 'csv']); ?>"><i class="fas fa-file-csv"></i> Export CSV</a>
-    <button type="button" class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-file-pdf"></i> Export PDF</button>
-</div>
-
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-label">Total Sales (<?php echo h($cardRange['label']); ?>)</div>
-        <div class="stat-num">₱<?php echo number_format($cardSummary['total_sales'], 2); ?></div>
-        <div class="stat-icon"><i class="fas fa-peso-sign"></i></div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Transactions</div>
-        <div class="stat-num"><?php echo number_format($cardSummary['transactions']); ?></div>
-        <div class="stat-icon"><i class="fas fa-shopping-cart"></i></div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Units Sold</div>
-        <div class="stat-num"><?php echo number_format($cardSummary['units_sold']); ?></div>
-        <div class="stat-icon"><i class="fas fa-boxes"></i></div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Avg. Transaction</div>
-        <div class="stat-num">₱<?php echo number_format($cardSummary['avg_transaction'], 2); ?></div>
-        <div class="stat-icon"><i class="fas fa-receipt"></i></div>
-    </div>
-</div>
-<p class="text-muted text-small no-print" style="margin:-6px 0 18px;">Live totals from order line items · <?php echo h($cardRange['from']->format('M d, Y') . ' – ' . $cardRange['to']->format('M d, Y')); ?></p>
-
-<div class="card">
-    <div class="card-header">
-        <div>
-            <h3><span class="card-icon"><i class="fas fa-chart-bar"></i></span> Monthly Sales Report</h3>
-            <div class="card-subtitle">Revenue by month from order details</div>
+<div class="rt-dash">
+    <section class="cx-card" aria-labelledby="sumTitle">
+        <div class="cx-card-head">
+            <h2 id="sumTitle"><i class="ph ph-chart-line-up" aria-hidden="true"></i> <?php echo h($cardRange['label']); ?></h2>
+            <span class="cx-card-meta cx-num"><?php echo h($cardRange['from']->format('M j') . ' – ' . $cardRange['to']->format('M j, Y')); ?> · live from order line items</span>
         </div>
-        <div class="card-actions no-print">
-            <button type="button" class="btn btn-outline btn-xs" onclick="openFilterModal('msModal')" title="Filter"><i class="fas fa-filter"></i></button>
-            <button type="button" class="btn btn-outline btn-xs" onclick="toggleDetail('msDetail')" title="Detailed view"><i class="fas fa-table"></i></button>
+        <div class="kpis">
+            <div class="kpi kpi-hero">
+                <span class="kpi-label">Total sales</span>
+                <strong class="kpi-value cx-num">₱<?php echo number_format($cardSummary['total_sales'], 2); ?></strong>
+                <span class="kpi-sub">VAT-inclusive</span>
+            </div>
+            <div class="kpi">
+                <span class="kpi-label">Transactions</span>
+                <strong class="kpi-value cx-num"><?php echo number_format($cardSummary['transactions']); ?></strong>
+                <span class="kpi-sub">orders in this period</span>
+            </div>
+            <div class="kpi">
+                <span class="kpi-label">Units sold</span>
+                <strong class="kpi-value cx-num"><?php echo number_format($cardSummary['units_sold']); ?></strong>
+                <span class="kpi-sub">items across all orders</span>
+            </div>
+            <div class="kpi">
+                <span class="kpi-label">Avg. transaction</span>
+                <strong class="kpi-value cx-num">₱<?php echo number_format($cardSummary['avg_transaction'], 2); ?></strong>
+                <span class="kpi-sub">per order</span>
+            </div>
         </div>
-    </div>
-    <div class="card-body" style="padding-top:0;">
-        <div class="table-wrap">
-            <table class="ias-table">
-                <thead>
-                    <tr><th>Month</th><th>Total Sales</th><th>Transactions</th><th>Units Sold</th><th>Avg. Transaction</th></tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($monthlySales as $m): ?>
-                    <tr>
-                        <td><strong><?php echo h($m['month']); ?></strong></td>
-                        <td>₱<?php echo number_format($m['total_sales'], 2); ?></td>
-                        <td><?php echo number_format($m['transactions']); ?></td>
-                        <td><?php echo number_format($m['units_sold']); ?></td>
-                        <td>₱<?php echo number_format($m['avg_transaction'], 2); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                    <?php if (empty($monthlySales)): ?>
-                    <tr><td colspan="5" class="empty-state">No sales data yet.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-        <div id="msDetail" class="detail-panel">
-            <h4 style="margin:16px 0 10px;">Detailed Orders by Month</h4>
-            <?php foreach ($monthlySales as $m): ?>
-                <?php if (empty($m['orders'])) continue; ?>
-                <p class="text-small"><strong><?php echo h($m['month']); ?></strong></p>
-                <div class="table-wrap" style="margin-bottom:16px;">
-                    <table class="ias-table">
-                        <thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Units</th><th>Total</th></tr></thead>
-                        <tbody>
-                        <?php foreach ($m['orders'] as $o): ?>
-                            <tr>
-                                <td>#<?php echo (int)$o['order_id']; ?></td>
-                                <td><?php echo h($o['customer_name']); ?></td>
-                                <td><?php echo h(substr($o['created_at'], 0, 10)); ?></td>
-                                <td><?php echo (int)$o['units']; ?></td>
-                                <td>₱<?php echo number_format($o['total'], 2); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
+    </section>
+
+    <section class="cx-card" aria-labelledby="msTitle">
+        <div class="cx-card-head">
+            <div>
+                <h2 id="msTitle"><i class="ph ph-calendar-blank" aria-hidden="true"></i> Monthly sales report</h2>
+                <p>Revenue by month from order details · last <?php echo (int)$msMonths; ?> months</p>
+            </div>
+            <div class="cx-card-tools no-print">
+                <form method="get" class="rt-inline-form">
+                    <?php retail_dashboard_preserve_hidden(['ms_months']); ?>
+                    <label class="sort-wrap" for="msMonths">
+                        <span>Show</span>
+                        <select id="msMonths" name="ms_months" onchange="this.form.submit()">
+                            <?php foreach ([6, 12, 18, 24] as $n): ?>
+                            <option value="<?php echo $n; ?>" <?php echo $msMonths === $n ? 'selected' : ''; ?>><?php echo $n; ?> months</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <noscript><button type="submit" class="cx-btn cx-btn-outline">Apply</button></noscript>
+                </form>
+                <div class="cx-seg" role="group" aria-label="Monthly sales view">
+                    <button type="button" id="msBtnDetail" onclick="setMsView('detail')" aria-pressed="true"><i class="ph ph-table" aria-hidden="true"></i> Table</button>
+                    <button type="button" id="msBtnGraph" onclick="setMsView('graph')" aria-pressed="false"><i class="ph ph-chart-bar" aria-hidden="true"></i> Graph</button>
                 </div>
-            <?php endforeach; ?>
+            </div>
         </div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <div>
-            <h3><span class="card-icon"><i class="fas fa-box-open"></i></span> Product Demand Forecasting</h3>
-            <div class="card-subtitle"><?php echo h($dfRange['label']); ?><?php echo $dfCategory !== '' ? ' · ' . h($dfCategory) : ' · All products'; ?> · next <?php echo (int)$dfDays; ?> days</div>
+        <?php if (empty($monthlySales)): ?>
+            <div class="cx-empty">
+                <span class="cx-empty-icon" aria-hidden="true"><i class="ph ph-receipt"></i></span>
+                <strong>No sales data yet</strong>
+                <span>Completed orders will be summarised here by month.</span>
+            </div>
+        <?php else: ?>
+        <div id="msGraphView" class="ms-view" hidden>
+            <div class="cx-chart"><canvas id="msChart" role="img" aria-label="Monthly sales and units sold chart. The table view lists the same figures."></canvas></div>
         </div>
-        <div class="card-actions no-print">
-            <button type="button" class="btn btn-outline btn-xs" onclick="openFilterModal('dfModal')" title="Filter"><i class="fas fa-filter"></i></button>
-            <button type="button" class="btn btn-outline btn-xs" onclick="toggleDetail('dfDetail')" title="Detailed view"><i class="fas fa-table"></i></button>
-        </div>
-    </div>
-    <div class="card-body" style="padding-top:0;">
-        <div class="table-wrap">
-            <table class="ias-table">
-                <thead>
-                    <tr><th>Product</th><th>Category</th><th>Units Sold</th><th>Avg / Day</th><th>Forecast Units</th><th>Forecast Revenue</th></tr>
-                </thead>
-                <tbody>
-                    <?php foreach (array_slice($demandForecast, 0, 10) as $row): ?>
-                    <tr>
-                        <td><strong><?php echo h($row['product_name']); ?></strong></td>
-                        <td><?php echo h($row['category']); ?></td>
-                        <td><?php echo number_format($row['units_sold']); ?></td>
-                        <td><?php echo number_format($row['avg_daily_units'], 2); ?></td>
-                        <td><?php echo number_format($row['forecast_units']); ?></td>
-                        <td>₱<?php echo number_format($row['forecast_revenue'], 2); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                    <?php if (empty($demandForecast)): ?>
-                    <tr><td colspan="6" class="empty-state">No demand data for this range.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-        <div id="dfDetail" class="detail-panel">
-            <div class="table-wrap">
-                <table class="ias-table">
+        <div id="msDetailView" class="ms-view">
+            <div class="cx-table-wrap">
+                <table class="cx-table ms-table">
                     <thead>
-                        <tr><th>Product</th><th>Category</th><th>Units Sold</th><th>Revenue</th><th>Avg / Day</th><th>Forecast Units</th><th>Forecast Revenue</th></tr>
+                        <tr>
+                            <th scope="col">Month</th>
+                            <th scope="col" class="num">Total sales</th>
+                            <th scope="col" class="num">Transactions</th>
+                            <th scope="col" class="num">Units sold</th>
+                            <th scope="col" class="num">Avg. transaction</th>
+                        </tr>
                     </thead>
                     <tbody>
-                    <?php foreach ($demandForecast as $row): ?>
+                        <?php foreach ($monthlySales as $m): ?>
                         <tr>
-                            <td><?php echo h($row['product_name']); ?></td>
-                            <td><?php echo h($row['category']); ?></td>
-                            <td><?php echo number_format($row['units_sold']); ?></td>
-                            <td>₱<?php echo number_format($row['revenue'], 2); ?></td>
-                            <td><?php echo number_format($row['avg_daily_units'], 2); ?></td>
-                            <td><?php echo number_format($row['forecast_units']); ?></td>
-                            <td>₱<?php echo number_format($row['forecast_revenue'], 2); ?></td>
+                            <td data-label="Month"><strong><?php echo h($m['month']); ?></strong></td>
+                            <td data-label="Total sales" class="num cx-num"><span class="price-tag">₱<?php echo number_format($m['total_sales'], 2); ?></span></td>
+                            <td data-label="Transactions" class="num cx-num"><?php echo number_format($m['transactions']); ?></td>
+                            <td data-label="Units sold" class="num cx-num"><?php echo number_format($m['units_sold']); ?></td>
+                            <td data-label="Avg. transaction" class="num cx-num">₱<?php echo number_format($m['avg_transaction'], 2); ?></td>
                         </tr>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
                     </tbody>
+                    <tfoot>
+                        <tr class="cx-print-row">
+                            <th scope="row">Total</th>
+                            <td class="num">₱<?php echo number_format((float)$msTotals['sales'], 2); ?></td>
+                            <td class="num"><?php echo number_format((int)$msTotals['tx']); ?></td>
+                            <td class="num"><?php echo number_format((int)$msTotals['units']); ?></td>
+                            <td class="num">₱<?php echo number_format($msTotals['tx'] > 0 ? $msTotals['sales'] / $msTotals['tx'] : 0, 2); ?></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>
-    </div>
-</div>
+        <?php endif; ?>
+    </section>
 
-<div class="card">
-    <div class="card-header">
-        <div>
-            <h3><span class="card-icon"><i class="fas fa-chart-line"></i></span> Sales Forecasting</h3>
-            <div class="card-subtitle"><?php echo h($sfRange['label']); ?> · projected next <?php echo (int)$sfDays; ?> days (avg ₱<?php echo number_format($salesForecast['avg_daily'], 2); ?>/day)</div>
-        </div>
-        <div class="card-actions no-print">
-            <button type="button" class="btn btn-outline btn-xs" onclick="openFilterModal('sfModal')" title="Filter"><i class="fas fa-filter"></i></button>
-            <button type="button" class="btn btn-outline btn-xs" onclick="toggleDetail('sfDetail')" title="Detailed view"><i class="fas fa-table"></i></button>
-        </div>
-    </div>
-    <div class="card-body">
-        <div class="chart-wrap"><canvas id="sfChart"></canvas></div>
-        <div id="sfDetail" class="detail-panel">
-            <div class="table-wrap">
-                <table class="ias-table">
-                    <thead><tr><th>Date</th><th>Type</th><th>Projected Sales (PHP)</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($salesForecast['historical'] as $day => $val): ?>
-                        <tr><td><?php echo h($day); ?></td><td>Actual</td><td>₱<?php echo number_format($val, 2); ?></td></tr>
-                    <?php endforeach; ?>
-                    <?php foreach ($salesForecast['forecast'] as $day => $val): ?>
-                        <tr><td><?php echo h($day); ?></td><td>Forecast</td><td>₱<?php echo number_format($val, 2); ?></td></tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+    <section class="cx-card" aria-labelledby="catTitle">
+        <div class="cx-card-head">
+            <div>
+                <h2 id="catTitle"><i class="ph ph-squares-four" aria-hidden="true"></i> Sales by category</h2>
+                <p>Units delivered per product · <span class="cx-num"><?php echo h($from->format('M j, Y') . ' – ' . $to->format('M j, Y')); ?></span><span class="print-only"> · <?php echo h($category !== '' ? $category : 'All categories'); ?></span></p>
+            </div>
+            <div class="cx-card-tools no-print">
+                <form method="get" id="periodForm">
+                    <?php retail_dashboard_preserve_hidden(['period']); ?>
+                    <label class="sort-wrap" for="invPeriodSelect">
+                        <span>Period</span>
+                        <select id="invPeriodSelect" name="period" onchange="this.form.submit()">
+                            <?php foreach ($periods as $k => $label): ?>
+                            <option value="<?php echo h($k); ?>" <?php echo $range['key'] === $k ? 'selected' : ''; ?>><?php echo h($label); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <noscript><button type="submit" class="cx-btn cx-btn-outline">Apply</button></noscript>
+                </form>
             </div>
         </div>
-    </div>
-</div>
-
-<div id="msModal" class="filter-modal no-print" onclick="if(event.target===this)closeFilterModal('msModal')">
-    <div class="filter-modal-card">
-        <h4><i class="fas fa-filter"></i> Monthly Sales Filters</h4>
-        <form method="get">
-            <?php retail_dashboard_preserve_hidden(['ms_months']); ?>
-            <div class="form-group">
-                <label class="form-label">Months to include</label>
-                <select name="ms_months" class="staff-select">
-                    <?php foreach ([6, 12, 18, 24] as $n): ?>
-                    <option value="<?php echo $n; ?>" <?php echo $msMonths === $n ? 'selected' : ''; ?>><?php echo $n; ?> months</option>
+        <nav class="cat-chips no-print" aria-label="Product categories">
+            <a class="cat-chip<?php echo $category === '' ? ' active' : ''; ?>"<?php echo $category === '' ? ' aria-current="true"' : ''; ?> href="?<?php echo h(http_build_query(array_diff_key($_GET, ['category' => 1]))); ?>">All categories</a>
+            <?php foreach ($categoryTabs as $cat): ?>
+            <a class="cat-chip<?php echo $category === $cat ? ' active' : ''; ?>"<?php echo $category === $cat ? ' aria-current="true"' : ''; ?> href="?<?php echo h(http_build_query(array_merge($_GET, ['category' => $cat]))); ?>"><?php echo h($cat); ?></a>
+            <?php endforeach; ?>
+        </nav>
+        <div class="cx-chart"><canvas id="trendChart" role="img" aria-label="Units delivered per product<?php echo $category !== '' ? ' in ' . h($category) : ''; ?>"></canvas></div>
+        <div class="cx-print-only">
+            <p class="rpt-caption">Units delivered by <?php echo $trendByMonth ? 'month' : 'day'; ?><?php echo $trendByMonth ? '' : ' (days without deliveries are left out)'; ?></p>
+            <?php if (!$trendRows): ?>
+                <p>No units delivered in this period.</p>
+            <?php else: ?>
+            <table class="cx-table">
+                <thead><tr><th scope="col"><?php echo $trendByMonth ? 'Month' : 'Day'; ?></th><th scope="col" class="num">Units delivered</th></tr></thead>
+                <tbody>
+                    <?php foreach ($trendRows as $t): ?>
+                    <tr><td><?php echo h($t[0]); ?></td><td class="num"><?php echo number_format($t[1]); ?></td></tr>
                     <?php endforeach; ?>
-                </select>
-            </div>
-            <button type="submit" class="btn btn-primary">Apply</button>
-            <button type="button" class="btn btn-outline" onclick="closeFilterModal('msModal')">Cancel</button>
-        </form>
-    </div>
-</div>
-
-<div id="dfModal" class="filter-modal no-print" onclick="if(event.target===this)closeFilterModal('dfModal')">
-    <div class="filter-modal-card">
-        <h4><i class="fas fa-filter"></i> Demand Forecast Filters</h4>
-        <form method="get">
-            <?php retail_dashboard_preserve_hidden(['df_preset', 'df_from', 'df_to', 'df_category', 'df_days']); ?>
-            <div class="form-group">
-                <label class="form-label">Date Range</label>
-                <select name="df_preset" class="staff-select" onchange="toggleSectionCustom(this,'dfCustom')">
-                    <?php foreach ($presets as $key => $p): ?>
-                    <option value="<?php echo h($key); ?>" <?php echo $dfRange['preset'] === $key ? 'selected' : ''; ?>><?php echo h($p['label']); ?></option>
-                    <?php endforeach; ?>
-                    <option value="custom" <?php echo $dfRange['preset'] === 'custom' ? 'selected' : ''; ?>>Custom Range</option>
-                </select>
-            </div>
-            <div id="dfCustom" class="form-row" style="<?php echo $dfRange['preset'] === 'custom' ? '' : 'display:none;'; ?>">
-                <div class="form-group"><label class="form-label">From</label><input type="date" name="df_from" class="staff-input" value="<?php echo h($dfRange['from']->format('Y-m-d')); ?>"></div>
-                <div class="form-group"><label class="form-label">To</label><input type="date" name="df_to" class="staff-input" value="<?php echo h($dfRange['to']->format('Y-m-d')); ?>"></div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Category (optional)</label>
-                <select name="df_category" class="staff-select">
-                    <option value="">All Products (default)</option>
-                    <?php foreach ($categories as $c): ?>
-                    <option value="<?php echo h($c); ?>" <?php echo $dfCategory === $c ? 'selected' : ''; ?>><?php echo h($c); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Forecast horizon (days)</label>
-                <input type="number" name="df_days" class="staff-input" min="7" max="90" value="<?php echo (int)$dfDays; ?>">
-            </div>
-            <button type="submit" class="btn btn-primary">Apply</button>
-            <button type="button" class="btn btn-outline" onclick="closeFilterModal('dfModal')">Cancel</button>
-        </form>
-    </div>
-</div>
-
-<div id="sfModal" class="filter-modal no-print" onclick="if(event.target===this)closeFilterModal('sfModal')">
-    <div class="filter-modal-card">
-        <h4><i class="fas fa-filter"></i> Sales Forecast Filters</h4>
-        <form method="get">
-            <?php retail_dashboard_preserve_hidden(['sf_preset', 'sf_from', 'sf_to', 'sf_days']); ?>
-            <div class="form-group">
-                <label class="form-label">Historical Range</label>
-                <select name="sf_preset" class="staff-select" onchange="toggleSectionCustom(this,'sfCustom')">
-                    <?php foreach ($presets as $key => $p): ?>
-                    <option value="<?php echo h($key); ?>" <?php echo $sfRange['preset'] === $key ? 'selected' : ''; ?>><?php echo h($p['label']); ?></option>
-                    <?php endforeach; ?>
-                    <option value="custom" <?php echo $sfRange['preset'] === 'custom' ? 'selected' : ''; ?>>Custom Range</option>
-                </select>
-            </div>
-            <div id="sfCustom" class="form-row" style="<?php echo $sfRange['preset'] === 'custom' ? '' : 'display:none;'; ?>">
-                <div class="form-group"><label class="form-label">From</label><input type="date" name="sf_from" class="staff-input" value="<?php echo h($sfRange['from']->format('Y-m-d')); ?>"></div>
-                <div class="form-group"><label class="form-label">To</label><input type="date" name="sf_to" class="staff-input" value="<?php echo h($sfRange['to']->format('Y-m-d')); ?>"></div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Forecast days ahead</label>
-                <input type="number" name="sf_days" class="staff-input" min="7" max="60" value="<?php echo (int)$sfDays; ?>">
-            </div>
-            <button type="submit" class="btn btn-primary">Apply</button>
-            <button type="button" class="btn btn-outline" onclick="closeFilterModal('sfModal')">Cancel</button>
-        </form>
-    </div>
+                </tbody>
+                <tfoot><tr><th scope="row">Total</th><td class="num"><?php echo number_format(array_sum(array_column($trendRows, 1))); ?></td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+            <p class="rpt-caption">Units delivered per product, by category</p>
+            <?php if (empty($dash['by_group'])): ?>
+                <p>No products delivered in this period.</p>
+            <?php else: ?>
+            <table class="cx-table">
+                <thead><tr><th scope="col">Category</th><th scope="col">Product</th><th scope="col" class="num">Units</th></tr></thead>
+                <tbody>
+                    <?php foreach ($dash['by_group'] as $group => $items): foreach ($items as $it): ?>
+                    <tr><td><?php echo h((string)$group); ?></td><td><?php echo h($it['product']); ?></td><td class="num"><?php echo number_format($it['units']); ?></td></tr>
+                    <?php endforeach; endforeach; ?>
+                </tbody>
+                <tfoot><tr><th scope="row" colspan="2">Total</th><td class="num"><?php echo number_format(array_sum(array_map(fn($items) => array_sum(array_column($items, 'units')), $dash['by_group']))); ?></td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+        </div>
+    </section>
 </div>
 
 <?php
-$histLabels = json_encode(array_map(fn($d) => date('M d', strtotime($d)), array_keys($salesForecast['historical'])));
-$histData = json_encode(array_values($salesForecast['historical']));
-$fcLabels = json_encode(array_map(fn($d) => date('M d', strtotime($d)), array_keys($salesForecast['forecast'])));
-$fcData = json_encode(array_values($salesForecast['forecast']));
-$histCount = count($salesForecast['historical']);
-$fcCount = count($salesForecast['forecast']);
-
-staff_page_end(<<<SCRIPTS
+$scripts = <<<'SCRIPTS'
 <script>
-function openFilterModal(id){ document.getElementById(id).classList.add('open'); }
-function closeFilterModal(id){ document.getElementById(id).classList.remove('open'); }
-function toggleDetail(id){ document.getElementById(id).classList.toggle('open'); }
-function toggleSectionCustom(sel, rowId){
-    document.getElementById(rowId).style.display = (sel.value === 'custom') ? '' : 'none';
+if (typeof Chart !== 'undefined') {
+    Chart.defaults.font.family = "'Fira Sans', 'Segoe UI', system-ui, sans-serif";
+    Chart.defaults.color = '#45514a';
 }
-const sfCtx = document.getElementById('sfChart').getContext('2d');
-const histData = {$histData};
-const fcData = {$fcData};
-new Chart(sfCtx, {
-    type: 'line',
-    data: {
-        labels: {$histLabels}.concat({$fcLabels}),
-        datasets: [
-            {
-                label: 'Actual Sales',
-                data: histData.concat(Array({$fcCount}).fill(null)),
-                borderColor: '#61b337',
-                backgroundColor: 'rgba(97, 179, 55, 0.12)',
-                fill: true, tension: 0.35, borderWidth: 3, pointRadius: 3
+
+// Monthly Sales Report: table view <-> graph view
+const MS_DATA = __MS_DATA__;
+let msChart = null;
+function setMsView(view) {
+    const graph = view === 'graph';
+    const detail = document.getElementById('msDetailView');
+    if (!detail) return;
+    detail.hidden = graph;
+    document.getElementById('msGraphView').hidden = !graph;
+    [['msBtnDetail', !graph], ['msBtnGraph', graph]].forEach(function (b) {
+        document.getElementById(b[0]).setAttribute('aria-pressed', b[1] ? 'true' : 'false');
+    });
+    const canvas = document.getElementById('msChart');
+    if (graph && canvas && !msChart) {
+        msChart = new Chart(canvas.getContext('2d'), {
+            data: {
+                labels: MS_DATA.labels,
+                datasets: [
+                    { type: 'bar', label: 'Total sales (PHP)', data: MS_DATA.sales, backgroundColor: '#4b8b2a', borderRadius: 6, maxBarThickness: 40, yAxisID: 'y' },
+                    { type: 'line', label: 'Units sold', data: MS_DATA.units, borderColor: '#b45309', backgroundColor: '#b45309', tension: 0.3, yAxisID: 'y1' }
+                ]
             },
-            {
-                label: 'Forecast',
-                data: Array({$histCount}).fill(null).concat(fcData),
-                borderColor: '#fed700',
-                backgroundColor: 'rgba(254, 215, 0, 0.15)',
-                borderDash: [6, 4],
-                fill: true, tension: 0.35, borderWidth: 3, pointRadius: 3
-            }
-        ]
-    },
-    options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } },
-        scales: {
-            y: { beginAtZero: true, ticks: { callback: v => '₱' + Number(v).toLocaleString() } },
-            x: { grid: { display: false } }
-        }
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } } },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true, grid: { color: '#e0e6dd' }, title: { display: true, text: 'Sales (PHP)' }, ticks: { callback: function (v) { return '₱' + Number(v).toLocaleString(); } } },
+                    y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Units' }, ticks: { precision: 0 } }
+                } }
+        });
     }
+}
+
+const TREND = __TREND__;
+new Chart(document.getElementById('trendChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels: TREND.labels, datasets: [{ label: 'Units delivered', data: TREND.data, backgroundColor: '#4b8b2a', borderRadius: 6, maxBarThickness: 36 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, grid: { color: '#e0e6dd' }, ticks: { precision: 0 } }, x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } } } }
 });
 </script>
-SCRIPTS);
+SCRIPTS;
+staff_page_end(str_replace(['__MS_DATA__', '__TREND__'], [$msChartJson, $trendJson], $scripts));

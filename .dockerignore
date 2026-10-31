@@ -1,0 +1,21 @@
+# Keep secrets, local-only tools and dev clutter out of the deployed site
+# (everything copied into the image is publicly served by Apache).
+.git
+.serena
+graphify-out
+reference
+claude
+
+TechPrime-AI/.env
+TechPrime-AI/vendor
+TechPrime-AI/graphify-out
+TechPrime-AI/CLIENT.zip
+TechPrime-AI/ml
+# ...except the Build a PC Random Forest, which includes/pc_recommend.php reads at runtime
+# (without it the picker shows no Recommended badges). Its .htaccess blocks direct downloads.
+!TechPrime-AI/ml/pc_recommend/models/forest.json
+!TechPrime-AI/ml/pc_recommend/models/.htaccess
+TechPrime-AI/scripts
+TechPrime-AI/database
+TechPrime-AI/*.csv
+TechPrime-AI/*.xlsx

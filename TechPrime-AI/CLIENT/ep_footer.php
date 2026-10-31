@@ -3,60 +3,64 @@
  * ep_footer.php — Shared EasyPC footer for all CLIENT pages.
  * Variables expected:
  *   $isLoggedIn  (bool)
+ *   $epShowPrimo (bool, set by ep_header.php) — adds the Primo chat widget
  */
 ?>
-    <button class="messages-float-btn ep-chat-float" onclick="location.href='messages.php'">
-        <i class="fas fa-comment-dots"></i>
-    </button>
-
-    <footer class="ep-footer full-width">
-        <div class="ep-newsletter-bar">
-            <div>
-                <h4>Join Our Newsletter</h4>
-                <p>Get the latest deals &amp; updates</p>
+    <?php $epFootLoggedIn = !empty($isLoggedIn); ?>
+    <footer class="ep-footer sf-footer full-width">
+        <div class="sf-wrap sf-footer-grid">
+            <div class="sf-footer-brand">
+                <a href="index.php" class="sf-footer-logo"><img src="../assets/logo.png" alt="EasyPC home" width="137" height="32" loading="lazy"></a>
+                <p class="sf-footer-tagline">Laptops, PC parts and accessories from EasyPC One Oasis in Rosario, Pasig City.</p>
+                <ul class="sf-footer-contact">
+                    <li><i class="fas fa-phone-alt" aria-hidden="true"></i><a href="tel:+639176255078">0917 625 5078</a></li>
+                    <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><a href="https://maps.app.goo.gl/ygnCyGTcDvdcJZxJ9" target="_blank" rel="noopener">One Oasis, Rosario, Pasig City<span class="sf-sr"> (opens Google Maps in a new tab)</span></a></li>
+                    <li><i class="fab fa-facebook-f" aria-hidden="true"></i><a href="https://www.facebook.com/EASYPCOneOasisPasigBranch" target="_blank" rel="noopener">EasyPC One Oasis on Facebook<span class="sf-sr"> (opens in a new tab)</span></a></li>
+                </ul>
             </div>
-            <form class="ep-newsletter-form" action="#" method="POST" onsubmit="return false;">
-                <input type="email" name="newsletter_email" placeholder="Enter your email" required>
-                <button type="submit">Subscribe</button>
-            </form>
+            <nav class="sf-footer-col" aria-label="Shop">
+                <h2 class="sf-footer-head">Shop</h2>
+                <ul>
+                    <li><a href="shop.php">All products</a></li>
+                    <li><a href="build_a_pc.php">Build a PC</a></li>
+                    <li><a href="cart.php">Cart</a></li>
+                    <li><a href="wishlist.php">Wishlist</a></li>
+                </ul>
+            </nav>
+            <nav class="sf-footer-col" aria-label="Account">
+                <h2 class="sf-footer-head">Account</h2>
+                <ul>
+                    <?php if ($epFootLoggedIn): ?>
+                        <li><a href="user_dashboard.php">My orders</a></li>
+                        <li><a href="saved_builds.php">Saved builds</a></li>
+                        <li><a href="notifications.php">Notifications</a></li>
+                        <li><a href="user_dashboard.php?settings=1">Settings</a></li>
+                    <?php else: ?>
+                        <li><a href="../login.php">Log in</a></li>
+                        <li><a href="../register.php">Create an account</a></li>
+                    <?php endif; ?>
+                </ul>
+            </nav>
+            <nav class="sf-footer-col" aria-label="Help">
+                <h2 class="sf-footer-head">Help</h2>
+                <ul>
+                    <li><a href="privacy_policy.php">Privacy policy</a></li>
+                    <li><a href="tel:+639176255078">Call the store</a></li>
+                </ul>
+            </nav>
         </div>
-        <div class="ep-footer-grid">
-            <div class="ep-footer-brand">
-                <div class="ep-footer-logo">
-                    <img src="../assets/logo.png" alt="EasyPC" class="ep-footer-logo-img">
-                </div>
-                <div class="ep-social-row">
-                    <a href="#" aria-label="X"><i class="fab fa-twitter"></i></a>
-                    <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
-                    <a href="#" aria-label="YouTube"><i class="fab fa-youtube"></i></a>
-                    <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
-                </div>
-            </div>
-            <div class="ep-footer-col">
-                <h5>Shop</h5>
-                <a href="category.php?type=Desktop">Desktop</a>
-                <a href="category.php?type=Laptops">Laptop</a>
-                <a href="category.php?type=Accessories">Accessories</a>
-                <a href="shop.php">Shop Now</a>
-            </div>
-            <div class="ep-footer-col">
-                <h5>Explore</h5>
-                <a href="index.php">Home</a>
-                <a href="cart.php">Cart</a>
-                <a href="user_dashboard.php">My Orders</a>
-                <a href="messages.php">EasyFix Support</a>
-            </div>
-            <div class="ep-footer-col">
-                <h5>Resources</h5>
-                <a href="privacy_policy.php">Privacy Policy</a>
-                <a href="<?php echo ($isLoggedIn ?? false) ? 'user_dashboard.php' : '../login.php'; ?>">My Account</a>
-                <a href="messages.php">Help Center</a>
-            </div>
+        <div class="sf-wrap sf-footer-bottom">
+            <span>&copy; 2026 EasyPC One Oasis. All rights reserved.</span>
+            <span class="sf-footer-pay"><i class="fas fa-money-bill-wave" aria-hidden="true"></i> Cash on delivery &middot; Online payment &middot; Prices include VAT</span>
         </div>
-        <div class="ep-footer-bottom">&copy; 2026 EASYPC One Oasis. All Rights Reserved.</div>
     </footer>
 
+<?php if (!empty($epShowPrimo)) include __DIR__ . '/primo.php'; ?>
+<?php if (empty($GLOBALS['ias_ui_alerts_loaded'])): $GLOBALS['ias_ui_alerts_loaded'] = true; // shared with ias_alert_footer() ?>
     <script src="../includes/ui_alerts.js"></script>
+<?php endif; ?>
+    <script src="ep_back.js"></script>
+    <script src="storefront.js?v=sf-1"></script>
     <script>
         // ── Nav dropdown toggle ────────────────────────────────────────────
         function epToggleDropdown(btn) {
@@ -71,12 +75,6 @@
             }
         });
 
-        // ── Carousel scroll helper ─────────────────────────────────────────
-        function epScroll(id, dir) {
-            const row = document.getElementById(id);
-            if (!row) return;
-            row.scrollBy({ left: dir * 320, behavior: 'smooth' });
-        }
     </script>
 <?php if (!empty($extraScripts)) echo $extraScripts; ?>
 </body>

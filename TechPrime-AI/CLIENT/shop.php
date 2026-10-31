@@ -3,41 +3,46 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../backend/config/database.php';
 require_once __DIR__ . '/../includes/client_helpers.php';
+require_once __DIR__ . '/../includes/client_shop_taxonomy.php';
 
 $db = getDbConnection();
 checkSessionTimeout();
+ep_ensure_session_wishlist($db);
+
+// Live search/filter requests (?partial=1) get only the product results as JSON.
+// Drop the flag from $_GET so ep_shop_url() pagination links don't carry it.
+$isPartial = ($_GET['partial'] ?? '') === '1';
+unset($_GET['partial']);
 
 $isLoggedIn = isset($_SESSION['user_id']);
 $activePage = 'shop';
-$pageTitle  = 'Shop';
-$searchQuery = '';
-$bodyClass  = 'ep-shop-page-body';
+$pageTitle  = 'Shop Now';
+$searchQuery = trim((string)($_GET['q'] ?? ''));
+$bodyClass  = '';
 
-/** Category header labels → existing DB category value(s) */
-$shopCategoryNav = [
-    'Desktop' => ['Desktop'],
-    'Laptops' => ['Laptops'],
-    'Audio' => ['Audio'],
-    'Printers and Scanners' => ['Printers and Scanners', 'Printer and Scanner'],
-    'Cooling' => ['Cooling'],
-    'Accessories' => ['Accessories'],
-    'Others' => ['Others'],
-];
-
+$taxonomy = ep_shop_taxonomy();
 $priceFloor = 0;
 $priceCeiling = 100000;
 
-$selectedCategory = isset($_GET['category']) ? trim((string) $_GET['category']) : '';
-if ($selectedCategory !== '' && !isset($shopCategoryNav[$selectedCategory])) {
-    $selectedCategory = '';
+$selectedParent = isset($_GET['cat']) ? trim((string)$_GET['cat']) : '';
+if ($selectedParent !== '' && !ep_shop_parent_valid($selectedParent)) {
+    $selectedParent = '';
 }
-$selectedCategoryValues = $selectedCategory !== '' ? $shopCategoryNav[$selectedCategory] : [];
+$selectedSub = isset($_GET['sub']) ? trim((string)$_GET['sub']) : '';
+if ($selectedParent === '' || !ep_shop_sub_valid($selectedParent, $selectedSub)) {
+    $selectedSub = '';
+}
+
+$selectedSection = isset($_GET['section']) ? trim((string)$_GET['section']) : '';
+$validSections = array_keys(ep_shop_special_sections());
+if ($selectedSection !== '' && !in_array($selectedSection, $validSections, true)) {
+    $selectedSection = '';
+}
 
 $selectedMinPrice = isset($_GET['price_min']) && $_GET['price_min'] !== ''
-    ? (float) $_GET['price_min'] : $priceFloor;
+    ? (float)$_GET['price_min'] : $priceFloor;
 $selectedMaxPrice = isset($_GET['price_max']) && $_GET['price_max'] !== ''
-    ? (float) $_GET['price_max'] : $priceCeiling;
-
+    ? (float)$_GET['price_max'] : $priceCeiling;
 if ($selectedMinPrice < $priceFloor) $selectedMinPrice = $priceFloor;
 if ($selectedMaxPrice > $priceCeiling) $selectedMaxPrice = $priceCeiling;
 if ($selectedMinPrice > $selectedMaxPrice) {
@@ -46,97 +51,214 @@ if ($selectedMinPrice > $selectedMaxPrice) {
     $selectedMaxPrice = $tmp;
 }
 
-$selectedRating = isset($_GET['rating']) && $_GET['rating'] !== ''
-    ? (int) $_GET['rating'] : 0;
+$selectedRating = isset($_GET['rating']) && $_GET['rating'] !== '' ? (int)$_GET['rating'] : 0;
 if ($selectedRating < 1 || $selectedRating > 5) {
     $selectedRating = 0;
 }
 
-$selectedBrand = isset($_GET['brand']) ? trim((string) $_GET['brand']) : '';
+$selectedBrand = isset($_GET['brand']) ? trim((string)$_GET['brand']) : '';
+$shopQuery = $searchQuery;
 
-$productResult = $db->query(
-    "SELECT p.*, u.name AS seller_name,
-            (SELECT AVG(r.rating) FROM reviews r WHERE r.product_id = p.id) AS avg_rating
+// Sort order for the product list; '' = newest first (the default, kept out of the URL).
+$sortOptions = [
+    ''           => 'Newest',
+    'price_asc'  => 'Price: Low to High',
+    'price_desc' => 'Price: High to Low',
+    'name_asc'   => 'Name: A to Z',
+    'name_desc'  => 'Name: Z to A',
+    'rating'     => 'Top rated',
+];
+$selectedSort = isset($_GET['sort']) ? trim((string)$_GET['sort']) : '';
+if (!isset($sortOptions[$selectedSort])) {
+    $selectedSort = '';
+}
+
+$perPage = 12;
+$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+
+$vis = ias_client_product_list_sql_condition('p');
+$allStmt = $db->query(
+    "SELECT p.id, p.name, p.price, p.stock, p.category, p.image, p.image_url, p.description, u.name AS seller_name
      FROM products p
      INNER JOIN users u ON p.seller_id = u.id
-     WHERE " . ias_client_product_list_sql_condition('p') . "
+     WHERE {$vis}
      ORDER BY p.id DESC"
 );
-$allProducts = ias_client_filter_products_for_display(
-    $productResult ? $productResult->fetch_all(MYSQLI_ASSOC) : []
-);
+$allProducts = ep_shop_attach_taxonomy($allStmt ? $allStmt->fetchAll(PDO::FETCH_ASSOC) : []);
 
-foreach ($allProducts as &$prod) {
-    $prod['brand'] = ias_client_product_brand($prod);
-    $prod['avg_rating'] = isset($prod['avg_rating']) && $prod['avg_rating'] !== null
-        ? (float) $prod['avg_rating'] : null;
+$ratings = [];
+if (($selectedRating > 0 || $selectedSort === 'rating') && !empty($allProducts)) {
+    try {
+        $ids = array_column($allProducts, 'id');
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $rst = $db->prepare("SELECT product_id, AVG(rating)::float AS avg_rating FROM reviews WHERE product_id IN ({$ph}) GROUP BY product_id");
+        $rst->execute($ids);
+        while ($row = $rst->fetch(PDO::FETCH_ASSOC)) {
+            $ratings[(int)$row['product_id']] = (float)$row['avg_rating'];
+        }
+    } catch (Throwable $e) {
+        $ratings = [];
+    }
 }
-unset($prod);
 
 $availableBrands = [];
 foreach ($allProducts as $p) {
-    if (($p['brand'] ?? '') !== '') {
+    if ($p['brand'] !== '') {
         $availableBrands[$p['brand']] = true;
     }
 }
 $availableBrands = array_keys($availableBrands);
 sort($availableBrands, SORT_STRING | SORT_FLAG_CASE);
-
-if ($selectedBrand !== '' && !in_array($selectedBrand, $availableBrands, true)) {
+if ($selectedBrand !== '' && !in_array($selectedBrand, $availableBrands, true)
+    && !in_array($selectedBrand, ['RAKK', 'EasyFix'], true)) {
     $selectedBrand = '';
 }
 
-$displayProducts = array_values(array_filter($allProducts, function ($p) use (
-    $selectedCategoryValues,
-    $selectedMinPrice,
-    $selectedMaxPrice,
-    $selectedRating,
-    $selectedBrand
-) {
-    if (!empty($selectedCategoryValues) && !in_array($p['category'] ?? '', $selectedCategoryValues, true)) {
-        return false;
+$filtered = [];
+foreach ($allProducts as $p) {
+    $pid = (int)$p['id'];
+    $p['avg_rating'] = $ratings[$pid] ?? null;
+
+    if ($selectedSection === 'power-stations' && empty($p['is_power_station'])) {
+        continue;
     }
-    $price = (float) ($p['price'] ?? 0);
-    if ($price < $selectedMinPrice || $price > $selectedMaxPrice) {
-        return false;
+    if ($selectedSection === 'desktop' && (($p['tax_sub'] ?? '') === 'ssd' || !ep_shop_matches_desktop_section($p))) {
+        continue;
     }
-    if ($selectedRating > 0) {
-        if ($p['avg_rating'] === null || (float) $p['avg_rating'] < $selectedRating) {
-            return false;
+    if ($selectedSection === 'laptop' && $p['tax_parent'] !== 'laptops-mobile') {
+        continue;
+    }
+    if ($selectedSection === 'rakk' && stripos((string)$p['name'], 'RAKK') === false) {
+        continue;
+    }
+    if ($selectedSection === 'easyfix' && stripos((string)$p['name'], 'EasyFix') === false
+        && stripos((string)$p['name'], 'Easy Fix') === false) {
+        continue;
+    }
+    if ($selectedSection === 'brands' && $selectedBrand === '') {
+        // Brand directory is handled separately; keep products for counts.
+    }
+
+    if ($selectedParent !== '') {
+        if ($selectedParent === 'desktop') {
+            if (($p['tax_sub'] ?? '') === 'ssd' || !ep_shop_matches_desktop_section($p)) {
+                continue;
+            }
+        } elseif ($p['tax_parent'] !== $selectedParent) {
+            continue;
         }
     }
-    if ($selectedBrand !== '' && ($p['brand'] ?? '') !== $selectedBrand) {
-        return false;
+    if ($selectedSub !== '' && $p['tax_sub'] !== $selectedSub) {
+        continue;
     }
-    return true;
-}));
+    $price = (float)$p['price'];
+    if ($price < $selectedMinPrice || $price > $selectedMaxPrice) {
+        continue;
+    }
+    if ($selectedRating > 0 && (float)($p['avg_rating'] ?? 0) < $selectedRating) {
+        continue;
+    }
+    if ($selectedBrand !== '' && strcasecmp((string)$p['brand'], $selectedBrand) !== 0) {
+        continue;
+    }
+    if ($shopQuery !== '') {
+        $hay = mb_strtolower($p['name'] . ' ' . $p['brand'] . ' ' . $p['tax_parent_label'] . ' ' . $p['tax_sub_label']);
+        if (!str_contains($hay, mb_strtolower($shopQuery))) {
+            continue;
+        }
+    }
+    $filtered[] = $p;
+}
 
-$resultCount = count($displayProducts);
-$filtersActive = $selectedCategory !== ''
+// $filtered is already newest first (ORDER BY p.id DESC); ties in the other orders fall back to that.
+if ($selectedSort !== '') {
+    usort($filtered, function (array $a, array $b) use ($selectedSort): int {
+        switch ($selectedSort) {
+            case 'price_asc':
+                $cmp = (float)$a['price'] <=> (float)$b['price'];
+                break;
+            case 'price_desc':
+                $cmp = (float)$b['price'] <=> (float)$a['price'];
+                break;
+            case 'name_asc':
+                $cmp = strnatcasecmp((string)$a['name'], (string)$b['name']);
+                break;
+            case 'name_desc':
+                $cmp = strnatcasecmp((string)$b['name'], (string)$a['name']);
+                break;
+            case 'rating':
+                // Unrated products go last.
+                $cmp = (float)($b['avg_rating'] ?? -1) <=> (float)($a['avg_rating'] ?? -1);
+                break;
+            default:
+                $cmp = 0;
+        }
+        return $cmp !== 0 ? $cmp : (int)$b['id'] <=> (int)$a['id'];
+    });
+}
+
+$brandCounts = [];
+foreach ($allProducts as $p) {
+    if ($p['brand'] === '') {
+        continue;
+    }
+    $brandCounts[$p['brand']] = ($brandCounts[$p['brand']] ?? 0) + 1;
+}
+ksort($brandCounts, SORT_STRING | SORT_FLAG_CASE);
+// Logos are only shown in the Brands directory; skip the per-file hashing elsewhere
+// so live search requests stay fast.
+$brandLogos = $selectedSection === 'brands' ? ep_shop_brand_logos($db) : [];
+$displayBrandLogos = [];
+$seenBrandLogos = [];
+foreach ($selectedSection === 'brands' ? $brandCounts : [] as $brandName => $_cnt) {
+    $brandImg = ep_shop_brand_logo_lookup($brandLogos, $brandName);
+    if ($brandImg === '') {
+        continue;
+    }
+    $rel = preg_replace('#^\.\./#', '', str_replace('\\', '/', $brandImg));
+    $abs = dirname(__DIR__) . '/' . $rel;
+    if (!is_file($abs) || !is_readable($abs)) {
+        continue;
+    }
+    $logoKey = hash_file('sha1', $abs) ?: strtolower($brandImg);
+    if (isset($seenBrandLogos[$logoKey])) {
+        continue;
+    }
+    $seenBrandLogos[$logoKey] = true;
+    $displayBrandLogos[] = ['name' => $brandName, 'img' => $brandImg];
+}
+
+$resultCount = count($filtered);
+$totalPages = max(1, (int)ceil($resultCount / $perPage));
+if ($page > $totalPages) {
+    $page = $totalPages;
+}
+$displayProducts = array_slice($filtered, ($page - 1) * $perPage, $perPage);
+
+$filtersActive = $selectedParent !== ''
+    || $selectedSub !== ''
+    || $selectedSection !== ''
     || $selectedBrand !== ''
     || $selectedRating > 0
+    || $shopQuery !== ''
     || $selectedMinPrice > $priceFloor
     || $selectedMaxPrice < $priceCeiling;
 
+$isBrandDirectory = $selectedSection === 'brands';
+
 $returnQuery = array_filter([
-    'category' => $selectedCategory !== '' ? $selectedCategory : null,
-    'price_min' => $selectedMinPrice > $priceFloor ? (string) (int) $selectedMinPrice : null,
-    'price_max' => $selectedMaxPrice < $priceCeiling ? (string) (int) $selectedMaxPrice : null,
-    'rating' => $selectedRating > 0 ? (string) $selectedRating : null,
+    'cat' => $selectedParent !== '' ? $selectedParent : null,
+    'sub' => $selectedSub !== '' ? $selectedSub : null,
+    'section' => $selectedSection !== '' ? $selectedSection : null,
+    'q' => $shopQuery !== '' ? $shopQuery : null,
+    'price_min' => $selectedMinPrice > $priceFloor ? (string)(int)$selectedMinPrice : null,
+    'price_max' => $selectedMaxPrice < $priceCeiling ? (string)(int)$selectedMaxPrice : null,
+    'rating' => $selectedRating > 0 ? (string)$selectedRating : null,
     'brand' => $selectedBrand !== '' ? $selectedBrand : null,
+    'sort' => $selectedSort !== '' ? $selectedSort : null,
+    'page' => $page > 1 ? (string)$page : null,
 ], fn($v) => $v !== null);
 $returnTo = 'shop.php' . ($returnQuery ? ('?' . http_build_query($returnQuery)) : '');
-
-function ep_shop_url(array $overrides = []): string
-{
-    $params = array_merge($_GET, $overrides);
-    foreach ($params as $k => $v) {
-        if ($v === null || $v === '' || $v === 0 || $v === '0') {
-            unset($params[$k]);
-        }
-    }
-    return 'shop.php' . ($params ? ('?' . http_build_query($params)) : '');
-}
 
 $minPct = ($priceCeiling > $priceFloor)
     ? (($selectedMinPrice - $priceFloor) / ($priceCeiling - $priceFloor)) * 100
@@ -144,133 +266,306 @@ $minPct = ($priceCeiling > $priceFloor)
 $maxPct = ($priceCeiling > $priceFloor)
     ? (($selectedMaxPrice - $priceFloor) / ($priceCeiling - $priceFloor)) * 100
     : 100;
+
+$parentCounts = [];
+$subCounts = [];
+foreach ($allProducts as $p) {
+    $parentCounts[$p['tax_parent']] = ($parentCounts[$p['tax_parent']] ?? 0) + 1;
+    if (!empty($p['is_display']) && $p['tax_parent'] !== 'desktop') {
+        $parentCounts['desktop'] = ($parentCounts['desktop'] ?? 0) + 1;
+    }
+    if ($p['tax_sub'] !== '') {
+        $subCounts[$p['tax_parent'] . ':' . $p['tax_sub']] = ($subCounts[$p['tax_parent'] . ':' . $p['tax_sub']] ?? 0) + 1;
+    }
+}
+
+require_once __DIR__ . '/../includes/storefront_components.php';
+$shopCsrf = generateCsrfToken();
+ob_start();
+?>
+                <?php if (!$isBrandDirectory && $resultCount > 0): ?>
+                    <div class="sf-results-bar">
+                        <p class="sf-results-count" role="status">
+                            Showing <strong class="sf-num"><?php echo number_format(($page - 1) * $perPage + 1); ?>&ndash;<?php echo number_format(($page - 1) * $perPage + count($displayProducts)); ?></strong>
+                            of <strong class="sf-num"><?php echo number_format($resultCount); ?></strong> product<?php echo $resultCount === 1 ? '' : 's'; ?>
+                        </p>
+                        <?php /* Plain GET form so sorting also works without JS; the live script intercepts the change. */ ?>
+                        <form class="ep-shop-sort" method="GET" action="shop.php">
+                            <?php foreach ($returnQuery as $k => $v):
+                                if ($k === 'sort' || $k === 'page') continue; ?>
+                                <input type="hidden" name="<?php echo h($k); ?>" value="<?php echo h($v); ?>">
+                            <?php endforeach; ?>
+                            <label for="epShopSort">Sort by</label>
+                            <select id="epShopSort" class="ep-shop-select" name="sort">
+                                <?php foreach ($sortOptions as $sortKey => $sortLabel): ?>
+                                    <option value="<?php echo h($sortKey); ?>"<?php echo $selectedSort === $sortKey ? ' selected' : ''; ?>><?php echo h($sortLabel); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <noscript><button type="submit" class="sf-btn sf-btn-outline">Sort</button></noscript>
+                        </form>
+                    </div>
+                <?php endif; ?>
+                <?php if (!empty($displayProducts) && !$isBrandDirectory): ?>
+                    <ul class="sf-grid ep-shop-grid">
+                        <?php foreach ($displayProducts as $p): ?>
+                            <li><?php echo sf_product_card($p, $returnTo, $shopCsrf, [
+                                'cat' => $p['tax_parent_label'] . ($p['tax_sub_label'] !== '' ? ' · ' . $p['tax_sub_label'] : ''),
+                                'wish' => true,
+                                'rating' => $p['avg_rating'],
+                            ]); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+
+                    <?php echo sf_pagination($page, $totalPages, fn($n) => ep_shop_url(['page' => $n])); ?>
+                <?php elseif (!$isBrandDirectory): ?>
+                    <?php echo sf_empty_state('fa-box-open', 'No products match your filters',
+                        'Try another category, brand or search, or reset the filters to see the full catalog.',
+                        '<a href="shop.php" class="sf-btn sf-btn-primary" data-shop-reset>Reset filters</a>'); ?>
+                <?php endif; ?>
+<?php
+$productsHtml = ob_get_clean();
+
+if ($isPartial) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode(['ok' => true, 'html' => $productsHtml, 'count' => $resultCount, 'url' => $returnTo], JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
 ?>
 <?php include __DIR__ . '/ep_header.php'; ?>
 
-<nav class="ep-shop-cat-nav" aria-label="Shop categories">
-    <div class="ep-shop-cat-nav-inner">
-        <?php foreach ($shopCategoryNav as $label => $_vals): ?>
-            <a href="<?php echo h(ep_shop_url(['category' => $label])); ?>"
-               class="ep-shop-cat-btn<?php echo $selectedCategory === $label ? ' active' : ''; ?>"
-               <?php echo $selectedCategory === $label ? 'aria-current="page"' : ''; ?>>
-                <?php echo h($label); ?>
-            </a>
-        <?php endforeach; ?>
-    </div>
-</nav>
-
-<main class="ep-main">
-    <div class="ep-page-inner ep-shop-page">
-
-        <div class="ep-shop-header">
-            <div>
-                <p class="ep-shop-kicker">EasyPC Store</p>
-                <h2 class="ep-page-title">Shop</h2>
-                <p class="ep-shop-subtitle">Browse real products from EasyPC inventory and refine by price, rating, or brand.</p>
-            </div>
-            <p class="ep-shop-count" aria-live="polite">
-                <?php echo (int) $resultCount; ?> product<?php echo $resultCount === 1 ? '' : 's'; ?>
-                <?php if ($filtersActive): ?> found<?php endif; ?>
-            </p>
-        </div>
-
-        <div class="ep-shop-layout">
-            <section class="ep-shop-products" aria-label="Products">
-                <?php if (!empty($displayProducts)): ?>
-                    <div class="ep-products-grid ep-shop-grid">
-                        <?php foreach ($displayProducts as $p): ?>
-                            <div class="ep-product-card ep-grid-card">
-                                <div class="ep-shop-card-media">
-                                    <img src="<?php echo h(ias_client_product_image_url($p)); ?>"
-                                         class="ep-product-img" alt="<?php echo h($p['name']); ?>">
-                                </div>
-                                <div class="ep-shop-card-body">
-                                    <div class="ep-product-name"><?php echo h($p['name']); ?></div>
-                                    <div class="ep-product-cat"><?php echo h($p['category'] ?: 'Uncategorized'); ?></div>
-                                    <?php if ($p['avg_rating'] !== null): ?>
-                                        <div class="ep-shop-card-rating" title="<?php echo number_format($p['avg_rating'], 1); ?> / 5">
-                                            <?php
-                                            $rounded = (int) round($p['avg_rating']);
-                                            for ($i = 1; $i <= 5; $i++):
-                                            ?>
-                                                <i class="<?php echo $i <= $rounded ? 'fas' : 'far'; ?> fa-star" aria-hidden="true"></i>
-                                            <?php endfor; ?>
-                                        </div>
+<?php
+$epShopSpecials = ep_shop_special_sections();
+// No visible page header on the shop (the toolbar starts the page); the h1 stays for screen readers
+// and follows the current scope: section, category (+ type), search, or the whole catalog.
+$shopTitle = 'All products';
+if ($selectedSection !== '' && isset($epShopSpecials[$selectedSection])) {
+    $shopTitle = $epShopSpecials[$selectedSection]['label'];
+} elseif ($selectedParent !== '' && isset($taxonomy[$selectedParent])) {
+    $shopTitle = $taxonomy[$selectedParent]['label'];
+    if ($selectedSub !== '' && isset($taxonomy[$selectedParent]['subs'][$selectedSub])) {
+        $shopTitle = $taxonomy[$selectedParent]['subs'][$selectedSub];
+    }
+}
+if ($shopQuery !== '' && $selectedSection === '' && $selectedParent === '') {
+    $shopTitle = 'Results for “' . $shopQuery . '”';
+}
+?>
+<main class="ep-main sf-main" id="main">
+    <h1 class="sf-sr" id="sfPageTitle"><?php echo h($shopTitle); ?></h1>
+    <div class="sf-wrap sf-body">
+    <div class="sf-shop-toolbar">
+    <nav class="ep-shop-cat-nav" aria-label="Shop categories">
+        <div class="ep-shop-cat-nav-inner">
+            <div class="ep-mega-wrap" id="epMegaWrap">
+                <button type="button" class="ep-shop-cat-btn ep-mega-trigger<?php echo ($selectedParent !== '' && $selectedSection === '') ? ' active' : ''; ?>"
+                        id="epMegaBtn" aria-haspopup="true" aria-expanded="false" aria-controls="epMegaMenu">
+                    <i class="fas fa-th-large" aria-hidden="true"></i>
+                    <span>Products</span>
+                    <i class="fas fa-chevron-down ep-mega-caret" aria-hidden="true"></i>
+                </button>
+                <div class="ep-mega-menu" id="epMegaMenu" hidden>
+                    <?php
+                    $megaDefault = ($selectedParent !== '' && isset($taxonomy[$selectedParent]))
+                        ? $selectedParent
+                        : array_key_first($taxonomy);
+                    ?>
+                    <ul class="ep-mega-cats" role="tablist" aria-label="Product categories">
+                        <?php foreach ($taxonomy as $parentSlug => $parent):
+                            $hasSubs = !empty($parent['subs']);
+                            $isOn = $parentSlug === $megaDefault;
+                            ?>
+                            <li>
+                                <button type="button"
+                                        class="ep-mega-cat<?php echo $isOn ? ' active' : ''; ?>"
+                                        id="epMegaTab-<?php echo h($parentSlug); ?>"
+                                        role="tab"
+                                        aria-selected="<?php echo $isOn ? 'true' : 'false'; ?>"
+                                        aria-controls="epMegaPanel-<?php echo h($parentSlug); ?>"
+                                        data-mega-cat="<?php echo h($parentSlug); ?>">
+                                    <span><?php echo h($parent['label']); ?></span>
+                                    <?php if ($hasSubs): ?>
+                                        <i class="fas fa-chevron-right" aria-hidden="true"></i>
                                     <?php endif; ?>
-                                    <div class="ep-product-price">₱<?php echo number_format((float) $p['price'], 2); ?></div>
-                                    <div class="ep-card-actions">
-                                        <form method="POST" action="products.php" class="ep-buy-form">
-                                            <input type="hidden" name="product_id" value="<?php echo (int) $p['id']; ?>">
-                                            <input type="hidden" name="return_to" value="<?php echo h($returnTo); ?>">
-                                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                                            <button type="submit" name="add_to_cart" value="1" class="ep-cart-icon" title="Add to cart"><i class="fas fa-shopping-cart"></i></button>
-                                            <button type="submit" name="buy_now" value="1" class="ep-buy-btn">BUY NOW</button>
-                                        </form>
-                                    </div>
-                                </div>
+                                </button>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <div class="ep-mega-panels">
+                        <?php foreach ($taxonomy as $parentSlug => $parent):
+                            $isOn = $parentSlug === $megaDefault;
+                            ?>
+                            <div class="ep-mega-panel<?php echo $isOn ? ' active' : ''; ?>"
+                                 id="epMegaPanel-<?php echo h($parentSlug); ?>"
+                                 role="tabpanel"
+                                 aria-labelledby="epMegaTab-<?php echo h($parentSlug); ?>"
+                                 <?php echo $isOn ? '' : 'hidden'; ?>>
+                                <h3 class="ep-mega-panel-title"><?php echo h($parent['label']); ?></h3>
+                                <?php if (!empty($parent['subs'])): ?>
+                                    <ul class="ep-mega-subs">
+                                        <?php foreach ($parent['subs'] as $subSlug => $subLabel): ?>
+                                            <li>
+                                                <a href="<?php echo h(ep_shop_url(['cat' => $parentSlug, 'sub' => $subSlug, 'section' => null, 'brand' => null])); ?>">
+                                                    <?php echo h($subLabel); ?>
+                                                </a>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php else: ?>
+                                    <a class="ep-mega-viewall" href="<?php echo h(ep_shop_url(['cat' => $parentSlug, 'sub' => null, 'section' => null, 'brand' => null])); ?>">
+                                        View all <?php echo h($parent['label']); ?>
+                                    </a>
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
-                <?php else: ?>
-                    <div class="ep-empty-state ep-shop-empty">
-                        <i class="fas fa-box-open" aria-hidden="true"></i>
-                        <h3>No products match your filters</h3>
-                        <p>Try adjusting the category, price, rating, or brand, or reset filters to see all products.</p>
-                        <a href="shop.php" class="ep-btn ep-btn-primary">Reset Filters</a>
-                    </div>
-                <?php endif; ?>
-            </section>
+                </div>
+            </div>
+            <?php foreach ($epShopSpecials as $secSlug => $sec):
+                $secActive = $selectedSection === $secSlug;
+                ?>
+                <a class="ep-shop-cat-btn<?php echo $secActive ? ' active' : ''; ?>"
+                   href="shop.php?section=<?php echo h(rawurlencode($secSlug)); ?>">
+                    <i class="fas <?php echo h($sec['icon']); ?>" aria-hidden="true"></i>
+                    <span><?php echo h($sec['label']); ?></span>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    </nav>
+        <form class="ep-shop-searchbar" id="epShopSearchForm" method="GET" action="shop.php" role="search">
+            <?php if ($selectedParent !== ''): ?><input type="hidden" name="cat" value="<?php echo h($selectedParent); ?>"><?php endif; ?>
+            <?php if ($selectedSub !== ''): ?><input type="hidden" name="sub" value="<?php echo h($selectedSub); ?>"><?php endif; ?>
+            <?php if ($selectedSection !== ''): ?><input type="hidden" name="section" value="<?php echo h($selectedSection); ?>"><?php endif; ?>
+            <label class="sr-only" for="epShopSearch">Search this catalog</label>
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input id="epShopSearch" type="search" name="q" value="<?php echo h($shopQuery); ?>" autocomplete="off"
+                   placeholder="Search products, brands, or categories...">
+            <button type="submit" class="sf-btn sf-btn-primary">Search</button>
+        </form>
+    </div>
+    </div>
 
+    <div class="sf-wrap sf-body ep-shop-page">
+
+
+        <?php if ($selectedSection === 'brands'): ?>
+            <section class="ep-shop-brands" aria-label="Brands">
+                <div class="ep-shop-brand-grid">
+                    <?php foreach ($displayBrandLogos as $brandRow):
+                        $brandName = $brandRow['name'];
+                        $brandImg = $brandRow['img'];
+                        ?>
+                        <div class="ep-shop-brand-tile">
+                            <span class="ep-shop-brand-logo<?php echo (stripos($brandImg, 'ortizan') !== false) ? ' is-light-logo' : ''; ?>">
+                                <img src="<?php echo h($brandImg); ?>" alt="<?php echo h($brandName); ?>" loading="lazy" decoding="async">
+                            </span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+        <?php endif; ?>
+
+        <?php if (!$isBrandDirectory): ?>
+        <div class="ep-shop-layout">
             <aside class="ep-shop-sidebar" aria-label="Product filters">
                 <form method="GET" action="shop.php" class="ep-shop-filter-card" id="epShopFilters">
-                    <?php if ($selectedCategory !== ''): ?>
-                        <input type="hidden" name="category" value="<?php echo h($selectedCategory); ?>">
+                    <?php if ($selectedSub !== ''): ?>
+                        <input type="hidden" name="sub" value="<?php echo h($selectedSub); ?>">
+                    <?php endif; ?>
+                    <?php if ($selectedSection !== ''): ?>
+                        <input type="hidden" name="section" value="<?php echo h($selectedSection); ?>">
+                    <?php endif; ?>
+                    <?php if ($shopQuery !== ''): ?>
+                        <input type="hidden" name="q" value="<?php echo h($shopQuery); ?>">
                     <?php endif; ?>
 
                     <div class="ep-shop-filter-head">
                         <h3><i class="fas fa-sliders-h" aria-hidden="true"></i> Filters</h3>
-                        <p>Refine by price, rating, and brand.</p>
+                        <p>Refine by category, price, rating, and brand.</p>
+                    </div>
+
+                    <div class="ep-shop-filter-group">
+                        <label for="epShopCatSelect">Product Categories</label>
+                        <select id="epShopCatSelect" class="ep-shop-select" name="cat" aria-label="Product Categories">
+                            <option value="" data-href="shop.php"<?php echo $selectedParent === '' ? ' selected' : ''; ?>>All products</option>
+                            <?php foreach ($taxonomy as $slug => $info): ?>
+                                <option value="<?php echo h($slug); ?>"
+                                        data-href="<?php echo h(ep_shop_url(['cat' => $slug, 'sub' => null, 'section' => null])); ?>"
+                                        <?php echo $selectedParent === $slug ? ' selected' : ''; ?>>
+                                    <?php echo h($info['label']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
 
                     <div class="ep-shop-filter-group">
                         <label>Price Range</label>
                         <div class="ep-shop-price-current" id="epShopPriceLabel">
-                            ₱<?php echo number_format((int) $selectedMinPrice); ?> — ₱<?php echo number_format((int) $selectedMaxPrice); ?>
+                            ₱<?php echo number_format((int)$selectedMinPrice); ?> — ₱<?php echo number_format((int)$selectedMaxPrice); ?>
                         </div>
-
                         <div class="ep-shop-slider"
                              style="--ep-min-pct: <?php echo h(number_format($minPct, 2, '.', '')); ?>%; --ep-max-pct: <?php echo h(number_format($maxPct, 2, '.', '')); ?>%;">
                             <div class="ep-shop-slider-track" aria-hidden="true"></div>
                             <div class="ep-shop-slider-range" id="epShopSliderRange" aria-hidden="true"></div>
                             <input type="range" id="epShopRangeMin"
-                                   min="<?php echo (int) $priceFloor; ?>"
-                                   max="<?php echo (int) $priceCeiling; ?>"
+                                   min="<?php echo (int)$priceFloor; ?>"
+                                   max="<?php echo (int)$priceCeiling; ?>"
                                    step="500"
-                                   value="<?php echo (int) $selectedMinPrice; ?>"
+                                   value="<?php echo (int)$selectedMinPrice; ?>"
                                    aria-label="Minimum price">
                             <input type="range" id="epShopRangeMax"
-                                   min="<?php echo (int) $priceFloor; ?>"
-                                   max="<?php echo (int) $priceCeiling; ?>"
+                                   min="<?php echo (int)$priceFloor; ?>"
+                                   max="<?php echo (int)$priceCeiling; ?>"
                                    step="500"
-                                   value="<?php echo (int) $selectedMaxPrice; ?>"
+                                   value="<?php echo (int)$selectedMaxPrice; ?>"
                                    aria-label="Maximum price">
                         </div>
-
                         <div class="ep-shop-price-bounds">
                             <span>₱0</span>
                             <span>₱100,000</span>
                         </div>
+                        <?php /* Typed prices for exact filtering; the slider moves in ₱500 steps. Unnamed: the hidden fields below are what gets sent. */ ?>
+                        <div class="ep-shop-price-inputs">
+                            <div class="ep-shop-price-field">
+                                <span aria-hidden="true">Min ₱</span>
+                                <input type="number" id="epShopPriceMinBox" inputmode="numeric"
+                                       min="<?php echo (int)$priceFloor; ?>" max="<?php echo (int)$priceCeiling; ?>" step="1"
+                                       value="<?php echo (int)$selectedMinPrice; ?>" aria-label="Minimum price in pesos">
+                            </div>
+                            <span class="ep-shop-price-dash" aria-hidden="true">–</span>
+                            <div class="ep-shop-price-field">
+                                <span aria-hidden="true">Max ₱</span>
+                                <input type="number" id="epShopPriceMaxBox" inputmode="numeric"
+                                       min="<?php echo (int)$priceFloor; ?>" max="<?php echo (int)$priceCeiling; ?>" step="1"
+                                       value="<?php echo (int)$selectedMaxPrice; ?>" aria-label="Maximum price in pesos">
+                            </div>
+                        </div>
+                        <input type="hidden" name="price_min" id="epShopPriceMin" value="<?php echo (int)$selectedMinPrice; ?>">
+                        <input type="hidden" name="price_max" id="epShopPriceMax" value="<?php echo (int)$selectedMaxPrice; ?>">
+                    </div>
 
-                        <input type="hidden" name="price_min" id="epShopPriceMin" value="<?php echo (int) $selectedMinPrice; ?>">
-                        <input type="hidden" name="price_max" id="epShopPriceMax" value="<?php echo (int) $selectedMaxPrice; ?>">
+                    <div class="ep-shop-filter-group">
+                        <label>Brand</label>
+                        <div class="ep-shop-brand-list" role="radiogroup" aria-label="Brand">
+                            <label class="ep-shop-brand-option<?php echo $selectedBrand === '' ? ' active' : ''; ?>">
+                                <input type="radio" name="brand" value="" <?php echo $selectedBrand === '' ? 'checked' : ''; ?>>
+                                <span>All Brands</span>
+                            </label>
+                            <?php foreach ($availableBrands as $brand): ?>
+                                <label class="ep-shop-brand-option<?php echo $selectedBrand === $brand ? ' active' : ''; ?>">
+                                    <input type="radio" name="brand" value="<?php echo h($brand); ?>"
+                                           <?php echo $selectedBrand === $brand ? 'checked' : ''; ?>>
+                                    <span><?php echo h($brand); ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
 
                     <div class="ep-shop-filter-group">
                         <label>Rating</label>
                         <div class="ep-shop-rating-list" role="radiogroup" aria-label="Minimum rating">
                             <label class="ep-shop-rating-option<?php echo $selectedRating === 0 ? ' active' : ''; ?>">
-                                <input type="radio" name="rating" value=""
-                                       <?php echo $selectedRating === 0 ? 'checked' : ''; ?>>
+                                <input type="radio" name="rating" value="" <?php echo $selectedRating === 0 ? 'checked' : ''; ?>>
                                 <span class="ep-shop-rating-text">Any rating</span>
                             </label>
                             <?php for ($stars = 5; $stars >= 1; $stars--): ?>
@@ -282,44 +577,24 @@ $maxPct = ($priceCeiling > $priceFloor)
                                             <i class="<?php echo $i <= $stars ? 'fas' : 'far'; ?> fa-star"></i>
                                         <?php endfor; ?>
                                     </span>
-                                    <span class="ep-shop-rating-text">
-                                        <?php echo $stars; ?> Star<?php echo $stars === 1 ? '' : 's'; ?>+
-                                    </span>
+                                    <span class="ep-shop-rating-text"><?php echo $stars; ?> Star<?php echo $stars === 1 ? '' : 's'; ?>+</span>
                                 </label>
                             <?php endfor; ?>
                         </div>
                     </div>
 
-                    <div class="ep-shop-filter-group">
-                        <label>Brand</label>
-                        <div class="ep-shop-brand-list" role="radiogroup" aria-label="Brand">
-                            <label class="ep-shop-brand-option<?php echo $selectedBrand === '' ? ' active' : ''; ?>">
-                                <input type="radio" name="brand" value=""
-                                       <?php echo $selectedBrand === '' ? 'checked' : ''; ?>>
-                                <span>All Brands</span>
-                            </label>
-                            <?php if (!empty($availableBrands)): ?>
-                                <?php foreach ($availableBrands as $brand): ?>
-                                    <label class="ep-shop-brand-option<?php echo $selectedBrand === $brand ? ' active' : ''; ?>">
-                                        <input type="radio" name="brand" value="<?php echo h($brand); ?>"
-                                               <?php echo $selectedBrand === $brand ? 'checked' : ''; ?>>
-                                        <span><?php echo h($brand); ?></span>
-                                    </label>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <p class="ep-shop-filter-hint">No brands available from current products.</p>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
                     <div class="ep-shop-filter-actions">
-                        <button type="submit" class="ep-btn ep-btn-primary ep-shop-apply">Apply Filters</button>
-                        <a href="shop.php" class="ep-btn ep-shop-reset">Reset Filters</a>
+                        <a href="shop.php" class="ep-btn ep-shop-reset" data-shop-reset>Reset filters</a>
+                        <button type="submit" class="ep-btn ep-btn-primary ep-shop-apply">Apply filters</button>
                     </div>
                 </form>
             </aside>
-        </div>
 
+            <section class="ep-shop-products" id="epShopResults" aria-label="Products">
+                <?php echo $productsHtml; ?>
+            </section>
+        </div>
+        <?php endif; ?>
     </div>
 </main>
 
@@ -329,25 +604,27 @@ $extraScripts = <<<'SCRIPTS'
 (function () {
     var form = document.getElementById('epShopFilters');
     if (!form) return;
-
     var minInput = document.getElementById('epShopPriceMin');
     var maxInput = document.getElementById('epShopPriceMax');
     var minRange = document.getElementById('epShopRangeMin');
     var maxRange = document.getElementById('epShopRangeMax');
     var label = document.getElementById('epShopPriceLabel');
     var slider = form.querySelector('.ep-shop-slider');
+    var minBox = document.getElementById('epShopPriceMinBox');
+    var maxBox = document.getElementById('epShopPriceMaxBox');
     var floor = 0;
     var ceiling = 100000;
-
-    function formatPeso(n) {
-        return '₱' + Number(n).toLocaleString('en-PH');
-    }
-
-    function updateUI() {
-        var minVal = Number(minRange.value);
-        var maxVal = Number(maxRange.value);
+    function formatPeso(n) { return '₱' + Number(n).toLocaleString('en-PH'); }
+    // The hidden fields hold the exact price; the sliders only snap to ₱500 steps.
+    function updateUI(minVal, maxVal) {
+        if (minVal === undefined) {
+            minVal = Number(minRange.value);
+            maxVal = Number(maxRange.value);
+        }
         minInput.value = minVal;
         maxInput.value = maxVal;
+        if (minBox && document.activeElement !== minBox) minBox.value = minVal;
+        if (maxBox && document.activeElement !== maxBox) maxBox.value = maxVal;
         if (label) label.textContent = formatPeso(minVal) + ' — ' + formatPeso(maxVal);
         if (slider) {
             var span = ceiling - floor;
@@ -357,7 +634,6 @@ $extraScripts = <<<'SCRIPTS'
             slider.style.setProperty('--ep-max-pct', maxPct + '%');
         }
     }
-
     function syncFromRanges(changed) {
         var minVal = Number(minRange.value);
         var maxVal = Number(maxRange.value);
@@ -365,10 +641,299 @@ $extraScripts = <<<'SCRIPTS'
         if (changed === 'max' && maxVal < minVal) maxRange.value = minVal;
         updateUI();
     }
+    minRange.addEventListener('input', function () { syncFromRanges('min'); scheduleLoad(300); });
+    maxRange.addEventListener('input', function () { syncFromRanges('max'); scheduleLoad(300); });
 
-    minRange.addEventListener('input', function () { syncFromRanges('min'); });
-    maxRange.addEventListener('input', function () { syncFromRanges('max'); });
-    updateUI();
+    function readBox(box, fallback) {
+        var raw = String(box.value).trim();
+        if (raw === '') return fallback;
+        var n = Math.round(Number(raw));
+        if (!isFinite(n)) return fallback;
+        return Math.min(ceiling, Math.max(floor, n));
+    }
+    // Typed prices: clamp to ₱0–₱100,000, swap if Min > Max, then move the sliders to match.
+    function syncFromBoxes() {
+        if (!minBox || !maxBox) return;
+        var minVal = readBox(minBox, floor);
+        var maxVal = readBox(maxBox, ceiling);
+        if (minVal > maxVal) { var t = minVal; minVal = maxVal; maxVal = t; }
+        minRange.value = minVal;
+        maxRange.value = maxVal;
+        updateUI(minVal, maxVal);
+    }
+    var boxTimer = null;
+    [minBox, maxBox].forEach(function (box) {
+        if (!box) return;
+        box.addEventListener('input', function () {
+            // Wait until the shopper pauses typing before filtering.
+            if (boxTimer) clearTimeout(boxTimer);
+            boxTimer = setTimeout(function () {
+                boxTimer = null;
+                syncFromBoxes();
+                load(buildParams());
+            }, 700);
+        });
+        box.addEventListener('change', function () {
+            if (boxTimer) { clearTimeout(boxTimer); boxTimer = null; }
+            syncFromBoxes();
+            minBox.value = minInput.value;
+            maxBox.value = maxInput.value;
+            load(buildParams());
+        });
+    });
+    updateUI(Number(minInput.value), Number(maxInput.value));
+
+    /* ---- Live results: refresh the product grid without reloading the page ---- */
+    var results = document.getElementById('epShopResults');
+    var searchForm = document.getElementById('epShopSearchForm');
+    var searchInput = document.getElementById('epShopSearch');
+    var catSelect = document.getElementById('epShopCatSelect');
+    var timer = null;
+    var controller = null;
+    var requestSeq = 0;
+    var lastQs = currentQs();
+    // Kept here, not read from the select: the select lives in the swapped results HTML and is
+    // missing when nothing matches, and the sort should survive that.
+    var currentSort = new URLSearchParams(window.location.search).get('sort') || '';
+
+    form.classList.add('is-live');
+
+    function currentQs() {
+        var p = new URLSearchParams(window.location.search);
+        p.delete('partial');
+        return p.toString();
+    }
+
+    function buildParams() {
+        var p = new URLSearchParams();
+        new FormData(form).forEach(function (v, k) {
+            if (k === 'q') return;
+            v = String(v).trim();
+            if (v !== '') p.set(k, v);
+        });
+        if (p.get('price_min') === String(floor)) p.delete('price_min');
+        if (p.get('price_max') === String(ceiling)) p.delete('price_max');
+        var q = searchInput ? searchInput.value.trim() : '';
+        if (q !== '') p.set('q', q);
+        if (currentSort !== '') p.set('sort', currentSort);
+        // Keep the same key order as the server-built URLs.
+        var ordered = new URLSearchParams();
+        ['cat', 'sub', 'section', 'q', 'price_min', 'price_max', 'rating', 'brand', 'sort', 'page'].forEach(function (k) {
+            if (p.has(k)) ordered.set(k, p.get(k));
+        });
+        return ordered;
+    }
+
+    function load(params, opts) {
+        opts = opts || {};
+        var qs = params.toString();
+        if (qs === lastQs && !opts.force) return;
+        lastQs = qs;
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (controller) controller.abort();
+        controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var seq = ++requestSeq;
+        var pageUrl = 'shop.php' + (qs ? '?' + qs : '');
+
+        results.classList.add('is-loading');
+        results.setAttribute('aria-busy', 'true');
+
+        fetch('shop.php?' + (qs ? qs + '&' : '') + 'partial=1', {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+            signal: controller ? controller.signal : undefined
+        }).then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        }).then(function (data) {
+            if (seq !== requestSeq) return;
+            if (!data || !data.ok) throw new Error('Bad response');
+            results.innerHTML = data.html;
+            if (opts.push) {
+                history.pushState({ epShop: true }, '', pageUrl);
+            } else {
+                history.replaceState({ epShop: true }, '', pageUrl);
+            }
+            if (opts.scroll) {
+                var hdrH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ep-header-h'), 10) || 116;
+                var top = results.getBoundingClientRect().top + window.pageYOffset - hdrH - 16;
+                if (window.pageYOffset > top) window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+            }
+        }).catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+            if (seq !== requestSeq) return;
+            // Session expired or network hiccup: fall back to a normal page load.
+            window.location.href = pageUrl;
+        }).then(function () {
+            if (seq !== requestSeq) return;
+            results.classList.remove('is-loading');
+            results.removeAttribute('aria-busy');
+        });
+    }
+
+    function scheduleLoad(delay) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () {
+            timer = null;
+            load(buildParams());
+        }, delay);
+    }
+
+    function syncActiveOptions(groupSelector, optionSelector) {
+        form.querySelectorAll(groupSelector + ' ' + optionSelector).forEach(function (lbl) {
+            var input = lbl.querySelector('input');
+            lbl.classList.toggle('active', !!(input && input.checked));
+        });
+    }
+
+    // Changing the category (or resetting) leaves the current subcategory / special section.
+    function clearScope() {
+        form.querySelectorAll('input[type="hidden"][name="sub"], input[type="hidden"][name="section"]').forEach(function (el) {
+            el.parentNode.removeChild(el);
+        });
+        var cat = catSelect ? catSelect.value : '';
+        document.querySelectorAll('.ep-shop-cat-nav .ep-shop-cat-btn').forEach(function (btn) {
+            btn.classList.toggle('active', btn.id === 'epMegaBtn' && cat !== '');
+        });
+    }
+
+    if (catSelect) {
+        catSelect.addEventListener('change', function () {
+            clearScope();
+            load(buildParams(), { push: true });
+        });
+    }
+
+    form.addEventListener('change', function (e) {
+        var t = e.target;
+        if (!t || t.type !== 'radio') return;
+        syncActiveOptions('.ep-shop-brand-list', '.ep-shop-brand-option');
+        syncActiveOptions('.ep-shop-rating-list', '.ep-shop-rating-option');
+        load(buildParams(), { push: true });
+    });
+
+    // Sort select (inside the live results): re-sort from page 1.
+    results.addEventListener('change', function (e) {
+        var t = e.target;
+        if (!t || t.id !== 'epShopSort') return;
+        currentSort = t.value;
+        load(buildParams(), { push: true });
+    });
+    results.addEventListener('submit', function (e) {
+        if (e.target && e.target.classList.contains('ep-shop-sort')) e.preventDefault();
+    });
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (boxTimer) { clearTimeout(boxTimer); boxTimer = null; }
+        if (minBox && (document.activeElement === minBox || document.activeElement === maxBox)) syncFromBoxes();
+        load(buildParams(), { force: true });
+    });
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function () { scheduleLoad(300); });
+    }
+    if (searchForm) {
+        searchForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            load(buildParams());
+        });
+    }
+
+    function resetFilters() {
+        if (catSelect) catSelect.value = '';
+        clearScope();
+        form.querySelectorAll('input[type="radio"][value=""]').forEach(function (r) { r.checked = true; });
+        syncActiveOptions('.ep-shop-brand-list', '.ep-shop-brand-option');
+        syncActiveOptions('.ep-shop-rating-list', '.ep-shop-rating-option');
+        minRange.value = floor;
+        maxRange.value = ceiling;
+        updateUI();
+        if (searchInput) searchInput.value = '';
+        load(buildParams(), { push: true, scroll: true });
+    }
+
+    document.addEventListener('click', function (e) {
+        var reset = e.target.closest('[data-shop-reset]');
+        if (reset && (form.contains(reset) || results.contains(reset))) {
+            e.preventDefault();
+            resetFilters();
+            return;
+        }
+        var pageLink = e.target.closest('.ep-pagination a.ep-page-link');
+        if (pageLink && results.contains(pageLink)) {
+            e.preventDefault();
+            if (pageLink.classList.contains('disabled') || pageLink.classList.contains('active')) return;
+            var url = new URL(pageLink.href, window.location.href);
+            load(new URLSearchParams(url.search), { push: true, scroll: true });
+        }
+    });
+
+    // Back/forward between live states: reload so the filter controls match the URL.
+    window.addEventListener('popstate', function () {
+        if (currentQs() !== lastQs) window.location.reload();
+    });
+})();
+
+(function () {
+    var megaWrap = document.getElementById('epMegaWrap');
+    var megaBtn = document.getElementById('epMegaBtn');
+    var megaMenu = document.getElementById('epMegaMenu');
+    if (!megaWrap || !megaBtn || !megaMenu) return;
+
+    function isOpen() {
+        return !megaMenu.hidden;
+    }
+    function inMega(el) {
+        return !!(el && (megaWrap.contains(el) || megaMenu.contains(el)));
+    }
+    function closeMega() {
+        megaMenu.hidden = true;
+        megaWrap.classList.remove('open');
+        megaBtn.setAttribute('aria-expanded', 'false');
+    }
+    function openMega() {
+        megaMenu.hidden = false;
+        megaWrap.classList.add('open');
+        megaBtn.setAttribute('aria-expanded', 'true');
+    }
+    function showPanel(slug) {
+        if (!slug) return;
+        megaMenu.querySelectorAll('.ep-mega-cat').forEach(function (btn) {
+            var on = btn.getAttribute('data-mega-cat') === slug;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        megaMenu.querySelectorAll('.ep-mega-panel').forEach(function (panel) {
+            var on = panel.id === 'epMegaPanel-' + slug;
+            panel.classList.toggle('active', on);
+            panel.hidden = !on;
+        });
+    }
+
+    megaBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isOpen()) closeMega(); else openMega();
+    });
+
+    megaMenu.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var tab = e.target.closest('[data-mega-cat]');
+        if (!tab) return;
+        e.preventDefault();
+        showPanel(tab.getAttribute('data-mega-cat'));
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!isOpen()) return;
+        if (inMega(e.target)) return;
+        closeMega();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeMega();
+    });
 })();
 </script>
 SCRIPTS;
